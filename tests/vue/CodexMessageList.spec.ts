@@ -11,6 +11,12 @@ const messages: SurfaceMessage[] = [{
   status: 'complete',
   parts: [{ type: 'text', text: 'Build a surface' }],
 }];
+const incomingMessage: SurfaceMessage = {
+  id: 'assistant-1',
+  role: 'assistant',
+  status: 'complete',
+  parts: [{ type: 'text', text: 'Surface built' }],
+};
 
 describe('CodexMessageList', () => {
   it('renders default messages and an empty state', async () => {
@@ -39,13 +45,21 @@ describe('CodexMessageList', () => {
       clientHeight: { configurable: true, value: 100 },
       scrollHeight: { configurable: true, value: 400 },
     });
+    await nextTick();
     list.scrollTop = 100;
     await wrapper.get('.codex-message-list').trigger('scroll');
     expect(wrapper.emitted('stickinessChange')).toContainEqual([false]);
 
+    await wrapper.setProps({
+      messages: [...messages, incomingMessage],
+    });
+    await nextTick();
+    expect(list.scrollTop).toBe(100);
+    expect(wrapper.emitted('stickinessChange')).toStrictEqual([[false]]);
+
     (wrapper.vm as unknown as { scrollToBottom(): void }).scrollToBottom();
     await nextTick();
     expect(list.scrollTop).toBe(400);
-    expect(wrapper.emitted('stickinessChange')).toContainEqual([true]);
+    expect(wrapper.emitted('stickinessChange')).toStrictEqual([[false], [true]]);
   });
 });

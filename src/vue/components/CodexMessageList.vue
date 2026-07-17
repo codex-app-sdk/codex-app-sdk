@@ -35,19 +35,14 @@ const emit = defineEmits<{
 
 const element = ref<HTMLElement | null>(null);
 const stickToBottom = ref(true);
-const previousMessages = ref<readonly Message[] | null>(props.messages);
-const previousMessageCount = ref(props.messages.length);
 
 onMounted(async () => {
   await nextTick();
   scrollToBottom();
 });
 
-watch(() => props.messages, async (messages) => {
-  const forceScroll = messages !== previousMessages.value || messages.length > previousMessageCount.value;
-  const shouldScroll = forceScroll || stickToBottom.value;
-  previousMessages.value = messages;
-  previousMessageCount.value = messages.length;
+watch(() => props.messages, async () => {
+  const shouldScroll = stickToBottom.value;
   await nextTick();
   if (shouldScroll) {
     scrollToBottom();

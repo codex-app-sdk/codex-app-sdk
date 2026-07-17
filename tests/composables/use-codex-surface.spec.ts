@@ -17,13 +17,26 @@ describe('useCodexSurface', () => {
     await nextTick();
     expect(surface.state.busy).toBe(true);
 
-    await surface.createConversation({ permissionMode: 'workspace-write' });
+    const conversationOptions = {
+      approvalMode: 'ask' as const,
+      cwd: '/tmp/sdk-project',
+      model: 'gpt-5',
+      permissionMode: 'workspace-write' as const,
+    };
+    await surface.createConversation(conversationOptions);
     await surface.selectConversation('thread-1');
-    await surface.sendMessage('Hello');
+    await surface.sendMessage('Hello', { model: 'gpt-5-mini' });
     await surface.interrupt();
     await surface.refreshConversations();
-    await surface.resolveApproval('approval-1', 'deny');
-    expect(api.sendMessage).toHaveBeenCalledWith('Hello', undefined);
+    await surface.resolveApproval('approval-1', 'approve', 'session');
+
+    expect(api.onStateChange).toHaveBeenCalledOnce();
+    expect(api.createConversation).toHaveBeenCalledWith(conversationOptions);
+    expect(api.selectConversation).toHaveBeenCalledWith('thread-1');
+    expect(api.sendMessage).toHaveBeenCalledWith('Hello', { model: 'gpt-5-mini' });
+    expect(api.interrupt).toHaveBeenCalledWith();
+    expect(api.refreshConversations).toHaveBeenCalledWith();
+    expect(api.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     scope.stop();
     expect(unsubscribe).toHaveBeenCalledOnce();
   });

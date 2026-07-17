@@ -22,6 +22,7 @@ describe('Codex surface Electron bridge', () => {
     const main = new FakeMainPort();
     const sender = { send: vi.fn() };
     let stateListener: ((value: CodexSurfaceSnapshot) => void) | undefined;
+    const unsubscribeState = vi.fn();
     const surface = {
       connect: vi.fn(async () => snapshot),
       createConversation: vi.fn(async () => snapshot),
@@ -33,18 +34,47 @@ describe('Codex surface Electron bridge', () => {
       sendMessage: vi.fn(async () => snapshot),
       onStateChange: vi.fn((listener: (value: CodexSurfaceSnapshot) => void) => {
         stateListener = listener;
-        return vi.fn();
+        return unsubscribeState;
       }),
     };
 
     const dispose = registerCodexSurfaceIpc(main, sender, surface);
+    expect([...main.handlers.keys()].sort()).toStrictEqual([
+      'codex-surface:connect',
+      'codex-surface:create-conversation',
+      'codex-surface:get-snapshot',
+      'codex-surface:interrupt',
+      'codex-surface:refresh-conversations',
+      'codex-surface:resolve-approval',
+      'codex-surface:select-conversation',
+      'codex-surface:send-message',
+    ]);
+    await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:create-conversation', {
+      approvalMode: 'ask',
+      permissionMode: 'workspace-write',
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:get-snapshot')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:interrupt')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:refresh-conversations')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:resolve-approval', 'approval-1', 'approve', 'session')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:select-conversation', 'thread-1')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:send-message', 'Hello', { model: 'gpt-5' })).resolves.toBe(snapshot);
     stateListener?.(snapshot);
+    expect(surface.connect).toHaveBeenCalledOnce();
+    expect(surface.createConversation).toHaveBeenCalledWith({
+      approvalMode: 'ask',
+      permissionMode: 'workspace-write',
+    });
+    expect(surface.getSnapshot).toHaveBeenCalledOnce();
+    expect(surface.interrupt).toHaveBeenCalledOnce();
+    expect(surface.refreshConversations).toHaveBeenCalledOnce();
+    expect(surface.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     expect(surface.selectConversation).toHaveBeenCalledWith('thread-1');
     expect(surface.sendMessage).toHaveBeenCalledWith('Hello', { model: 'gpt-5' });
     expect(sender.send).toHaveBeenCalledWith('codex-surface:state-changed', snapshot);
     dispose();
+    expect(unsubscribeState).toHaveBeenCalledOnce();
     expect(main.handlers.size).toBe(0);
   });
 
@@ -59,22 +89,24 @@ describe('Codex surface Electron bridge', () => {
     await api.refreshConversations();
     await api.resolveApproval('approval-1', 'approve', 'once');
     await api.selectConversation('thread-2');
-    await api.sendMessage('Build it');
+    await api.sendMessage('Build it', { model: 'gpt-5' });
     await api.interrupt();
     await api.getSnapshot();
     renderer.emit('codex-surface:state-changed', snapshot);
     unsubscribe();
+    renderer.emit('codex-surface:state-changed', { ...snapshot, busy: true });
 
-    expect(renderer.invoke.mock.calls.map(([channel]) => channel)).toStrictEqual([
-      'codex-surface:connect',
-      'codex-surface:create-conversation',
-      'codex-surface:refresh-conversations',
-      'codex-surface:resolve-approval',
-      'codex-surface:select-conversation',
-      'codex-surface:send-message',
-      'codex-surface:interrupt',
-      'codex-surface:get-snapshot',
+    expect(renderer.invoke.mock.calls).toStrictEqual([
+      ['codex-surface:connect'],
+      ['codex-surface:create-conversation', { permissionMode: 'workspace-write' }],
+      ['codex-surface:refresh-conversations'],
+      ['codex-surface:resolve-approval', 'approval-1', 'approve', 'once'],
+      ['codex-surface:select-conversation', 'thread-2'],
+      ['codex-surface:send-message', 'Build it', { model: 'gpt-5' }],
+      ['codex-surface:interrupt'],
+      ['codex-surface:get-snapshot'],
     ]);
+    expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(snapshot);
   });
 });
