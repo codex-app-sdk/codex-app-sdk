@@ -2,6 +2,7 @@ export {
   connectIpcEventsToBus,
   registerIpcMainHandlers,
   sendIpcEvent,
+  TypedIpcMain,
   TypedIpcRenderer,
   type IpcEventSender,
   type IpcMainHandlers,
@@ -11,4 +12,3 @@ export {
   type IpcRequestArguments,
   type IpcRequestResult,
 } from './typed-ipc';
-

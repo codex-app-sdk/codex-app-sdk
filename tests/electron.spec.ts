@@ -4,6 +4,7 @@ import {
   connectIpcEventsToBus,
   registerIpcMainHandlers,
   sendIpcEvent,
+  TypedIpcMain,
   TypedIpcRenderer,
   type IpcMainPort,
   type IpcRendererPort,
@@ -86,6 +87,16 @@ describe('typed Electron IPC', () => {
     expect(port.handlers.size).toBe(0);
   });
 
+  it('registers and removes individual typed main handlers', async () => {
+    const port = new FakeMainPort();
+    const main = new TypedIpcMain<Requests>(port);
+    main.handle('conversation:load', async (_event, conversationId) => ({ title: `Conversation ${conversationId}` }));
+
+    await expect(port.handlers.get('conversation:load')?.({}, '7')).resolves.toStrictEqual({ title: 'Conversation 7' });
+    main.removeHandler('conversation:load');
+    expect(port.handlers.size).toBe(0);
+  });
+
   it('sends typed events and relays renderer events into a bus', () => {
     const sender = { send: vi.fn() };
     sendIpcEvent<Events, 'turn:completed'>(sender, 'turn:completed', { turnId: 'turn-1' });
@@ -106,4 +117,3 @@ describe('typed Electron IPC', () => {
     expect(listener).toHaveBeenCalledWith({ messageId: 'message-1', delta: 'Hello' });
   });
 });
-

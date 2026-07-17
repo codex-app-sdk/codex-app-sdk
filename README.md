@@ -1,8 +1,8 @@
 # codex-app-sdk
 
 `codex-app-sdk` is a reusable foundation for building native Codex surfaces.
-It packages the seams that a product should share without importing Codex
-Claw's teams, persistence, loops, Git workflows, or product state.
+It packages reusable protocol, transport, event, IPC, and presentation seams
+without importing any host application's domain model or product state.
 
 The SDK is being built around four public layers:
 
@@ -74,7 +74,7 @@ generated methods, params, results, notifications, and request responders.
 ## Events and Electron IPC
 
 `TypedEventBus` provides app-owned event contracts without coupling state to a
-framework. `TypedIpcRenderer`, `registerIpcMainHandlers`, and `sendIpcEvent`
+framework. `TypedIpcRenderer`, `TypedIpcMain`, `registerIpcMainHandlers`, and `sendIpcEvent`
 apply the same contracts across Electron's security boundary using narrow
 structural ports—`codex-app-sdk` never exposes Electron or Node primitives to
 the renderer.
@@ -103,4 +103,4 @@ import 'codex-app-sdk/styles.css';
 message-list slots let products replace text, tool, status, and full-message
 rendering while retaining tested layout and auto-scroll behavior. Components
 use `--codex-*` semantic CSS variables with neutral fallbacks and do not depend
-on Element Plus, Electron, Codex Claw stores, or raw app-server types.
+on Element Plus, Electron, application stores, or raw app-server types.

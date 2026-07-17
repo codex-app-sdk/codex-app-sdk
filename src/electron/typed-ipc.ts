@@ -55,20 +55,45 @@ export type IpcMainHandlers<Requests extends object> = {
   ) => IpcRequestResult<Requests[Name]> | Promise<IpcRequestResult<Requests[Name]>>;
 };
 
+export class TypedIpcMain<Requests extends object> {
+  private readonly registeredChannels = new Set<RequestName<Requests>>();
+
+  constructor(private readonly port: IpcMainPort) {}
+
+  handle<Name extends RequestName<Requests>>(
+    channel: Name,
+    handler: IpcMainHandlers<Pick<Requests, Name>>[Name],
+  ): void {
+    this.port.handle(channel, (event, ...args) => handler(
+      event,
+      ...args as IpcRequestArguments<Requests[Name]>,
+    ));
+    this.registeredChannels.add(channel);
+  }
+
+  removeHandler<Name extends RequestName<Requests>>(channel: Name): void {
+    this.port.removeHandler(channel);
+    this.registeredChannels.delete(channel);
+  }
+
+  dispose(): void {
+    for (const channel of this.registeredChannels) {
+      this.port.removeHandler(channel);
+    }
+    this.registeredChannels.clear();
+  }
+}
+
 export function registerIpcMainHandlers<Requests extends object>(
   port: IpcMainPort,
   handlers: IpcMainHandlers<Requests>,
 ): () => void {
+  const main = new TypedIpcMain<Requests>(port);
   const channels = Object.keys(handlers) as Array<RequestName<Requests>>;
   for (const channel of channels) {
-    const handler = handlers[channel];
-    port.handle(channel, (event, ...args) => handler(event, ...args as IpcRequestArguments<Requests[typeof channel]>));
+    main.handle(channel, handlers[channel]);
   }
-  return () => {
-    for (const channel of channels) {
-      port.removeHandler(channel);
-    }
-  };
+  return () => main.dispose();
 }
 
 export function sendIpcEvent<Events extends object, Name extends EventName<Events>>(
@@ -91,4 +116,3 @@ export function connectIpcEventsToBus<Events extends object>(
     }
   };
 }
-
