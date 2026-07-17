@@ -8,7 +8,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const generatedDir = join(root, 'src', 'codex', 'generated');
 const tempDir = mkdtempSync(join(tmpdir(), 'codex-app-sdk-schema-'));
 
-const responseOverrides = {
+// Most generated FooParams types pair with FooResponse. These are the protocol's
+// response type naming exceptions; they do not override values or runtime behavior.
+const responseTypeNameExceptions = {
   'account/logout': 'LogoutAccountResponse',
   'account/rateLimits/read': 'GetAccountRateLimitsResponse',
   'account/usage/read': 'GetAccountTokenUsageResponse',
@@ -35,7 +37,7 @@ try {
     generatedDir,
     sourceFile: join(generatedDir, 'ClientRequest.ts'),
     responseByName,
-    responseOverrides,
+    responseTypeNameExceptions,
     exportedName: 'CodexAppServerMethodMap',
   });
   writeFileSync(join(root, 'src', 'codex', 'method-map.ts'), methodMap);
@@ -44,7 +46,7 @@ try {
     generatedDir,
     sourceFile: join(generatedDir, 'ServerRequest.ts'),
     responseByName,
-    responseOverrides: {},
+    responseTypeNameExceptions: {},
     exportedName: 'CodexServerRequestMethodMap',
   });
   writeFileSync(join(root, 'src', 'codex', 'server-request-map.ts'), serverRequestMap);
@@ -60,7 +62,7 @@ try {
   rmSync(tempDir, { force: true, recursive: true });
 }
 
-function createMethodMap({ generatedDir, sourceFile, responseByName, responseOverrides, exportedName }) {
+function createMethodMap({ generatedDir, sourceFile, responseByName, responseTypeNameExceptions, exportedName }) {
   const source = readFileSync(sourceFile, 'utf8');
   const importPaths = parseImportPaths(source);
   const methods = [];
@@ -73,7 +75,7 @@ function createMethodMap({ generatedDir, sourceFile, responseByName, responseOve
       .split('|')
       .map((value) => value.trim())
       .filter((value) => value !== 'null' && value !== 'undefined');
-    const responseName = responseOverrides[method]
+    const responseName = responseTypeNameExceptions[method]
       ?? paramsTypes
         .map((name) => name.endsWith('Params') ? `${name.slice(0, -'Params'.length)}Response` : '')
         .find((name) => responseByName.has(name))

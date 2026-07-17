@@ -22,8 +22,11 @@ npm run schema:generate
 ```
 
 The generator records the source CLI version and creates method maps that pair
-every generated request's parameter and response types. Applications consume
-those maps through the typed client instead of assembling JSON-RPC envelopes.
+every generated request's parameter and response types. A small explicit table
+handles protocol response-type naming exceptions where `FooParams` does not
+pair with `FooResponse`; it does not override runtime responses. Applications
+consume those maps through the typed client instead of assembling JSON-RPC
+envelopes.
 
 ## Development
 
@@ -92,7 +95,8 @@ consume surface-owned messages and state, not raw app-server notifications.
 ## Vue surfaces
 
 The Vue entry includes `CodexComposer`, `CodexComposerMenu`,
-`CodexComposerSendButton`, `CodexMessage`, and `CodexMessageList`:
+`CodexComposerMenuList`, `CodexComposerSendButton`, `CodexMessage`, and
+`CodexMessageList`:
 
 ```ts
 import { CodexComposer, CodexMessageList } from 'codex-app-sdk/vue';
@@ -109,3 +113,7 @@ message-list slots let products replace text, tool, status, and full-message
 rendering while retaining tested layout and auto-scroll behavior. Components
 use `--codex-*` semantic CSS variables with neutral fallbacks and do not depend
 on Element Plus, Electron, application stores, or raw app-server types.
+
+Every public Vue component has one same-named isolated spec. A package-boundary
+test compares the component and test manifests so catch-all component suites
+cannot replace that one-to-one structure.
