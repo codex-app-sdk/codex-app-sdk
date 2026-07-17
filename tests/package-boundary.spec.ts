@@ -22,6 +22,18 @@ describe('package boundary', () => {
 
     expect(violations).toStrictEqual([]);
   });
+
+  it('mirrors every public Vue component with one isolated test file', async () => {
+    const componentNames = (await readdir(path.join(packageRoot, 'src/vue/components')))
+      .filter((name) => name.endsWith('.vue'))
+      .map((name) => name.replace(/\.vue$/, '.spec.ts'))
+      .sort();
+    const testNames = (await readdir(path.join(packageRoot, 'tests/vue')))
+      .filter((name) => name.endsWith('.spec.ts'))
+      .sort();
+
+    expect(testNames).toStrictEqual(componentNames);
+  });
 });
 
 async function sourceFiles(directory: string): Promise<string[]> {
