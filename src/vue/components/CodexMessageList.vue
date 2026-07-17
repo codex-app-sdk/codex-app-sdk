@@ -108,6 +108,8 @@ defineExpose({ scrollToBottom });
   gap: var(--codex-message-list-gap, 12px);
   width: min(100%, var(--codex-message-list-content-width, 900px));
   margin: 0 auto;
+  padding: var(--codex-message-list-content-padding, 0);
+  box-sizing: border-box;
 }
 
 .codex-message-list__empty {
@@ -116,4 +118,3 @@ defineExpose({ scrollToBottom });
   text-align: center;
 }
 </style>
-
