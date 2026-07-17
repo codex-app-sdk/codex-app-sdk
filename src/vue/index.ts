@@ -1,4 +1,5 @@
 export { default as CodexComposer } from './components/CodexComposer.vue';
+export { default as CodexConversationPane } from './components/CodexConversationPane.vue';
 export { default as CodexComposerMenu } from './components/CodexComposerMenu.vue';
 export { default as CodexComposerMenuList } from './components/CodexComposerMenuList.vue';
 export { default as CodexComposerSendButton } from './components/CodexComposerSendButton.vue';
@@ -21,3 +22,4 @@ export type {
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,
 } from './types';
+export { useCodexSurface } from './use-codex-surface';

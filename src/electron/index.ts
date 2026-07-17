@@ -12,3 +12,8 @@ export {
   type IpcRequestArguments,
   type IpcRequestResult,
 } from './typed-ipc';
+export {
+  createCodexSurfaceRendererApi,
+  registerCodexSurfaceIpc,
+  type CodexSurfaceRendererApi,
+} from './codex-surface-ipc';
