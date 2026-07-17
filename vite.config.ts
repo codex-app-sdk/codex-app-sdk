@@ -9,6 +9,8 @@ export default defineConfig({
       entry: {
         index: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
         codex: fileURLToPath(new URL('./src/codex/index.ts', import.meta.url)),
+        electron: fileURLToPath(new URL('./src/electron/index.ts', import.meta.url)),
+        events: fileURLToPath(new URL('./src/events/index.ts', import.meta.url)),
         node: fileURLToPath(new URL('./src/node/index.ts', import.meta.url)),
       },
       formats: ['es'],

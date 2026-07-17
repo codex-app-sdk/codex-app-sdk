@@ -70,3 +70,21 @@ client.onServerRequest('item/tool/requestUserInput', (request, responder) => {
 
 The transport and wire envelopes are replaceable. Surface code only sees
 generated methods, params, results, notifications, and request responders.
+
+## Events and Electron IPC
+
+`TypedEventBus` provides app-owned event contracts without coupling state to a
+framework. `TypedIpcRenderer`, `registerIpcMainHandlers`, and `sendIpcEvent`
+apply the same contracts across Electron's security boundary using narrow
+structural ports—`codex-app-sdk` never exposes Electron or Node primitives to
+the renderer.
+
+A typical desktop pipeline is:
+
+```text
+Codex notification -> product adapter -> TypedEventBus -> Electron IPC
+  -> renderer event bus/store -> Vue components
+```
+
+Protocol-specific payloads should be adapted before they cross IPC. Components
+consume surface-owned messages and state, not raw app-server notifications.

@@ -21,6 +21,14 @@
       "types": "./dist/codex/index.d.ts",
       "import": "./dist/codex.js"
     },
+    "./electron": {
+      "types": "./dist/electron/index.d.ts",
+      "import": "./dist/electron.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "import": "./dist/events.js"
+    },
     "./node": {
       "types": "./dist/node/index.d.ts",
       "import": "./dist/node.js"
