@@ -131,8 +131,9 @@ describe('CodexComposerMenu', () => {
   ];
 
   it('renders contributed entries and emits the selected typed item', async () => {
-    const wrapper = mount(CodexComposerMenu, { props: { items } });
+    const wrapper = mount(CodexComposerMenu, { props: { items, menuClass: 'host-menu' } });
     await wrapper.get('.codex-composer-menu__trigger').trigger('click');
+    expect(wrapper.get('[role="menu"]').classes()).toContain('host-menu');
     expect(wrapper.text()).toContain('Run custom tool');
     expect(wrapper.text()).toContain('Provided by the host application');
     expect(wrapper.text()).toContain('Ask first');

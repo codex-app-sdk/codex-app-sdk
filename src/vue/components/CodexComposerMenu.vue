@@ -18,6 +18,7 @@
     <CodexComposerMenuList
       v-if="menuOpen"
       class="codex-composer-menu__list"
+      :class="menuClass"
       :aria-label="ariaLabel"
       :items="items"
       @select="selectItem"
@@ -38,11 +39,13 @@ const props = withDefaults(defineProps<{
   buttonLabel?: string;
   disabled?: boolean;
   items: readonly CodexComposerMenuItem<Payload>[];
+  menuClass?: string;
   open?: boolean;
 }>(), {
   ariaLabel: 'Composer actions',
   buttonLabel: 'Open composer actions',
   disabled: false,
+  menuClass: undefined,
   open: undefined,
 });
 
