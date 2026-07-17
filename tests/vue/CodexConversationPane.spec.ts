@@ -99,10 +99,10 @@ describe('CodexConversationPane', () => {
         'after-composer': '<div class="footer-slot">Footer slot</div>',
       },
     });
-    expect(wrapper.get('.approval-slot').exists()).toBe(true);
-    expect(wrapper.get('.message-slot').exists()).toBe(true);
-    expect(wrapper.get('.input-slot').exists()).toBe(true);
-    expect(wrapper.get('.after-slot').exists()).toBe(true);
-    expect(wrapper.get('.footer-slot').exists()).toBe(true);
+    expect(wrapper.get('.approval-slot').text()).toBe('Approval slot');
+    expect(wrapper.get('.message-slot').text()).toBe('Message slot');
+    expect(wrapper.get('.input-slot').text()).toBe('Input slot');
+    expect(wrapper.get('.after-slot').text()).toBe('After slot');
+    expect(wrapper.get('.footer-slot').text()).toBe('Footer slot');
   });
 });
