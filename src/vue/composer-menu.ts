@@ -1,11 +1,9 @@
-import type { Component } from 'vue';
-
 export type CodexComposerMenuItemBase<Payload = unknown> = {
   id: string;
   label: string;
   description?: string;
   disabled?: boolean;
-  icon?: Component;
+  icon?: unknown;
   payload?: Payload;
   value?: string;
 };

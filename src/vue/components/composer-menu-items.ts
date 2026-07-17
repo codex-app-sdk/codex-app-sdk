@@ -1,4 +1,4 @@
-import { defineComponent, h, type PropType, type Slots, type VNode } from 'vue';
+import { defineComponent, h, type Component, type PropType, type Slots, type VNode } from 'vue';
 import type {
   CodexComposerMenuItem,
   CodexComposerMenuItemBase,
@@ -115,7 +115,7 @@ function renderContent(item: CodexComposerMenuItemBase<unknown>, slots: Slots): 
 
   const customIcon = slots.icon?.({ item });
   const icon = customIcon?.length ? customIcon : (item.icon
-    ? [h(item.icon, { class: 'codex-composer-menu-list__icon', 'aria-hidden': 'true' })]
+    ? [h(item.icon as Component, { class: 'codex-composer-menu-list__icon', 'aria-hidden': 'true' })]
     : [h('span', {
       class: 'codex-composer-menu-list__icon codex-composer-menu-list__icon--empty',
       'aria-hidden': 'true',
