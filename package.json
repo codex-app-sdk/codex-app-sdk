@@ -1,0 +1,53 @@
+{
+  "name": "codex-app-sdk",
+  "version": "0.1.0",
+  "description": "Typed Codex app-server communication, Electron event bridges, and Vue surface components.",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./codex": {
+      "types": "./dist/codex/index.d.ts",
+      "import": "./dist/codex.js"
+    }
+  },
+  "scripts": {
+    "schema:generate": "node scripts/generate-codex-schema.mjs",
+    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "npm run typecheck",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepare": "npm run build"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^29.0.0",
+    "typescript": "^6.0.0",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.0",
+    "vue": "^3.5.0",
+    "vue-tsc": "^3.3.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
+
