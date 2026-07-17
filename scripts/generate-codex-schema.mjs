@@ -17,9 +17,6 @@ const responseOverrides = {
   'config/mcpServer/reload': 'McpServerRefreshResponse',
   'config/value/write': 'ConfigWriteResponse',
   'externalAgentConfig/import/readHistories': 'ExternalAgentConfigImportHistoriesReadResponse',
-  'memory/reset': 'MemoryResetResponse',
-  'remoteControl/status/read': 'RemoteControlStatusReadResponse',
-  'windowsSandbox/readiness': 'WindowsSandboxReadinessResponse',
 };
 
 try {
@@ -146,4 +143,3 @@ function normalizeImportPath(path) {
   const normalized = path.split(sep).join('/');
   return normalized.startsWith('.') ? normalized : `./${normalized}`;
 }
-

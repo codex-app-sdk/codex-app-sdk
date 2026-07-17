@@ -20,6 +20,10 @@
     "./codex": {
       "types": "./dist/codex/index.d.ts",
       "import": "./dist/codex.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node.js"
     }
   },
   "scripts": {
@@ -50,4 +54,3 @@
     "node": ">=22"
   }
 }
-

@@ -38,3 +38,35 @@ npm run build
 The package targets Node 22 or newer and Vue 3.5. Vue is a peer dependency so
 applications keep ownership of their renderer runtime.
 
+## Typed app-server client
+
+The client performs request correlation, timeouts, notifications, and
+server-initiated request responses while preserving generated method types:
+
+```ts
+import { CodexAppServerClient } from 'codex-app-sdk/codex';
+import { CodexAppServerStdioTransport } from 'codex-app-sdk/node';
+
+const client = new CodexAppServerClient(new CodexAppServerStdioTransport());
+await client.start();
+await client.initialize({
+  clientInfo: { name: 'my_surface', title: 'My Surface', version: '0.1.0' },
+  capabilities: { experimentalApi: true, requestAttestation: false },
+});
+
+const { thread } = await client.request('thread/start', {
+  cwd: process.cwd(),
+});
+
+client.onNotification('item/agentMessage/delta', ({ params }) => {
+  console.log(params.delta);
+});
+
+client.onServerRequest('item/tool/requestUserInput', (request, responder) => {
+  responder.resolve({ answers: {} });
+  return true;
+});
+```
+
+The transport and wire envelopes are replaceable. Surface code only sees
+generated methods, params, results, notifications, and request responders.
