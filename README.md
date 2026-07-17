@@ -91,13 +91,18 @@ consume surface-owned messages and state, not raw app-server notifications.
 
 ## Vue surfaces
 
-The Vue entry includes `CodexComposer`, `CodexComposerSendButton`,
-`CodexMessage`, and `CodexMessageList`:
+The Vue entry includes `CodexComposer`, `CodexComposerMenu`,
+`CodexComposerSendButton`, `CodexMessage`, and `CodexMessageList`:
 
 ```ts
 import { CodexComposer, CodexMessageList } from 'codex-app-sdk/vue';
 import 'codex-app-sdk/styles.css';
 ```
+
+`CodexComposerMenu` accepts nested action, checkbox, radio, separator, submenu,
+and custom entries. Typed payloads let a host application contribute its own
+actions, while scoped `trigger`, `item`, and `icon` slots can replace the
+default presentation without forking menu behavior.
 
 `CodexMessage` renders the SDK's safe `SurfaceMessage` contract. Message and
 message-list slots let products replace text, tool, status, and full-message

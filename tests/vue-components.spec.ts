@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
-import { nextTick } from 'vue';
+import { h, nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CodexComposer,
+  CodexComposerMenu,
   CodexComposerSendButton,
   CodexMessage,
   CodexMessageList,
+  type CodexComposerMenuItem,
   type SurfaceMessage,
 } from '../src/vue';
 
@@ -95,6 +97,100 @@ describe('CodexComposerSendButton', () => {
 
     await wrapper.setProps({ busy: true });
     expect(wrapper.find('.codex-composer-send-button__spinner').exists()).toBe(true);
+  });
+});
+
+describe('CodexComposerMenu', () => {
+  const items: CodexComposerMenuItem<{ source: string }>[] = [
+    {
+      id: 'custom-tool',
+      type: 'custom',
+      label: 'Run custom tool',
+      description: 'Provided by the host application',
+      payload: { source: 'plugin' },
+    },
+    {
+      id: 'plan-mode',
+      type: 'checkbox',
+      label: 'Plan mode',
+      checked: false,
+      payload: { source: 'built-in' },
+    },
+    {
+      id: 'approval',
+      type: 'submenu',
+      label: 'Approval',
+      items: [{
+        id: 'approval:user',
+        type: 'radio',
+        label: 'Ask first',
+        checked: true,
+        payload: { source: 'built-in' },
+      }],
+    },
+  ];
+
+  it('renders contributed entries and emits the selected typed item', async () => {
+    const wrapper = mount(CodexComposerMenu, { props: { items } });
+    await wrapper.get('.codex-composer-menu__trigger').trigger('click');
+    expect(wrapper.text()).toContain('Run custom tool');
+    expect(wrapper.text()).toContain('Provided by the host application');
+    expect(wrapper.text()).toContain('Ask first');
+
+    const customAction = wrapper.findAll('button').find((button) => button.text().includes('Run custom tool'))!;
+    await customAction.trigger('click');
+
+    expect(wrapper.emitted('select')?.[0]).toStrictEqual([items[0]]);
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+  });
+
+  it('keeps checkbox menus open and supports scoped trigger and item slots', async () => {
+    const wrapper = mount(CodexComposerMenu, {
+      props: { items },
+      slots: {
+        trigger: ({ toggle }: { toggle: (event?: Event) => void }) => (
+          h('button', { class: 'custom-trigger', onClick: toggle }, 'More')
+        ),
+        item: ({ item }: { item: { label: string } }) => h('span', { class: 'custom-item' }, `Custom ${item.label}`),
+      },
+    });
+    await wrapper.get('.custom-trigger').trigger('click');
+    const planMode = wrapper.findAll('button').find((button) => button.text().includes('Custom Plan mode'))!;
+    await planMode.trigger('click');
+
+    expect(wrapper.emitted('select')?.[0]).toStrictEqual([items[1]]);
+    expect(wrapper.find('[role="menu"]').exists()).toBe(true);
+    await wrapper.get('.codex-composer-menu').trigger('keydown', { key: 'Escape' });
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+  });
+
+  it('supports controlled visibility, disabled state, and per-item close behavior', async () => {
+    const controlledItems: CodexComposerMenuItem[] = [
+      { id: 'separator', type: 'separator' },
+      { id: 'disabled', type: 'action', label: 'Disabled action', disabled: true },
+      { id: 'keep-open', type: 'action', label: 'Keep open', closeOnSelect: false, danger: true, value: '⌘K' },
+    ];
+    const wrapper = mount(CodexComposerMenu, {
+      attachTo: document.body,
+      props: { disabled: true, items: controlledItems, open: true },
+    });
+
+    expect(wrapper.get('.codex-composer-menu__trigger').attributes('disabled')).toBeDefined();
+    expect(wrapper.find('[role="separator"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('⌘K');
+    await wrapper.get('.codex-composer-menu__trigger').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text().includes('Disabled action'))!.trigger('click');
+    expect(wrapper.emitted('select')).toBeUndefined();
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Keep open'))!.trigger('click');
+    expect(wrapper.emitted('select')?.[0]).toStrictEqual([controlledItems[2]]);
+    expect(wrapper.find('[role="menu"]').exists()).toBe(true);
+
+    (wrapper.vm as unknown as { close(): void }).close();
+    expect(wrapper.emitted('update:open')).toContainEqual([false]);
+    await wrapper.setProps({ open: false });
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 });
 
