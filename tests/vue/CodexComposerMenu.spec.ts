@@ -73,4 +73,33 @@ describe('CodexComposerMenu', () => {
     expect(wrapper.find('[role="menu"]').exists()).toBe(false);
     wrapper.unmount();
   });
+
+  it('moves focus with menu keys and restores the trigger on Escape', async () => {
+    const wrapper = mount(CodexComposerMenu, { attachTo: document.body, props: { items } });
+    const trigger = wrapper.get('.codex-composer-menu__trigger');
+    await trigger.trigger('click');
+
+    const menuItems = wrapper.findAll('[role^="menuitem"]');
+    expect(document.activeElement).toBe(menuItems[0]!.element);
+    await menuItems[0]!.trigger('keydown', { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(menuItems[1]!.element);
+    await menuItems[1]!.trigger('keydown', { key: 'Home' });
+    expect(document.activeElement).toBe(menuItems[0]!.element);
+    await menuItems[0]!.trigger('keydown', { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(menuItems[1]!.element);
+    await menuItems[1]!.trigger('keydown', { key: 'End' });
+    expect(document.activeElement).toBe(menuItems[1]!.element);
+
+    await menuItems[0]!.trigger('keydown', { key: 'Escape' });
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+    expect(document.activeElement).toBe(trigger.element);
+    wrapper.unmount();
+  });
+
+  it('does not open when the exposed toggle is called while disabled', () => {
+    const wrapper = mount(CodexComposerMenu, { props: { disabled: true, items } });
+    (wrapper.vm as unknown as { toggle(): void }).toggle();
+    expect(wrapper.emitted('update:open')).toBeUndefined();
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+  });
 });

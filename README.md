@@ -47,6 +47,11 @@ contextBridge.exposeInMainWorld(
 );
 ```
 
+Filesystem roots, sandbox mode, and approval policy are main-process policy.
+The renderer bridge deliberately cannot override them; renderer-created
+conversations may select only a model. The main IPC adapter also strips unknown
+runtime fields before calling the surface.
+
 Vue binds the bridge to reactive state and uses the SDK conversation pane:
 
 ```vue
@@ -75,7 +80,9 @@ void connect();
 select, send, interrupt, approve/deny, subscribe, and close. With
 `approvalMode: 'ask'`, command, file-change, and permission requests appear as
 serializable `state.approvals` and are answered through `resolveApproval`; apps
-never handle server-request responders. The runtime translates persisted history
+never handle server-request responders. Approval objects include the exact
+requested filesystem/network access and the scopes the server permits, so hosts
+can present an informed and valid choice. The runtime translates persisted history
 and live user, assistant, command, file-change, MCP, reasoning, search, image,
 and agent items into the SDK's serializable surface model.
 
@@ -168,6 +175,8 @@ Codex notification -> product adapter -> TypedEventBus -> Electron IPC
 
 Protocol-specific payloads should be adapted before they cross IPC. Components
 consume surface-owned messages and state, not raw app-server notifications.
+Fatal app-server transport failures move the surface into an error state; calling
+`connect()` starts a fresh process and initializes it again.
 
 ## Vue surfaces
 
@@ -188,7 +197,8 @@ entries without requiring a fork.
 `CodexComposerMenu` accepts nested action, checkbox, radio, separator, submenu,
 and custom entries. Typed payloads let a host application contribute its own
 actions, while scoped `trigger`, `item`, and `icon` slots can replace the
-default presentation without forking menu behavior.
+default presentation without forking menu behavior. The default menu implements
+roving focus, arrow/Home/End navigation, submenu state, and Escape focus restore.
 
 `CodexMessage` renders the SDK's safe `SurfaceMessage` contract. Message and
 message-list slots let products replace text, tool, status, and full-message

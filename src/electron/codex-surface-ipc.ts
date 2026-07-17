@@ -1,10 +1,10 @@
 import type { CodexSurface } from '../node/codex-surface';
 import type {
-  CodexSurfaceApi,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
+  CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
-  CreateCodexConversationOptions,
+  CreateCodexRendererConversationOptions,
   SendCodexMessageOptions,
 } from '../surface/types';
 import {
@@ -30,7 +30,7 @@ const channels = {
 
 type SurfaceRequests = {
   [channels.connect]: IpcRequest<[], CodexSurfaceSnapshot>;
-  [channels.createConversation]: IpcRequest<[options?: CreateCodexConversationOptions], CodexSurfaceSnapshot>;
+  [channels.createConversation]: IpcRequest<[options?: CreateCodexRendererConversationOptions], CodexSurfaceSnapshot>;
   [channels.getSnapshot]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.interrupt]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.refreshConversations]: IpcRequest<[], CodexSurfaceSnapshot>;
@@ -47,7 +47,7 @@ type SurfaceEvents = {
   [channels.stateChanged]: CodexSurfaceSnapshot;
 };
 
-export type CodexSurfaceRendererApi = CodexSurfaceApi;
+export type { CodexSurfaceRendererApi } from '../surface/types';
 
 export function registerCodexSurfaceIpc(
   port: IpcMainPort,
@@ -65,7 +65,7 @@ export function registerCodexSurfaceIpc(
 ): () => void {
   const unregisterHandlers = registerIpcMainHandlers<SurfaceRequests>(port, {
     [channels.connect]: () => surface.connect(),
-    [channels.createConversation]: (_event, options) => surface.createConversation(options),
+    [channels.createConversation]: (_event, options) => surface.createConversation(rendererConversationOptions(options)),
     [channels.getSnapshot]: () => surface.getSnapshot(),
     [channels.interrupt]: () => surface.interrupt(),
     [channels.refreshConversations]: () => surface.refreshConversations(),
@@ -78,6 +78,19 @@ export function registerCodexSurfaceIpc(
     unsubscribeState();
     unregisterHandlers();
   };
+}
+
+function rendererConversationOptions(value: unknown): CreateCodexRendererConversationOptions | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError('Conversation options must be an object');
+  }
+  const model = (value as Record<string, unknown>).model;
+  if (model === undefined) return {};
+  if (typeof model !== 'string' || !model.trim()) {
+    throw new TypeError('Conversation model must be a non-empty string');
+  }
+  return { model };
 }
 
 export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfaceRendererApi {

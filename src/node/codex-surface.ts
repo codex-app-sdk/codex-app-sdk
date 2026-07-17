@@ -43,6 +43,7 @@ export class CodexSurface {
   private readonly listeners = new Set<StateListener>();
   private readonly pendingApprovals = new Map<string, PendingCodexApproval>();
   private readonly unsubscribeApprovals: () => void;
+  private readonly unsubscribeDisconnect: () => void;
   private readonly unsubscribeNotification: () => void;
   private activeTurnId: string | null = null;
   private connectPromise: Promise<CodexSurfaceSnapshot> | null = null;
@@ -63,6 +64,7 @@ export class CodexSurface {
       cwd: options.transport?.cwd ?? options.cwd,
     }));
     this.unsubscribeNotification = this.client.onNotification((notification) => this.handleNotification(notification));
+    this.unsubscribeDisconnect = this.client.onDisconnect((error) => this.handleDisconnect(error));
     this.unsubscribeApprovals = registerCodexApprovalHandlers(this.client, (pending) => {
       this.pendingApprovals.set(pending.approval.id, pending);
       this.patch({
@@ -255,6 +257,7 @@ export class CodexSurface {
     if (this.closed) return;
     this.closed = true;
     this.unsubscribeNotification();
+    this.unsubscribeDisconnect();
     this.unsubscribeApprovals();
     this.pendingApprovals.clear();
     await this.client.close();
@@ -317,6 +320,18 @@ export class CodexSurface {
       default:
         return;
     }
+  }
+
+  private handleDisconnect(error: Error): void {
+    if (this.closed) return;
+    this.activeTurnId = null;
+    this.pendingApprovals.clear();
+    this.patch({
+      status: 'error',
+      busy: false,
+      approvals: [],
+      error: error.message,
+    });
   }
 
   private applyAgentDelta(params: v2.AgentMessageDeltaNotification): void {

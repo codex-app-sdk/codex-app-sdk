@@ -51,9 +51,21 @@ describe('Codex surface Electron bridge', () => {
     ]);
     await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', {
+      model: 'gpt-5',
+      cwd: '/',
       approvalMode: 'ask',
-      permissionMode: 'workspace-write',
+      permissionMode: 'full-access',
     })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:create-conversation', { cwd: '/' })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:create-conversation', 'unsafe')).rejects.toThrow(
+      'Conversation options must be an object',
+    );
+    await expect(main.call('codex-surface:create-conversation', { model: 42 })).rejects.toThrow(
+      'Conversation model must be a non-empty string',
+    );
+    await expect(main.call('codex-surface:create-conversation', { model: '   ' })).rejects.toThrow(
+      'Conversation model must be a non-empty string',
+    );
     await expect(main.call('codex-surface:get-snapshot')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:interrupt')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:refresh-conversations')).resolves.toBe(snapshot);
@@ -62,10 +74,10 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:send-message', 'Hello', { model: 'gpt-5' })).resolves.toBe(snapshot);
     stateListener?.(snapshot);
     expect(surface.connect).toHaveBeenCalledOnce();
-    expect(surface.createConversation).toHaveBeenCalledWith({
-      approvalMode: 'ask',
-      permissionMode: 'workspace-write',
+    expect(surface.createConversation).toHaveBeenNthCalledWith(1, {
+      model: 'gpt-5',
     });
+    expect(surface.createConversation).toHaveBeenNthCalledWith(2, {});
     expect(surface.getSnapshot).toHaveBeenCalledOnce();
     expect(surface.interrupt).toHaveBeenCalledOnce();
     expect(surface.refreshConversations).toHaveBeenCalledOnce();
@@ -85,7 +97,7 @@ describe('Codex surface Electron bridge', () => {
     const unsubscribe = api.onStateChange(listener);
 
     await api.connect();
-    await api.createConversation({ permissionMode: 'workspace-write' });
+    await api.createConversation({ model: 'gpt-5' });
     await api.refreshConversations();
     await api.resolveApproval('approval-1', 'approve', 'once');
     await api.selectConversation('thread-2');
@@ -98,7 +110,7 @@ describe('Codex surface Electron bridge', () => {
 
     expect(renderer.invoke.mock.calls).toStrictEqual([
       ['codex-surface:connect'],
-      ['codex-surface:create-conversation', { permissionMode: 'workspace-write' }],
+      ['codex-surface:create-conversation', { model: 'gpt-5' }],
       ['codex-surface:refresh-conversations'],
       ['codex-surface:resolve-approval', 'approval-1', 'approve', 'once'],
       ['codex-surface:select-conversation', 'thread-2'],

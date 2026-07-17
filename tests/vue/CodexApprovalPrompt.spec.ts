@@ -51,4 +51,45 @@ describe('CodexApprovalPrompt', () => {
     expect(wrapper.find('code').exists()).toBe(false);
     expect(wrapper.find('small').exists()).toBe(false);
   });
+
+  it('shows exact requested access and only offers server-supported decisions', async () => {
+    const wrapper = mount(CodexApprovalPrompt, {
+      props: {
+        approval: {
+          ...approval,
+          requestedPermissions: [
+            { kind: 'network', enabled: true, host: 'registry.npmjs.org', protocol: 'https' },
+            { kind: 'filesystem', access: 'write', path: '/tmp/results/**' },
+          ],
+          allowedScopes: ['once'],
+          canDeny: false,
+        },
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Requested permissions"]').text()).toContain(
+      'Network access to https://registry.npmjs.org: enabled',
+    );
+    expect(wrapper.text()).toContain('Write access: /tmp/results/**');
+    expect(wrapper.text()).not.toContain('Deny');
+    expect(wrapper.text()).not.toContain('Allow for session');
+    await wrapper.get('button').trigger('click');
+    expect(wrapper.emitted('resolve')).toStrictEqual([['approve', 'once']]);
+  });
+
+  it('describes disabled and protocol-free network access', () => {
+    const wrapper = mount(CodexApprovalPrompt, {
+      props: {
+        approval: {
+          ...approval,
+          requestedPermissions: [
+            { kind: 'network', enabled: false },
+            { kind: 'network', enabled: true, host: 'internal.example' },
+          ],
+        },
+      },
+    });
+    expect(wrapper.text()).toContain('Network access: disabled');
+    expect(wrapper.text()).toContain('Network access to internal.example: enabled');
+  });
 });

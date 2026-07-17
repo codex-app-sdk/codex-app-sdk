@@ -3,6 +3,7 @@ import type {
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
+  CodexSurfaceRequestedPermission,
 } from '../surface/types';
 
 export type PendingCodexApproval = {
@@ -19,7 +20,7 @@ export function registerCodexApprovalHandlers(
       onApproval({
         approval: commandApproval(request.id, request.params),
         resolve: (decision, scope) => responder.resolve({
-          decision: decision === 'deny' ? 'decline' : scope === 'session' ? 'acceptForSession' : 'accept',
+          decision: commandDecision(request.params, decision, scope),
         }),
       });
       return true;
@@ -93,6 +94,17 @@ function commandApproval(
   id: string | number,
   params: v2.CommandExecutionRequestApprovalParams,
 ): CodexSurfaceApproval {
+  const availableDecisions = params.availableDecisions;
+  const additionalPermissions = permissionDetails(params.additionalPermissions);
+  const requestedPermissions = [
+    ...(params.networkApprovalContext ? [{
+      kind: 'network' as const,
+      enabled: true,
+      host: params.networkApprovalContext.host,
+      protocol: params.networkApprovalContext.protocol,
+    }] : []),
+    ...additionalPermissions.filter((permission) => !params.networkApprovalContext || permission.kind !== 'network'),
+  ];
   return {
     id: String(id),
     kind: 'command',
@@ -103,6 +115,14 @@ function commandApproval(
     command: params.command ?? undefined,
     cwd: params.cwd ?? undefined,
     ...(params.reason ? { description: params.reason } : {}),
+    ...(requestedPermissions.length ? { requestedPermissions } : {}),
+    ...(availableDecisions ? {
+      allowedScopes: [
+        ...(availableDecisions.includes('accept') ? ['once' as const] : []),
+        ...(availableDecisions.includes('acceptForSession') ? ['session' as const] : []),
+      ],
+      canDeny: availableDecisions.includes('decline') || availableDecisions.includes('cancel'),
+    } : {}),
   };
 }
 
@@ -127,6 +147,7 @@ function permissionsApproval(
   id: string | number,
   params: v2.PermissionsRequestApprovalParams,
 ): CodexSurfaceApproval {
+  const requestedPermissions = permissionDetails(params.permissions);
   return {
     id: String(id),
     kind: 'permissions',
@@ -136,5 +157,58 @@ function permissionsApproval(
     title: 'Grant additional permissions',
     description: params.reason ?? 'Codex requested additional access for this task.',
     cwd: params.cwd,
+    ...(requestedPermissions.length ? { requestedPermissions } : {}),
   };
+}
+
+function commandDecision(
+  params: v2.CommandExecutionRequestApprovalParams,
+  decision: CodexSurfaceApprovalDecision,
+  scope: CodexSurfaceApprovalScope,
+): v2.CommandExecutionApprovalDecision {
+  const available = params.availableDecisions;
+  const requested = decision === 'deny' ? 'decline' : scope === 'session' ? 'acceptForSession' : 'accept';
+  if (!available || available.includes(requested)) return requested;
+  if (decision === 'deny' && available.includes('cancel')) return 'cancel';
+  throw new Error(`Approval decision '${decision}:${scope}' is not available for this command`);
+}
+
+function permissionDetails(
+  profile: v2.RequestPermissionProfile | v2.AdditionalPermissionProfile | null | undefined,
+): CodexSurfaceRequestedPermission[] {
+  if (!profile) return [];
+  const permissions: CodexSurfaceRequestedPermission[] = [];
+  if (profile.network) {
+    permissions.push({ kind: 'network', enabled: profile.network.enabled ?? false });
+  }
+  if (profile.fileSystem) {
+    for (const path of profile.fileSystem.read ?? []) {
+      permissions.push({ kind: 'filesystem', access: 'read', path });
+    }
+    for (const path of profile.fileSystem.write ?? []) {
+      permissions.push({ kind: 'filesystem', access: 'write', path });
+    }
+    for (const entry of profile.fileSystem.entries ?? []) {
+      permissions.push({
+        kind: 'filesystem',
+        access: entry.access,
+        path: fileSystemPath(entry.path),
+      });
+    }
+  }
+  return permissions;
+}
+
+function fileSystemPath(path: v2.FileSystemPath): string {
+  if (path.type === 'path') return path.path;
+  if (path.type === 'glob_pattern') return path.pattern;
+  const special = path.value;
+  switch (special.kind) {
+    case 'project_roots': return special.subpath ? `project roots/${special.subpath}` : 'project roots';
+    case 'tmpdir': return 'system temporary directory';
+    case 'slash_tmp': return '/tmp';
+    case 'root': return 'filesystem root';
+    case 'minimal': return 'minimal runtime paths';
+    case 'unknown': return [special.path, special.subpath].filter(Boolean).join('/');
+  }
 }

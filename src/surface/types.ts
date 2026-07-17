@@ -55,7 +55,23 @@ export type CodexSurfaceApproval = {
   description?: string;
   command?: string;
   cwd?: string;
+  requestedPermissions?: readonly CodexSurfaceRequestedPermission[];
+  allowedScopes?: readonly CodexSurfaceApprovalScope[];
+  canDeny?: boolean;
 };
+
+export type CodexSurfaceRequestedPermission =
+  | {
+    kind: 'filesystem';
+    access: 'read' | 'write' | 'deny';
+    path: string;
+  }
+  | {
+    kind: 'network';
+    enabled: boolean;
+    host?: string;
+    protocol?: string;
+  };
 
 export type CodexSurfaceApprovalDecision = 'approve' | 'deny';
 export type CodexSurfaceApprovalScope = 'once' | 'session';
@@ -82,6 +98,9 @@ export type CreateCodexConversationOptions = {
   permissionMode?: CodexSurfacePermissionMode;
 };
 
+/** Renderer-safe options. Filesystem and approval policy remain owned by the main process. */
+export type CreateCodexRendererConversationOptions = Pick<CreateCodexConversationOptions, 'model'>;
+
 export type SendCodexMessageOptions = {
   model?: string;
 };
@@ -100,4 +119,8 @@ export type CodexSurfaceApi = {
   ): Promise<CodexSurfaceSnapshot>;
   getSnapshot(): Promise<CodexSurfaceSnapshot>;
   onStateChange(listener: (snapshot: CodexSurfaceSnapshot) => void): () => void;
+};
+
+export type CodexSurfaceRendererApi = Omit<CodexSurfaceApi, 'createConversation'> & {
+  createConversation(options?: CreateCodexRendererConversationOptions): Promise<CodexSurfaceSnapshot>;
 };

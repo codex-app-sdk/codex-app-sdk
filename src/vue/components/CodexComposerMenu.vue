@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="codex-composer-menu" @keydown.escape.prevent.stop="close">
+  <div ref="root" class="codex-composer-menu" @keydown.escape.prevent.stop="close(true)">
     <slot name="trigger" :open="menuOpen" :toggle="toggle">
       <button
         class="codex-composer-menu__trigger"
@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts" generic="Payload = unknown">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposerMenuList from './CodexComposerMenuList.vue';
 
@@ -55,11 +55,21 @@ const emit = defineEmits<{
 }>();
 
 const root = ref<HTMLElement | null>(null);
+const triggerElement = ref<HTMLElement | null>(null);
 const internalOpen = ref(false);
 const menuOpen = computed(() => props.open ?? internalOpen.value);
 
 onMounted(() => document.addEventListener('click', closeOnOutsideClick));
 onBeforeUnmount(() => document.removeEventListener('click', closeOnOutsideClick));
+
+watch(menuOpen, async (open) => {
+  if (!open) return;
+  await nextTick();
+  const firstItem = root.value?.querySelector(
+    '.codex-composer-menu__list > button[role^="menuitem"], .codex-composer-menu__list > div > button[role^="menuitem"]',
+  );
+  if (firstItem instanceof HTMLElement) firstItem.focus();
+}, { immediate: true });
 
 function setOpen(open: boolean): void {
   if (props.open === undefined) {
@@ -70,20 +80,22 @@ function setOpen(open: boolean): void {
 
 function toggle(event?: Event): void {
   event?.stopPropagation();
+  if (event?.currentTarget instanceof HTMLElement) triggerElement.value = event.currentTarget;
   if (!props.disabled) {
     setOpen(!menuOpen.value);
   }
 }
 
-function close(): void {
+function close(restoreFocus = false): void {
   if (menuOpen.value) {
     setOpen(false);
+    if (restoreFocus) void nextTick(() => triggerElement.value?.focus());
   }
 }
 
 function closeOnOutsideClick(event: MouseEvent): void {
   if (root.value && event.target && !root.value.contains(event.target as Node)) {
-    close();
+    close(false);
   }
 }
 
@@ -91,7 +103,7 @@ function selectItem(item: CodexComposerMenuSelectableItem<Payload>): void {
   emit('select', item);
   const shouldClose = item.closeOnSelect ?? (item.type !== 'checkbox');
   if (shouldClose) {
-    close();
+    close(true);
   }
 }
 

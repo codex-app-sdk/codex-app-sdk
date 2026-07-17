@@ -4,6 +4,7 @@ import {
   isRecord,
   isRpcError,
   RpcRemoteError,
+  RpcTransportProtocolError,
   type RpcMessage,
   type RpcTransport,
 } from '../src/codex';
@@ -133,8 +134,30 @@ describe('CodexAppServerClient', () => {
     await timeoutExpectation;
 
     const disconnected = client.request('configRequirements/read');
+    const onDisconnect = vi.fn();
+    client.onDisconnect(onDisconnect);
     transport.fail(new Error('transport closed'));
     await expect(disconnected).rejects.toThrow('transport closed');
+    expect(onDisconnect).toHaveBeenCalledWith(expect.objectContaining({ message: 'transport closed' }));
+
+    await client.start();
+    expect(transport.start).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports malformed frames without disconnecting a healthy transport', async () => {
+    const transport = new FakeTransport();
+    const onProtocolError = vi.fn();
+    const onDisconnect = vi.fn();
+    const client = new CodexAppServerClient(transport, { onProtocolError });
+    client.onDisconnect(onDisconnect);
+    await client.start();
+
+    transport.fail(new RpcTransportProtocolError('malformed frame'));
+    await client.start();
+
+    expect(onProtocolError).toHaveBeenCalledWith(expect.objectContaining({ message: 'malformed frame' }));
+    expect(onDisconnect).not.toHaveBeenCalled();
+    expect(transport.start).toHaveBeenCalledOnce();
   });
 
   it('routes all and method-specific notifications with unsubscribe cleanup', async () => {

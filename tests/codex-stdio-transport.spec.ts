@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodexAppServerStdioTransport } from '../src/node';
 
 const spawnMock = vi.hoisted(() => vi.fn());
@@ -9,26 +9,35 @@ vi.mock('node:child_process', () => ({
 }));
 
 type FakeChild = EventEmitter & {
-  stdin: { write: ReturnType<typeof vi.fn> };
+  stdin: EventEmitter & { write: ReturnType<typeof vi.fn> };
   stdout: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
   stderr: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
   kill: ReturnType<typeof vi.fn>;
+  exitCode: number | null;
+  signalCode: NodeJS.Signals | null;
 };
 
 function createFakeChild(): FakeChild {
   const child = new EventEmitter() as FakeChild;
-  child.stdin = { write: vi.fn() };
+  child.stdin = new EventEmitter() as FakeChild['stdin'];
+  child.stdin.write = vi.fn();
   child.stdout = new EventEmitter() as FakeChild['stdout'];
   child.stdout.setEncoding = vi.fn();
   child.stderr = new EventEmitter() as FakeChild['stderr'];
   child.stderr.setEncoding = vi.fn();
   child.kill = vi.fn();
+  child.exitCode = null;
+  child.signalCode = null;
   return child;
 }
 
 describe('CodexAppServerStdioTransport', () => {
   beforeEach(() => {
     spawnMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('starts Codex app-server with isolated configuration and writes JSONL', async () => {
@@ -112,6 +121,32 @@ describe('CodexAppServerStdioTransport', () => {
     expect(errors[0]?.message).toBe('Codex app-server exited (1): permission denied');
   });
 
+  it('bounds diagnostics and rejects oversized output frames without disconnecting', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const onExit = vi.fn();
+    const errors: Error[] = [];
+    const transport = new CodexAppServerStdioTransport({
+      maxDiagnosticBufferChars: 4,
+      maxOutputLineChars: 5,
+      onExit,
+    });
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stderr.emit('data', 'abcdef');
+    child.stdout.emit('data', '123456\n');
+    child.stdout.emit('data', 'abcdef');
+    child.emit('exit', 1, null);
+
+    expect(onExit).toHaveBeenCalledWith({ code: 1, signal: null, stderr: 'cdef' });
+    expect(errors.map((error) => error.message)).toStrictEqual([
+      'Codex app-server output line exceeded the configured limit',
+      'Codex app-server output line exceeded the configured limit',
+      'Codex app-server exited (1): cdef',
+    ]);
+  });
+
   it('reports spawn errors and treats explicit close as expected', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);
@@ -129,13 +164,61 @@ describe('CodexAppServerStdioTransport', () => {
     const replacement = createFakeChild();
     spawnMock.mockReturnValue(replacement);
     await transport.start();
-    await transport.close();
-    await transport.close();
+    const closing = transport.close();
     replacement.emit('exit', null, 'SIGTERM');
+    await closing;
+    await transport.close();
 
     expect(spawnMock).toHaveBeenLastCalledWith('codex', ['app-server', '--listen', 'stdio://'], expect.any(Object));
     expect(replacement.kill).toHaveBeenCalledOnce();
     expect(errors).toHaveLength(1);
     expect(() => transport.send({ method: 'initialized' })).toThrow('Codex app-server transport is not started');
+  });
+
+  it('surfaces stdin failures once and terminates the unusable child', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const errors: Error[] = [];
+    const transport = new CodexAppServerStdioTransport();
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdin.emit('error', new Error('write EPIPE'));
+    child.emit('exit', 1, null);
+
+    expect(child.kill).toHaveBeenCalledOnce();
+    expect(errors.map((error) => error.message)).toStrictEqual(['write EPIPE']);
+    expect(() => transport.send({ method: 'initialized' })).toThrow('Codex app-server transport is not started');
+  });
+
+  it('escalates shutdown to SIGKILL and rejects if the child still does not exit', async () => {
+    vi.useFakeTimers();
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ shutdownTimeoutMs: 10 });
+    await transport.start();
+
+    const closing = transport.close();
+    const rejection = expect(closing).rejects.toThrow('Codex app-server did not exit after SIGKILL');
+    await vi.advanceTimersByTimeAsync(10);
+    expect(child.kill).toHaveBeenNthCalledWith(1);
+    expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
+    await vi.advanceTimersByTimeAsync(10);
+    await rejection;
+  });
+
+  it('resolves shutdown when the child exits after SIGKILL', async () => {
+    vi.useFakeTimers();
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ shutdownTimeoutMs: 10 });
+    await transport.start();
+
+    const closing = transport.close();
+    await vi.advanceTimersByTimeAsync(10);
+    child.emit('exit', null, 'SIGKILL');
+
+    await expect(closing).resolves.toBeUndefined();
+    expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
   });
 });

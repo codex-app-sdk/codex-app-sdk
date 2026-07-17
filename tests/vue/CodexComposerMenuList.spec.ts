@@ -77,4 +77,24 @@ describe('CodexComposerMenuList', () => {
     });
     expect(iconWrapper.find('.host-icon').exists()).toBe(true);
   });
+
+  it('reports real submenu state and supports right and left arrow navigation', async () => {
+    const wrapper = mount(CodexComposerMenuList, {
+      attachTo: document.body,
+      props: { items },
+    });
+    const submenuTrigger = wrapper.findAll('button').find((button) => button.text().includes('Approval'))!;
+    expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
+
+    await submenuTrigger.trigger('focus');
+    expect(submenuTrigger.attributes('aria-expanded')).toBe('true');
+    await submenuTrigger.trigger('keydown', { key: 'ArrowRight' });
+    const child = wrapper.findAll('button').find((button) => button.text().includes('Ask first'))!;
+    expect(document.activeElement).toBe(child.element);
+
+    await child.trigger('keydown', { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(submenuTrigger.element);
+    expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
+    wrapper.unmount();
+  });
 });

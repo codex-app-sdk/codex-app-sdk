@@ -5,11 +5,16 @@
       <p v-if="approval.description">{{ approval.description }}</p>
       <code v-if="approval.command">{{ approval.command }}</code>
       <small v-if="approval.cwd">{{ approval.cwd }}</small>
+      <ul v-if="approval.requestedPermissions?.length" class="codex-approval-prompt__permissions" aria-label="Requested permissions">
+        <li v-for="(permission, index) in approval.requestedPermissions" :key="`${permission.kind}-${index}`">
+          {{ permissionLabel(permission) }}
+        </li>
+      </ul>
     </div>
     <div class="codex-approval-prompt__actions">
-      <button type="button" :disabled="disabled" @click="emit('resolve', 'deny', 'once')">Deny</button>
-      <button type="button" :disabled="disabled" @click="emit('resolve', 'approve', 'session')">Allow for session</button>
-      <button class="codex-approval-prompt__primary" type="button" :disabled="disabled" @click="emit('resolve', 'approve', 'once')">
+      <button v-if="canDeny" type="button" :disabled="disabled" @click="emit('resolve', 'deny', 'once')">Deny</button>
+      <button v-if="allowedScopes.includes('session')" type="button" :disabled="disabled" @click="emit('resolve', 'approve', 'session')">Allow for session</button>
+      <button v-if="allowedScopes.includes('once')" class="codex-approval-prompt__primary" type="button" :disabled="disabled" @click="emit('resolve', 'approve', 'once')">
         Allow once
       </button>
     </div>
@@ -17,13 +22,15 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type {
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
+  CodexSurfaceRequestedPermission,
 } from '../../surface/types';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   approval: CodexSurfaceApproval;
   disabled?: boolean;
 }>(), {
@@ -33,6 +40,19 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   resolve: [decision: CodexSurfaceApprovalDecision, scope: CodexSurfaceApprovalScope];
 }>();
+
+const allowedScopes = computed(() => props.approval.allowedScopes ?? ['once', 'session']);
+const canDeny = computed(() => props.approval.canDeny ?? true);
+
+function permissionLabel(permission: CodexSurfaceRequestedPermission): string {
+  if (permission.kind === 'network') {
+    const destination = permission.host
+      ? ` to ${permission.protocol ? `${permission.protocol}://` : ''}${permission.host}`
+      : '';
+    return `Network access${destination}: ${permission.enabled ? 'enabled' : 'disabled'}`;
+  }
+  return `${permission.access[0]?.toUpperCase()}${permission.access.slice(1)} access: ${permission.path}`;
+}
 </script>
 
 <style scoped>
@@ -56,10 +76,18 @@ const emit = defineEmits<{
 
 .codex-approval-prompt p,
 .codex-approval-prompt code,
-.codex-approval-prompt small {
+.codex-approval-prompt small,
+.codex-approval-prompt__permissions {
   margin: 0;
   color: var(--codex-muted-text-color, #777b82);
   font-size: 12px;
+}
+
+.codex-approval-prompt__permissions {
+  display: grid;
+  gap: 2px;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
 }
 
 .codex-approval-prompt code {

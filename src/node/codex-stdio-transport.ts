@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'node:child_process';
-import type { RpcMessage, RpcTransport } from '../codex/wire';
+import { RpcTransportProtocolError, type RpcMessage, type RpcTransport } from '../codex/wire';
 import {
   discoverCodexExecutable,
   withCodexRuntimePath,
@@ -22,7 +22,14 @@ export type CodexAppServerStdioTransportOptions = {
   onExit?: (exit: CodexAppServerExit) => void;
   onStderr?: (text: string) => void;
   spawnProcess?: typeof spawn;
+  shutdownTimeoutMs?: number;
+  maxDiagnosticBufferChars?: number;
+  maxOutputLineChars?: number;
 };
+
+const DEFAULT_DIAGNOSTIC_BUFFER_CHARS = 64 * 1024;
+const DEFAULT_OUTPUT_LINE_CHARS = 4 * 1024 * 1024;
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 1_000;
 
 export class CodexAppServerStdioTransport implements RpcTransport {
   private child: ChildProcessWithoutNullStreams | null = null;
@@ -56,6 +63,8 @@ export class CodexAppServerStdioTransport implements RpcTransport {
     this.child = child;
     let stdoutBuffer = '';
     let stderrBuffer = '';
+    const maxDiagnosticBufferChars = Math.max(1, this.options.maxDiagnosticBufferChars ?? DEFAULT_DIAGNOSTIC_BUFFER_CHARS);
+    const maxOutputLineChars = Math.max(1, this.options.maxOutputLineChars ?? DEFAULT_OUTPUT_LINE_CHARS);
 
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
@@ -67,20 +76,38 @@ export class CodexAppServerStdioTransport implements RpcTransport {
         stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
         newlineIndex = stdoutBuffer.indexOf('\n');
         if (line) {
-          this.parseLine(line);
+          if (line.length > maxOutputLineChars) {
+            this.emitError(new RpcTransportProtocolError('Codex app-server output line exceeded the configured limit'));
+          } else {
+            this.parseLine(line);
+          }
         }
+      }
+      if (stdoutBuffer.length > maxOutputLineChars) {
+        stdoutBuffer = '';
+        this.emitError(new RpcTransportProtocolError('Codex app-server output line exceeded the configured limit'));
       }
     });
     child.stderr.on('data', (chunk: string | Buffer) => {
       const text = chunk.toString();
-      stderrBuffer += text;
+      stderrBuffer = appendBounded(stderrBuffer, text, maxDiagnosticBufferChars);
       this.options.onStderr?.(text);
+    });
+    child.stdin.on('error', (error) => {
+      if (this.child !== child || this.expectedExits.has(child)) return;
+      this.child = null;
+      this.expectedExits.add(child);
+      child.kill();
+      this.emitError(error);
     });
     child.once('error', (error) => {
       if (this.child === child) {
         this.child = null;
       }
-      this.emitError(error);
+      if (!this.expectedExits.has(child)) {
+        this.expectedExits.add(child);
+        this.emitError(error);
+      }
     });
     child.once('exit', (code, signal) => {
       if (this.child === child) {
@@ -110,7 +137,16 @@ export class CodexAppServerStdioTransport implements RpcTransport {
       return;
     }
     this.expectedExits.add(child);
+    const shutdownTimeoutMs = this.options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
+    const gracefulExit = waitForExit(child, shutdownTimeoutMs);
     child.kill();
+    if (await gracefulExit) return;
+
+    const forcedExit = waitForExit(child, shutdownTimeoutMs);
+    child.kill('SIGKILL');
+    if (!await forcedExit) {
+      throw new Error('Codex app-server did not exit after SIGKILL');
+    }
   }
 
   onMessage(listener: (message: unknown) => void): () => void {
@@ -130,7 +166,10 @@ export class CodexAppServerStdioTransport implements RpcTransport {
         listener(message);
       }
     } catch (error) {
-      this.emitError(error instanceof Error ? error : new Error(String(error)));
+      this.emitError(new RpcTransportProtocolError(
+        'Codex app-server sent malformed JSON',
+        { cause: error },
+      ));
     }
   }
 
@@ -139,4 +178,24 @@ export class CodexAppServerStdioTransport implements RpcTransport {
       listener(error);
     }
   }
+}
+
+function appendBounded(current: string, chunk: string, limit: number): string {
+  const combined = current + chunk;
+  return combined.length <= limit ? combined : combined.slice(-limit);
+}
+
+function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const onExit = (): void => {
+      clearTimeout(timeout);
+      resolve(true);
+    };
+    const timeout = setTimeout(() => {
+      child.off('exit', onExit);
+      resolve(false);
+    }, Math.max(0, timeoutMs));
+    child.once('exit', onExit);
+  });
 }

@@ -33,9 +33,29 @@ class FakeTransport implements RpcTransport {
   emit(message: unknown): void {
     for (const listener of this.messageListeners) listener(message);
   }
+
+  fail(error: Error): void {
+    for (const listener of this.errorListeners) listener(error);
+  }
 }
 
 describe('CodexSurface', () => {
+  it('enters an error state after disconnect and reconnects the app-server', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+
+    transport.fail(new Error('app-server exited'));
+    expect(surface.getSnapshot()).toMatchObject({
+      status: 'error',
+      busy: false,
+      approvals: [],
+      error: 'app-server exited',
+    });
+
+    await expect(surface.connect()).resolves.toMatchObject({ status: 'ready', error: null });
+    expect(transport.start).toHaveBeenCalledTimes(2);
+  });
+
   it('bootstraps Codex and exposes conversation summaries without protocol details', async () => {
     const { surface, transport } = createSurface();
     const listener = vi.fn();
@@ -320,11 +340,24 @@ describe('CodexSurface', () => {
       params: {
         threadId: 'thread-existing', turnId: 'turn-1', itemId: 'command-1', startedAtMs: 1,
         command: 'npm test', cwd: '/tmp/project', reason: 'Run tests', environmentId: null,
+        networkApprovalContext: { host: 'registry.npmjs.org', protocol: 'https' },
+        additionalPermissions: {
+          network: { enabled: true },
+          fileSystem: {
+            read: null,
+            write: null,
+            entries: [{ path: { type: 'glob_pattern', pattern: '/tmp/results/**' }, access: 'write' }],
+          },
+        },
       },
     });
     await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
     expect(surface.getSnapshot().approvals[0]).toMatchObject({
       id: '90', kind: 'command', title: 'Run command', command: 'npm test',
+      requestedPermissions: [
+        { kind: 'network', enabled: true, host: 'registry.npmjs.org', protocol: 'https' },
+        { kind: 'filesystem', access: 'write', path: '/tmp/results/**' },
+      ],
     });
     await surface.resolveApproval('90', 'approve', 'session');
     expect(lastResponse(transport, 90)).toMatchObject({ result: { decision: 'acceptForSession' } });
@@ -342,10 +375,37 @@ describe('CodexSurface', () => {
       params: {
         threadId: 'thread-existing', turnId: 'turn-1', itemId: 'permissions-1', startedAtMs: 1,
         environmentId: null, cwd: '/tmp/project', reason: null,
-        permissions: { network: null, fileSystem: { read: ['/tmp'], write: ['/tmp'] } },
+        permissions: {
+          network: { enabled: null },
+          fileSystem: {
+            read: ['/tmp'],
+            write: ['/tmp'],
+            entries: [
+              { path: { type: 'path', path: '/var/log' }, access: 'read' },
+              { path: { type: 'special', value: { kind: 'root' } }, access: 'deny' },
+              { path: { type: 'special', value: { kind: 'minimal' } }, access: 'read' },
+              { path: { type: 'special', value: { kind: 'project_roots', subpath: 'src' } }, access: 'write' },
+              { path: { type: 'special', value: { kind: 'tmpdir' } }, access: 'write' },
+              { path: { type: 'special', value: { kind: 'slash_tmp' } }, access: 'write' },
+              { path: { type: 'special', value: { kind: 'unknown', path: '/private', subpath: 'cache' } }, access: 'write' },
+            ],
+          },
+        },
       },
     });
     await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    expect(surface.getSnapshot().approvals[0]?.requestedPermissions).toStrictEqual([
+      { kind: 'network', enabled: false },
+      { kind: 'filesystem', access: 'read', path: '/tmp' },
+      { kind: 'filesystem', access: 'write', path: '/tmp' },
+      { kind: 'filesystem', access: 'read', path: '/var/log' },
+      { kind: 'filesystem', access: 'deny', path: 'filesystem root' },
+      { kind: 'filesystem', access: 'read', path: 'minimal runtime paths' },
+      { kind: 'filesystem', access: 'write', path: 'project roots/src' },
+      { kind: 'filesystem', access: 'write', path: 'system temporary directory' },
+      { kind: 'filesystem', access: 'write', path: '/tmp' },
+      { kind: 'filesystem', access: 'write', path: '/private/cache' },
+    ]);
     await surface.resolveApproval('91', 'approve');
     expect(lastResponse(transport, 91)).toMatchObject({ result: { scope: 'turn' } });
 
@@ -389,11 +449,16 @@ describe('CodexSurface', () => {
       params: {
         threadId: 'thread-existing', turnId: 'turn-1', itemId: 'command-2', startedAtMs: 1,
         command: null, cwd: null, reason: null, environmentId: null,
+        availableDecisions: ['accept', 'cancel'],
       },
     });
     await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    expect(surface.getSnapshot().approvals[0]).toMatchObject({ allowedScopes: ['once'], canDeny: true });
+    await expect(surface.resolveApproval('93', 'approve', 'session')).rejects.toThrow(
+      "Approval decision 'approve:session' is not available",
+    );
     await surface.resolveApproval('93', 'deny');
-    expect(lastResponse(transport, 93)).toMatchObject({ result: { decision: 'decline' } });
+    expect(lastResponse(transport, 93)).toMatchObject({ result: { decision: 'cancel' } });
 
     transport.emit({
       id: 'patch-2', method: 'item/fileChange/requestApproval',

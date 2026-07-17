@@ -127,7 +127,7 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   left: 100%;
 }
 
-.codex-composer-menu-list__submenu:not(:hover):not(:focus-within) > .codex-composer-menu-list__submenu-list {
+.codex-composer-menu-list__submenu:not(.codex-composer-menu-list__submenu--open) > .codex-composer-menu-list__submenu-list {
   display: none;
 }
 </style>

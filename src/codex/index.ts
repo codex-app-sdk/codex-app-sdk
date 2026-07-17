@@ -12,6 +12,7 @@ export {
   isRecord,
   isRpcError,
   RpcRemoteError,
+  RpcTransportProtocolError,
   type RpcError,
   type RpcErrorResponse,
   type RpcId,

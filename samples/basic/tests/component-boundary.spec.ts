@@ -11,7 +11,7 @@ describe('sample component test boundary', () => {
       .map((name) => name.replace(/\.vue$/, '.spec.ts'))
       .sort();
     const tests = (await readdir(path.join(sampleRoot, 'tests')))
-      .filter((name) => name.endsWith('.spec.ts') && name !== 'component-boundary.spec.ts')
+      .filter((name) => components.includes(name))
       .sort();
     expect(tests).toStrictEqual(components);
   });

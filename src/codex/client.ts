@@ -9,6 +9,7 @@ import {
   isRecord,
   isRpcError,
   RpcRemoteError,
+  RpcTransportProtocolError,
   type RpcError,
   type RpcId,
   type RpcMessage,
@@ -77,6 +78,7 @@ export class CodexAppServerClient {
   private readonly notificationListenersByMethod = new Map<string, Set<(notification: ServerNotification) => void>>();
   private readonly serverRequestHandlers = new Map<string, Set<AnyServerRequestHandler>>();
   private readonly anyServerRequestHandlers = new Set<AnyServerRequestHandler>();
+  private readonly disconnectListeners = new Set<(error: Error) => void>();
   private unsubscribeMessage?: () => void;
   private unsubscribeError?: () => void;
 
@@ -91,7 +93,7 @@ export class CodexAppServerClient {
     }
 
     this.unsubscribeMessage = this.transport.onMessage((message) => this.handleMessage(message));
-    this.unsubscribeError = this.transport.onError((error) => this.rejectAll(error));
+    this.unsubscribeError = this.transport.onError((error) => this.handleTransportError(error));
 
     try {
       await this.transport.start();
@@ -212,6 +214,11 @@ export class CodexAppServerClient {
   onAnyServerRequest(handler: AnyServerRequestHandler): () => void {
     this.anyServerRequestHandlers.add(handler);
     return () => this.anyServerRequestHandlers.delete(handler);
+  }
+
+  onDisconnect(listener: (error: Error) => void): () => void {
+    this.disconnectListeners.add(listener);
+    return () => this.disconnectListeners.delete(listener);
   }
 
   async close(): Promise<void> {
@@ -349,6 +356,18 @@ export class CodexAppServerClient {
     this.pending.clear();
   }
 
+  private handleTransportError(error: Error): void {
+    if (error instanceof RpcTransportProtocolError) {
+      this.reportProtocolError(error);
+      return;
+    }
+    this.started = false;
+    this.initializePromise = null;
+    this.unsubscribeTransport();
+    this.rejectAll(error);
+    for (const listener of this.disconnectListeners) listener(error);
+  }
+
   private reportProtocolError(error: Error): void {
     this.options.onProtocolError?.(error);
   }
@@ -371,4 +390,3 @@ function isRpcId(value: unknown): value is RpcId {
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
-

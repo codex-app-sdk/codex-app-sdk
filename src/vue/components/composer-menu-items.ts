@@ -1,4 +1,4 @@
-import { defineComponent, h, type Component, type PropType, type Slots, type VNode } from 'vue';
+import { defineComponent, h, nextTick, reactive, type Component, type PropType, type Slots, type VNode } from 'vue';
 import type {
   CodexComposerMenuItem,
   CodexComposerMenuItemBase,
@@ -21,13 +21,14 @@ const CodexComposerMenuItems = defineComponent({
     select: (_item: CodexComposerMenuSelectableItem<unknown>) => true,
   },
   setup(props, { emit, slots }) {
+    const openSubmenus = reactive(new Set<string>());
     const select = (item: CodexComposerMenuSelectableItem<unknown>): void => {
       if (!item.disabled) {
         emit('select', item);
       }
     };
 
-    return (): VNode => renderMenu(props.items, props.ariaLabel, slots, select);
+    return (): VNode => renderMenu(props.items, props.ariaLabel, slots, select, openSubmenus);
   },
 });
 
@@ -36,19 +37,26 @@ function renderMenu(
   ariaLabel: string,
   slots: Slots,
   select: (item: CodexComposerMenuSelectableItem<unknown>) => void,
+  openSubmenus: Set<string>,
   className = 'codex-composer-menu-list',
 ): VNode {
+  const firstFocusableId = items.find((item) => item.type !== 'separator'
+    && !item.disabled
+    && (item.type !== 'submenu' || item.items.length > 0))?.id;
   return h('div', {
     class: className,
     role: 'menu',
     'aria-label': ariaLabel,
-  }, items.map((item) => renderItem(item, slots, select)));
+    onKeydown: (event: KeyboardEvent) => handleMenuKeydown(event, openSubmenus),
+  }, items.map((item) => renderItem(item, slots, select, openSubmenus, item.id === firstFocusableId)));
 }
 
 function renderItem(
   item: CodexComposerMenuItem<unknown>,
   slots: Slots,
   select: (item: CodexComposerMenuSelectableItem<unknown>) => void,
+  openSubmenus: Set<string>,
+  firstFocusable: boolean,
 ): VNode {
   if (item.type === 'separator') {
     return h('div', {
@@ -59,27 +67,64 @@ function renderItem(
   }
 
   if (item.type === 'submenu') {
+    const enabled = !item.disabled && item.items.length > 0;
+    const expanded = enabled && openSubmenus.has(item.id);
     return h('div', {
       key: item.id,
-      class: 'codex-composer-menu-list__submenu',
+      class: [
+        'codex-composer-menu-list__submenu',
+        expanded ? 'codex-composer-menu-list__submenu--open' : null,
+      ],
+      'data-submenu-id': item.id,
+      onMouseenter: () => {
+        if (enabled) openSubmenus.add(item.id);
+      },
+      onMouseleave: (event: MouseEvent) => {
+        if (!(event.currentTarget as HTMLElement).contains(document.activeElement)) {
+          openSubmenus.delete(item.id);
+        }
+      },
+      onFocusout: (event: FocusEvent) => {
+        const container = event.currentTarget as HTMLElement;
+        void nextTick(() => {
+          if (!container.contains(document.activeElement)) openSubmenus.delete(item.id);
+        });
+      },
     }, [
       h('button', {
         class: 'codex-composer-menu-list__item',
         type: 'button',
         role: 'menuitem',
         'aria-haspopup': 'menu',
-        'aria-expanded': !item.disabled && item.items.length > 0,
-        disabled: item.disabled || item.items.length === 0,
+        'aria-expanded': expanded,
+        disabled: !enabled,
+        tabindex: firstFocusable ? 0 : -1,
+        onClick: () => expanded ? openSubmenus.delete(item.id) : openSubmenus.add(item.id),
+        onFocus: () => {
+          if (enabled) openSubmenus.add(item.id);
+        },
+        onKeydown: (event: KeyboardEvent) => {
+          if (event.key !== 'ArrowRight' || !enabled) return;
+          const trigger = event.currentTarget as HTMLElement;
+          event.preventDefault();
+          event.stopPropagation();
+          openSubmenus.add(item.id);
+          void nextTick(() => {
+            const submenu = trigger.nextElementSibling as HTMLElement | null;
+            focusItem(submenu, menuItems(submenu)[0]);
+          });
+        },
       }, [
         ...renderContent(item, slots),
         h('span', { class: 'codex-composer-menu-list__chevron', 'aria-hidden': 'true' }, '›'),
       ]),
-      !item.disabled && item.items.length > 0
+      enabled
         ? renderMenu(
           item.items,
           item.label,
           slots,
           select,
+          openSubmenus,
           'codex-composer-menu-list codex-composer-menu-list__submenu-list',
         )
         : null,
@@ -98,6 +143,7 @@ function renderItem(
     role: itemRole(item),
     'aria-checked': itemChecked(item),
     disabled: item.disabled,
+    tabindex: firstFocusable ? 0 : -1,
     onClick: () => select(item),
   }, [
     ...renderContent(item, slots),
@@ -105,6 +151,52 @@ function renderItem(
       ? h('span', { class: 'codex-composer-menu-list__selection', 'aria-hidden': 'true' }, item.checked ? '✓' : '')
       : null,
   ]);
+}
+
+function handleMenuKeydown(event: KeyboardEvent, openSubmenus: Set<string>): void {
+  const menu = event.currentTarget as HTMLElement;
+  const items = menuItems(menu);
+  const current = event.target as HTMLButtonElement;
+  const currentIndex = items.indexOf(current);
+  let target: HTMLButtonElement | undefined;
+  let submenuToClose: string | undefined;
+  switch (event.key) {
+    case 'ArrowDown': target = items[(currentIndex + 1 + items.length) % items.length]; break;
+    case 'ArrowUp': target = items[(currentIndex - 1 + items.length) % items.length]; break;
+    case 'Home': target = items[0]; break;
+    case 'End': target = items.at(-1); break;
+    case 'ArrowLeft': {
+      if (!menu.classList.contains('codex-composer-menu-list__submenu-list')) return;
+      const container = menu.parentElement;
+      const trigger = container?.querySelector(':scope > button[role="menuitem"]') as HTMLButtonElement | null;
+      submenuToClose = container?.dataset.submenuId;
+      target = trigger ?? undefined;
+      break;
+    }
+    default: return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  focusItem(menu, target);
+  if (submenuToClose) openSubmenus.delete(submenuToClose);
+}
+
+function menuItems(menu: HTMLElement | null): HTMLButtonElement[] {
+  if (!menu) return [];
+  const items: HTMLButtonElement[] = [];
+  for (const child of menu.children) {
+    const candidate = child.matches('button[role^="menuitem"]')
+      ? child
+      : child.querySelector(':scope > button[role^="menuitem"]');
+    if (candidate instanceof HTMLButtonElement && !candidate.disabled) items.push(candidate);
+  }
+  return items;
+}
+
+function focusItem(menu: HTMLElement | null, target: HTMLButtonElement | undefined): void {
+  if (!target) return;
+  for (const item of menuItems(menu)) item.tabIndex = item === target ? 0 : -1;
+  target.focus();
 }
 
 function renderContent(item: CodexComposerMenuItemBase<unknown>, slots: Slots): Array<VNode | null> {

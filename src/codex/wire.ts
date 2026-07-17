@@ -41,6 +41,14 @@ export interface RpcTransport {
   onError(listener: (error: Error) => void): () => void;
 }
 
+/** A malformed transport frame that does not imply the connection was lost. */
+export class RpcTransportProtocolError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'RpcTransportProtocolError';
+  }
+}
+
 export class RpcRemoteError extends Error {
   readonly code: number;
   readonly data?: unknown;
@@ -64,4 +72,3 @@ export function isRpcError(value: unknown): value is RpcError {
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
