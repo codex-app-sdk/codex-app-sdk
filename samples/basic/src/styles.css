@@ -1,0 +1,52 @@
+:root {
+  color: #20211f;
+  background: #f7f7f5;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  --codex-surface-color: #f9f9f7;
+  --codex-composer-background: #fff;
+  --codex-border-color: #deded9;
+  --codex-message-list-content-width: 760px;
+  --codex-composer-content-width: 760px;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; }
+button, textarea { font: inherit; }
+
+.app-shell {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: 260px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.welcome {
+  display: grid;
+  max-width: 440px;
+  margin: auto;
+  place-items: center;
+  color: #73736d;
+  text-align: center;
+}
+
+.welcome__mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 10px;
+  border: 1px solid #d2d2cc;
+  border-radius: 13px;
+  place-items: center;
+  color: #30312e;
+  background: #fff;
+  font-size: 24px;
+}
+
+.welcome h2 { margin: 0 0 8px; color: #2a2b29; font-size: 20px; }
+.welcome p { margin: 0; font-size: 13px; line-height: 1.55; }
+
+@media (max-width: 760px) {
+  .app-shell { grid-template-columns: 210px minmax(0, 1fr); }
+}

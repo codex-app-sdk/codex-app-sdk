@@ -30,7 +30,7 @@ export type SurfaceMessage = {
   id: string;
   role: 'user' | 'assistant' | 'system';
   status: 'complete' | 'streaming' | 'error';
-  parts: SurfaceMessagePart[];
+  parts: readonly SurfaceMessagePart[];
   createdAt?: string;
   metadata?: Record<string, unknown>;
 };

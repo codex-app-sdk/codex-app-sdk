@@ -2,7 +2,7 @@ import {
   CodexAppServerClient,
   type ServerNotification,
   type v2,
-} from '../codex';
+} from '../codex/index';
 import type {
   CodexConversationSummary,
   CodexSurfaceApprovalMode,
@@ -11,7 +11,7 @@ import type {
   CreateCodexConversationOptions,
   SendCodexMessageOptions,
   SurfaceMessage,
-} from '../surface';
+} from '../surface/types';
 import { codexItemToSurfaceMessage, codexThreadToSurfaceMessages } from './codex-conversation-history';
 import {
   CodexAppServerStdioTransport,

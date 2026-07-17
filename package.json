@@ -1,9 +1,12 @@
 {
   "name": "codex-app-sdk",
   "version": "0.1.0",
-  "description": "Typed Codex app-server communication, Electron event bridges, and Vue surface components.",
+  "description": "High-level runtime, Electron bridge, and Vue kit for building Codex surfaces.",
   "type": "module",
   "license": "MIT",
+  "workspaces": [
+    "samples/*"
+  ],
   "sideEffects": [
     "**/*.css"
   ],
@@ -50,6 +53,9 @@
     "lint": "npm run typecheck",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "sample:build": "npm run build -w @codex-app-sdk/basic-sample",
+    "sample:start": "npm run start -w @codex-app-sdk/basic-sample",
+    "sample:test": "npm run test -w @codex-app-sdk/basic-sample",
     "prepare": "npm run build"
   },
   "peerDependencies": {

@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts" generic="Payload = unknown">
-import type { SurfaceMessage } from '../../surface';
+import type { SurfaceMessage } from '../../surface/types';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposer from './CodexComposer.vue';
 import CodexComposerMenu from './CodexComposerMenu.vue';

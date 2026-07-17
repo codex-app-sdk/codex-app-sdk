@@ -1,15 +1,88 @@
 # codex-app-sdk
 
 `codex-app-sdk` is a reusable foundation for building native Codex surfaces.
-It packages reusable protocol, transport, event, IPC, and presentation seams
-without importing any host application's domain model or product state.
+The default API owns Codex discovery, app-server lifecycle, initialization,
+conversation history, live updates, Electron IPC, and Vue presentation. An app
+chooses its product shell and policy without learning JSON-RPC method names or
+generated protocol types.
 
-The SDK is being built around four public layers:
+The SDK has five public layers:
 
+- a high-level conversation surface for normal application code;
 - a bidirectional, strongly typed Codex app-server client;
-- transport adapters, beginning with JSONL-over-stdio;
-- a transport-neutral event bus and typed Electron IPC adapters;
-- Vue components for composers, messages, and message lists.
+- automatic executable discovery and JSONL-over-stdio transport;
+- secure high-level and generic Electron IPC adapters;
+- Vue state bindings and extensible conversation components.
+
+## Build a surface
+
+Electron main creates one high-level surface. The SDK finds the Codex CLI in
+normal GUI-app locations (including login-shell, Homebrew, user-bin, nvm, and
+Windows `PATHEXT` paths), launches app-server, and owns its lifecycle:
+
+```ts
+import { ipcMain } from 'electron';
+import { registerCodexSurfaceIpc } from 'codex-app-sdk/electron';
+import { createCodexSurface } from 'codex-app-sdk/node';
+
+const surface = createCodexSurface({
+  cwd: '/absolute/path/to/project',
+  permissionMode: 'read-only',
+  approvalMode: 'never',
+});
+
+const disposeIpc = registerCodexSurfaceIpc(ipcMain, window.webContents, surface);
+```
+
+Preload exposes the narrow SDK bridge; no Node or Electron primitive crosses
+into the renderer:
+
+```ts
+import { contextBridge, ipcRenderer } from 'electron';
+import { createCodexSurfaceRendererApi } from 'codex-app-sdk/electron';
+
+contextBridge.exposeInMainWorld(
+  'codexSurface',
+  createCodexSurfaceRendererApi(ipcRenderer),
+);
+```
+
+Vue binds the bridge to reactive state and uses the SDK conversation pane:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
+import 'codex-app-sdk/styles.css';
+
+const draft = ref('');
+const { state, connect, sendMessage, interrupt } = useCodexSurface(window.codexSurface);
+void connect();
+</script>
+
+<template>
+  <CodexConversationPane
+    v-model="draft"
+    :busy="state.busy"
+    :messages="state.messages"
+    @interrupt="interrupt"
+    @submit="sendMessage"
+  />
+</template>
+```
+
+`CodexSurface` exposes stable product operations: connect, list/refresh, create,
+select, send, interrupt, subscribe, and close. It translates persisted history
+and live user, assistant, command, file-change, MCP, reasoning, search, image,
+and agent items into the SDK's serializable surface model.
+
+The [basic Electron + Vue sample](./samples/basic) proves the boundary with a
+sample-owned conversation sidebar and an SDK-owned conversation pane. It also
+adds a sample-specific composer menu entry to demonstrate extensibility. Run:
+
+```bash
+npm run sample:start
+```
 
 ## Generated app-server types
 
@@ -41,7 +114,7 @@ npm run build
 The package targets Node 22 or newer and Vue 3.5. Vue is a peer dependency so
 applications keep ownership of their renderer runtime.
 
-## Typed app-server client
+## Advanced: typed app-server client
 
 The client performs request correlation, timeouts, notifications, and
 server-initiated request responses while preserving generated method types:
@@ -71,8 +144,9 @@ client.onServerRequest('item/tool/requestUserInput', (request, responder) => {
 });
 ```
 
-The transport and wire envelopes are replaceable. Surface code only sees
-generated methods, params, results, notifications, and request responders.
+The transport and wire envelopes are replaceable. This layer is for advanced
+features that the high-level surface does not yet cover; ordinary surface code
+should use `CodexSurface` and never handle these generated types.
 
 ## Events and Electron IPC
 
@@ -82,7 +156,7 @@ apply the same contracts across Electron's security boundary using narrow
 structural ports—`codex-app-sdk` never exposes Electron or Node primitives to
 the renderer.
 
-A typical desktop pipeline is:
+A custom low-level desktop pipeline is:
 
 ```text
 Codex notification -> product adapter -> TypedEventBus -> Electron IPC
@@ -94,7 +168,7 @@ consume surface-owned messages and state, not raw app-server notifications.
 
 ## Vue surfaces
 
-The Vue entry includes `CodexComposer`, `CodexComposerMenu`,
+The Vue entry includes `CodexConversationPane`, `CodexComposer`, `CodexComposerMenu`,
 `CodexComposerMenuList`, `CodexComposerSendButton`, `CodexMessage`, and
 `CodexMessageList`:
 
@@ -102,6 +176,10 @@ The Vue entry includes `CodexComposer`, `CodexComposerMenu`,
 import { CodexComposer, CodexMessageList } from 'codex-app-sdk/vue';
 import 'codex-app-sdk/styles.css';
 ```
+
+`CodexConversationPane` composes message-list, composer, error, header, and empty
+states. It forwards header, empty-state, message, composer, and menu slots, and
+accepts custom composer menu entries without requiring a fork.
 
 `CodexComposerMenu` accepts nested action, checkbox, radio, separator, submenu,
 and custom entries. Typed payloads let a host application contribute its own

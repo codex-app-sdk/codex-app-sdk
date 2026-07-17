@@ -4,7 +4,7 @@ import type {
   CodexSurfaceSnapshot,
   CreateCodexConversationOptions,
   SendCodexMessageOptions,
-} from '../surface';
+} from '../surface/types';
 import {
   registerIpcMainHandlers,
   TypedIpcRenderer,
