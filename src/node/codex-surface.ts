@@ -5,7 +5,9 @@ import {
 } from '../codex/index';
 import type {
   CodexConversationSummary,
+  CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalMode,
+  CodexSurfaceApprovalScope,
   CodexSurfacePermissionMode,
   CodexSurfaceSnapshot,
   CreateCodexConversationOptions,
@@ -13,6 +15,7 @@ import type {
   SurfaceMessage,
 } from '../surface/types';
 import { codexItemToSurfaceMessage, codexThreadToSurfaceMessages } from './codex-conversation-history';
+import { registerCodexApprovalHandlers, type PendingCodexApproval } from './codex-approvals';
 import {
   CodexAppServerStdioTransport,
   type CodexAppServerStdioTransportOptions,
@@ -38,6 +41,8 @@ export type CodexSurfaceOptions = {
 export class CodexSurface {
   private readonly client: CodexAppServerClient;
   private readonly listeners = new Set<StateListener>();
+  private readonly pendingApprovals = new Map<string, PendingCodexApproval>();
+  private readonly unsubscribeApprovals: () => void;
   private readonly unsubscribeNotification: () => void;
   private activeTurnId: string | null = null;
   private connectPromise: Promise<CodexSurfaceSnapshot> | null = null;
@@ -47,6 +52,7 @@ export class CodexSurface {
     conversations: [],
     activeConversationId: null,
     messages: [],
+    approvals: [],
     busy: false,
     error: null,
   };
@@ -57,6 +63,15 @@ export class CodexSurface {
       cwd: options.transport?.cwd ?? options.cwd,
     }));
     this.unsubscribeNotification = this.client.onNotification((notification) => this.handleNotification(notification));
+    this.unsubscribeApprovals = registerCodexApprovalHandlers(this.client, (pending) => {
+      this.pendingApprovals.set(pending.approval.id, pending);
+      this.patch({
+        approvals: [
+          ...this.state.approvals.filter((approval) => approval.id !== pending.approval.id),
+          pending.approval,
+        ],
+      });
+    });
   }
 
   connect(): Promise<CodexSurfaceSnapshot> {
@@ -87,7 +102,7 @@ export class CodexSurface {
           },
           capabilities: { experimentalApi: true, requestAttestation: false },
         });
-        await this.refreshConversations();
+        await this.loadConversations();
         this.patch({ status: 'ready', error: null });
         return this.getSnapshot();
       } catch (error) {
@@ -101,6 +116,11 @@ export class CodexSurface {
   }
 
   async refreshConversations(): Promise<CodexSurfaceSnapshot> {
+    await this.ensureConnected();
+    return this.loadConversations();
+  }
+
+  private async loadConversations(): Promise<CodexSurfaceSnapshot> {
     const response = await this.client.request('thread/list', {
       archived: false,
       cwd: this.options.cwd,
@@ -191,7 +211,7 @@ export class CodexSurface {
         cwd: this.options.cwd,
         ...(options.model ? { model: options.model } : {}),
       });
-      this.activeTurnId = response.turn.id;
+      this.activeTurnId = response.turn.status === 'inProgress' ? response.turn.id : null;
       this.patch({ busy: response.turn.status === 'inProgress' });
     } catch (error) {
       this.patch({ busy: false, error: errorMessage(error) });
@@ -209,6 +229,19 @@ export class CodexSurface {
     return this.getSnapshot();
   }
 
+  async resolveApproval(
+    approvalId: string,
+    decision: CodexSurfaceApprovalDecision,
+    scope: CodexSurfaceApprovalScope = 'once',
+  ): Promise<CodexSurfaceSnapshot> {
+    const pending = this.pendingApprovals.get(approvalId);
+    if (!pending) throw new Error(`Unknown approval '${approvalId}'`);
+    pending.resolve(decision, scope);
+    this.pendingApprovals.delete(approvalId);
+    this.patch({ approvals: this.state.approvals.filter((approval) => approval.id !== approvalId) });
+    return this.getSnapshot();
+  }
+
   getSnapshot(): CodexSurfaceSnapshot {
     return structuredClone(this.state);
   }
@@ -222,8 +255,10 @@ export class CodexSurface {
     if (this.closed) return;
     this.closed = true;
     this.unsubscribeNotification();
+    this.unsubscribeApprovals();
+    this.pendingApprovals.clear();
     await this.client.close();
-    this.patch({ status: 'idle', busy: false });
+    this.patch({ status: 'idle', busy: false, approvals: [] });
   }
 
   private async ensureConnected(): Promise<void> {

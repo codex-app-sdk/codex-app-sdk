@@ -22,6 +22,7 @@ describe('useCodexSurface', () => {
     await surface.sendMessage('Hello');
     await surface.interrupt();
     await surface.refreshConversations();
+    await surface.resolveApproval('approval-1', 'deny');
     expect(api.sendMessage).toHaveBeenCalledWith('Hello', undefined);
     scope.stop();
     expect(unsubscribe).toHaveBeenCalledOnce();
@@ -33,6 +34,7 @@ const readySnapshot: CodexSurfaceSnapshot = {
   conversations: [],
   activeConversationId: null,
   messages: [],
+  approvals: [],
   busy: false,
   error: null,
 };
@@ -47,6 +49,7 @@ function fakeApi(
     interrupt: vi.fn(async () => readySnapshot),
     onStateChange: vi.fn(subscribe),
     refreshConversations: vi.fn(async () => readySnapshot),
+    resolveApproval: vi.fn(async () => readySnapshot),
     selectConversation: vi.fn(async () => readySnapshot),
     sendMessage: vi.fn(async () => readySnapshot),
   };

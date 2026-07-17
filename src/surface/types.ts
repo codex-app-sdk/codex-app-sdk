@@ -45,6 +45,21 @@ export type CodexConversationSummary = {
   updatedAt: string;
 };
 
+export type CodexSurfaceApproval = {
+  id: string;
+  kind: 'command' | 'file-change' | 'permissions';
+  conversationId: string;
+  turnId?: string;
+  itemId: string;
+  title: string;
+  description?: string;
+  command?: string;
+  cwd?: string;
+};
+
+export type CodexSurfaceApprovalDecision = 'approve' | 'deny';
+export type CodexSurfaceApprovalScope = 'once' | 'session';
+
 export type CodexSurfaceStatus = 'idle' | 'connecting' | 'ready' | 'error';
 
 export type CodexSurfaceSnapshot = {
@@ -52,6 +67,7 @@ export type CodexSurfaceSnapshot = {
   conversations: CodexConversationSummary[];
   activeConversationId: string | null;
   messages: SurfaceMessage[];
+  approvals: CodexSurfaceApproval[];
   busy: boolean;
   error: string | null;
 };
@@ -77,6 +93,11 @@ export type CodexSurfaceApi = {
   selectConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
   interrupt(): Promise<CodexSurfaceSnapshot>;
+  resolveApproval(
+    approvalId: string,
+    decision: CodexSurfaceApprovalDecision,
+    scope?: CodexSurfaceApprovalScope,
+  ): Promise<CodexSurfaceSnapshot>;
   getSnapshot(): Promise<CodexSurfaceSnapshot>;
   onStateChange(listener: (snapshot: CodexSurfaceSnapshot) => void): () => void;
 };

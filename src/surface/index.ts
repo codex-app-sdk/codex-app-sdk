@@ -1,7 +1,10 @@
 export type {
   CodexConversationSummary,
   CodexSurfaceApi,
+  CodexSurfaceApproval,
+  CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalMode,
+  CodexSurfaceApprovalScope,
   CodexSurfacePermissionMode,
   CodexSurfaceSnapshot,
   CodexSurfaceStatus,

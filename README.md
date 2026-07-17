@@ -72,7 +72,10 @@ void connect();
 ```
 
 `CodexSurface` exposes stable product operations: connect, list/refresh, create,
-select, send, interrupt, subscribe, and close. It translates persisted history
+select, send, interrupt, approve/deny, subscribe, and close. With
+`approvalMode: 'ask'`, command, file-change, and permission requests appear as
+serializable `state.approvals` and are answered through `resolveApproval`; apps
+never handle server-request responders. The runtime translates persisted history
 and live user, assistant, command, file-change, MCP, reasoning, search, image,
 and agent items into the SDK's serializable surface model.
 
@@ -168,9 +171,9 @@ consume surface-owned messages and state, not raw app-server notifications.
 
 ## Vue surfaces
 
-The Vue entry includes `CodexConversationPane`, `CodexComposer`, `CodexComposerMenu`,
-`CodexComposerMenuList`, `CodexComposerSendButton`, `CodexMessage`, and
-`CodexMessageList`:
+The Vue entry includes `CodexConversationPane`, `CodexApprovalPrompt`,
+`CodexComposer`, `CodexComposerMenu`, `CodexComposerMenuList`,
+`CodexComposerSendButton`, `CodexMessage`, and `CodexMessageList`:
 
 ```ts
 import { CodexComposer, CodexMessageList } from 'codex-app-sdk/vue';
@@ -178,8 +181,9 @@ import 'codex-app-sdk/styles.css';
 ```
 
 `CodexConversationPane` composes message-list, composer, error, header, and empty
-states. It forwards header, empty-state, message, composer, and menu slots, and
-accepts custom composer menu entries without requiring a fork.
+states plus app-owned approval prompts. It forwards header, empty-state,
+message, approval, composer, and menu slots, and accepts custom composer menu
+entries without requiring a fork.
 
 `CodexComposerMenu` accepts nested action, checkbox, radio, separator, submenu,
 and custom entries. Typed payloads let a host application contribute its own

@@ -79,4 +79,53 @@ describe('Codex executable discovery', () => {
     expect(env.SURFACE_TEST).toBe('1');
     expect(env.PATH).toBe('/usr/bin:/opt/homebrew/bin');
   });
+
+  it('supports Nushell discovery, HOME fallback, and an already-prefixed nvm version', () => {
+    const execFileSync = vi.fn()
+      .mockReturnValueOnce('/nu/bin')
+      .mockImplementationOnce(() => { throw new Error('nvm unavailable'); });
+    const existsSync = vi.fn((filePath: string) => [
+      '/Users/from-env/.local/bin',
+      '/Users/from-env/.nvm/alias/default',
+      '/Users/from-env/.nvm/versions/node',
+      '/Users/from-env/.nvm/versions/node/v24.1.0/bin/codex',
+    ].includes(filePath));
+
+    expect(discoverCodexExecutable({
+      env: { HOME: '/Users/from-env', PATH: '', SHELL: '/bin/nu' },
+      execFileSync,
+      existsSync,
+      pathDelimiter: ':',
+      platform: 'darwin',
+      readFileSync: vi.fn(() => 'v24.1.0'),
+      readdirSync: vi.fn(() => ['v24.1.0']),
+    })).toBe('/Users/from-env/.nvm/versions/node/v24.1.0/bin/codex');
+    expect(execFileSync.mock.calls[0]?.[1]).toStrictEqual(['-l', '-c', 'print $env.PATH']);
+  });
+
+  it('handles empty or unreadable nvm aliases without inventing a path', () => {
+    const base = {
+      env: { PATH: '' },
+      execFileSync: vi.fn(() => { throw new Error('shell unavailable'); }),
+      existsSync: vi.fn((filePath: string) => filePath.endsWith('/.nvm/alias/default') || filePath.endsWith('/.nvm/versions/node')),
+      homedir: () => '/Users/nicolas',
+      pathDelimiter: ':',
+      platform: 'darwin' as const,
+      readdirSync: vi.fn(() => []),
+    };
+    expect(discoverCodexExecutable({ ...base, readFileSync: vi.fn(() => '') })).toBeNull();
+    expect(discoverCodexExecutable({
+      ...base,
+      readFileSync: vi.fn(() => { throw new Error('unreadable'); }),
+    })).toBeNull();
+  });
+
+  it('uses default Windows executable extensions when PATHEXT is absent', () => {
+    expect(discoverCodexExecutable({
+      env: { PATH: 'C:\\Tools', PATHEXT: undefined },
+      existsSync: vi.fn((filePath: string) => filePath.toLowerCase().endsWith('codex.exe')),
+      pathDelimiter: ';',
+      platform: 'win32',
+    })).toMatch(/codex\.exe$/i);
+  });
 });

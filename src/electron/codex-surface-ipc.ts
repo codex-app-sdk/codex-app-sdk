@@ -1,6 +1,8 @@
 import type { CodexSurface } from '../node/codex-surface';
 import type {
   CodexSurfaceApi,
+  CodexSurfaceApprovalDecision,
+  CodexSurfaceApprovalScope,
   CodexSurfaceSnapshot,
   CreateCodexConversationOptions,
   SendCodexMessageOptions,
@@ -20,6 +22,7 @@ const channels = {
   getSnapshot: 'codex-surface:get-snapshot',
   interrupt: 'codex-surface:interrupt',
   refreshConversations: 'codex-surface:refresh-conversations',
+  resolveApproval: 'codex-surface:resolve-approval',
   selectConversation: 'codex-surface:select-conversation',
   sendMessage: 'codex-surface:send-message',
   stateChanged: 'codex-surface:state-changed',
@@ -31,6 +34,11 @@ type SurfaceRequests = {
   [channels.getSnapshot]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.interrupt]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.refreshConversations]: IpcRequest<[], CodexSurfaceSnapshot>;
+  [channels.resolveApproval]: IpcRequest<[
+    approvalId: string,
+    decision: CodexSurfaceApprovalDecision,
+    scope?: CodexSurfaceApprovalScope,
+  ], CodexSurfaceSnapshot>;
   [channels.selectConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.sendMessage]: IpcRequest<[prompt: string, options?: SendCodexMessageOptions], CodexSurfaceSnapshot>;
 };
@@ -51,6 +59,7 @@ export function registerCodexSurfaceIpc(
     | 'interrupt'
     | 'onStateChange'
     | 'refreshConversations'
+    | 'resolveApproval'
     | 'selectConversation'
     | 'sendMessage'>,
 ): () => void {
@@ -60,6 +69,7 @@ export function registerCodexSurfaceIpc(
     [channels.getSnapshot]: () => surface.getSnapshot(),
     [channels.interrupt]: () => surface.interrupt(),
     [channels.refreshConversations]: () => surface.refreshConversations(),
+    [channels.resolveApproval]: (_event, approvalId, decision, scope) => surface.resolveApproval(approvalId, decision, scope),
     [channels.selectConversation]: (_event, conversationId) => surface.selectConversation(conversationId),
     [channels.sendMessage]: (_event, prompt, options) => surface.sendMessage(prompt, options),
   });
@@ -79,6 +89,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     interrupt: () => renderer.invoke(channels.interrupt),
     onStateChange: (listener) => renderer.on(channels.stateChanged, listener),
     refreshConversations: () => renderer.invoke(channels.refreshConversations),
+    resolveApproval: (approvalId, decision, scope) => renderer.invoke(channels.resolveApproval, approvalId, decision, scope),
     selectConversation: (conversationId) => renderer.invoke(channels.selectConversation, conversationId),
     sendMessage: (prompt, options) => renderer.invoke(channels.sendMessage, prompt, options),
   };

@@ -1,6 +1,8 @@
 import { getCurrentScope, onScopeDispose, reactive, readonly } from 'vue';
 import type {
   CodexSurfaceApi,
+  CodexSurfaceApprovalDecision,
+  CodexSurfaceApprovalScope,
   CodexSurfaceSnapshot,
   CreateCodexConversationOptions,
   SendCodexMessageOptions,
@@ -11,6 +13,7 @@ const initialState: CodexSurfaceSnapshot = {
   conversations: [],
   activeConversationId: null,
   messages: [],
+  approvals: [],
   busy: false,
   error: null,
 };
@@ -33,6 +36,11 @@ export function useCodexSurface(api: CodexSurfaceApi) {
     createConversation: (options?: CreateCodexConversationOptions) => run(() => api.createConversation(options)),
     interrupt: () => run(() => api.interrupt()),
     refreshConversations: () => run(() => api.refreshConversations()),
+    resolveApproval: (
+      approvalId: string,
+      decision: CodexSurfaceApprovalDecision,
+      scope?: CodexSurfaceApprovalScope,
+    ) => run(() => api.resolveApproval(approvalId, decision, scope)),
     selectConversation: (conversationId: string) => run(() => api.selectConversation(conversationId)),
     sendMessage: (prompt: string, options?: SendCodexMessageOptions) => run(() => api.sendMessage(prompt, options)),
   };

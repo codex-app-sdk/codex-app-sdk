@@ -55,10 +55,6 @@ function resolveExecutable(
   executable: string,
   dependencies: CodexExecutableDiscoveryDependencies,
 ): string | null {
-  if (path.isAbsolute(executable)) {
-    return executableExists(executable, dependencies) ? executable : null;
-  }
-
   for (const entry of codexRuntimePathEntries(dependencies)) {
     for (const candidate of executableCandidates(executable, dependencies)) {
       const filePath = path.join(entry, candidate);

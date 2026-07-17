@@ -11,6 +11,7 @@
     <CodexConversationPane
       v-model="draft"
       :busy="state.busy"
+      :approvals="state.approvals"
       :disabled="state.status !== 'ready'"
       :error="visibleError"
       :menu-items="composerMenuItems"
@@ -19,6 +20,7 @@
       autofocus
       @interrupt="run(interrupt)"
       @menu-select="handleMenuAction"
+      @resolve-approval="(id, decision, scope) => run(() => resolveApproval(id, decision, scope))"
       @submit="run(() => sendMessage($event))"
     >
       <template #empty>
@@ -50,6 +52,7 @@ const {
   createConversation,
   interrupt,
   refreshConversations,
+  resolveApproval,
   selectConversation,
   sendMessage,
 } = useCodexSurface(window.codexSurface);

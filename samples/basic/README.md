@@ -20,4 +20,6 @@ The sample uses the current directory as its project. Set `CODEX_SAMPLE_CWD` to 
 CODEX_SAMPLE_CWD=/absolute/path/to/project npm run sample:start
 ```
 
-The surface defaults to read-only access with no approval prompts. Change `permissionMode` and `approvalMode` in `electron/main.ts` when adding an approval UI.
+The surface defaults to read-only access with no approval prompts. The SDK pane
+already renders and resolves approvals, so change `permissionMode` and
+`approvalMode` in `electron/main.ts` when you want to enable them.

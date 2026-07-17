@@ -1,4 +1,5 @@
 export { default as CodexComposer } from './components/CodexComposer.vue';
+export { default as CodexApprovalPrompt } from './components/CodexApprovalPrompt.vue';
 export { default as CodexConversationPane } from './components/CodexConversationPane.vue';
 export { default as CodexComposerMenu } from './components/CodexComposerMenu.vue';
 export { default as CodexComposerMenuList } from './components/CodexComposerMenuList.vue';

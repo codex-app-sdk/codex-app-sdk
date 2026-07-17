@@ -12,6 +12,7 @@ const snapshot: CodexSurfaceSnapshot = {
   conversations: [],
   activeConversationId: null,
   messages: [],
+  approvals: [],
   busy: false,
   error: null,
 };
@@ -27,6 +28,7 @@ describe('Codex surface Electron bridge', () => {
       getSnapshot: vi.fn(() => snapshot),
       interrupt: vi.fn(async () => snapshot),
       refreshConversations: vi.fn(async () => snapshot),
+      resolveApproval: vi.fn(async () => snapshot),
       selectConversation: vi.fn(async () => snapshot),
       sendMessage: vi.fn(async () => snapshot),
       onStateChange: vi.fn((listener: (value: CodexSurfaceSnapshot) => void) => {
@@ -55,6 +57,7 @@ describe('Codex surface Electron bridge', () => {
     await api.connect();
     await api.createConversation({ permissionMode: 'workspace-write' });
     await api.refreshConversations();
+    await api.resolveApproval('approval-1', 'approve', 'once');
     await api.selectConversation('thread-2');
     await api.sendMessage('Build it');
     await api.interrupt();
@@ -66,6 +69,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:connect',
       'codex-surface:create-conversation',
       'codex-surface:refresh-conversations',
+      'codex-surface:resolve-approval',
       'codex-surface:select-conversation',
       'codex-surface:send-message',
       'codex-surface:interrupt',

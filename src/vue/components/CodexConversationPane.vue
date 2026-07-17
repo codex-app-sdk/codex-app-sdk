@@ -14,6 +14,17 @@
     <p v-if="error" class="codex-conversation-pane__error" role="alert">{{ error }}</p>
 
     <footer class="codex-conversation-pane__footer">
+      <div v-if="approvals.length > 0" class="codex-conversation-pane__approvals">
+        <template v-for="approval in approvals" :key="approval.id">
+          <slot name="approval" :approval="approval">
+            <CodexApprovalPrompt
+              :approval="approval"
+              :disabled="disabled"
+              @resolve="(decision, scope) => emit('resolveApproval', approval.id, decision, scope)"
+            />
+          </slot>
+        </template>
+      </div>
       <slot name="before-composer" />
       <CodexComposer
         :autofocus="autofocus"
@@ -44,14 +55,21 @@
 </template>
 
 <script setup lang="ts" generic="Payload = unknown">
-import type { SurfaceMessage } from '../../surface/types';
+import type {
+  CodexSurfaceApproval,
+  CodexSurfaceApprovalDecision,
+  CodexSurfaceApprovalScope,
+  SurfaceMessage,
+} from '../../surface/types';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposer from './CodexComposer.vue';
+import CodexApprovalPrompt from './CodexApprovalPrompt.vue';
 import CodexComposerMenu from './CodexComposerMenu.vue';
 import CodexMessageList from './CodexMessageList.vue';
 
 withDefaults(defineProps<{
   ariaLabel?: string;
+  approvals?: readonly CodexSurfaceApproval[];
   autofocus?: boolean;
   busy?: boolean;
   disabled?: boolean;
@@ -64,6 +82,7 @@ withDefaults(defineProps<{
   title?: string;
 }>(), {
   ariaLabel: 'Conversation',
+  approvals: () => [],
   autofocus: false,
   busy: false,
   disabled: false,
@@ -77,6 +96,11 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   interrupt: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
+  resolveApproval: [
+    approvalId: string,
+    decision: CodexSurfaceApprovalDecision,
+    scope: CodexSurfaceApprovalScope,
+  ];
   submit: [prompt: string];
   'update:modelValue': [value: string];
 }>();

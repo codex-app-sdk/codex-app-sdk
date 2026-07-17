@@ -40,6 +40,7 @@ const snapshot: CodexSurfaceSnapshot = {
   }],
   activeConversationId: null,
   messages: [],
+  approvals: [],
   busy: false,
   error: null,
 };
@@ -52,6 +53,7 @@ function fakeSurfaceApi(): CodexSurfaceApi & Record<string, ReturnType<typeof vi
     interrupt: vi.fn(async () => snapshot),
     onStateChange: vi.fn(() => vi.fn()),
     refreshConversations: vi.fn(async () => snapshot),
+    resolveApproval: vi.fn(async () => snapshot),
     selectConversation: vi.fn(async () => ({ ...snapshot, activeConversationId: 'thread-1' })),
     sendMessage: vi.fn(async () => snapshot),
   };

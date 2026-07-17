@@ -1,0 +1,101 @@
+<template>
+  <article class="codex-approval-prompt" role="status">
+    <div class="codex-approval-prompt__copy">
+      <strong>{{ approval.title }}</strong>
+      <p v-if="approval.description">{{ approval.description }}</p>
+      <code v-if="approval.command">{{ approval.command }}</code>
+      <small v-if="approval.cwd">{{ approval.cwd }}</small>
+    </div>
+    <div class="codex-approval-prompt__actions">
+      <button type="button" :disabled="disabled" @click="emit('resolve', 'deny', 'once')">Deny</button>
+      <button type="button" :disabled="disabled" @click="emit('resolve', 'approve', 'session')">Allow for session</button>
+      <button class="codex-approval-prompt__primary" type="button" :disabled="disabled" @click="emit('resolve', 'approve', 'once')">
+        Allow once
+      </button>
+    </div>
+  </article>
+</template>
+
+<script setup lang="ts">
+import type {
+  CodexSurfaceApproval,
+  CodexSurfaceApprovalDecision,
+  CodexSurfaceApprovalScope,
+} from '../../surface/types';
+
+withDefaults(defineProps<{
+  approval: CodexSurfaceApproval;
+  disabled?: boolean;
+}>(), {
+  disabled: false,
+});
+
+const emit = defineEmits<{
+  resolve: [decision: CodexSurfaceApprovalDecision, scope: CodexSurfaceApprovalScope];
+}>();
+</script>
+
+<style scoped>
+.codex-approval-prompt {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--codex-space-3, 12px);
+  justify-content: space-between;
+  margin-bottom: var(--codex-space-2, 8px);
+  padding: 12px;
+  border: 1px solid var(--codex-border-color, #d8dadd);
+  border-radius: 12px;
+  background: var(--codex-subtle-surface-color, #f7f7f5);
+}
+
+.codex-approval-prompt__copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.codex-approval-prompt p,
+.codex-approval-prompt code,
+.codex-approval-prompt small {
+  margin: 0;
+  color: var(--codex-muted-text-color, #777b82);
+  font-size: 12px;
+}
+
+.codex-approval-prompt code {
+  overflow: hidden;
+  color: var(--codex-text-color, #202124);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-approval-prompt__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.codex-approval-prompt button {
+  padding: 6px 9px;
+  border: 1px solid var(--codex-border-color, #d8dadd);
+  border-radius: 8px;
+  color: var(--codex-text-color, #202124);
+  background: var(--codex-surface-color, #fff);
+  cursor: pointer;
+}
+
+.codex-approval-prompt__primary {
+  color: var(--codex-primary-contrast-color, #fff) !important;
+  background: var(--codex-primary-color, #202124) !important;
+}
+
+.codex-approval-prompt button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 680px) {
+  .codex-approval-prompt { align-items: stretch; flex-direction: column; }
+  .codex-approval-prompt__actions { flex-wrap: wrap; }
+}
+</style>

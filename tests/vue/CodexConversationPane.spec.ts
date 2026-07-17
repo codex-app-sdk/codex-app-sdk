@@ -64,4 +64,45 @@ describe('CodexConversationPane', () => {
     await wrapper.findAll('button').find((button) => button.text().includes('Custom action'))!.trigger('click');
     expect(wrapper.emitted('menuSelect')?.[0]).toStrictEqual([menuItems[0]]);
   });
+
+  it('composes approvals and forwards decisions without exposing protocol types', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        approvals: [{
+          id: 'approval-1', kind: 'file-change', conversationId: 'thread-1', turnId: 'turn-1',
+          itemId: 'item-1', title: 'Apply file changes',
+        }],
+        messages,
+        modelValue: '',
+      },
+    });
+    await wrapper.findAll('button').find((button) => button.text() === 'Allow once')!.trigger('click');
+    expect(wrapper.emitted('resolveApproval')).toStrictEqual([['approval-1', 'approve', 'once']]);
+  });
+
+  it('forwards presentation extension slots at each composition boundary', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        approvals: [{
+          id: 'approval-slot', kind: 'permissions', conversationId: 'thread-1', itemId: 'item-1',
+          title: 'Permissions',
+        }],
+        menuItems: [{ id: 'custom', type: 'custom', label: 'Custom' }],
+        messages,
+        modelValue: '',
+      },
+      slots: {
+        approval: '<div class="approval-slot">Approval slot</div>',
+        message: '<div class="message-slot">Message slot</div>',
+        'composer-after-input': '<div class="input-slot">Input slot</div>',
+        'composer-after': '<div class="after-slot">After slot</div>',
+        'after-composer': '<div class="footer-slot">Footer slot</div>',
+      },
+    });
+    expect(wrapper.get('.approval-slot').exists()).toBe(true);
+    expect(wrapper.get('.message-slot').exists()).toBe(true);
+    expect(wrapper.get('.input-slot').exists()).toBe(true);
+    expect(wrapper.get('.after-slot').exists()).toBe(true);
+    expect(wrapper.get('.footer-slot').exists()).toBe(true);
+  });
 });
