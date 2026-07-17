@@ -32,7 +32,12 @@
     "./node": {
       "types": "./dist/node/index.d.ts",
       "import": "./dist/node.js"
-    }
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./styles.css": "./dist/codex-app-sdk.css"
   },
   "scripts": {
     "schema:generate": "node scripts/generate-codex-schema.mjs",

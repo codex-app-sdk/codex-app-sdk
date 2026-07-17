@@ -88,3 +88,19 @@ Codex notification -> product adapter -> TypedEventBus -> Electron IPC
 
 Protocol-specific payloads should be adapted before they cross IPC. Components
 consume surface-owned messages and state, not raw app-server notifications.
+
+## Vue surfaces
+
+The Vue entry includes `CodexComposer`, `CodexComposerSendButton`,
+`CodexMessage`, and `CodexMessageList`:
+
+```ts
+import { CodexComposer, CodexMessageList } from 'codex-app-sdk/vue';
+import 'codex-app-sdk/styles.css';
+```
+
+`CodexMessage` renders the SDK's safe `SurfaceMessage` contract. Message and
+message-list slots let products replace text, tool, status, and full-message
+rendering while retaining tested layout and auto-scroll behavior. Components
+use `--codex-*` semantic CSS variables with neutral fallbacks and do not depend
+on Element Plus, Electron, Codex Claw stores, or raw app-server types.
