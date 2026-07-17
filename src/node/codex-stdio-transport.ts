@@ -1,5 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'node:child_process';
 import type { RpcMessage, RpcTransport } from '../codex/wire';
+import {
+  discoverCodexExecutable,
+  withCodexRuntimePath,
+  type CodexExecutableDiscoveryDependencies,
+} from './codex-executable';
 
 export type CodexAppServerExit = {
   code: number | null;
@@ -13,6 +18,7 @@ export type CodexAppServerStdioTransportOptions = {
   codexHome?: string;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  executableDiscovery?: CodexExecutableDiscoveryDependencies;
   onExit?: (exit: CodexAppServerExit) => void;
   onStderr?: (text: string) => void;
   spawnProcess?: typeof spawn;
@@ -31,17 +37,19 @@ export class CodexAppServerStdioTransport implements RpcTransport {
       return;
     }
 
-    const command = this.options.command?.trim() || 'codex';
+    const env = withCodexRuntimePath(this.options.env, this.options.executableDiscovery);
+    const command = this.options.command?.trim()
+      || discoverCodexExecutable({ ...this.options.executableDiscovery, env })
+      || 'codex';
     const configArgs = this.options.configOverrides?.flatMap((override) => ['-c', override]) ?? [];
     const args = [...configArgs, 'app-server', '--listen', 'stdio://'];
-    const env = {
-      ...process.env,
-      ...this.options.env,
+    const processEnv = {
+      ...env,
       ...(this.options.codexHome ? { CODEX_HOME: this.options.codexHome } : {}),
     };
     const spawnOptions: SpawnOptionsWithoutStdio = {
       ...(this.options.cwd ? { cwd: this.options.cwd } : {}),
-      env,
+      env: processEnv,
       stdio: 'pipe',
     };
     const child = (this.options.spawnProcess ?? spawn)(command, args, spawnOptions);
@@ -132,4 +140,3 @@ export class CodexAppServerStdioTransport implements RpcTransport {
     }
   }
 }
-

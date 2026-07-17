@@ -12,6 +12,7 @@ export default defineConfig({
         electron: fileURLToPath(new URL('./src/electron/index.ts', import.meta.url)),
         events: fileURLToPath(new URL('./src/events/index.ts', import.meta.url)),
         node: fileURLToPath(new URL('./src/node/index.ts', import.meta.url)),
+        surface: fileURLToPath(new URL('./src/surface/index.ts', import.meta.url)),
         vue: fileURLToPath(new URL('./src/vue/index.ts', import.meta.url)),
       },
       formats: ['es'],

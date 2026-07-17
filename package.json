@@ -33,6 +33,10 @@
       "types": "./dist/node/index.d.ts",
       "import": "./dist/node.js"
     },
+    "./surface": {
+      "types": "./dist/surface/index.d.ts",
+      "import": "./dist/surface.js"
+    },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue.js"

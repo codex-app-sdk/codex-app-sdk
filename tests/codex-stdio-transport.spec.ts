@@ -40,6 +40,10 @@ describe('CodexAppServerStdioTransport', () => {
       configOverrides: ['features.apps=true'],
       cwd: '/tmp/project',
       env: { SURFACE_TEST: 'yes' },
+      executableDiscovery: {
+        execFileSync: vi.fn(() => ''),
+        existsSync: vi.fn(() => false),
+      },
     });
 
     await transport.start();
@@ -64,7 +68,9 @@ describe('CodexAppServerStdioTransport', () => {
   it('frames partial and multiple JSONL messages and reports malformed lines', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);
-    const transport = new CodexAppServerStdioTransport();
+    const transport = new CodexAppServerStdioTransport({
+      executableDiscovery: { execFileSync: vi.fn(() => ''), existsSync: vi.fn(() => false) },
+    });
     const messages: unknown[] = [];
     const errors: Error[] = [];
     const unsubscribeMessage = transport.onMessage((message) => messages.push(message));
@@ -90,7 +96,11 @@ describe('CodexAppServerStdioTransport', () => {
     const onStderr = vi.fn();
     const onExit = vi.fn();
     const errors: Error[] = [];
-    const transport = new CodexAppServerStdioTransport({ onExit, onStderr });
+    const transport = new CodexAppServerStdioTransport({
+      executableDiscovery: { execFileSync: vi.fn(() => ''), existsSync: vi.fn(() => false) },
+      onExit,
+      onStderr,
+    });
     transport.onError((error) => errors.push(error));
     await transport.start();
 
@@ -106,7 +116,10 @@ describe('CodexAppServerStdioTransport', () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);
     const errors: Error[] = [];
-    const transport = new CodexAppServerStdioTransport({ command: '  ' });
+    const transport = new CodexAppServerStdioTransport({
+      command: '  ',
+      executableDiscovery: { execFileSync: vi.fn(() => ''), existsSync: vi.fn(() => false) },
+    });
     transport.onError((error) => errors.push(error));
     await transport.start();
 
@@ -126,4 +139,3 @@ describe('CodexAppServerStdioTransport', () => {
     expect(() => transport.send({ method: 'initialized' })).toThrow('Codex app-server transport is not started');
   });
 });
-
