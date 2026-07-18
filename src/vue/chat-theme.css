@@ -30,7 +30,7 @@
   --color-shine: var(--codex-shine-color, rgb(255 255 255 / 95%));
 
   --font-family-base: var(--codex-font-family, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-  --font-family-mono: var(--codex-mono-font-family, "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace);
+  --font-family-mono: var(--codex-mono-font-family, "JetBrains Mono", ui-monospace, "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace);
   --font-size-8: 8px;
   --font-size-9: 9px;
   --font-size-10: 10px;

@@ -13,10 +13,13 @@
   animation: codex-text-shimmer 4.5s linear infinite;
 }
 
+.codex-chat-theme {
+  font-family: var(--font-family-base);
+}
+
 .codex-chat-theme,
 .codex-chat-theme * {
   box-sizing: border-box;
-  font-family: var(--font-family-base);
 }
 
 .codex-chat-theme::before,

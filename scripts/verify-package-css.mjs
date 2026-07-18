@@ -7,6 +7,7 @@ const css = await readFile(cssPath, 'utf8');
 const requiredMarkers = [
   '.codex-text-shimmer',
   '.codex-markdown',
+  '.codex-chat-theme{font-family:var(--font-family-base)}',
   ':where(.codex-chat-theme)',
   '.codex-chat-theme--dark',
   '.codex-chat-theme--system',
@@ -24,6 +25,10 @@ const missingMarkers = requiredMarkers.filter((marker) => !css.includes(marker))
 
 if (missingMarkers.length > 0) {
   throw new Error(`The published CSS bundle is missing: ${missingMarkers.join(', ')}`);
+}
+
+if (/\.codex-chat-theme \*\{[^}]*font-family/.test(css)) {
+  throw new Error('The published CSS must let themed descendants inherit specialized fonts.');
 }
 
 const vueDeclaration = await readFile(vueDeclarationPath, 'utf8');
