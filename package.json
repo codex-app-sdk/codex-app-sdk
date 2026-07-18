@@ -61,6 +61,11 @@
     "sample:build": "npm run build -w @codex-app-sdk/basic-sample",
     "sample:start": "npm run start -w @codex-app-sdk/basic-sample",
     "sample:test": "npm run test -w @codex-app-sdk/basic-sample",
+    "kids:build": "npm run build -w @codex-app-sdk/kids-sample",
+    "kids:dev": "npm run dev -w @codex-app-sdk/kids-sample",
+    "kids:start": "npm run start -w @codex-app-sdk/kids-sample",
+    "kids:test": "npm run test -w @codex-app-sdk/kids-sample",
+    "kids:typecheck": "npm run typecheck -w @codex-app-sdk/kids-sample",
     "prepare": "npm run build"
   },
   "dependencies": {

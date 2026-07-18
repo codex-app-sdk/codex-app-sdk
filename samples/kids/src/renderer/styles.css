@@ -1,0 +1,660 @@
+:root {
+  color: #142b54;
+  background: #fffaf1;
+  font-family: "Avenir Next", Avenir, "Nunito Sans", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.spark-status {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  width: 100%;
+  min-height: 100%;
+  padding: 36px;
+  text-align: center;
+  background: #fffaf1;
+}
+
+.spark-status__mascot {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  color: #ff9f45;
+  background: #7c5ce5;
+  border-radius: 28px;
+  box-shadow: 0 14px 30px rgb(73 48 142 / 22%);
+  font-size: 52px;
+}
+
+.spark-status__mascot--loading {
+  animation: spark-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.spark-status h1 {
+  margin: 24px 0 0;
+  font-size: 34px;
+}
+
+.spark-status p {
+  max-width: 440px;
+  margin: 10px 0 0;
+  color: #61708d;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.spark-status button {
+  min-height: 52px;
+  margin-top: 24px;
+  padding: 10px 24px;
+  color: white;
+  background: #6b4de6;
+  border: 0;
+  border-radius: 17px;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@keyframes spark-pulse {
+  to { transform: scale(1.06) rotate(4deg); }
+}
+
+.spark-landing {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100%;
+  padding: 36px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 16% 18%, rgb(124 92 229 / 12%) 0 120px, transparent 121px),
+    radial-gradient(circle at 84% 82%, rgb(55 169 162 / 12%) 0 150px, transparent 151px),
+    #fffaf1;
+}
+
+.spark-landing__card {
+  display: grid;
+  justify-items: center;
+  width: min(620px, 100%);
+  padding: 54px 54px 46px;
+  text-align: center;
+  background: rgb(255 253 249 / 94%);
+  border: 1px solid #eadfcd;
+  border-radius: 34px;
+  box-shadow: 0 28px 80px rgb(66 45 110 / 13%);
+}
+
+.spark-landing__stars {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  color: #ff9f45;
+  font-size: 28px;
+}
+
+.spark-landing__mascot {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  color: #ff9f45;
+  background: #7c5ce5;
+  border: 6px solid #f2ecff;
+  border-radius: 32px;
+  box-shadow: 0 14px 30px rgb(73 48 142 / 22%);
+  font-size: 58px;
+  transform: rotate(-4deg);
+}
+
+.spark-landing__eyebrow {
+  margin: 28px 0 0;
+  color: #6b4de6;
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.spark-landing h1 {
+  margin: 10px 0 0;
+  font-size: clamp(36px, 6vw, 54px);
+  line-height: 1.08;
+  letter-spacing: -0.05em;
+}
+
+.spark-landing__description {
+  max-width: 450px;
+  margin: 16px 0 0;
+  color: #61708d;
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.spark-landing__sign-in {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  min-width: min(360px, 100%);
+  min-height: 62px;
+  margin-top: 34px;
+  padding: 14px 26px;
+  color: #fff;
+  background: #6b4de6;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 10px 24px rgb(107 77 230 / 24%);
+  font-size: 19px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.spark-landing__sign-in:hover:not(:disabled) {
+  background: #593bd5;
+  transform: translateY(-2px);
+}
+
+.spark-landing__sign-in:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.spark-landing__grown-up {
+  margin: 14px 0 0;
+  color: #6a7893;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.spark-landing__error {
+  max-width: 420px;
+  margin: 18px 0 0;
+  padding: 12px 16px;
+  color: #8b2d28;
+  background: #fff0ed;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.spark-shell {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fffaf1;
+}
+
+.spark-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 26px 20px 20px;
+  overflow: hidden;
+  color: #142b54;
+  background: #fff7ea;
+  border-right: 1px solid #eadfcd;
+}
+
+.spark-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 26px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.spark-brand__mark,
+.spark-conversation__avatar,
+.spark-empty__mascot {
+  display: grid;
+  place-items: center;
+  color: #ff8a3d;
+  background: #7c5ce5;
+  border-radius: 30%;
+  box-shadow: 0 6px 18px rgb(73 48 142 / 20%);
+}
+
+.spark-brand__mark {
+  width: 44px;
+  height: 44px;
+  font-size: 29px;
+}
+
+.spark-sidebar__heading {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 0 4px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.spark-sidebar__new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  border: 0;
+  border-radius: 17px;
+  color: white;
+  background: #ff7043;
+  box-shadow: 0 8px 18px rgb(255 112 67 / 22%);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.spark-sidebar__new:hover:not(:disabled) {
+  background: #ee6036;
+  transform: translateY(-1px);
+}
+
+.spark-sidebar__new:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.spark-sidebar__list {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  grid-auto-rows: 72px;
+  gap: 10px;
+  min-height: 0;
+  padding-right: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.spark-sidebar__empty {
+  margin: 26px 12px;
+  color: #61708d;
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.spark-chat-card {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  height: 72px;
+  min-height: 72px;
+  padding: 11px 12px;
+  text-align: left;
+  background: #fffdf9;
+  border: 1px solid #eadfcd;
+  border-radius: 18px;
+  cursor: pointer;
+}
+
+.spark-chat-card:hover,
+.spark-chat-card--active {
+  border-color: #37a9a2;
+  background: #effbf9;
+}
+
+.spark-chat-card--active {
+  box-shadow: inset 4px 0 #37a9a2;
+}
+
+.spark-chat-card__icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  font-size: 26px;
+  background: #f2ecff;
+  border-radius: 14px;
+}
+
+.spark-chat-card__copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.spark-chat-card__title,
+.spark-chat-card__preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-chat-card__title {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.spark-chat-card__preview {
+  color: #6a7893;
+  font-size: 13px;
+}
+
+.spark-sidebar__bottom {
+  display: grid;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+.spark-account {
+  position: relative;
+}
+
+.spark-account__summary {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 8px 10px;
+  background: #fffdf9;
+  border: 1px solid #eadfcd;
+  border-radius: 17px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.spark-account__summary::-webkit-details-marker {
+  display: none;
+}
+
+.spark-account__summary:hover,
+.spark-account[open] .spark-account__summary {
+  background: #f3edff;
+  border-color: #c8b6ef;
+}
+
+.spark-account__avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: #d9f5f1;
+  border-radius: 13px;
+  font-size: 21px;
+}
+
+.spark-account__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.spark-account__copy strong,
+.spark-account__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-account__copy strong {
+  font-size: 14px;
+}
+
+.spark-account__copy small {
+  color: #6a7893;
+  font-size: 12px;
+}
+
+.spark-account__chevron {
+  color: #6a7893;
+  font-size: 17px;
+  transition: transform 150ms ease;
+}
+
+.spark-account[open] .spark-account__chevron {
+  transform: rotate(180deg);
+}
+
+.spark-account__menu {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  padding: 8px;
+  background: #fffdf9;
+  border: 1px solid #eadfcd;
+  border-radius: 17px;
+  box-shadow: 0 14px 34px rgb(66 45 110 / 16%);
+}
+
+.spark-account__menu button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  color: #8b2d28;
+  text-align: left;
+  background: #fff0ed;
+  border: 0;
+  border-radius: 13px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.spark-account__menu button:hover:not(:disabled) {
+  background: #ffe2dc;
+}
+
+.spark-account__menu button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.spark-account__menu p {
+  margin: 8px 4px 2px;
+  color: #8b2d28;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.spark-sidebar__footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 8px 2px;
+  color: #6a7893;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.spark-conversation {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: #fffdf9;
+}
+
+.spark-conversation__header {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  min-height: 88px;
+  padding: 18px 30px;
+  border-bottom: 1px solid #eadfcd;
+}
+
+.spark-conversation__avatar {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  font-size: 34px;
+}
+
+.spark-conversation__header h1,
+.spark-conversation__header p {
+  margin: 0;
+}
+
+.spark-conversation__header h1 {
+  font-size: 23px;
+  line-height: 1.2;
+}
+
+.spark-conversation__header p {
+  margin-top: 3px;
+  color: #6a7893;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.spark-chat {
+  --codex-font-family: "Avenir Next", Avenir, "Nunito Sans", system-ui, sans-serif;
+  --codex-message-font-size: 18px;
+  --codex-composer-font-size: 18px;
+  --codex-menu-font-size: 17px;
+  --codex-menu-description-font-size: 14px;
+  --codex-composer-control-size: 48px;
+  --codex-composer-compact-control-size: 42px;
+  --codex-message-action-control-size: 36px;
+  --codex-background-color: #fffdf9;
+  --codex-app-surface-color: #fffdf9;
+  --codex-surface-color: #fffdf9;
+  --codex-surface-raised-color: #fff8ee;
+  --codex-surface-high-color: #f3edff;
+  --codex-surface-highest-color: #e9e0ff;
+  --codex-text-color: #142b54;
+  --codex-muted-text-color: #6a7893;
+  --codex-border-color: #eadfcd;
+  --codex-strong-border-color: #d7c8b3;
+  --codex-primary-color: #6b4de6;
+  --codex-primary-container-color: #e8ddff;
+  --codex-on-primary-color: #fff;
+  --codex-on-primary-container-color: #2d1b72;
+  --codex-secondary-color: #178b84;
+  --codex-secondary-container-color: #d9f5f1;
+  --codex-on-secondary-container-color: #0a5551;
+  --codex-hover-color: #f7f0ff;
+  --codex-message-list-content-width: 780px;
+  --codex-composer-content-width: 780px;
+  min-height: 0;
+  font-size: 17px;
+}
+
+.spark-empty {
+  display: grid;
+  justify-items: center;
+  max-width: 720px;
+  margin: auto;
+  padding: 40px 28px;
+  text-align: center;
+}
+
+.spark-empty__mascot {
+  width: 78px;
+  height: 78px;
+  margin-bottom: 20px;
+  font-size: 50px;
+}
+
+.spark-empty h2,
+.spark-empty p {
+  margin: 0;
+}
+
+.spark-empty h2 {
+  font-size: 32px;
+  letter-spacing: -0.03em;
+}
+
+.spark-empty p {
+  margin-top: 8px;
+  color: #6a7893;
+  font-size: 18px;
+}
+
+.spark-prompts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  margin-top: 32px;
+}
+
+.spark-prompts button {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  min-height: 112px;
+  padding: 16px;
+  color: #142b54;
+  background: #fff8ee;
+  border: 1px solid #eadfcd;
+  border-radius: 20px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.spark-prompts button:hover {
+  border-color: #7c5ce5;
+  background: #f7f0ff;
+  transform: translateY(-2px);
+}
+
+.spark-prompts button span {
+  font-size: 30px;
+}
+
+@media (max-width: 900px) {
+  .spark-shell {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+
+  .spark-sidebar {
+    padding-inline: 12px;
+  }
+
+  .spark-prompts {
+    grid-template-columns: 1fr;
+  }
+
+  .spark-prompts button {
+    grid-template-columns: auto 1fr;
+    min-height: 64px;
+  }
+}
