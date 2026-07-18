@@ -1,70 +1,18 @@
 # codex-app-sdk
 
-`codex-app-sdk` is a reusable foundation for building native Codex surfaces.
-The default API owns Codex discovery, app-server lifecycle, initialization,
-conversation history, live updates, Electron IPC, and Vue presentation. An app
-chooses its product shell and policy without learning JSON-RPC method names or
-generated protocol types.
+Build full-featured desktop applications on top of Codex app-server without
+making every application reimplement process management, JSON-RPC, Electron
+IPC, conversation state, and chat UI.
 
-The SDK has five public layers:
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-339933.svg)](./package.json)
+[![Vue](https://img.shields.io/badge/vue-%3E%3D3.5-42b883.svg)](https://vuejs.org/)
 
-- a high-level conversation surface for normal application code;
-- a bidirectional, strongly typed Codex app-server client;
-- automatic executable discovery and JSONL-over-stdio transport;
-- secure high-level and generic Electron IPC adapters;
-- Vue state bindings and extensible conversation components.
+`codex-app-sdk` is a high-level Codex runtime, a narrow validated Electron
+bridge, and a complete Vue conversation kit. It owns the reusable plumbing and
+UI; your app owns its product shell, policy, business data, and integrations.
 
-## Build a surface
-
-Electron main creates one high-level surface. The SDK finds the Codex CLI in
-normal GUI-app locations (including login-shell, Homebrew, user-bin, nvm, and
-Windows `PATHEXT` paths), launches app-server, and owns its lifecycle:
-
-```ts
-import { clipboard, dialog, ipcMain, shell } from 'electron';
-import { registerCodexElectronMain } from 'codex-app-sdk/electron';
-import { createCodexSurface } from 'codex-app-sdk/node';
-
-const surface = createCodexSurface();
-const disposeSdk = registerCodexElectronMain({
-  clipboard, dialog, ipcMain, shell, surface,
-  sender: window.webContents,
-});
-```
-
-Host-owned app-server identity and conversation defaults stay in the main
-process. `codexHome` creates an isolated app-server child without mutating the
-parent environment; it is never exposed through snapshots or renderer IPC:
-
-```ts
-const surface = createCodexSurface({
-  codexHome: appSpecificCodexHome,
-  conversationDefaults: {
-    model: 'gpt-5.6-terra',
-    reasoningEffort: 'medium',
-  },
-});
-```
-
-Conversation defaults apply to explicit creation when a field is omitted and
-to every implicit creation path, including first send, goals, and reviews.
-
-Preload exposes the narrow SDK bridge; no Node or Electron primitive crosses
-into the renderer:
-
-```ts
-import { contextBridge, ipcRenderer } from 'electron';
-import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
-
-exposeCodexElectronPreload(contextBridge, ipcRenderer);
-```
-
-The main-process surface loads app-server's model and skill catalogs, permission
-profiles, goals, and persisted threads. Renderer settings updates are validated against that
-catalog before the surface sends typed `thread/settings/update` requests. The
-main IPC adapter strips unknown runtime fields before calling the surface.
-
-Vue binds the bridge to reactive state and uses the SDK conversation pane:
+The basic renderer can be this small:
 
 ```vue
 <script setup lang="ts">
@@ -76,6 +24,7 @@ const surface = useCodexSurface(window.codexSurface);
 
 <template>
   <MyConversationList
+    :active-id="surface.state.activeConversationId"
     :conversations="surface.state.conversations"
     @create="surface.createConversation()"
     @select="surface.selectConversation($event)"
@@ -84,243 +33,617 @@ const surface = useCodexSurface(window.codexSurface);
 </template>
 ```
 
-That bound-pane form auto-connects and owns the standard settings, approval,
-goal, message-action, attachment, copy, and voice-transcription wiring. All
-props and events remain available as additive overrides for provider-neutral or
-fully controlled hosts.
+No raw app-server method names, generated protocol payloads, Node primitives,
+or Electron objects need to cross into the renderer.
 
-`CodexSurface` exposes stable product operations: connect, list/refresh, create,
-select/read/rename, archive/unarchive/permanently delete conversations,
-send/queue/steer, interrupt, compact, start a review, update settings, set/clear
-goals, approve/deny/respond, delete/edit/retry messages, subscribe, and close.
-Its snapshots include per-thread live state, thread status, context
-usage, rate limits, authoritative account/login state, goals, approvals, pending app-server questions, queued
-prompts, and turn git diffs. `connect()` paginates the global, non-archived app-server thread list
-without applying a cwd filter, then resumes the newest thread so the first
-snapshot already contains the real conversation history. By default the SDK does
-not override app-server's working directory; a host may pass `cwd` explicitly for
-a deliberately project-scoped new conversation. It never restricts conversation
-discovery. `conversationLimit` can explicitly cap the total loaded list. Command,
-file-change, and permission requests appear as serializable `state.approvals`
-and are answered through `resolveApproval`; apps never handle server-request
-responders. Approval objects include the exact requested filesystem/network
-access and the scopes the server permits. The runtime translates persisted
-history and live user, assistant, command, file-change, MCP, plan, search,
-image, compaction, raw response, and agent items into the SDK's serializable
-surface model. Reasoning remains internal while the empty streaming assistant
-placeholder drives the standard Thinking shimmer.
+> **Project status:** the SDK is currently `0.1.x` and source-first. The public
+> surface API is intentionally much smaller than Codex app-server, but the
+> generated low-level client remains available for advanced integrations.
 
-Authentication is projected from app-server `account/read` without filesystem
-or error-string inference. A signed-out surface is still `ready`, with
-`state.authentication` preserving `account`, `requiresOpenaiAuth`, load status,
-and managed-login state. Call `startChatGptLogin()` to receive the app-server
-`loginId` and `authUrl`, open that URL through the SDK native external-link
-bridge, and let `account/login/completed` update the same controller. The SDK
-then refreshes account-dependent catalogs and conversations so the app can
-create and send immediately without restarting. `cancelLogin()`, `logout()`,
-and `refreshAccount()` cross the same typed IPC boundary.
+## Contents
 
-Account-scoped conversation state is invalidated when `account/read` exposes a
-distinct identity. The current protocol has no stable account id for API-key
-accounts, Bedrock accounts with the same credential source, or ChatGPT accounts
-whose email is null; a host replacing those indistinguishable credentials must
-restart the surface so app-server and SDK state begin from the same session.
+- [Why this SDK exists](#why-this-sdk-exists)
+- [What is included](#what-is-included)
+- [Architecture](#architecture)
+- [Requirements and installation](#requirements-and-installation)
+- [Quick start](#quick-start)
+- [Configure the surface](#configure-the-surface)
+- [Authentication](#authentication)
+- [Concurrent conversations and events](#concurrent-conversations-and-events)
+- [Extensions, dynamic tools, and MCP](#extensions-dynamic-tools-and-mcp)
+- [Vue conversation kit](#vue-conversation-kit)
+- [Samples](#samples)
+- [Public entry points](#public-entry-points)
+- [Security boundary](#security-boundary)
+- [Advanced app-server client](#advanced-app-server-client)
+- [Development](#development)
+- [Compatibility and lifecycle notes](#compatibility-and-lifecycle-notes)
+- [License](#license)
 
-### Concurrent conversations and host extensions
+## Why this SDK exists
 
-`CodexSurface` keeps every loaded conversation live. `conversation(id)` returns
-a stable, thread-scoped handle, so several agents can send, stream, wait for
-approval, steer, and finish concurrently without changing the conversation
-selected by the UI:
+Codex app-server is a rich, evolving, bidirectional JSON-RPC protocol. A real
+desktop product needs substantially more than a request helper:
+
+- executable discovery and app-server lifecycle management;
+- request correlation, notifications, server requests, reconnects, and schema
+  compatibility;
+- several simultaneously active conversations with independent streaming
+  state;
+- authentication, models, skills, plugins, permissions, approvals, goals,
+  plans, rate limits, context usage, and persisted history;
+- native file picking, paste and drag/drop, clipboard, audio capture, and
+  transcription;
+- a constrained main/preload/renderer boundary;
+- a polished conversation UI that applications can theme and simplify without
+  forking it.
+
+Those concerns are generic. Workspace bars, settings screens, cockpits,
+business dashboards, GitHub workflows, and other product-specific experiences
+are not. The SDK keeps that boundary explicit.
+
+## What is included
+
+| Layer | What it owns |
+| --- | --- |
+| High-level surface | App-server startup, account state, catalogs, conversation discovery, history, concurrent live turns, actions, approvals, and semantic events |
+| Node runtime | Codex executable discovery, JSONL-over-stdio transport, host-only defaults, extensions, dynamic tools, and MCP configuration |
+| Electron bridge | Narrow typed IPC, validated renderer actions, native file/clipboard/link/transcription capabilities, and cleanup |
+| Vue kit | `CodexConversationPane`, composer, message list, tools, approvals, generated media, thinking, goals, queues, menus, and reusable leaf components |
+| Low-level client | Generated app-server request/response types, typed notifications, server-request responders, and replaceable transport |
+
+Out of the box, the default conversation pane supports:
+
+- global persisted conversation discovery with no implicit `cwd` filter;
+- creation, selection, rename, archive, unarchive, and permanent deletion;
+- multiple conversations streaming concurrently;
+- model and reasoning selection, permissions, approval presets, plan mode,
+  goals, reviews, compaction, interruption, steering, retry, edit, and rollback;
+- native attachments, image paste/drop, host-provided file mentions, skills,
+  plugins, slash commands, copy/quote actions, and Apple speech transcription
+  on supported macOS hosts;
+- Markdown, syntax highlighting, Mermaid, tool groups, confirmation requests,
+  thinking shimmer, context usage, git diff summaries, queued prompts, and
+  generated-image media with fullscreen/download/prompt presentation;
+- restored history and live app-server events through the same serializable
+  `SurfaceMessage` model.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Main["Electron main process"]
+    Host["App policy and business services"]
+    Surface["CodexSurface"]
+    Transport["Typed stdio transport"]
+    Bridge["Validated SDK IPC"]
+    Extensions["Extensions and dynamic tools"]
+    Host --> Surface
+    Extensions --> Surface
+    Surface <--> Transport
+    Surface <--> Bridge
+  end
+
+  Server["Codex app-server"]
+  Mcp["App-owned MCP servers"]
+
+  subgraph Renderer["Sandboxed renderer"]
+    Controller["useCodexSurface"]
+    Pane["CodexConversationPane"]
+    Shell["App-owned shell, lists, and business UI"]
+    Controller --> Pane
+    Shell --> Controller
+  end
+
+  Transport <--> Server
+  Server <--> Mcp
+  Bridge <--> Controller
+```
+
+Snapshots are the authoritative state and resynchronization mechanism.
+Ordered semantic events provide incremental integration after the matching
+snapshot mutation has already been applied.
+
+## Requirements and installation
+
+- Node.js 22 or newer;
+- Vue 3.5 or newer for the Vue package;
+- Electron for the included desktop bridge;
+- a compatible Codex executable available to discovery, or an explicit
+  transport command.
+
+Until an npm release is published, install directly from GitHub:
+
+```bash
+npm install github:nbonamy/codex-app-sdk vue
+npm install --save-dev electron
+```
+
+For repository development:
+
+```bash
+git clone git@github.com:nbonamy/codex-app-sdk.git
+cd codex-app-sdk
+npm install
+```
+
+The SDK searches the normal GUI-app locations for Codex, including login-shell,
+Homebrew, user-bin, nvm, and Windows `PATHEXT` paths. Override the command only
+when your application manages a specific executable:
+
+```ts
+const surface = createCodexSurface({
+  transport: { command: '/absolute/path/to/codex' },
+});
+```
+
+## Quick start
+
+### 1. Main process
+
+Create one surface and register the complete surface/native bridge. Trusted
+policy and configuration paths belong here, not in renderer code.
+
+```ts
+import path from 'node:path';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { registerCodexElectronMain } from 'codex-app-sdk/electron';
+import { createCodexSurface } from 'codex-app-sdk/node';
+
+await app.whenReady();
+
+const mainWindow = new BrowserWindow({
+  webPreferences: {
+    contextIsolation: true,
+    nodeIntegration: false,
+    preload: path.join(import.meta.dirname, 'preload.cjs'),
+    sandbox: true,
+  },
+});
+const surface = createCodexSurface();
+
+const unregisterSdk = registerCodexElectronMain({
+  clipboard,
+  dialog,
+  ipcMain,
+  shell,
+  surface,
+  sender: {
+    send: (channel, payload) => mainWindow.webContents.send(channel, payload),
+  },
+});
+
+app.on('before-quit', () => {
+  unregisterSdk();
+  void surface.close();
+});
+```
+
+Production windows should keep `contextIsolation: true`, `nodeIntegration:
+false`, and `sandbox: true`. The samples also deny renderer navigation and open
+links with supported protocols externally.
+
+### 2. Preload
+
+```ts
+import { contextBridge, ipcRenderer } from 'electron';
+import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
+
+exposeCodexElectronPreload(contextBridge, ipcRenderer);
+```
+
+This exposes two narrow APIs:
+
+- `window.codexSurface` for safe surface state and actions;
+- `window.codexAppSdkNative` for validated native capabilities.
+
+Declare those globals once in your renderer types:
+
+```ts
+import type {
+  CodexNativeRendererApi,
+  CodexSurfaceRendererApi,
+} from 'codex-app-sdk/electron';
+
+declare global {
+  interface Window {
+    codexAppSdkNative: CodexNativeRendererApi;
+    codexSurface: CodexSurfaceRendererApi;
+  }
+}
+
+export {};
+```
+
+### 3. Renderer
+
+```vue
+<script setup lang="ts">
+import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
+import 'codex-app-sdk/styles.css';
+
+const surface = useCodexSurface(window.codexSurface);
+</script>
+
+<template>
+  <div class="app-shell">
+    <MyConversationList
+      :conversations="surface.state.conversations"
+      :active-conversation-id="surface.state.activeConversationId"
+      @create="surface.createConversation()"
+      @select="surface.selectConversation($event)"
+    />
+    <CodexConversationPane :surface="surface" autofocus />
+  </div>
+</template>
+```
+
+The bound pane auto-connects and owns standard settings, approvals, goals,
+attachments, copy, native picker, image paste/drop, and voice-transcription
+wiring. Your app still owns its header, navigation, and product UI.
+
+See [`samples/basic`](./samples/basic) for the complete Electron lifecycle,
+preload typing, navigation policy, custom conversation list, and HMR setup.
+
+## Configure the surface
+
+Host-owned identity, policy, and defaults stay in the main process:
+
+```ts
+import path from 'node:path';
+import { app } from 'electron';
+import { createCodexSurface } from 'codex-app-sdk/node';
+
+const surface = createCodexSurface({
+  clientInfo: { name: 'my_app', title: 'My App', version: '0.1.0' },
+  codexHome: path.join(app.getPath('userData'), 'codex-home'),
+  permissionMode: 'read-only',
+  approvalMode: 'ask',
+});
+```
+
+Key rules:
+
+- `codexHome` applies only to the spawned app-server child; it does not mutate
+  the parent process and never crosses IPC.
+- Conversation defaults apply to explicit creation when omitted and to implicit
+  first-send, goal, and review creation paths.
+- A host may pin `conversationDefaults.model` and `reasoningEffort` when it
+  knows they are available in the app-server model catalog.
+- The SDK does not send a working directory unless the host deliberately
+  configures one.
+- A configured `cwd` scopes new conversations, not global persisted
+  conversation discovery.
+- Filesystem/network policy, raw approval/permission modes, MCP commands,
+  environments, and custom tool implementations remain main-process concerns.
+  Renderer approval-preset selection is shape-checked and limited to the
+  app-server-advertised preset catalog.
+
+`CodexSurface` and its stable `conversation(id)` handles provide high-level
+operations for connection, discovery, creation, history, settings, messaging,
+queues, steering, interruption, compaction, reviews, goals, approvals, client
+requests, message mutation, rollback, archive/delete, state/event subscriptions,
+and cleanup.
+
+## Authentication
+
+Authentication is projected directly from app-server `account/read`. A
+signed-out surface is still ready, which lets an app render its own landing
+screen instead of treating sign-in as a transport failure.
+
+```ts
+await surface.connect();
+
+const auth = surface.getSnapshot().authentication;
+if (auth.account === null && auth.requiresOpenaiAuth === true) {
+  const { authUrl } = await surface.startChatGptLogin();
+  await shell.openExternal(authUrl);
+}
+```
+
+The SDK handles `account/login/completed`, refreshes auth-dependent catalogs and
+conversations, and makes the same mounted surface immediately usable. It also
+exposes `cancelLogin()`, `refreshAccount()`, and `logout()` through the typed
+bridge.
+
+For an isolated product identity, give the surface its own `codexHome` as Spark
+does. If a host replaces credentials whose app-server account payload has no
+distinguishable identity, restart the surface so app-server and SDK state begin
+from the same session.
+
+## Concurrent conversations and events
+
+Every loaded conversation has independent runtime state. `conversation(id)`
+returns a stable handle, so background agents can continue without changing the
+conversation selected in the UI:
 
 ```ts
 const build = surface.conversation(buildThreadId);
 const tests = surface.conversation(testThreadId);
 
 await Promise.all([
-  build.load({ cwd: '/workspace/build', extensionContext: { agentId: 'build' } }),
-  tests.load({ cwd: '/workspace/tests', extensionContext: { agentId: 'tests' } }),
+  build.load({ extensionContext: { agentId: 'build' } }),
+  tests.load({ extensionContext: { agentId: 'tests' } }),
 ]);
 
-build.onStateChange((state) => renderBuildStatus(state));
-tests.onStateChange((state) => renderTestStatus(state));
-await Promise.all([build.sendMessage('Implement it'), tests.sendMessage('Test it')]);
+build.onStateChange(renderBuildState);
+tests.onStateChange(renderTestState);
+
+await Promise.all([
+  build.sendMessage('Implement the feature'),
+  tests.sendMessage('Exercise the risky boundaries'),
+]);
 ```
 
-Conversation snapshots expose `activeTurnId` and `turnIds`; handles also expose
-direct rollback, goals, settings, approvals, client responses, reviews, queues,
-and message editing. The original active-conversation methods remain available
-for a single `CodexConversationPane`. `listConversations({ cwd })` and the
-Node-only `listSkills({ cwd })` perform scoped discovery without leaking raw
-`thread/list` or `skills/list` protocol types.
+Conversation snapshots expose their own messages, active turn, turn IDs,
+approvals, queues, goal, settings, history-loading state, and errors.
 
-Use the typed semantic event stream for incremental host integration. Events are
-emitted after their matching state mutation, carry a monotonic sequence number,
-and identify whether they came from a host action, app-server notification, or
-surface lifecycle. The global surface receives catalog, runtime, rate-limit,
-conversation, message, turn, tool, plan, approval, and client-request events;
-thread handles receive only events for their conversation:
+The semantic event stream is protocol-free, ordered, and emitted after state
+mutation:
 
 ```ts
-surface.onEvent((event) => persistOrRoute(event));
-build.onEvent((event) => routeBuildAgentEvent(event));
+surface.onEvent((event) => {
+  if (event.type === 'tool.completed') {
+    refreshBusinessState(event.conversationId);
+  }
+});
 ```
 
-The same stream crosses the Electron bridge through `window.codexSurface.onEvent`
-and is exposed by `useCodexSurface` as `onEvent` and `lastEvent`. Snapshots remain
-the authoritative initial state and resynchronization mechanism; consumers do
-not need to reconstruct state by replaying events. `listModels()` performs a
-fresh, paginated visible-model read by default; pass `{ forceReload: false }`
-only when a cached catalog is explicitly desired.
+Events cover surface lifecycle, authentication, catalogs, conversation
+summaries, settings, messages, turns, tools, plans, approvals, client requests,
+goals, diffs, queues, rate limits, and history replacement. Each event carries
+a monotonic sequence number and an `action`, `notification`, or `lifecycle`
+origin.
 
-Main-process hosts can install product-neutral extensions. The SDK applies
-thread start/resume configuration and executes dynamic tool calls; application
-code never handles a JSON-RPC request or responder:
+## Extensions, dynamic tools, and MCP
+
+### Host extensions and dynamic tools
+
+Extensions can add developer instructions, start/resume configuration, and
+app-owned dynamic tools without exposing JSON-RPC responders:
 
 ```ts
 const surface = createCodexSurface({
   extensions: [{
-    configureConversation: ({ operation, extensionContext }) => ({
-      config: { product_agent: (extensionContext as { agentId: string }).agentId },
-      developerInstructions: `Product agent (${operation})`,
-    }),
+    configureConversation: ({ operation, extensionContext }) => {
+      const context = extensionContext as { agentId?: string } | undefined;
+      return {
+        developerInstructions: `Product agent (${operation})`,
+        ...(context?.agentId
+          ? { config: { product_agent: context.agentId } }
+          : {}),
+      };
+    },
     dynamicTools: [{
       name: 'lookup_ticket',
-      description: 'Look up a ticket by id',
+      description: 'Look up a support ticket by id',
       inputSchema: {
         type: 'object',
         properties: { id: { type: 'string' } },
         required: ['id'],
       },
-      execute: async ({ arguments: input, extensionContext }) => {
-        const ticket = await lookupTicket(
-          (input as { id: string }).id,
-          (extensionContext as { agentId: string }).agentId,
-        );
-        return JSON.stringify(ticket);
+      execute: async ({ arguments: input }) => {
+        return JSON.stringify(await lookupTicket((input as { id: string }).id));
       },
     }],
   }],
 });
-
-const created = await surface.createConversation(
-  { cwd: '/workspace/build', developerInstructions: 'Keep changes focused.' },
-  { extensionContext: { agentId: 'build' } },
-);
-const conversation = surface.conversation(created.activeConversationId!);
 ```
 
-`extensionContext` is opaque host-only data. It is retained per conversation,
-passed to start/resume configuration and dynamic tools, and is never exposed by
-the renderer IPC API.
+`extensionContext` is opaque host-only data retained per conversation. It is
+available to configuration and tool execution but never enters snapshots or
+renderer IPC.
 
-App-owned MCP servers use the same trusted main-process boundary without raw
-Codex configuration keys. Definitions are applied on thread start and resume;
-MCP calls then use the standard tool rendering, progress, confirmation, and
-`tool.started` / `tool.updated` / `tool.completed` events:
+### App-owned MCP servers
+
+Register trusted stdio or HTTP MCP servers directly on the surface:
 
 ```ts
 const surface = createCodexSurface({
   mcpServers: [{
-    name: 'relay',
-    transport: { type: 'http', url: relayMcpUrl },
-    toolApprovalMode: 'approve',
+    name: 'operations',
+    transport: {
+      type: 'stdio',
+      command: process.execPath,
+      args: [mcpServerPath],
+      cwd: path.dirname(mcpServerPath),
+      env: { OPERATIONS_STATE_PATH: statePath },
+    },
+    toolApprovalMode: 'writes',
     required: true,
-    enabledTools: ['get_shipments', 'update_shipment'],
+    enabledTools: ['list_exceptions', 'get_shipment', 'rebook_shipment'],
+    startupTimeoutMs: 10_000,
+    toolTimeoutMs: 30_000,
   }],
-});
-
-surface.onEvent((event) => {
-  if (event.type === 'tool.completed' && event.payload.toolPart.kind === 'mcp') {
-    refreshBusinessState();
-  }
 });
 ```
 
-Stdio definitions accept `command`, `args`, absolute `cwd`, explicit `env`, and
-`envVars` names to inherit without copying secret values. Pass `mcpServers` in
-the Node-only conversation host options to replace the surface definitions for
-one explicitly created or loaded conversation; `[]` disables SDK-provided MCP
-servers for that conversation. These definitions never enter snapshots or
-renderer IPC. They are initial thread configuration, not a hot-swap API: use
-surface defaults for automatically restored conversations, or disable automatic
-selection and call `conversation(id).load({ mcpServers })` explicitly.
+The definitions are compiled to app-server configuration in the main process.
+They never enter snapshots or renderer IPC. MCP calls use normal tool rendering,
+progress, confirmations, and semantic tool events.
 
-The [basic Electron + Vue sample](./samples/basic) proves the complete boundary:
-its custom left pane renders the app-server conversation list from the SDK's
-reactive state and per-conversation status, while its right pane mounts one
-bound `CodexConversationPane`. SDK defaults supply native file picking and
-ingestion, image paste/drop, attachment previews, copy, audio capture and Apple
-speech transcription, models, permissions, plans, goals, and concurrent live
-conversation state without `App.vue` plumbing. It contains no raw app-server or
-IPC plumbing. The custom list demonstrates a confirmed permanent-delete action
-through the high-level surface API. Run:
+Per-conversation host options can replace the surface MCP list; `[]` disables
+SDK-provided definitions for that conversation. Definitions are initial thread
+configuration, not a hot-swap API. Use surface defaults for automatically
+restored conversations, or explicitly load a conversation with its host options.
+
+## Vue conversation kit
+
+The primary component is a deliberately headerless
+`CodexConversationPane`. Apps decide whether they need a header and what it
+contains. The pane composes:
+
+- history loading and empty/error states;
+- message list and rich message blocks;
+- thinking and streaming status;
+- composer, menus, models, reasoning, permissions, plan mode, and attachments;
+- goals, queued prompts, turn git diff, context usage, approvals, and app-server
+  questions.
+
+The Vue package also exports the independently reusable composer, menu, message,
+tool, approval, layout, media, Mermaid, goal, queue, and native-capability
+components. Use `CodexWorkbenchLayout` when you want a measured sticky
+header/footer frame without adopting an app-specific header.
+
+### Simplify the default UI
+
+Capabilities control behavior; presentation controls decide which supported UI
+is visible. An app can build a simple chat surface without internal CSS hacks:
+
+```ts
+import type {
+  CodexCapabilities,
+  CodexConversationPresentation,
+} from 'codex-app-sdk/vue';
+
+export const capabilities: CodexCapabilities = {
+  models: false,
+  skills: false,
+  reasoningEffort: false,
+  planMode: false,
+  goals: false,
+  steerPrompt: false,
+  interrupt: true,
+  history: true,
+  rollback: false,
+  editMessage: false,
+  retryMessage: false,
+  approvals: false,
+  approvalPresets: [],
+};
+
+export const presentation: CodexConversationPresentation = {
+  composer: { actionMenu: false, contextUsage: false, voice: false },
+  messages: {
+    actions: { copy: false, delete: false, edit: false, quote: false, retry: false },
+    toolBlocks: false,
+  },
+  shelf: { goal: false, queuedPrompts: false, turnGitDiff: false },
+};
+```
+
+```vue
+<CodexConversationPane
+  :surface="surface"
+  :capabilities="capabilities"
+  :presentation="presentation"
+/>
+```
+
+Generated images remain visible as rich media even when technical tool blocks
+are hidden. Disabled attachment or transcription capabilities remove their
+controls instead of leaving dead buttons.
+
+### Slots and custom controls
+
+The pane forwards scoped slots for empty state, full messages, message blocks,
+text, attachments, tools, thinking, actions, approvals, composer content, menu
+trigger, menu entries, and custom composer actions. Customize media through the
+general message-block slot or mount the exported `CodexMediaBlock` directly.
+`CodexComposerMenu` supports nested actions, checkboxes, radio items, headings,
+separators, submenus, roving focus, keyboard navigation, and Escape focus
+restoration.
+
+### Themes and sizing
+
+Import `codex-app-sdk/styles.css` once. SDK components scope their complete
+default styles under `.codex-chat-theme`, so they do not reset the host app.
+
+Choose light, dark, or system mode with `data-codex-theme`, a theme class, or
+the optional `applyCodexTheme()` helper. Override public semantic tokens on an
+ancestor:
+
+```css
+.my-codex-surface {
+  --codex-font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  --codex-primary-color: #3659d9;
+  --codex-background-color: #fafbff;
+  --codex-surface-color: #fff;
+  --codex-message-font-size: 16px;
+  --codex-message-line-height: 24px;
+  --codex-composer-font-size: 16px;
+  --codex-composer-control-size: 42px;
+  --codex-menu-font-size: 14px;
+  --codex-menu-control-min-height: 34px;
+  --codex-message-action-control-size: 30px;
+}
+```
+
+Colors, typography, menus, icons, message blocks, composer states, thinking,
+history loading, and interaction feedback all have SDK-owned defaults. Host CSS
+should style the shell and documented tokens/slots, not internal classes.
+
+## Samples
+
+Three Electron + Vue applications exercise different SDK boundaries:
+
+| Sample | Product shape | What it proves | Run |
+| --- | --- | --- | --- |
+| [`basic`](./samples/basic) | Custom conversation sidebar + stock pane | Minimal renderer code, global app-server threads, concurrent turns, full composer/native features, permanent deletion, HMR | `cd samples/basic && npm run dev` |
+| [`kids`](./samples/kids) | Spark, a focused child-friendly chatbot | Isolated `CODEX_HOME`, signed-out landing, fixed model/default reasoning, simple presentation controls, semantic theming | `npm run kids:dev` |
+| [`relay`](./samples/relay) | Single-conversation logistics exception desk | App-owned business UI, contextual prompts, stdio MCP tools, write confirmations, business-state refresh | `npm run relay:dev` |
+
+Production-style start commands build before launching Electron:
 
 ```bash
 npm run sample:start
-```
-
-The [Spark kids chatbot sample](./samples/kids) shows a deliberately simpler
-product built from the same default conversation components. It uses its own
-`CODEX_HOME`, SDK-managed account/login state, host-owned Terra/medium
-conversation defaults, typed presentation controls that hide advanced UI, and
-public semantic theme tokens for larger, colorful controls. Run:
-
-```bash
 npm run kids:start
-```
-
-The [Relay logistics exception desk](./samples/relay) demonstrates a more
-complex business product built around one persistent conversation. Its
-sample-owned operations board sends explicit click context into an otherwise
-stock `CodexConversationPane`; the model reads and mutates authoritative
-shipment state through Relay's own stdio MCP server built with the official
-TypeScript MCP SDK. MCP tools use normal SDK rendering, progress, confirmation,
-and semantic events, while the renderer receives only a narrow read-only
-business snapshot API. Run:
-
-```bash
 npm run relay:start
 ```
 
-For renderer HMR and automatic Electron restarts when sample or SDK source
-changes, run `npm run dev` inside `samples/basic`. The development command is
-owned by the developer; the SDK does not launch a background watcher itself.
+The samples deliberately keep product UI outside the SDK. Basic owns its
+conversation list, Spark owns its identity and simplified shell, and Relay owns
+its operations board and MCP business logic. All three reuse the same surface,
+IPC, and conversation-component contracts while choosing their own capabilities
+and presentation.
 
-## Generated app-server types
+Spark demonstrates UI customization; it is not a child-safety system. Relay's
+MCP server uses a seeded local JSON store to demonstrate the integration seam;
+it is not a production logistics backend.
 
-Codex app-server's schema is version-specific. The checked-in bindings are
-generated from the local Codex CLI and include experimental APIs because rich
-surfaces need goals, plans, approvals, and streamed item events.
+## Public entry points
 
-```bash
-npm run schema:generate
-```
+| Import | Intended use |
+| --- | --- |
+| `codex-app-sdk/node` | High-level `CodexSurface`, stdio transport, discovery, history adapters, extensions, and MCP types |
+| `codex-app-sdk/electron` | Main-process registration plus reusable typed IPC primitives |
+| `codex-app-sdk/electron/preload` | Context-bridge-safe preload APIs |
+| `codex-app-sdk/vue` | Reactive surface controller and complete Vue component kit |
+| `codex-app-sdk/styles.css` | Scoped default component styles and public theme tokens |
+| `codex-app-sdk/surface` | Framework-neutral serializable surface contracts |
+| `codex-app-sdk/codex` | Advanced typed app-server client and generated method types |
+| `codex-app-sdk/events` | Framework-neutral typed event bus |
+| `codex-app-sdk` | Core aggregate exports for protocol, Electron, events, and surface contracts |
 
-The generator records the source CLI version and creates method maps that pair
-every generated request's parameter and response types. A small explicit table
-handles protocol response-type naming exceptions where `FooParams` does not
-pair with `FooResponse`; it does not override runtime responses. Applications
-consume those maps through the typed client instead of assembling JSON-RPC
-envelopes.
+Normal Electron + Vue apps generally need only `node`, `electron`,
+`electron/preload`, `vue`, and `styles.css`.
 
-## Development
+## Security boundary
 
-```bash
-npm install
-npm test
-npm run test:coverage
-npm run typecheck
-npm run build
-```
+The SDK treats the main process as the trusted policy boundary.
 
-The package targets Node 22 or newer and Vue 3.5. Vue is a peer dependency so
-applications keep ownership of their renderer runtime.
+| Main process only | Safe renderer surface |
+| --- | --- |
+| `CODEX_HOME`, cwd, raw approval/permission modes, and thread config | Serializable account, catalog, conversation, message, approval, and status snapshots |
+| MCP commands, paths, environment values, enabled tools | Validated high-level actions and semantic events |
+| Extension context and dynamic tool implementations | Presentation/capability choices and app-owned UI state |
+| App-server transport and generated protocol types | Native capability methods with validated payloads |
 
-## Advanced: typed app-server client
+The renderer cannot submit raw thread configuration, MCP definitions, commands,
+environment values, or generated JSON-RPC envelopes through the high-level IPC
+API. It can select only an approval preset advertised by app-server; unknown
+input keys are rejected. Hiding a preset in the Vue presentation is not an
+authorization boundary. File, clipboard, external-link, and audio operations
+use explicit native handlers rather than exposing Node.
 
-The client performs request correlation, timeouts, notifications, and
-server-initiated request responses while preserving generated method types:
+The SDK intentionally contains no product-specific GitHub integration, agent
+workspace shell, settings screen, or business backend. Add those in your app or
+through trusted extensions/MCP servers.
+
+## Advanced app-server client
+
+The low-level client is available when app-server adds a capability that the
+high-level surface has not projected yet:
 
 ```ts
 import { CodexAppServerClient } from 'codex-app-sdk/codex';
@@ -333,107 +656,79 @@ await client.initialize({
   capabilities: { experimentalApi: true, requestAttestation: false },
 });
 
-const { thread } = await client.request('thread/start', {
-  cwd: process.cwd(),
-});
+const { thread } = await client.request('thread/start', {});
 
 client.onNotification('item/agentMessage/delta', ({ params }) => {
   console.log(params.delta);
 });
 
-client.onServerRequest('item/tool/requestUserInput', (request, responder) => {
+client.onServerRequest('item/tool/requestUserInput', (_request, responder) => {
   responder.resolve({ answers: {} });
   return true;
 });
 ```
 
-The transport and wire envelopes are replaceable. This layer is for advanced
-features that the high-level surface does not yet cover; ordinary surface code
-should use `CodexSurface` and never handle these generated types.
+The client handles correlation, timeouts, notifications, transport failure, and
+server-request responses while preserving generated method types. Adapt
+protocol-specific payloads before they cross IPC. If ordinary renderer code
+needs raw `thread/*`, `turn/*`, or JSON-RPC types, the high-level boundary should
+probably be extended instead.
 
-## Events and Electron IPC
+## Development
 
-`TypedEventBus` provides app-owned event contracts without coupling state to a
-framework. `TypedIpcRenderer`, `TypedIpcMain`, `registerIpcMainHandlers`, and `sendIpcEvent`
-apply the same contracts across Electron's security boundary using narrow
-structural ports—`codex-app-sdk` never exposes Electron or Node primitives to
-the renderer.
-
-A custom low-level desktop pipeline is:
-
-```text
-Codex notification -> product adapter -> TypedEventBus -> Electron IPC
-  -> renderer event bus/store -> Vue components
+```bash
+npm install
+npm test
+npm run typecheck
+npm run build
 ```
 
-Protocol-specific payloads should be adapted before they cross IPC. Components
-consume surface-owned messages and state, not raw app-server notifications.
-Fatal app-server transport failures move the surface into an error state; calling
-`connect()` starts a fresh process and initializes it again.
+Additional gates:
 
-## Vue surfaces
-
-The Vue entry includes `CodexConversationPane`, `CodexApprovalPrompt`,
-`CodexComposer`, `CodexComposerMenu`, `CodexComposerMenuList`,
-`CodexComposerSendButton`, `CodexMessage`, and `CodexMessageList`:
-
-```ts
-import { CodexComposer, CodexMessageList } from 'codex-app-sdk/vue';
-import 'codex-app-sdk/styles.css';
+```bash
+npm run test:coverage
+npm run sample:test
+npm run kids:test
+npm run kids:typecheck
+npm run kids:build
+npm run relay:test
+npm run relay:typecheck
+npm run relay:build
 ```
 
-`useCodexSurface` is the app-server-backed reactive controller. Applications own
-their shell, header, and list/navigation UI, then bind the controller's state
-and actions to `CodexConversationPane`. The pane is deliberately headerless: it
-composes the conversation history loader, message list, composer shelf, goals,
-queued prompts, errors, empty state, and approval prompts. It forwards
-empty-state, message, message-action, message-block, thinking, tool, approval,
-composer, and menu slots, and accepts custom composer menu entries without
-requiring a fork. Apps that want a measured sticky header/footer layout can
-compose the separately exported `CodexWorkbenchLayout`; apps can also use
-`CodexConversationHistoryLoader` independently.
+The production build emits JavaScript, declarations, source maps, and the scoped
+stylesheet. The Apple speech helper ships separately through the package's
+`assets` directory. Package-boundary tests verify the public component and
+stylesheet inventories.
 
-The SDK stylesheet owns the complete default presentation of every SDK-rendered
-component: typography, spacing, icons, menus, message blocks, composer states,
-thinking shimmer, history loading, light/dark presentation, and interaction
-feedback. Host applications own shell and navigation styling, plus the content
-of customization slots. Import `codex-app-sdk/styles.css` once. Components apply
-the scoped `.codex-chat-theme` root themselves, so the stylesheet does not reset
-the host application. Set `data-codex-theme="dark"`,
-`data-codex-theme="system"`, `.codex-chat-theme--dark`, or
-`.codex-chat-theme--system` on an ancestor to choose a theme; override semantic
-`--codex-*` variables for product theming. The sample does not patch component
-internals. `applyCodexTheme(element, { mode, tokens })` is an optional helper
-for hosts that want the SDK to install and later clean up theme attributes and
-token overrides; direct CSS variables remain supported.
+### Generated app-server types
 
-`CodexComposerMenu` accepts nested action, checkbox, radio, separator, submenu,
-and custom entries. Typed payloads let a host application contribute its own
-actions, while scoped `trigger`, `item`, and `icon` slots can replace the
-default presentation without forking menu behavior. The default menu implements
-roving focus, arrow/Home/End navigation, submenu state, and Escape focus restore.
+Codex app-server's schema is version-specific. Regenerate checked-in bindings
+from the local Codex executable with:
 
-`CodexMessage` renders the SDK's safe `SurfaceMessage` contract. Message and
-message-list slots let products replace text, tool, status, and full-message
-rendering while retaining tested layout and auto-scroll behavior. Components
-use `--codex-*` semantic CSS variables with neutral fallbacks and do not depend
-on Element Plus, Electron, application stores, or raw app-server types.
-Completed image-generation items are projected as first-class media alongside
-their technical tool part, including for restored history, so generated images
-remain visible when an app hides technical tool blocks.
+```bash
+npm run schema:generate
+```
 
-For a simpler default surface without CSS hacks, pass the typed `presentation`
-prop. It independently controls composer actions, voice, context usage, shelf
-goal/queue/diff sections, individual message actions, and technical tool
-blocks. Disabled attachment support produces no dead plus-menu entry, and a
-missing transcription capability produces no disabled voice button. Public
-size hooks include `--codex-message-font-size`,
-`--codex-message-line-height`, `--codex-composer-font-size`,
-`--codex-composer-line-height`, `--codex-composer-control-size`,
-`--codex-menu-font-size`, `--codex-menu-control-min-height`, and
-`--codex-message-action-control-size`.
+The generator records its source CLI version and creates request/response and
+notification maps. Do not hand-edit generated files.
 
-Every top-level Vue component has one same-named isolated spec. Public leaf
-components copied from the conversation kit are also mounted directly by the
-Vue tests. Package-boundary tests enforce both inventories so a component cannot
-be shipped accidentally without executable coverage.
+## Compatibility and lifecycle notes
+
+- The package targets Node 22+ and Vue 3.5+.
+- Vue is a peer dependency, so applications own their renderer runtime.
+- The checked-in app-server schema was generated from `codex-cli 0.144.1` and
+  includes experimental APIs required by rich surfaces. Unknown notifications
+  can be observed through
+  `onUnknownNotification` while the SDK catches up to a newer server.
+- Fatal transport failures move the surface to an error state. Calling
+  `connect()` starts and initializes a fresh app-server process.
+- MCP definitions apply on thread start/resume; they are not hot-swapped into an
+  already-running thread.
+- The default surface reads the app-server's global non-archived conversation
+  catalog. Cloud-only ChatGPT conversations that app-server cannot expose are
+  outside this SDK's data source.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](./LICENSE).

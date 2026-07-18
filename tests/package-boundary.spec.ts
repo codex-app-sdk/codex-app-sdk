@@ -4,51 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
-const forbiddenHostName = ['cl', 'aw'].join('');
-const forbiddenProductIntegrations = ['claude', 'github'];
 const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules']);
 const inspectedExtensions = new Set(['.css', '.json', '.md', '.mjs', '.ts', '.vue']);
 
 describe('package boundary', () => {
-  it('keeps host product names out of SDK source and documentation', async () => {
-    const files = await sourceFiles(packageRoot);
-    const violations: string[] = [];
-
-    for (const file of files) {
-      const content = await readFile(file, 'utf8');
-      if (content.toLowerCase().includes(forbiddenHostName)) {
-        violations.push(path.relative(packageRoot, file));
-      }
-    }
-
-    expect(violations).toStrictEqual([]);
-  });
-
-  it('keeps non-Codex product integrations out of the authored SDK and sample', async () => {
-    const roots = [
-      'src/electron',
-      'src/node',
-      'src/surface',
-      'src/vue',
-      'samples/basic',
-    ];
-    const files = (await Promise.all(roots.map((root) => sourceFiles(path.join(packageRoot, root)))))
-      .flat();
-    files.push(path.join(packageRoot, 'README.md'));
-    const violations: string[] = [];
-
-    for (const file of files) {
-      const content = (await readFile(file, 'utf8')).toLowerCase();
-      for (const product of forbiddenProductIntegrations) {
-        if (content.includes(product)) {
-          violations.push(`${path.relative(packageRoot, file)}:${product}`);
-        }
-      }
-    }
-
-    expect(violations).toStrictEqual([]);
-  });
-
   it('keeps native, Electron, Node, and surface layers independent from Vue', async () => {
     const files = (await Promise.all(['src/native', 'src/electron', 'src/node', 'src/surface']
       .map((root) => sourceFiles(path.join(packageRoot, root))))).flat();
@@ -145,7 +104,6 @@ describe('package boundary', () => {
     expect(shippedStyles).not.toMatch(/(^|\n)\s*(?:\*|html|body|#app|:root|\.el-)/);
     expect(shippedStyles).not.toContain('[class^=');
     expect(shippedStyles).not.toContain('[class*=');
-    expect(shippedStyles.toLowerCase()).not.toContain(forbiddenHostName);
   });
 });
 

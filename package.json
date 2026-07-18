@@ -3,7 +3,15 @@
   "version": "0.1.0",
   "description": "High-level runtime, Electron bridge, and Vue kit for building Codex surfaces.",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nbonamy/codex-app-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nbonamy/codex-app-sdk/issues"
+  },
+  "homepage": "https://github.com/nbonamy/codex-app-sdk#readme",
   "workspaces": [
     "samples/*"
   ],
