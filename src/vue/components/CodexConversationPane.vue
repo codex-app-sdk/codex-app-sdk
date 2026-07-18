@@ -30,7 +30,9 @@
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
         :messages="effectiveMessages"
+        :plugins="effectivePlugins"
         :reset-key="effectiveConversationKey"
+        :skills="effectiveSkills"
         @cancel="cancel"
         @client-response="respondToClientRequest"
         @copy-message="emit('copyMessage', $event)"
@@ -167,6 +169,7 @@ import type {
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
+  CodexSurfacePlugin,
   SurfaceMessage,
   SendCodexMessageOptions,
 } from '../../surface/types';
@@ -174,6 +177,7 @@ import type { CodexNativeAttachment } from '../../native/types';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import type { Message } from '../chat/types';
 import type { MessageBlock } from '../chat/message-blocks';
+import { stripMessageContext } from '../chat/message-blocks';
 import type { QueuedChatPrompt } from '../chat/queued-prompts';
 import { chatMessageFromInput } from '../chat/renderer-message-adapter';
 import type {
@@ -245,6 +249,7 @@ const props = withDefaults(defineProps<{
   placeholder?: string;
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
+  plugins?: readonly CodexSurfacePlugin[];
   queuedPrompts?: readonly QueuedChatPrompt[];
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
@@ -370,6 +375,7 @@ const effectiveApprovalPreset = computed(() => (
   props.approvalPreset !== undefined ? props.approvalPreset : surfaceState.value?.approvalPreset
 ));
 const effectivePlanMode = computed(() => props.planMode ?? surfaceState.value?.planMode);
+const effectivePlugins = computed(() => props.plugins ?? surfaceState.value?.plugins);
 const effectiveQueuedPrompts = computed(() => props.queuedPrompts ?? surfaceState.value?.queuedPrompts ?? []);
 const effectiveSelectedModelId = computed(() => (
   props.selectedModelId !== undefined ? props.selectedModelId : surfaceState.value?.selectedModelId
@@ -417,11 +423,16 @@ watch(effectiveAttachEnabled, (enabled) => {
 });
 
 watch(effectiveConversationKey, () => {
+  localError.value = null;
   localDraft.value = '';
   selectedAttachments.value = [];
   draftRevision.value += 1;
   emit('update:modelValue', '');
   emit('attachmentsChange', []);
+});
+
+watch(() => [surfaceState.value?.status, surfaceState.value?.error] as const, ([status, error]) => {
+  if (status === 'ready' && error == null) localError.value = null;
 });
 
 onMounted(() => {
@@ -445,8 +456,9 @@ function quoteMessage(index: number): void {
   const message = effectiveMessages.value[index];
   if (!message) return;
   const chatMessage = chatMessageFromInput(message);
-  if (chatMessage.role !== 'user' || !chatMessage.content.trim()) return;
-  updateDraft(chatMessage.content);
+  const content = stripMessageContext(chatMessage.content);
+  if (chatMessage.role !== 'user' || !content.trim()) return;
+  updateDraft(content);
   emit('quoteMessage', index);
 }
 

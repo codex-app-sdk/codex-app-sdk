@@ -99,6 +99,45 @@ describe('CodexAppServerStdioTransport', () => {
     expect(errors).toHaveLength(1);
   });
 
+  it('accepts app-server responses larger than the former four-megabyte default', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport();
+    const messages: unknown[] = [];
+    const errors: Error[] = [];
+    transport.onMessage((message) => messages.push(message));
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    const payload = 'x'.repeat(4 * 1024 * 1024 + 1);
+    child.stdout.emit('data', `${JSON.stringify({ id: 1, result: { payload } })}\n`);
+
+    expect(errors).toStrictEqual([]);
+    expect(messages).toHaveLength(1);
+    expect((messages[0] as { result: { payload: string } }).result.payload).toHaveLength(payload.length);
+  });
+
+  it('correlates and discards an oversized partial frame through its newline', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ maxOutputLineChars: 32 });
+    const messages: unknown[] = [];
+    const errors: Error[] = [];
+    transport.onMessage((message) => messages.push(message));
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', '{"id":7,"result":{"payload":"xxxxxxxxxxxx');
+    child.stdout.emit('data', 'looks-valid"}}\n{"id":8,"result":{}}\n');
+
+    expect(messages).toStrictEqual([{ id: 8, result: {} }]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      message: 'Codex app-server output line exceeded the configured limit',
+      requestId: 7,
+    });
+  });
+
   it('surfaces stderr and unexpected process termination', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);

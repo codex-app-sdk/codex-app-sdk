@@ -24,6 +24,7 @@ export type {
   CodexSurfaceModel,
   CodexSurfacePermissionMode,
   CodexSurfacePermissionProfile,
+  CodexSurfacePlugin,
   CodexSurfacePlanStep,
   CodexSurfacePlanStepStatus,
   CodexSurfaceQueuedPrompt,

@@ -114,6 +114,34 @@ describe('CodexMessage', () => {
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/notes.md');
   });
 
+  it('hides ambient context from rendering, editing, and clipboard output', async () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'user-with-ambient-context',
+        role: 'user',
+        content: [
+          '## My request for Codex:',
+          'Find a rental car',
+          '',
+          '<in-app-browser-context source="ambient-ui-state">',
+          'Current URL: https://www.skyscanner.com/car-rental',
+          '</in-app-browser-context>',
+        ].join('\n'),
+      },
+    });
+
+    expect(wrapper.text()).toContain('Find a rental car');
+    expect(wrapper.text()).not.toContain('Current URL');
+    expect(wrapper.text()).not.toContain('in-app-browser-context');
+    expect(wrapper.text()).not.toContain('My request for Codex');
+
+    await wrapper.get('[aria-label="Copy"]').trigger('click');
+    expect(clipboardWriteText).toHaveBeenCalledWith('Find a rental car');
+
+    await wrapper.get('[aria-label="Edit"]').trigger('click');
+    expect(wrapper.get('textarea').element.value).toBe('Find a rental car');
+  });
+
   it('hides unsupported user mutation actions while keeping copy and quote', () => {
     const wrapper = mountMessage({
       canDeleteMessage: false,

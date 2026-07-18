@@ -1,8 +1,10 @@
 <template>
   <slot v-if="block.type === 'user-text'" name="text" :block="block" :content="block.content" user>
-    <div
-      class="codex-chat-theme chat-message-block chat-message-block--text codex-markdown"
-      v-html="renderUserText(block.content)"
+    <ChatUserText
+      class="chat-message-block chat-message-block--text"
+      :content="block.content"
+      :plugins="plugins"
+      :skills="skills"
     />
   </slot>
   <slot v-else-if="block.type === 'text'" name="text" :block="block" :content="block.content" :user="false">
@@ -56,9 +58,11 @@ import ChatMediaBlock from './ChatMediaBlock.vue'
 import ChatMermaidBlock from './ChatMermaidBlock.vue'
 import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
-import { renderMarkdown, renderUserText } from './message-markdown'
+import ChatUserText from './ChatUserText.vue'
+import { renderMarkdown } from './message-markdown'
 import type { MessageBlock } from './message-blocks'
 import type { ClientRequestResponse } from './contracts'
+import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../surface/types'
 
 defineSlots<{
   attachment(props: {
@@ -79,6 +83,8 @@ defineProps<{
   block: MessageBlock
   answeredClientRequestIds?: ReadonlySet<string>
   followUpsDisabled?: boolean
+  plugins?: readonly CodexSurfacePlugin[]
+  skills?: readonly CodexSurfaceSkill[]
 }>()
 
 const emit = defineEmits<{

@@ -20,6 +20,8 @@
             :follow-ups-disabled="followUpsDisabled"
             :index="index"
             :message="message"
+            :plugins="plugins"
+            :skills="skills"
             @cancel="emit('cancel')"
             @client-response="emit('client-response', $event)"
             @copy-message="emit('copy-message', $event)"
@@ -45,7 +47,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import type { SurfaceMessage } from '../../surface/types'
+import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
 import type { ClientRequestResponse } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
@@ -63,7 +65,9 @@ const props = withDefaults(defineProps<{
   emptyLabel?: string
   followUpsDisabled?: boolean
   messages: readonly (Message | SurfaceMessage)[]
+  plugins?: readonly CodexSurfacePlugin[]
   resetKey?: string | number | null
+  skills?: readonly CodexSurfaceSkill[]
 }>(), {
   ariaLabel: 'Conversation',
   bottomThreshold: 24,

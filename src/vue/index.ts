@@ -39,6 +39,7 @@ export { default as CodexToolConfirmation } from './chat/ChatToolConfirmation.vu
 export { default as CodexToolGroup } from './chat/ChatToolGroup.vue';
 export { default as CodexToolUserInputRequest } from './chat/ChatToolUserInputRequest.vue';
 export { default as CodexTurnGitInfo } from './chat/ChatTurnGitInfo.vue';
+export { default as CodexUserText } from './chat/ChatUserText.vue';
 export { codexCapabilities } from './chat/codex-capabilities';
 export { codexCommands } from './chat/codex-commands';
 export { approvalPresetOptions, defaultApprovalPreset, isApprovalPreset } from './chat/approval-presets';
@@ -57,6 +58,8 @@ export {
   skillDisplayName,
 } from './chat/composer-skills';
 export { renderMarkdown } from './chat/message-markdown';
+export { humanizeMentionName, parseCodexUserText } from './chat/user-text';
+export type { CodexUserTextToken } from './chat/user-text';
 export { languageForFilePath, renderCodeBlock } from './chat/syntax-highlighting';
 export { registerCodexToolTitlePresenter } from './chat/tool-status';
 export type { CodexToolTitlePresenter, CodexToolTitlePresenterContext } from './chat/tool-status';

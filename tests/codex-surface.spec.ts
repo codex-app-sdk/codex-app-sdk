@@ -95,11 +95,357 @@ describe('CodexSurface', () => {
     });
     expect(transport.sent.map((message) => 'method' in message ? message.method : null)).toStrictEqual([
       'initialize', 'initialized', 'model/list', 'skills/list', 'permissionProfile/list', 'account/rateLimits/read',
-      'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get',
+      'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get', 'thread/turns/list',
+      'plugin/installed',
     ]);
+    expect(lastRequest(transport, 'thread/resume')).toMatchObject({
+      params: {
+        threadId: 'thread-existing',
+        excludeTurns: true,
+        initialTurnsPage: { limit: 5, itemsView: 'summary', sortDirection: 'desc' },
+      },
+    });
     expect(listener).toHaveBeenCalled();
     await expect(surface.connect()).resolves.toMatchObject({ status: 'ready' });
     expect(transport.start).toHaveBeenCalledOnce();
+  });
+
+  it('exposes the installed plugin catalog with canonical ids and renderer-safe presentation metadata', async () => {
+    const transport = new FakeTransport({
+      'thread/list': () => ({
+        data: [
+          thread('thread-existing', false),
+          { ...thread('thread-other', false), cwd: '/workspace/other' },
+        ],
+        nextCursor: null,
+      }),
+      'plugin/installed': () => ({
+        marketplaces: [{
+          name: 'installed',
+          plugins: [
+            pluginSummary('gmail@openai-curated-remote', 'gmail', {
+              displayName: ' Gmail ',
+              shortDescription: ' Mail and calendar ',
+              longDescription: ' Work with Gmail messages. ',
+              brandColor: ' #ea4335 ',
+              composerIconUrl: 'https://cdn.example.com/gmail-composer.png',
+              logoUrl: 'https://cdn.example.com/gmail-logo.png',
+              logoUrlDark: 'https://cdn.example.com/gmail-logo-dark.png',
+            }),
+            pluginSummary('drive@openai-curated-remote', 'drive', {
+              displayName: 'Drive',
+              logoUrl: 'https://cdn.example.com/drive-logo.png',
+              logoUrlDark: 'https://cdn.example.com/drive-logo-dark.png',
+            }),
+          ],
+        }],
+        marketplaceLoadErrors: [],
+      }),
+    });
+    const surface = new CodexSurface({
+      client: new CodexAppServerClient(transport),
+      cwd: '/tmp/project',
+    });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+
+    await surface.connect();
+    await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('loaded'));
+
+    expect(lastRequest(transport, 'plugin/installed')).toMatchObject({
+      params: { cwds: ['/tmp/project', '/workspace/other'] },
+    });
+    expect(surface.getSnapshot().plugins).toStrictEqual([
+      {
+        id: 'gmail@openai-curated-remote',
+        name: 'gmail',
+        displayName: 'Gmail',
+        shortDescription: 'Mail and calendar',
+        longDescription: 'Work with Gmail messages.',
+        brandColor: '#ea4335',
+        iconUrl: 'https://cdn.example.com/gmail-composer.png',
+        iconUrlDark: 'https://cdn.example.com/gmail-composer.png',
+        enabled: true,
+      },
+      {
+        id: 'drive@openai-curated-remote',
+        name: 'drive',
+        displayName: 'Drive',
+        iconUrl: 'https://cdn.example.com/drive-logo.png',
+        iconUrlDark: 'https://cdn.example.com/drive-logo-dark.png',
+        enabled: true,
+      },
+    ]);
+    expect(events.filter((event) => event.type === 'catalog.pluginsChanged')).toStrictEqual([
+      expect.objectContaining({
+        origin: 'action',
+        payload: { plugins: [], status: 'loading' },
+      }),
+      expect.objectContaining({
+        origin: 'action',
+        payload: { plugins: surface.getSnapshot().plugins, status: 'loaded' },
+      }),
+    ]);
+  });
+
+  it('does not block ready state on a cold installed-plugin lookup', async () => {
+    const pendingPlugins = deferred<unknown>();
+    const transport = new FakeTransport({
+      'plugin/installed': () => pendingPlugins.promise,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await expect(surface.connect()).resolves.toMatchObject({
+      status: 'ready',
+      pluginCatalogStatus: 'loading',
+      plugins: [],
+    });
+    expect(lastRequest(transport, 'plugin/installed')).toBeDefined();
+
+    pendingPlugins.resolve({ marketplaces: [], marketplaceLoadErrors: [] });
+    await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('loaded'));
+  });
+
+  it('retries a transient plugin catalog failure on an explicit conversation refresh', async () => {
+    let attempts = 0;
+    const transport = new FakeTransport({
+      'plugin/installed': () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('catalog unavailable');
+        return { marketplaces: [], marketplaceLoadErrors: [] };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('error'));
+
+    await surface.refreshConversations();
+    await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('loaded'));
+
+    expect(attempts).toBe(2);
+  });
+
+  it('materializes bounded local plugin icons without exposing filesystem URLs', async () => {
+    const readPaths: string[] = [];
+    const transport = new FakeTransport({
+      'plugin/installed': () => ({
+        marketplaces: [{
+          name: 'local',
+          plugins: [
+            pluginSummary('local-plugin', 'local-plugin', {
+              displayName: 'Local plugin',
+              composerIcon: '/plugins/local/icon.svg',
+            }),
+            pluginSummary('oversized-plugin', 'oversized-plugin', {
+              displayName: 'Oversized plugin',
+              composerIcon: '/plugins/local/readme.txt',
+              logo: '/plugins/local/oversized.png',
+            }),
+          ],
+        }],
+        marketplaceLoadErrors: [],
+      }),
+      'fs/readFile': (params) => {
+        const path = (params as { path: string }).path;
+        readPaths.push(path);
+        return {
+          dataBase64: path.endsWith('icon.svg') ? 'PHN2Zy8+' : 'A'.repeat(350_000),
+        };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await surface.connect();
+    await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('loaded'));
+
+    expect(readPaths).toStrictEqual(['/plugins/local/icon.svg', '/plugins/local/oversized.png']);
+    expect(surface.getSnapshot().plugins).toStrictEqual([
+      {
+        id: 'local-plugin',
+        name: 'local-plugin',
+        displayName: 'Local plugin',
+        iconUrl: 'data:image/svg+xml;base64,PHN2Zy8+',
+        iconUrlDark: 'data:image/svg+xml;base64,PHN2Zy8+',
+        enabled: true,
+      },
+      {
+        id: 'oversized-plugin',
+        name: 'oversized-plugin',
+        displayName: 'Oversized plugin',
+        enabled: true,
+      },
+    ]);
+    expect(JSON.stringify(surface.getSnapshot().plugins)).not.toContain('file://');
+  });
+
+  it('materializes bounded local skill icons without exposing filesystem paths', async () => {
+    const readPaths: string[] = [];
+    const transport = new FakeTransport({
+      'skills/list': () => ({
+        data: [{
+          cwd: '/tmp/project',
+          skills: [
+            {
+              name: 'branded-skill',
+              description: 'A skill with catalog artwork',
+              path: '/skills/branded/SKILL.md',
+              scope: 'user',
+              enabled: true,
+              interface: {
+                displayName: 'Branded Skill',
+                iconSmall: '/skills/branded/icon-small.svg',
+                iconLarge: '/skills/branded/icon-large.png',
+              },
+            },
+            {
+              name: 'invalid-icons',
+              description: 'A skill whose artwork cannot be exposed safely',
+              path: '/skills/invalid/SKILL.md',
+              scope: 'user',
+              enabled: true,
+              interface: {
+                iconSmall: '/skills/invalid/readme.txt',
+                iconLarge: '/skills/invalid/oversized.png',
+              },
+            },
+          ],
+          errors: [],
+        }],
+      }),
+      'fs/readFile': (params) => {
+        const path = (params as { path: string }).path;
+        readPaths.push(path);
+        if (path.endsWith('icon-small.svg')) return { dataBase64: 'PHN2Zy8+' };
+        if (path.endsWith('icon-large.png')) return { dataBase64: 'cG5n' };
+        return { dataBase64: 'A'.repeat(350_000) };
+      },
+    });
+    const surface = new CodexSurface({
+      client: new CodexAppServerClient(transport),
+      autoSelectFirstConversation: false,
+    });
+
+    const snapshot = await surface.connect();
+
+    expect(readPaths).toStrictEqual([
+      '/skills/branded/icon-small.svg',
+      '/skills/branded/icon-large.png',
+      '/skills/invalid/oversized.png',
+    ]);
+    expect(snapshot.skills).toMatchObject([
+      {
+        name: 'branded-skill',
+        description: 'A skill with catalog artwork',
+        displayName: 'Branded Skill',
+        iconSmall: 'data:image/svg+xml;base64,PHN2Zy8+',
+        iconLarge: 'data:image/png;base64,cG5n',
+        path: '/skills/branded/SKILL.md',
+        scope: 'user',
+        enabled: true,
+      },
+      {
+        name: 'invalid-icons',
+        description: 'A skill whose artwork cannot be exposed safely',
+        path: '/skills/invalid/SKILL.md',
+        scope: 'user',
+        enabled: true,
+      },
+    ]);
+    expect(snapshot.skills[1]?.iconSmall).toBeUndefined();
+    expect(snapshot.skills[1]?.iconLarge).toBeUndefined();
+    expect(JSON.stringify(snapshot.skills)).not.toContain('/skills/branded/icon-');
+    expect(JSON.stringify(snapshot.skills)).not.toContain('/skills/invalid/readme.txt');
+    expect(JSON.stringify(snapshot.skills)).not.toContain('/skills/invalid/oversized.png');
+  });
+
+  it('rereads same-path skill icons when the skill catalog is force reloaded', async () => {
+    let iconReads = 0;
+    const transport = new FakeTransport({
+      'skills/list': () => ({
+        data: [{
+          cwd: '/tmp/project',
+          skills: [{
+            name: 'changing-skill',
+            description: 'A skill whose icon can change in place',
+            path: '/skills/changing/SKILL.md',
+            scope: 'user',
+            enabled: true,
+            interface: { iconSmall: '/skills/changing/icon.png' },
+          }],
+          errors: [],
+        }],
+      }),
+      'fs/readFile': () => {
+        iconReads += 1;
+        return { dataBase64: iconReads === 1 ? 'QQ==' : 'Qg==' };
+      },
+    });
+    const surface = new CodexSurface({
+      client: new CodexAppServerClient(transport),
+      autoSelectFirstConversation: false,
+    });
+
+    const initial = await surface.connect();
+    expect(initial.skills[0]?.iconSmall).toBe('data:image/png;base64,QQ==');
+
+    const reloaded = await surface.listSkills({ forceReload: true });
+    expect(reloaded[0]?.iconSmall).toBe('data:image/png;base64,Qg==');
+    expect(iconReads).toBe(2);
+  });
+
+  it('refreshes the plugin catalog when the conversation cwd union grows', async () => {
+    let includeSecondCwd = false;
+    const pluginScopes: unknown[] = [];
+    const transport = new FakeTransport({
+      'thread/list': () => ({
+        data: [
+          thread('thread-existing', false),
+          ...(includeSecondCwd ? [{ ...thread('thread-new-cwd', false), cwd: '/workspace/new' }] : []),
+        ],
+        nextCursor: null,
+      }),
+      'plugin/installed': (params) => {
+        pluginScopes.push(params);
+        return { marketplaces: [], marketplaceLoadErrors: [] };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    await vi.waitFor(() => expect(pluginScopes).toHaveLength(1));
+
+    includeSecondCwd = true;
+    await surface.refreshConversations();
+    await vi.waitFor(() => expect(pluginScopes).toHaveLength(2));
+
+    expect(pluginScopes).toStrictEqual([
+      { cwds: ['/tmp/project'] },
+      { cwds: ['/tmp/project', '/workspace/new'] },
+    ]);
+  });
+
+  it('refreshes the plugin catalog after creating a conversation in a new cwd', async () => {
+    const pluginScopes: unknown[] = [];
+    const transport = new FakeTransport({
+      'plugin/installed': (params) => {
+        pluginScopes.push(params);
+        return { marketplaces: [], marketplaceLoadErrors: [] };
+      },
+      'thread/start': () => {
+        const created = { ...thread('thread-new', false), cwd: '/workspace/new' };
+        return { ...resumeResponse(created), cwd: '/workspace/new' };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    await vi.waitFor(() => expect(pluginScopes).toHaveLength(1));
+
+    await surface.createConversation({ cwd: '/workspace/new' });
+    await vi.waitFor(() => expect(pluginScopes).toHaveLength(2));
+
+    expect(pluginScopes).toStrictEqual([
+      { cwds: ['/tmp/project'] },
+      { cwds: ['/tmp/project', '/workspace/new'] },
+    ]);
   });
 
   it('deduplicates concurrent bootstrap and honors client and list configuration', async () => {
@@ -231,6 +577,94 @@ describe('CodexSurface', () => {
       status: 'complete',
       parts: [{ type: 'text', text: 'Working… done', itemId: 'agent-live' }],
     });
+  });
+
+  it('renders a bounded summary page before hydrating full history in the background', async () => {
+    const firstTurn = turn('turn-first', 'completed', [
+      { type: 'userMessage', id: 'user-first', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
+      {
+        type: 'commandExecution', id: 'command-first', command: 'npm test', cwd: '/tmp/project', processId: null,
+        source: 'unifiedExec', status: 'completed', commandActions: [], aggregatedOutput: 'passed', exitCode: 0,
+        durationMs: 20,
+      },
+      { type: 'agentMessage', id: 'agent-first', text: 'First reply', phase: null, memoryCitation: null },
+    ]);
+    const secondTurn = turn('turn-second', 'completed', [
+      { type: 'userMessage', id: 'user-second', clientId: null, content: [{ type: 'text', text: 'Second', text_elements: [] }] },
+      { type: 'agentMessage', id: 'agent-second', text: 'Second reply', phase: null, memoryCitation: null },
+    ]);
+    const firstFullPage = deferred<unknown>();
+    const transport = new FakeTransport({
+      'thread/resume': (params) => ({
+        ...resumeResponse(thread(String((params as { threadId: string }).threadId), false)),
+        initialTurnsPage: { data: [secondTurn], nextCursor: 'summary-page-2', backwardsCursor: null },
+      }),
+      'thread/turns/list': (params) => {
+        const cursor = (params as { cursor: string | null }).cursor;
+        expect(params).toMatchObject({
+          threadId: 'thread-existing', limit: 5, sortDirection: 'desc', itemsView: 'full',
+        });
+        return cursor === null
+          ? firstFullPage.promise
+          : { data: [firstTurn], nextCursor: null, backwardsCursor: null };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    const snapshot = await surface.connect();
+
+    expect(snapshot.messages.map((message) => message.parts[0])).toMatchObject([
+      { type: 'text', text: 'Second' },
+      { type: 'text', text: 'Second reply' },
+    ]);
+    firstFullPage.resolve({ data: [secondTurn], nextCursor: 'full-page-2', backwardsCursor: null });
+    await vi.waitFor(() => expect(surface.getSnapshot().messages.map((message) => message.parts[0])).toMatchObject([
+      { type: 'text', text: 'First' },
+      { type: 'tool', id: 'command-first', kind: 'command' },
+      { type: 'text', text: 'Second' },
+      { type: 'text', text: 'Second reply' },
+    ]));
+    expect(surface.getSnapshot().conversations[0]).toMatchObject({ id: 'thread-existing', turnCount: 2 });
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/turns/list'
+    ))).toHaveLength(2);
+  });
+
+  it('does not resurrect a completed turn from a stale background history page', async () => {
+    const staleFullPage = deferred<unknown>();
+    const historyHydrated = deferred<void>();
+    const runningTurn = turn('turn-running', 'inProgress', []);
+    const transport = new FakeTransport({
+      'thread/resume': () => {
+        const running = thread('thread-existing', false);
+        running.status = { type: 'active', activeFlags: [] };
+        running.turns = [runningTurn];
+        return resumeResponse(running);
+      },
+      'thread/turns/list': () => staleFullPage.promise,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    surface.onEvent((event) => {
+      if (event.type === 'conversation.historyReplaced' && event.payload.reason === 'resync') {
+        historyHydrated.resolve();
+      }
+    });
+    await surface.connect();
+    expect(surface.getSnapshot().busy).toBe(true);
+
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-running', 'completed', []) },
+    });
+    expect(surface.getSnapshot().busy).toBe(false);
+    staleFullPage.resolve({ data: [runningTurn], nextCursor: null, backwardsCursor: null });
+    await historyHydrated.promise;
+
+    expect(surface.getSnapshot().busy).toBe(false);
+    expect(surface.conversation('thread-existing').getSnapshot().activeTurnId).toBeNull();
+    expect(surface.getSnapshot().messages).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ turnId: 'turn-running', status: 'streaming' }),
+    ]));
   });
 
   it('emits ordered semantic events after matching state mutations for conversation handles', async () => {
@@ -2054,7 +2488,9 @@ describe('CodexSurface', () => {
       params: { threadId: 'thread-running', turn: turn('turn-running', 'completed', []) },
     });
 
-    const assistant = surface.getSnapshot().messages.filter((message) => message.role === 'assistant');
+    const assistant = surface.getSnapshot().messages.filter((message) => (
+      message.role === 'assistant' && message.turnId === 'turn-running'
+    ));
     expect(assistant).toHaveLength(1);
     expect(assistant[0]).toMatchObject({
       status: 'complete',
@@ -2109,6 +2545,14 @@ describe('CodexSurface', () => {
     };
     const transport = new FakeTransport({
       'thread/goal/get': () => ({ goal }),
+      'thread/resume': (params) => {
+        const threadId = (params as { threadId: string }).threadId;
+        if (threadId !== 'thread-running-read') return resumeResponse(thread(threadId, true));
+        const running = thread(threadId, false);
+        running.status = { type: 'active', activeFlags: [] };
+        running.turns = [turn('turn-running-read', 'inProgress', [])];
+        return resumeResponse(running);
+      },
       'thread/goal/clear': () => ({ cleared: true }),
       'thread/read': (params) => {
         const threadId = (params as { threadId: string }).threadId;
@@ -2119,6 +2563,16 @@ describe('CodexSurface', () => {
           return { thread: running };
         }
         return { thread: thread(threadId, true) };
+      },
+      'thread/turns/list': (params) => {
+        const threadId = (params as { threadId: string }).threadId;
+        return {
+          data: threadId === 'thread-running-read'
+            ? [turn('turn-running-read', 'inProgress', [])]
+            : (thread(threadId, true).turns as unknown[]),
+          nextCursor: null,
+          backwardsCursor: null,
+        };
       },
       'review/start': (params) => ({
         turn: turn('review-complete', 'completed', []),
@@ -2176,6 +2630,11 @@ describe('CodexSurface', () => {
       })],
     });
     expect(surface.getSnapshot().activeConversationId).toBe('thread-existing');
+    expect(transport.sent.filter((message) => (
+      'method' in message
+      && message.method === 'thread/read'
+      && (message.params as { includeTurns?: boolean }).includeTurns === false
+    ))).toHaveLength(1);
   });
 
   it('validates create settings before persistence and rejects detached responses for inline reviews', async () => {
@@ -2250,6 +2709,7 @@ describe('CodexSurface', () => {
         data: [thread('thread-a', false), thread('thread-b', false)], nextCursor: null,
       }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, false)),
+      'thread/turns/list': () => ({ data: [], nextCursor: null, backwardsCursor: null }),
       'turn/start': (params) => ({
         turn: turn(`turn-${(params as { threadId: string }).threadId}`, 'inProgress', []),
       }),
@@ -2671,6 +3131,7 @@ function responseFor(method: string, params: unknown): unknown {
       nextCursor: null,
     };
     case 'skills/list': return { data: [{ cwd: '/tmp/project', skills: [], errors: [] }] };
+    case 'plugin/installed': return { marketplaces: [], marketplaceLoadErrors: [] };
     case 'permissionProfile/list': return {
       data: [
         { id: ':read-only', description: null, allowed: true },
@@ -2681,6 +3142,14 @@ function responseFor(method: string, params: unknown): unknown {
     };
     case 'configRequirements/read': return { requirements: null };
     case 'thread/list': return { data: [thread('thread-existing', false)], nextCursor: null };
+    case 'thread/turns/list': {
+      const threadId = String((params as { threadId: string }).threadId);
+      return {
+        data: (thread(threadId, true).turns as unknown[]),
+        nextCursor: null,
+        backwardsCursor: null,
+      };
+    }
     case 'thread/resume': return resumeResponse(thread(String((params as { threadId: string }).threadId), true));
     case 'thread/start': return resumeResponse(thread('thread-new', false));
     case 'turn/start': return { turn: turn('turn-live', 'inProgress', []) };
@@ -2715,8 +3184,10 @@ function turn(id: string, status: string, items: unknown[]): Record<string, unkn
 }
 
 function resumeResponse(value: Record<string, unknown>): Record<string, unknown> {
+  const turns = Array.isArray(value.turns) ? value.turns : [];
   return {
-    thread: value,
+    thread: { ...value, turns: [] },
+    initialTurnsPage: { data: [...turns].reverse(), nextCursor: null, backwardsCursor: null },
     model: 'gpt-5',
     cwd: '/tmp/project',
     approvalPolicy: 'on-request',
@@ -2748,6 +3219,20 @@ function testModel(id: string, model: string, isDefault: boolean): Record<string
     serviceTiers: [],
     defaultServiceTier: null,
     isDefault,
+  };
+}
+
+function pluginSummary(
+  id: string,
+  name: string,
+  pluginInterface: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    id,
+    name,
+    installed: true,
+    enabled: true,
+    interface: pluginInterface,
   };
 }
 

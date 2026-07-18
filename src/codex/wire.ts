@@ -43,9 +43,12 @@ export interface RpcTransport {
 
 /** A malformed transport frame that does not imply the connection was lost. */
 export class RpcTransportProtocolError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
+  readonly requestId?: RpcId;
+
+  constructor(message: string, options?: ErrorOptions & { requestId?: RpcId }) {
     super(message, options);
     this.name = 'RpcTransportProtocolError';
+    this.requestId = options?.requestId;
   }
 }
 

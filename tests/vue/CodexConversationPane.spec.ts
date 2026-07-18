@@ -32,6 +32,60 @@ describe('CodexConversationPane', () => {
     expect(wrapper.text()).toContain('Start a conversation with Codex');
   });
 
+  it('renders catalog-backed app and skill mentions without pane-specific adapters', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages: [{
+          role: 'user',
+          content: [
+            'Use [@gmail](plugin://gmail@openai-curated-remote)',
+            'and [$bank](/skills/update-bank-balance-sheet/SKILL.md)',
+          ].join(' '),
+        }],
+        modelValue: '',
+        plugins: [{
+          id: 'gmail@openai-curated-remote',
+          name: 'gmail',
+          displayName: 'Gmail',
+          iconUrl: 'https://files.openai.com/gmail.png',
+          brandColor: '#EA4335',
+          enabled: true,
+        }],
+        skills: [{
+          name: 'update-bank-balance-sheet',
+          displayName: 'Update Bank Balance Sheet',
+          path: '/skills/update-bank-balance-sheet/SKILL.md',
+          enabled: true,
+        }],
+      },
+    });
+
+    expect(wrapper.get('.chat-user-text__mention--plugin').text()).toBe('Gmail');
+    expect(wrapper.get('.chat-user-text__mention--skill').text()).toBe('Update Bank Balance Sheet');
+    expect(wrapper.text()).not.toContain('plugin://');
+    expect(wrapper.text()).not.toContain('/skills/update-bank-balance-sheet');
+  });
+
+  it('quotes only the visible portion of ambient-enriched user messages', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages: [{
+          role: 'user',
+          content: [
+            '## My request for Codex:',
+            'Find a rental car',
+            '<in-app-browser-context source="ambient-ui-state">hidden browser state</in-app-browser-context>',
+          ].join('\n'),
+        }],
+        modelValue: '',
+      },
+    });
+
+    await wrapper.get('[aria-label="Quote"]').trigger('click');
+    expect(wrapper.get('textarea').element.value).toBe('Find a rental car');
+    expect(wrapper.emitted('update:modelValue')).toContainEqual(['Find a rental car']);
+  });
+
   it('shows composer failures and exposes them to pane consumers', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: { messages, modelValue: '' },
@@ -265,6 +319,20 @@ describe('CodexConversationPane', () => {
     expect(wrapper.get('textarea').attributes()).toHaveProperty('disabled');
   });
 
+  it('clears a stale local action error after the bound conversation recovers', async () => {
+    const controller = fakeSurfaceController();
+    vi.mocked(controller.connect).mockRejectedValueOnce(new Error('resume failed'));
+    const wrapper = mount(CodexConversationPane, { props: { surface: controller } });
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('resume failed'));
+    controller.state.status = 'ready';
+    controller.state.error = null;
+    controller.state.activeConversationId = 'thread-recovered';
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+
   it('exposes slots and extensible composer menu entries', async () => {
     const menuItems: CodexComposerMenuItem<{ source: string }>[] = [{
       id: 'custom-action',
@@ -423,6 +491,8 @@ function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurface
     modelCatalogStatus: 'loaded',
     skills: [],
     skillCatalogStatus: 'loaded',
+    plugins: [],
+    pluginCatalogStatus: 'loaded',
     permissionProfiles: [],
     approvalPresets: [],
     approvalPreset: null,

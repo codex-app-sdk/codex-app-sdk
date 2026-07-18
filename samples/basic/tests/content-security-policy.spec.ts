@@ -11,6 +11,7 @@ describe('basic sample renderer security policy', () => {
     expect(html).toContain('http-equiv="Content-Security-Policy"');
     expect(html).toContain("default-src 'self'");
     expect(html).toContain("script-src 'self'");
+    expect(html).toContain("img-src 'self' data: blob: https:");
     expect(html).toContain("object-src 'none'");
     expect(html).toContain("base-uri 'none'");
     expect(html).toContain("form-action 'none'");

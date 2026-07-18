@@ -359,6 +359,16 @@ export class CodexAppServerClient {
   private handleTransportError(error: Error): void {
     if (error instanceof RpcTransportProtocolError) {
       this.reportProtocolError(error);
+      if (error.requestId !== undefined) {
+        const pending = this.pending.get(error.requestId);
+        if (pending) {
+          clearTimeout(pending.timeout);
+          this.pending.delete(error.requestId);
+          pending.reject(error);
+        }
+      } else {
+        this.rejectAll(error);
+      }
       return;
     }
     this.started = false;

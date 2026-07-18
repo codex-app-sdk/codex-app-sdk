@@ -1,4 +1,4 @@
-import { basename, isAbsolute } from 'node:path';
+import { basename, extname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   CodexAppServerClient,
@@ -25,6 +25,7 @@ import type {
   CodexSurfaceJsonValue,
   CodexSurfaceModel,
   CodexSurfacePermissionMode,
+  CodexSurfacePlugin,
   CodexSurfaceRateLimitSnapshot,
   CodexSurfaceRateLimits,
   CodexSurfaceReviewTarget,
@@ -48,6 +49,7 @@ import {
   codexItemToSurfaceMessage,
   codexItemToToolPart,
   codexThreadToSurfaceMessages,
+  codexTurnToSurfaceMessages,
 } from './codex-conversation-history';
 import {
   commandOutputDeltaToToolPartUpdate,
@@ -67,6 +69,9 @@ type StateListener = (snapshot: CodexSurfaceSnapshot) => void;
 type ConversationStateListener = (snapshot: CodexConversationSnapshot) => void;
 type SurfaceEventListener = (event: CodexSurfaceEvent) => void;
 type ConversationEventListener = (event: CodexConversationEvent) => void;
+const CONVERSATION_HISTORY_PAGE_SIZE = 5;
+const MAX_CATALOG_ICON_BYTES = 256 * 1024;
+const MAX_CATALOG_ICON_BASE64_LENGTH = Math.ceil(MAX_CATALOG_ICON_BYTES / 3) * 4;
 type SurfaceEventInput = CodexSurfaceEvent extends infer Event
   ? Event extends CodexSurfaceEvent
     ? Omit<Event, 'seq' | 'occurredAt' | 'origin'>
@@ -205,6 +210,7 @@ type ThreadRuntimeState = {
   busy: boolean;
   turnStartPending: boolean;
   historyLoading: boolean;
+  fullHistoryHydrated: boolean;
   error: string | null;
   planMarkdownByTurn: Map<string, string>;
 };
@@ -244,6 +250,8 @@ export class CodexSurface {
   private readonly conversationHandles = new Map<string, CodexConversation>();
   private readonly dynamicTools = new Map<string, CodexDynamicTool>();
   private readonly hydrationPromises = new Map<string, Promise<void>>();
+  private readonly historyHydrationPromises = new Map<string, Promise<void>>();
+  private readonly catalogIconDataUrls = new Map<string, Promise<string | undefined>>();
   private readonly hostOptionsByThread = new Map<string, CodexConversationLoadOptions>();
   private readonly pendingApprovals = new Map<string, PendingCodexApproval>();
   private readonly pendingClientRequests = new Map<string, PendingClientRequest>();
@@ -257,6 +265,9 @@ export class CodexSurface {
   private readonly unsubscribeMcpElicitationRequests: () => void;
   private readonly unsubscribeServerRequestPolicies: () => void;
   private connectPromise: Promise<CodexSurfaceSnapshot> | null = null;
+  private pluginCatalogPromise: Promise<void> | null = null;
+  private pluginCatalogLastAttemptedCwdsKey: string | null = null;
+  private pluginCatalogRefreshRequested = false;
   private eventSequence = 0;
   private closed = false;
   private state: CodexSurfaceSnapshot = {
@@ -271,6 +282,8 @@ export class CodexSurface {
     modelCatalogStatus: 'notLoaded',
     skills: [],
     skillCatalogStatus: 'notLoaded',
+    plugins: [],
+    pluginCatalogStatus: 'notLoaded',
     permissionProfiles: [],
     approvalPresets: [],
     approvalPreset: null,
@@ -390,6 +403,7 @@ export class CodexSurface {
         }
         this.patch({ status: 'ready', error: null });
         this.emitSurfaceStatus('lifecycle');
+        this.schedulePluginCatalogRefresh();
         return this.getSnapshot();
       } catch (error) {
         this.patch({ status: 'error', error: errorMessage(error) });
@@ -410,6 +424,7 @@ export class CodexSurface {
   private async loadConversations(): Promise<CodexSurfaceSnapshot> {
     const conversations = await this.requestConversations({ limit: this.options.conversationLimit });
     this.patch({ conversations });
+    this.schedulePluginCatalogRefresh(true);
     for (const summary of conversations) {
       this.emitSummaryUpserted(summary, 'listed', 'action');
     }
@@ -476,6 +491,89 @@ export class CodexSurface {
       cursor = response.nextCursor;
     } while (cursor && conversations.length < totalLimit);
     return conversations;
+  }
+
+  private hydrateCompleteConversationHistory(threadId: string): Promise<void> {
+    const runtime = this.requireRuntime(threadId);
+    if (runtime.fullHistoryHydrated) return Promise.resolve();
+    const existing = this.historyHydrationPromises.get(threadId);
+    if (existing) return existing;
+    const hydration = (async () => {
+      try {
+        const requestedCursors = new Set<string>();
+        let cursor: string | null = null;
+        do {
+          if (cursor !== null) {
+            if (requestedCursors.has(cursor)) {
+              throw new Error(`Codex app-server repeated a thread history cursor for '${threadId}'`);
+            }
+            requestedCursors.add(cursor);
+          }
+          const response: v2.ThreadTurnsListResponse = await this.client.request('thread/turns/list', {
+            threadId,
+            cursor,
+            limit: CONVERSATION_HISTORY_PAGE_SIZE,
+            sortDirection: 'desc',
+            itemsView: 'full',
+          });
+          this.mergeHydratedHistoryPage(threadId, [...response.data].reverse());
+          cursor = response.nextCursor;
+        } while (cursor !== null);
+        if (!this.runtimes.has(threadId)) return;
+        this.patchRuntime(threadId, { fullHistoryHydrated: true });
+        this.emitHistoryReplaced(threadId, 'resync', 'action');
+      } catch (error) {
+        if (this.runtimes.has(threadId)) {
+          this.patchRuntime(threadId, { error: `Could not load complete conversation history: ${errorMessage(error)}` });
+        }
+        throw error;
+      }
+    })();
+    this.historyHydrationPromises.set(threadId, hydration);
+    void hydration.finally(() => {
+      if (this.historyHydrationPromises.get(threadId) === hydration) {
+        this.historyHydrationPromises.delete(threadId);
+      }
+    }).catch(() => undefined);
+    return hydration;
+  }
+
+  private mergeHydratedHistoryPage(threadId: string, turns: readonly v2.Turn[]): void {
+    const current = this.runtimes.get(threadId);
+    if (!current) return;
+    const protectedTurnIds = new Set<string>();
+    if (current.activeTurnId) protectedTurnIds.add(current.activeTurnId);
+    for (const turn of turns) {
+      if (turn.status === 'inProgress' && current.turnIds.includes(turn.id)) protectedTurnIds.add(turn.id);
+    }
+    const replaceableTurnIds = new Set(turns
+      .filter((turn) => !protectedTurnIds.has(turn.id))
+      .map((turn) => turn.id));
+    const historicalTurns = turns.filter((turn) => replaceableTurnIds.has(turn.id));
+    const preservedTurnIds = current.turnIds.filter((turnId) => !replaceableTurnIds.has(turnId));
+    const preservedMessages = current.messages.filter((message) => (
+      message.turnId === undefined || !replaceableTurnIds.has(message.turnId)
+    ));
+    const messages = historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn));
+    this.patchRuntime(threadId, {
+      turnIds: [...historicalTurns.map((turn) => turn.id), ...preservedTurnIds],
+      messages: [...messages, ...preservedMessages],
+    });
+    const turnCount = this.requireRuntime(threadId).turnIds.length;
+    this.patch({
+      conversations: this.state.conversations.map((conversation) => conversation.id === threadId
+        ? { ...conversation, turnCount }
+        : conversation),
+    });
+    const summary = this.state.conversations.find((conversation) => conversation.id === threadId);
+    if (summary) this.emitSummaryUpserted(summary, 'updated', 'action');
+  }
+
+  private async refreshCompleteConversationHistory(threadId: string): Promise<void> {
+    const existing = this.historyHydrationPromises.get(threadId);
+    if (existing) await existing.catch(() => undefined);
+    this.requireRuntime(threadId).fullHistoryHydrated = false;
+    await this.hydrateCompleteConversationHistory(threadId);
   }
 
   private async requestModels(includeHidden: boolean): Promise<CodexSurfaceModel[]> {
@@ -548,6 +646,7 @@ export class CodexSurface {
     forceReload = false,
     origin: CodexSurfaceEventOrigin = 'action',
   ): Promise<void> {
+    if (forceReload) this.catalogIconDataUrls.clear();
     this.patch({ skillCatalogStatus: 'loading' });
     this.emitEvent(origin, {
       type: 'catalog.skillsChanged',
@@ -558,10 +657,10 @@ export class CodexSurface {
         ...(this.options.cwd ? { cwds: [this.options.cwd] } : {}),
         forceReload,
       });
-      const skills = response.data
-        .flatMap((entry) => entry.skills)
-        .filter((skill) => skill.enabled)
-        .map(surfaceSkill);
+      const skills = await surfaceSkills(
+        response.data.flatMap((entry) => entry.skills),
+        (path) => this.catalogIconDataUrl(path),
+      );
       this.patch({ skills, skillCatalogStatus: 'loaded' });
       this.emitEvent(origin, {
         type: 'catalog.skillsChanged',
@@ -576,16 +675,103 @@ export class CodexSurface {
     }
   }
 
+  private schedulePluginCatalogRefresh(force = false): void {
+    if (this.closed || this.state.status !== 'ready') return;
+    const scope = this.pluginCatalogScope();
+    if (force) {
+      this.pluginCatalogLastAttemptedCwdsKey = null;
+      this.pluginCatalogRefreshRequested = true;
+    }
+    if (this.pluginCatalogPromise) return;
+    if (!this.pluginCatalogRefreshRequested && this.pluginCatalogLastAttemptedCwdsKey === scope.key) return;
+    this.pluginCatalogRefreshRequested = false;
+    this.patch({ pluginCatalogStatus: 'loading' });
+    this.emitEvent('action', {
+      type: 'catalog.pluginsChanged',
+      payload: { plugins: structuredClone(this.state.plugins), status: 'loading' },
+    });
+    const loading = this.loadPluginCatalog(scope.cwds, scope.key);
+    this.pluginCatalogPromise = loading;
+    void loading.finally(() => {
+      if (this.pluginCatalogPromise === loading) this.pluginCatalogPromise = null;
+      if (this.pluginCatalogRefreshRequested || this.pluginCatalogScope().key !== scope.key) {
+        this.schedulePluginCatalogRefresh();
+      }
+    }).catch(() => undefined);
+  }
+
+  private pluginCatalogScope(): { cwds: string[]; key: string } {
+    const cwds = [...new Set([
+      this.options.cwd,
+      ...this.state.conversations.map((conversation) => conversation.cwd),
+      ...[...this.runtimes.values()].map((runtime) => runtime.cwd ?? undefined),
+    ].filter((cwd): cwd is string => typeof cwd === 'string' && cwd.trim().length > 0))].sort();
+    return { cwds, key: JSON.stringify(cwds) };
+  }
+
+  private async loadPluginCatalog(cwds: readonly string[], key: string): Promise<void> {
+    this.pluginCatalogLastAttemptedCwdsKey = key;
+    try {
+      const response = await this.client.request('plugin/installed', {
+        ...(cwds.length > 0 ? { cwds: [...cwds] } : {}),
+      });
+      const summaries = new Map<string, v2.PluginSummary>();
+      for (const marketplace of response.marketplaces) {
+        for (const plugin of marketplace.plugins) {
+          if (!summaries.has(plugin.id)) summaries.set(plugin.id, plugin);
+        }
+      }
+      const plugins = await Promise.all(
+        [...summaries.values()].map((plugin) => surfacePlugin(plugin, (path) => this.catalogIconDataUrl(path))),
+      );
+      if (this.closed) return;
+      this.patch({ plugins, pluginCatalogStatus: 'loaded' });
+      this.emitEvent('action', {
+        type: 'catalog.pluginsChanged',
+        payload: { plugins: structuredClone(plugins), status: 'loaded' },
+      });
+    } catch {
+      if (this.closed) return;
+      this.pluginCatalogLastAttemptedCwdsKey = null;
+      this.patch({ pluginCatalogStatus: 'error' });
+      this.emitEvent('action', {
+        type: 'catalog.pluginsChanged',
+        payload: { plugins: structuredClone(this.state.plugins), status: 'error' },
+      });
+    }
+  }
+
+  private catalogIconDataUrl(path: string): Promise<string | undefined> {
+    const existing = this.catalogIconDataUrls.get(path);
+    if (existing) return existing;
+    const materialized = this.readCatalogIconDataUrl(path);
+    this.catalogIconDataUrls.set(path, materialized);
+    return materialized;
+  }
+
+  private async readCatalogIconDataUrl(path: string): Promise<string | undefined> {
+    if (!isAbsolute(path)) return undefined;
+    const mimeType = catalogIconMimeType(path);
+    if (!mimeType) return undefined;
+    try {
+      const response = await this.client.request('fs/readFile', { path });
+      return boundedImageDataUrl(mimeType, response.dataBase64);
+    } catch {
+      return undefined;
+    }
+  }
+
   async listSkills(options: ListCodexSkillsOptions = {}): Promise<CodexSurfaceSkill[]> {
     await this.ensureConnected();
+    if (options.forceReload) this.catalogIconDataUrls.clear();
     const response = await this.client.request('skills/list', {
       ...(options.cwd ? { cwds: [options.cwd] } : {}),
       forceReload: options.forceReload ?? false,
     });
-    const skills = response.data
-      .flatMap((entry) => entry.skills)
-      .filter((skill) => skill.enabled)
-      .map(surfaceSkill);
+    const skills = await surfaceSkills(
+      response.data.flatMap((entry) => entry.skills),
+      (path) => this.catalogIconDataUrl(path),
+    );
     for (const runtime of this.runtimes.values()) {
       if (runtime.cwd !== (options.cwd ?? null)) continue;
       this.patchRuntime(runtime.threadId, { skills, skillCatalogStatus: 'loaded' });
@@ -686,10 +872,10 @@ export class CodexSurface {
       })(),
     ]);
     const skills = skillResult.status === 'fulfilled'
-      ? skillResult.value.data
-        .flatMap((entry) => entry.skills)
-        .filter((skill) => skill.enabled)
-        .map(surfaceSkill)
+      ? await surfaceSkills(
+        skillResult.value.data.flatMap((entry) => entry.skills),
+        (path) => this.catalogIconDataUrl(path),
+      )
       : [];
     const permissionProfiles = permissionResult.status === 'fulfilled'
       ? permissionResult.value.profiles
@@ -835,6 +1021,12 @@ export class CodexSurface {
       const [response, goal] = await Promise.all([
         this.client.request('thread/resume', {
           threadId: conversationId,
+          excludeTurns: true,
+          initialTurnsPage: {
+            limit: CONVERSATION_HISTORY_PAGE_SIZE,
+            sortDirection: 'desc',
+            itemsView: 'summary',
+          },
           ...(hostOptions.cwd ? { cwd: hostOptions.cwd } : {}),
           ...(extension.baseInstructions === undefined ? {} : { baseInstructions: extension.baseInstructions }),
           ...(extension.developerInstructions === undefined
@@ -849,19 +1041,28 @@ export class CodexSurface {
       if (response.thread.id !== conversationId) {
         throw new Error(`Codex thread/resume returned '${response.thread.id}' for requested thread '${conversationId}'`);
       }
+      const initialPage = response.initialTurnsPage ?? await this.client.request('thread/turns/list', {
+        threadId: response.thread.id,
+        cursor: null,
+        limit: CONVERSATION_HISTORY_PAGE_SIZE,
+        sortDirection: 'desc',
+        itemsView: 'summary',
+      });
+      const turns = [...initialPage.data].reverse();
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
       const catalogs = await this.loadConversationCatalogs(cwd);
-      const runningTurnId = activeTurnId(response.thread.turns);
-      const historyMessages = codexThreadToSurfaceMessages(response.thread);
+      const runningTurnId = activeTurnId(turns);
+      const historyMessages = codexThreadToSurfaceMessages({ ...response.thread, turns });
       const messages = runningTurnId
         ? ensureAssistantTurnMessage(historyMessages, response.thread.id, runningTurnId)
         : historyMessages;
       const runtime = this.createRuntime(response.thread.id, {
         hydrated: true,
+        fullHistoryHydrated: false,
         cwd: cwd ?? null,
         historyLoading: false,
         activeTurnId: runningTurnId,
-        turnIds: response.thread.turns.map((turn) => turn.id),
+        turnIds: turns.map((turn) => turn.id),
         messages,
         busy: Boolean(runningTurnId),
         goal: goal ? { ...goal } : null,
@@ -869,7 +1070,7 @@ export class CodexSurface {
         ...catalogs,
         ...sessionSelection(response, this.state.models, this.snapshotForRuntime(loadingRuntime)),
       });
-      const summary = threadToSummary(response.thread);
+      const summary = { ...threadToSummary(response.thread), turnCount: turns.length };
       this.patch({
         conversations: upsertConversation(this.state.conversations, summary),
         ...(this.state.activeConversationId === response.thread.id ? this.runtimeProjection(runtime) : {}),
@@ -880,6 +1081,7 @@ export class CodexSurface {
       this.emitConversationSettings(response.thread.id, 'action');
       this.emitConversationSkills(response.thread.id, 'action');
       this.emitConversationPermissions(response.thread.id, 'action');
+      void this.hydrateCompleteConversationHistory(response.thread.id).catch(() => undefined);
       return this.getSnapshot();
     } catch (error) {
       this.patchRuntime(conversationId, { historyLoading: false, error: errorMessage(error) });
@@ -890,7 +1092,7 @@ export class CodexSurface {
   async readConversationHistory(conversationId = this.state.activeConversationId ?? ''): Promise<CodexConversationHistory> {
     await this.ensureConnected();
     if (!conversationId) throw new Error('There is no active conversation');
-    const existing = this.runtimes.get(conversationId);
+    const existing = await this.ensureThreadReady(conversationId);
     if (existing?.busy) {
       return {
         conversationId,
@@ -901,24 +1103,25 @@ export class CodexSurface {
     const loadingRuntime = this.createRuntime(conversationId, { historyLoading: true, error: null });
     if (this.state.activeConversationId === conversationId) this.activateRuntime(loadingRuntime);
     try {
-      const response = await this.client.request('thread/read', { threadId: conversationId, includeTurns: true });
+      const [response] = await Promise.all([
+        this.client.request('thread/read', { threadId: conversationId, includeTurns: false }),
+        this.refreshCompleteConversationHistory(conversationId),
+      ]);
       if (response.thread.id !== conversationId) {
         throw new Error(`Codex thread/read returned '${response.thread.id}' for requested thread '${conversationId}'`);
       }
-      const runningTurnId = activeTurnId(response.thread.turns);
-      const historyMessages = codexThreadToSurfaceMessages(response.thread);
+      const hydratedRuntime = this.requireRuntime(conversationId);
+      const runningTurnId = hydratedRuntime.activeTurnId;
       const runtime = this.createRuntime(conversationId, {
         hydrated: true,
         historyLoading: false,
         activeTurnId: runningTurnId,
-        turnIds: response.thread.turns.map((turn) => turn.id),
-        messages: runningTurnId
-          ? ensureAssistantTurnMessage(historyMessages, response.thread.id, runningTurnId)
-          : historyMessages,
+        turnIds: hydratedRuntime.turnIds,
+        messages: hydratedRuntime.messages,
         busy: Boolean(runningTurnId),
         threadStatus: surfaceThreadStatus(response.thread.status),
       });
-      const summary = threadToSummary(response.thread);
+      const summary = { ...threadToSummary(response.thread), turnCount: runtime.turnIds.length };
       this.patch({
         conversations: upsertConversation(this.state.conversations, summary),
         ...(this.state.activeConversationId === conversationId ? this.runtimeProjection(runtime) : {}),
@@ -1543,8 +1746,7 @@ export class CodexSurface {
     if (runtime.busy) throw new Error('Cannot roll back while Codex is responding');
     let targetIndex = runtime.turnIds.indexOf(turnId);
     if (targetIndex < 0) {
-      const read = await this.client.request('thread/read', { threadId, includeTurns: true });
-      runtime.turnIds = read.thread.turns.map((turn) => turn.id);
+      await this.hydrateCompleteConversationHistory(threadId);
       targetIndex = runtime.turnIds.indexOf(turnId);
     }
     if (targetIndex < 0) throw new Error(`Cannot roll back to unknown Codex turn '${turnId}'`);
@@ -1773,6 +1975,7 @@ export class CodexSurface {
     this.pendingApprovals.clear();
     this.pendingClientRequests.clear();
     this.commandOutputForwardItemIds.clear();
+    this.catalogIconDataUrls.clear();
     for (const runtime of this.runtimes.values()) {
       runtime.activeTurnId = null;
       runtime.busy = false;
@@ -1839,6 +2042,7 @@ export class CodexSurface {
       busy: false,
       turnStartPending: false,
       historyLoading: false,
+      fullHistoryHydrated: false,
       error: null,
       planMarkdownByTurn: new Map(),
       ...patch,
@@ -1935,6 +2139,7 @@ export class CodexSurface {
     reason: Extract<CodexSurfaceEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
     origin: CodexSurfaceEventOrigin,
   ): void {
+    this.schedulePluginCatalogRefresh();
     const fingerprint = JSON.stringify({
       id: summary.id,
       title: summary.title,
@@ -2190,6 +2395,7 @@ export class CodexSurface {
     this.runtimes.delete(threadId);
     this.hostOptionsByThread.delete(threadId);
     this.hydrationPromises.delete(threadId);
+    this.historyHydrationPromises.delete(threadId);
     this.conversationHandles.delete(threadId);
     this.semanticEventValues.delete(`summary:${threadId}`);
     const conversations = this.state.conversations.filter((conversation) => conversation.id !== threadId);
@@ -2721,6 +2927,9 @@ export class CodexSurface {
 
   private handleDisconnect(error: Error): void {
     if (this.closed) return;
+    this.pluginCatalogLastAttemptedCwdsKey = null;
+    this.pluginCatalogRefreshRequested = false;
+    this.catalogIconDataUrls.clear();
     for (const runtime of this.runtimes.values()) {
       this.clearPendingForThread(runtime.threadId, error.message, 'surface_disconnected');
       runtime.activeTurnId = null;
@@ -3348,20 +3557,132 @@ function codexModelToSurfaceModel(model: v2.Model): CodexSurfaceModel {
   };
 }
 
-function surfaceSkill(skill: v2.SkillMetadata): CodexSurfaceSkill {
+async function surfaceSkills(
+  skills: readonly v2.SkillMetadata[],
+  localIconDataUrl: (path: string) => Promise<string | undefined>,
+): Promise<CodexSurfaceSkill[]> {
+  return Promise.all(
+    skills
+      .filter((skill) => skill.enabled)
+      .map((skill) => surfaceSkill(skill, localIconDataUrl)),
+  );
+}
+
+async function surfaceSkill(
+  skill: v2.SkillMetadata,
+  localIconDataUrl: (path: string) => Promise<string | undefined>,
+): Promise<CodexSurfaceSkill> {
+  const [iconSmall, iconLarge] = await Promise.all([
+    skill.interface?.iconSmall ? localIconDataUrl(skill.interface.iconSmall) : undefined,
+    skill.interface?.iconLarge ? localIconDataUrl(skill.interface.iconLarge) : undefined,
+  ]);
   return {
     name: skill.name,
     description: skill.description,
     shortDescription: skill.shortDescription ?? skill.interface?.shortDescription,
     displayName: skill.interface?.displayName,
-    iconSmall: skill.interface?.iconSmall,
-    iconLarge: skill.interface?.iconLarge,
+    iconSmall,
+    iconLarge,
     brandColor: skill.interface?.brandColor,
     defaultPrompt: skill.interface?.defaultPrompt,
     path: skill.path,
     scope: skill.scope,
     enabled: skill.enabled,
   };
+}
+
+async function surfacePlugin(
+  plugin: v2.PluginSummary,
+  localIconDataUrl: (path: string) => Promise<string | undefined>,
+): Promise<CodexSurfacePlugin> {
+  const pluginInterface = plugin.interface;
+  const composerIconUrl = safeRemoteImageUrl(pluginInterface?.composerIconUrl);
+  const logoUrl = safeRemoteImageUrl(pluginInterface?.logoUrl);
+  const logoUrlDark = safeRemoteImageUrl(pluginInterface?.logoUrlDark);
+  const displayName = nonEmpty(pluginInterface?.displayName) ?? plugin.name;
+  const shortDescription = nonEmpty(pluginInterface?.shortDescription);
+  const longDescription = nonEmpty(pluginInterface?.longDescription);
+  const brandColor = nonEmpty(pluginInterface?.brandColor);
+  const iconUrl = composerIconUrl
+    ?? logoUrl
+    ?? await firstLocalPluginIcon([pluginInterface?.composerIcon, pluginInterface?.logo], localIconDataUrl);
+  const iconUrlDark = composerIconUrl
+    ?? logoUrlDark
+    ?? logoUrl
+    ?? await firstLocalPluginIcon([
+      pluginInterface?.composerIcon,
+      pluginInterface?.logoDark,
+      pluginInterface?.logo,
+    ], localIconDataUrl);
+  return {
+    id: plugin.id,
+    name: plugin.name,
+    displayName,
+    ...(shortDescription ? { shortDescription } : {}),
+    ...(longDescription ? { longDescription } : {}),
+    ...(brandColor ? { brandColor } : {}),
+    ...(iconUrl ? { iconUrl } : {}),
+    ...(iconUrlDark ? { iconUrlDark } : {}),
+    enabled: plugin.enabled,
+  };
+}
+
+async function firstLocalPluginIcon(
+  paths: readonly (string | null | undefined)[],
+  localIconDataUrl: (path: string) => Promise<string | undefined>,
+): Promise<string | undefined> {
+  for (const path of paths) {
+    if (!path) continue;
+    const dataUrl = await localIconDataUrl(path);
+    if (dataUrl) return dataUrl;
+  }
+  return undefined;
+}
+
+function safeRemoteImageUrl(value: string | null | undefined): string | undefined {
+  const url = nonEmpty(value);
+  if (!url) return undefined;
+  try {
+    return new URL(url).protocol === 'https:' ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function catalogIconMimeType(path: string): string | undefined {
+  switch (extname(path).toLowerCase()) {
+    case '.avif': return 'image/avif';
+    case '.bmp': return 'image/bmp';
+    case '.gif': return 'image/gif';
+    case '.ico': return 'image/x-icon';
+    case '.jpeg':
+    case '.jpg': return 'image/jpeg';
+    case '.png': return 'image/png';
+    case '.svg': return 'image/svg+xml';
+    case '.webp': return 'image/webp';
+    default: return undefined;
+  }
+}
+
+function boundedImageDataUrl(mimeType: string, dataBase64: string): string | undefined {
+  const encoded = dataBase64.trim();
+  if (!encoded || encoded.length > MAX_CATALOG_ICON_BASE64_LENGTH || !/^[a-z\d+/]+={0,2}$/i.test(encoded)) {
+    return undefined;
+  }
+  const unpadded = encoded.replace(/=+$/, '');
+  if (unpadded.length % 4 === 1) return undefined;
+  const suppliedPadding = encoded.length - unpadded.length;
+  const requiredPadding = (4 - (unpadded.length % 4)) % 4;
+  if (suppliedPadding !== 0 && suppliedPadding !== requiredPadding) return undefined;
+  const byteLength = Math.floor((unpadded.length * 3) / 4);
+  if (byteLength > MAX_CATALOG_ICON_BYTES) return undefined;
+  const padded = `${unpadded}${'='.repeat((4 - (unpadded.length % 4)) % 4)}`;
+  return `data:${mimeType};base64,${padded}`;
+}
+
+function nonEmpty(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed || undefined;
 }
 
 function selectedModel(models: CodexSurfaceModel[], idOrModel: string | null): CodexSurfaceModel | null {

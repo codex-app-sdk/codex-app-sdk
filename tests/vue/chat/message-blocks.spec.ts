@@ -32,6 +32,48 @@ describe('message block computation', () => {
     ]);
   });
 
+  it('hides complete ambient browser context blocks without swallowing malformed user text', () => {
+    const content = [
+      '## My request for Codex:',
+      'Find me a rental car.',
+      '',
+      '<in-app-browser-context source="ambient-ui-state">',
+      'This block is automatically supplied ambient UI state.',
+      'Current URL: https://www.skyscanner.com/car-rental',
+      '</in-app-browser-context>',
+    ].join('\n');
+
+    expect(stripMessageContext(content)).toBe('Find me a rental car.');
+    expect(computeMessageBlocks({ role: 'user', content })).toStrictEqual([
+      { type: 'user-text', content: 'Find me a rental car.' },
+    ]);
+    expect(stripMessageContext([
+      '<in-app-browser-context source="ambient-ui-state">first</in-app-browser-context>',
+      'Visible',
+      '<in-app-browser-context>second</in-app-browser-context>',
+    ].join('\n'))).toBe('Visible');
+
+    const malformed = 'Keep this <in-app-browser-context source="ambient-ui-state">unfinished text';
+    expect(stripMessageContext(malformed)).toBe(malformed);
+    expect(stripMessageContext('<in-app-browser-contextual>literal</in-app-browser-contextual>'))
+      .toBe('<in-app-browser-contextual>literal</in-app-browser-contextual>');
+    expect(stripMessageContext('## My request for Codex:\nKeep this ordinary heading'))
+      .toBe('## My request for Codex:\nKeep this ordinary heading');
+    expect(stripMessageContext([
+      '# Files mentioned by the user:',
+      '## My request for Codex:',
+      'Visible request.',
+      '<in-app-browser-context source="ambient-ui-state">hidden</in-app-browser-context>',
+      '## My request for Codex:',
+      'This later heading belongs to the user.',
+    ].join('\n'))).toBe([
+      '# Files mentioned by the user:',
+      'Visible request.',
+      '## My request for Codex:',
+      'This later heading belongs to the user.',
+    ].join('\n'));
+  });
+
   it('returns no blocks for empty assistant messages without tools', () => {
     expect(computeMessageBlocks({ role: 'user', content: '' })).toStrictEqual([]);
     expect(computeMessageBlocks({ role: 'assistant', content: '' })).toStrictEqual([]);

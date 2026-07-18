@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'node:child_process';
+import { constants as bufferConstants } from 'node:buffer';
 import { RpcTransportProtocolError, type RpcMessage, type RpcTransport } from '../codex/wire';
 import {
   discoverCodexExecutable,
@@ -28,7 +29,10 @@ export type CodexAppServerStdioTransportOptions = {
 };
 
 const DEFAULT_DIAGNOSTIC_BUFFER_CHARS = 64 * 1024;
-const DEFAULT_OUTPUT_LINE_CHARS = 4 * 1024 * 1024;
+const DEFAULT_OUTPUT_LINE_CHARS = Math.min(
+  256 * 1024 * 1024,
+  Math.floor(bufferConstants.MAX_STRING_LENGTH / 2),
+);
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 1_000;
 
 export class CodexAppServerStdioTransport implements RpcTransport {
@@ -62,6 +66,7 @@ export class CodexAppServerStdioTransport implements RpcTransport {
     const child = (this.options.spawnProcess ?? spawn)(command, args, spawnOptions);
     this.child = child;
     let stdoutBuffer = '';
+    let discardingOversizedLine = false;
     let stderrBuffer = '';
     const maxDiagnosticBufferChars = Math.max(1, this.options.maxDiagnosticBufferChars ?? DEFAULT_DIAGNOSTIC_BUFFER_CHARS);
     const maxOutputLineChars = Math.max(1, this.options.maxOutputLineChars ?? DEFAULT_OUTPUT_LINE_CHARS);
@@ -69,7 +74,14 @@ export class CodexAppServerStdioTransport implements RpcTransport {
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string | Buffer) => {
-      stdoutBuffer += chunk.toString();
+      let text = chunk.toString();
+      if (discardingOversizedLine) {
+        const discardedLineEnd = text.indexOf('\n');
+        if (discardedLineEnd < 0) return;
+        discardingOversizedLine = false;
+        text = text.slice(discardedLineEnd + 1);
+      }
+      stdoutBuffer += text;
       let newlineIndex = stdoutBuffer.indexOf('\n');
       while (newlineIndex >= 0) {
         const line = stdoutBuffer.slice(0, newlineIndex).trim();
@@ -77,15 +89,23 @@ export class CodexAppServerStdioTransport implements RpcTransport {
         newlineIndex = stdoutBuffer.indexOf('\n');
         if (line) {
           if (line.length > maxOutputLineChars) {
-            this.emitError(new RpcTransportProtocolError('Codex app-server output line exceeded the configured limit'));
+            this.emitError(new RpcTransportProtocolError(
+              'Codex app-server output line exceeded the configured limit',
+              { requestId: rpcResponseIdFromPrefix(line) },
+            ));
           } else {
             this.parseLine(line);
           }
         }
       }
       if (stdoutBuffer.length > maxOutputLineChars) {
+        const requestId = rpcResponseIdFromPrefix(stdoutBuffer);
         stdoutBuffer = '';
-        this.emitError(new RpcTransportProtocolError('Codex app-server output line exceeded the configured limit'));
+        discardingOversizedLine = true;
+        this.emitError(new RpcTransportProtocolError(
+          'Codex app-server output line exceeded the configured limit',
+          { requestId },
+        ));
       }
     });
     child.stderr.on('data', (chunk: string | Buffer) => {
@@ -183,6 +203,21 @@ export class CodexAppServerStdioTransport implements RpcTransport {
 function appendBounded(current: string, chunk: string, limit: number): string {
   const combined = current + chunk;
   return combined.length <= limit ? combined : combined.slice(-limit);
+}
+
+function rpcResponseIdFromPrefix(frame: string): string | number | undefined {
+  const match = /^\s*\{\s*"id"\s*:\s*(?:(-?\d+)|("(?:\\.|[^"\\])*"))/.exec(frame);
+  if (!match) return undefined;
+  if (match[1] !== undefined) {
+    const id = Number(match[1]);
+    return Number.isSafeInteger(id) ? id : undefined;
+  }
+  try {
+    const id: unknown = JSON.parse(match[2] ?? '');
+    return typeof id === 'string' ? id : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {

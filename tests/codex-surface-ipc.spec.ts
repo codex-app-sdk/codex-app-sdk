@@ -19,6 +19,8 @@ const snapshot: CodexSurfaceSnapshot = {
   modelCatalogStatus: 'loaded',
   skills: [],
   skillCatalogStatus: 'loaded',
+  plugins: [],
+  pluginCatalogStatus: 'loaded',
   permissionProfiles: [],
   approvalPresets: [],
   approvalPreset: null,

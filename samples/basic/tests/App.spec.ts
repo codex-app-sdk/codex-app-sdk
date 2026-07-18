@@ -216,6 +216,8 @@ const snapshot: CodexSurfaceSnapshot = {
   modelCatalogStatus: 'loaded',
   skills: [],
   skillCatalogStatus: 'loaded',
+  plugins: [],
+  pluginCatalogStatus: 'loaded',
   permissionProfiles: [
     { id: ':workspace', description: null, allowed: true },
     { id: ':danger-full-access', description: null, allowed: true },

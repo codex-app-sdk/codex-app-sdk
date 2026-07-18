@@ -152,10 +152,20 @@ describe('CodexAppServerClient', () => {
     client.onDisconnect(onDisconnect);
     await client.start();
 
-    transport.fail(new RpcTransportProtocolError('malformed frame'));
+    const affected = client.request('configRequirements/read');
+    const unaffected = client.request('configRequirements/read');
+    transport.fail(new RpcTransportProtocolError('malformed frame', { requestId: 1 }));
+    await expect(affected).rejects.toThrow('malformed frame');
+    transport.receive({ id: 2, result: { requirements: null } });
+    await expect(unaffected).resolves.toStrictEqual({ requirements: null });
+
+    const uncorrelated = client.request('configRequirements/read');
+    transport.fail(new RpcTransportProtocolError('uncorrelated malformed frame'));
+    await expect(uncorrelated).rejects.toThrow('uncorrelated malformed frame');
     await client.start();
 
-    expect(onProtocolError).toHaveBeenCalledWith(expect.objectContaining({ message: 'malformed frame' }));
+    expect(onProtocolError).toHaveBeenCalledTimes(2);
+    expect(onProtocolError).toHaveBeenCalledWith(expect.objectContaining({ message: 'malformed frame', requestId: 1 }));
     expect(onDisconnect).not.toHaveBeenCalled();
     expect(transport.start).toHaveBeenCalledOnce();
   });

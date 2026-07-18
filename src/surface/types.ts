@@ -197,12 +197,29 @@ export type CodexSurfaceSkill = {
   description?: string;
   shortDescription?: string;
   displayName?: string;
+  /** Renderer-safe bounded image data URL. Local filesystem paths are never exposed. */
   iconSmall?: string;
+  /** Renderer-safe bounded image data URL. Local filesystem paths are never exposed. */
   iconLarge?: string;
   brandColor?: string;
   defaultPrompt?: string;
   path: string;
   scope?: string;
+  enabled: boolean;
+};
+
+export type CodexSurfacePlugin = {
+  /** Canonical app-server plugin id, suitable for matching `plugin://` mentions exactly. */
+  id: string;
+  name: string;
+  displayName: string;
+  shortDescription?: string;
+  longDescription?: string;
+  brandColor?: string;
+  /** Renderer-safe remote URL or bounded image data URL. Local filesystem paths are never exposed. */
+  iconUrl?: string;
+  /** Renderer-safe dark-mode icon with the same guarantees as `iconUrl`. */
+  iconUrlDark?: string;
   enabled: boolean;
 };
 
@@ -308,6 +325,8 @@ export type CodexSurfaceSnapshot = {
   modelCatalogStatus: CodexSurfaceCatalogStatus;
   skills: CodexSurfaceSkill[];
   skillCatalogStatus: CodexSurfaceCatalogStatus;
+  plugins: CodexSurfacePlugin[];
+  pluginCatalogStatus: CodexSurfaceCatalogStatus;
   permissionProfiles: CodexSurfacePermissionProfile[];
   approvalPresets: CodexSurfaceApprovalPreset[];
   approvalPreset: CodexSurfaceApprovalPreset | null;
@@ -384,6 +403,10 @@ export type CodexSurfaceEvent =
   | CodexSurfaceEventEnvelope<'catalog.skillsChanged', {
     cwd: string | null;
     skills: readonly CodexSurfaceSkill[];
+    status: CodexSurfaceCatalogStatus;
+  }>
+  | CodexSurfaceEventEnvelope<'catalog.pluginsChanged', {
+    plugins: readonly CodexSurfacePlugin[];
     status: CodexSurfaceCatalogStatus;
   }>
   | CodexSurfaceEventEnvelope<'catalog.permissionsChanged', {

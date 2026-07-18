@@ -18,6 +18,8 @@ type CodeBlockRange = {
 const toolTagRegex = /<tool\s+(id|index)="([^"]*)"><\/tool>/g
 const markdownImageRegex = /(?<!\[)!\[([^\]]*)\]\(([^)\s]+)(?:\s+["']([^"']*)["'])?\)/g
 const contextTagRegex = /<context>[\s\S]*?<\/context>\s*/g
+const inAppBrowserContextTagRegex = /<in-app-browser-context(?:\s+[^>]*)?>[\s\S]*?<\/in-app-browser-context>\s*/g
+const ambientRequestHeadingRegex = /^[ \t]*## My request for Codex:[ \t]*(?:\r?\n|$)/m
 const followUpTagRegex = /<follow-up>([\s\S]*?)<\/follow-up>/g
 const ungroupedToolNames = new Set([
   'ask_user_question',
@@ -148,7 +150,12 @@ function finalizeAssistantBlocks(blocks: MessageBlock[], prompts: string[]): Mes
 }
 
 export function stripMessageContext(content: string) {
-  return content.replace(contextTagRegex, '').trimStart()
+  const withoutContext = content.replace(contextTagRegex, '')
+  const withoutBrowserContext = withoutContext.replace(inAppBrowserContextTagRegex, '')
+  return (withoutBrowserContext === withoutContext
+    ? withoutBrowserContext
+    : withoutBrowserContext.replace(ambientRequestHeadingRegex, ''))
+    .trim()
 }
 
 export function groupToolBlocks(blocks: MessageBlock[]): MessageBlock[] {

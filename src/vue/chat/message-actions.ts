@@ -1,4 +1,5 @@
 import { renderMarkdown } from './message-markdown'
+import { stripMessageContext } from './message-blocks'
 import { getCodexNativeRendererApi } from '../native-capabilities'
 
 const toolTagRegex = /<tool\s+(id|index)="[^"]*"><\/tool>/g
@@ -6,7 +7,7 @@ const followUpTagRegex = /<follow-up>[\s\S]*?<\/follow-up>/g
 const breakTagRegex = /<br\s*\/?>/gi
 
 export function stripMessageMarkup(content: string) {
-  return content
+  return stripMessageContext(content)
     .replace(toolTagRegex, '')
     .replace(followUpTagRegex, '')
     .trim()

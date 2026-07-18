@@ -23,7 +23,7 @@
         <ChatMessageEditor
           v-if="isEditing"
           :cancel-label="t('chat.actions.cancel')"
-          :content="chatMessage.content"
+          :content="visibleUserContent"
           :input-label="t('chat.actions.editPrompt')"
           :save-label="t('chat.actions.resubmit')"
           @cancel="cancelEdit"
@@ -36,6 +36,8 @@
                 :answered-client-request-ids="answeredClientRequestIds"
                 :block="block"
                 :follow-ups-disabled="followUpsDisabled"
+                :plugins="plugins"
+                :skills="skills"
                 @cancel="emit('cancel')"
                 @client-response="emit('client-response', $event)"
                 @send-follow-up="emit('send-follow-up', $event)"
@@ -104,13 +106,13 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { useCodexChatI18n } from '../chat/chat-i18n'
 import type { ClientRequestResponse } from '../chat/contracts'
 import type { Message } from '../chat/types'
-import type { SurfaceMessage } from '../../surface/types'
+import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
 import type { MessageBlock } from '../chat/message-blocks'
 import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
 import ChatCompactionMessage from '../chat/ChatCompactionMessage.vue'
 import ChatMessageEditor from '../chat/ChatMessageEditor.vue'
-import { computeMessageBlocks } from '../chat/message-blocks'
+import { computeMessageBlocks, stripMessageContext } from '../chat/message-blocks'
 import { copyMessageToClipboard } from '../chat/message-actions'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 
@@ -123,6 +125,8 @@ const props = withDefaults(defineProps<{
   followUpsDisabled?: boolean
   index?: number
   message: Message | SurfaceMessage
+  plugins?: readonly CodexSurfacePlugin[]
+  skills?: readonly CodexSurfaceSkill[]
 }>(), {
   canDeleteMessage: true,
   canEditMessage: true,
@@ -164,6 +168,7 @@ const emit = defineEmits<{
 const { t } = useCodexChatI18n()
 const chatMessage = computed(() => chatMessageFromInput(props.message))
 const blocks = computed(() => computeMessageBlocks(chatMessage.value))
+const visibleUserContent = computed(() => stripMessageContext(chatMessage.value.content))
 const copied = ref(false)
 const isEditing = ref(false)
 let copyResetTimeout: ReturnType<typeof setTimeout> | null = null
