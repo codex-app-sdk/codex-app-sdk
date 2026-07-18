@@ -610,6 +610,9 @@ export type CodexSurfaceApi = {
   listConversations(options?: ListCodexConversationsOptions): Promise<CodexConversationSummary[]>;
   listModels(options?: ListCodexModelsOptions): Promise<CodexSurfaceModel[]>;
   createConversation(options?: CreateCodexConversationOptions): Promise<CodexSurfaceSnapshot>;
+  archiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
+  deleteConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
+  unarchiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   selectConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   readConversationHistory(conversationId?: string): Promise<CodexConversationHistory>;
   renameConversation(title: string): Promise<CodexSurfaceSnapshot>;

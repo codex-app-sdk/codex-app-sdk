@@ -87,6 +87,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
       eventListeners.add(listener);
       return () => eventListeners.delete(listener);
     },
+    archiveConversation: (conversationId: string) => run(() => api.archiveConversation(conversationId)),
     clearGoal: () => run(() => api.clearGoal()),
     compactConversation: () => run(() => api.compactConversation()),
     connect: () => {
@@ -94,6 +95,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
       return run(() => api.connect());
     },
     createConversation: (options?: CreateCodexRendererConversationOptions) => run(() => api.createConversation(options)),
+    deleteConversation: (conversationId: string) => run(() => api.deleteConversation(conversationId)),
     deleteMessage: (index: number) => run(() => api.deleteMessage(index)),
     deleteQueuedPrompt: (promptId: string) => run(() => api.deleteQueuedPrompt(promptId)),
     editMessage: (index: number, content: string) => run(() => api.editMessage(index, content)),
@@ -121,6 +123,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     startReview: (options?: StartCodexReviewOptions) => run(() => api.startReview(options)),
     steerMessage: (prompt: string) => run(() => api.steerMessage(prompt)),
     steerQueuedPrompt: (promptId: string) => run(() => api.steerQueuedPrompt(promptId)),
+    unarchiveConversation: (conversationId: string) => run(() => api.unarchiveConversation(conversationId)),
     updateConversationSettings: (settings: UpdateCodexConversationSettings) => (
       run(() => api.updateConversationSettings(settings))
     ),

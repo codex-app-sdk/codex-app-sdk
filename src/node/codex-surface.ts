@@ -421,6 +421,35 @@ export class CodexSurface {
     return structuredClone(await this.requestConversations(options));
   }
 
+  async archiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot> {
+    const threadId = normalizedConversationId(conversationId);
+    await this.ensureConnected();
+    await this.client.request('thread/archive', { threadId });
+    this.removeThread(threadId, 'archived', 'action');
+    return this.getSnapshot();
+  }
+
+  async deleteConversation(conversationId: string): Promise<CodexSurfaceSnapshot> {
+    const threadId = normalizedConversationId(conversationId);
+    await this.ensureConnected();
+    await this.client.request('thread/delete', { threadId });
+    this.removeThread(threadId, 'deleted', 'action');
+    return this.getSnapshot();
+  }
+
+  async unarchiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot> {
+    const threadId = normalizedConversationId(conversationId);
+    await this.ensureConnected();
+    const response = await this.client.request('thread/unarchive', { threadId });
+    if (response.thread.id !== threadId) {
+      throw new Error(`Codex thread/unarchive returned '${response.thread.id}' for requested thread '${threadId}'`);
+    }
+    const summary = this.summaryWithKnownTurnCount(response.thread);
+    this.patch({ conversations: upsertConversation(this.state.conversations, summary) });
+    this.emitSummaryUpserted(summary, 'updated', 'action');
+    return this.getSnapshot();
+  }
+
   private async requestConversations(
     options: ListCodexConversationsOptions = {},
   ): Promise<CodexConversationSummary[]> {
@@ -1598,8 +1627,7 @@ export class CodexSurface {
   }
 
   conversation(conversationId: string): CodexConversation {
-    const id = conversationId.trim();
-    if (!id) throw new Error('Conversation id cannot be empty');
+    const id = normalizedConversationId(conversationId);
     const existing = this.conversationHandles.get(id);
     if (existing) return existing;
     const snapshot = () => this.getConversationSnapshot(id);
@@ -2147,14 +2175,27 @@ export class CodexSurface {
     }
   }
 
-  private removeThread(threadId: string, reason: 'archived' | 'deleted'): void {
+  private removeThread(
+    threadId: string,
+    reason: 'archived' | 'deleted',
+    origin: CodexSurfaceEventOrigin = 'notification',
+  ): void {
+    const known = this.state.activeConversationId === threadId
+      || this.state.conversations.some((conversation) => conversation.id === threadId)
+      || this.runtimes.has(threadId)
+      || [...this.pendingApprovals.values()].some((pending) => pending.approval.conversationId === threadId)
+      || [...this.pendingClientRequests.values()].some((pending) => pending.threadId === threadId);
+    if (!known) return;
     this.clearPendingForThread(threadId, 'Codex thread is no longer available', 'conversation_removed');
     this.runtimes.delete(threadId);
+    this.hostOptionsByThread.delete(threadId);
+    this.hydrationPromises.delete(threadId);
+    this.conversationHandles.delete(threadId);
     this.semanticEventValues.delete(`summary:${threadId}`);
     const conversations = this.state.conversations.filter((conversation) => conversation.id !== threadId);
     if (this.state.activeConversationId !== threadId) {
       this.patch({ conversations });
-      this.emitEvent('notification', {
+      this.emitEvent(origin, {
         type: 'conversation.summaryRemoved',
         conversationId: threadId,
         payload: { reason },
@@ -2176,12 +2217,12 @@ export class CodexSurface {
       historyLoading: false,
       error: null,
     });
-    this.emitEvent('notification', {
+    this.emitEvent(origin, {
       type: 'conversation.summaryRemoved',
       conversationId: threadId,
       payload: { reason },
     });
-    this.emitEvent('notification', {
+    this.emitEvent(origin, {
       type: 'conversation.selected',
       payload: { conversationId: null },
     });
@@ -3594,7 +3635,10 @@ function approvalPresetFromSettings(
       || profile === ':danger-no-sandbox'
     )
   ) return 'full-access';
-  if (approvalPolicy === 'on-request' && approvalsReviewer === 'auto_review') return 'approve-for-me';
+  if (
+    approvalPolicy === 'on-request'
+    && (approvalsReviewer === 'auto_review' || approvalsReviewer === 'guardian_subagent')
+  ) return 'approve-for-me';
   if (approvalPolicy === 'on-request') return 'ask-for-approval';
   return null;
 }
@@ -4263,6 +4307,12 @@ function persistSupports(value: unknown, mode: 'always' | 'session'): boolean {
 
 function stringValue(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizedConversationId(value: string): string {
+  const conversationId = value.trim();
+  if (!conversationId) throw new Error('Conversation id cannot be empty');
+  return conversationId;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

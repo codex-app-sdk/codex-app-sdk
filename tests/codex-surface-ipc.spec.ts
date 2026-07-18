@@ -59,10 +59,12 @@ describe('Codex surface Electron bridge', () => {
     const unsubscribeState = vi.fn();
     const unsubscribeEvents = vi.fn();
     const surface = {
+      archiveConversation: vi.fn(async () => snapshot),
       clearGoal: vi.fn(async () => snapshot),
       compactConversation: vi.fn(async () => snapshot),
       connect: vi.fn(async () => snapshot),
       createConversation: vi.fn(async () => snapshot),
+      deleteConversation: vi.fn(async () => snapshot),
       deleteMessage: vi.fn(async () => snapshot),
       deleteQueuedPrompt: vi.fn(async () => snapshot),
       editMessage: vi.fn(async () => snapshot),
@@ -82,6 +84,7 @@ describe('Codex surface Electron bridge', () => {
       startReview: vi.fn(async () => snapshot),
       steerMessage: vi.fn(async () => snapshot),
       steerQueuedPrompt: vi.fn(async () => snapshot),
+      unarchiveConversation: vi.fn(async () => snapshot),
       updateConversationSettings: vi.fn(async () => snapshot),
       onStateChange: vi.fn((listener: (value: CodexSurfaceSnapshot) => void) => {
         stateListener = listener;
@@ -95,10 +98,12 @@ describe('Codex surface Electron bridge', () => {
 
     const dispose = registerCodexSurfaceIpc(main, sender, surface);
     expect([...main.handlers.keys()].sort()).toStrictEqual([
+      'codex-surface:archive-conversation',
       'codex-surface:clear-goal',
       'codex-surface:compact-conversation',
       'codex-surface:connect',
       'codex-surface:create-conversation',
+      'codex-surface:delete-conversation',
       'codex-surface:delete-message',
       'codex-surface:delete-queued-prompt',
       'codex-surface:edit-message',
@@ -118,8 +123,10 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:start-review',
       'codex-surface:steer-message',
       'codex-surface:steer-queued-prompt',
+      'codex-surface:unarchive-conversation',
       'codex-surface:update-conversation-settings',
     ]);
+    await expect(main.call('codex-surface:archive-conversation', 'thread-archive')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:clear-goal')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:compact-conversation')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
@@ -133,6 +140,7 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:create-conversation', {
       reasoningEffort: 'high', approvalPreset: 'approve-for-me',
     })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:delete-conversation', 'thread-delete')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:delete-message', 2)).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:delete-queued-prompt', 'queued-1')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:edit-message', 1, 'Replacement')).resolves.toBe(snapshot);
@@ -159,6 +167,12 @@ describe('Codex surface Electron bridge', () => {
     );
     await expect(main.call('codex-surface:delete-message', '1')).rejects.toThrow(
       'Message index must be a non-negative integer',
+    );
+    await expect(main.call('codex-surface:archive-conversation', '   ')).rejects.toThrow(
+      'Conversation id must be a non-empty string',
+    );
+    await expect(main.call('codex-surface:delete-conversation', '')).rejects.toThrow(
+      'Conversation id must be a non-empty string',
     );
     await expect(main.call('codex-surface:get-snapshot')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:interrupt')).resolves.toBe(snapshot);
@@ -374,6 +388,10 @@ describe('Codex surface Electron bridge', () => {
     })).rejects.toThrow('Review instructions must be a non-empty string');
     await expect(main.call('codex-surface:steer-message', 'More detail')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:steer-queued-prompt', 'queued-2')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:unarchive-conversation', 'thread-unarchive')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:unarchive-conversation', '   ')).rejects.toThrow(
+      'Conversation id must be a non-empty string',
+    );
     await expect(main.call('codex-surface:update-conversation-settings', {
       modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
     })).resolves.toBe(snapshot);
@@ -393,13 +411,24 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:send-message')).rejects.toThrow(
       'codex-surface:send-message received an invalid number of arguments',
     );
+    await expect(main.call('codex-surface:archive-conversation')).rejects.toThrow(
+      'codex-surface:archive-conversation received an invalid number of arguments',
+    );
+    await expect(main.call('codex-surface:delete-conversation', 'thread-1', 'unexpected')).rejects.toThrow(
+      'codex-surface:delete-conversation received an invalid number of arguments',
+    );
+    await expect(main.call('codex-surface:unarchive-conversation')).rejects.toThrow(
+      'codex-surface:unarchive-conversation received an invalid number of arguments',
+    );
     stateListener?.(snapshot);
+    expect(surface.archiveConversation).toHaveBeenCalledWith('thread-archive');
     expect(surface.connect).toHaveBeenCalledOnce();
     expect(surface.clearGoal).toHaveBeenCalledOnce();
     expect(surface.createConversation).toHaveBeenNthCalledWith(1, {
       model: 'gpt-5',
     });
     expect(surface.createConversation).toHaveBeenNthCalledWith(2, undefined);
+    expect(surface.deleteConversation).toHaveBeenCalledWith('thread-delete');
     expect(surface.deleteMessage).toHaveBeenCalledWith(2);
     expect(surface.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
     expect(surface.editMessage).toHaveBeenCalledWith(1, 'Replacement');
@@ -442,6 +471,7 @@ describe('Codex surface Electron bridge', () => {
     expect(surface.startReview).toHaveBeenCalledWith({ target: { type: 'baseBranch', branch: 'main' } });
     expect(surface.steerMessage).toHaveBeenCalledWith('More detail');
     expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2');
+    expect(surface.unarchiveConversation).toHaveBeenCalledWith('thread-unarchive');
     expect(surface.updateConversationSettings).toHaveBeenCalledWith({
       modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
     });
@@ -463,10 +493,12 @@ describe('Codex surface Electron bridge', () => {
     const unsubscribe = api.onStateChange(listener);
     const unsubscribeEvent = api.onEvent(eventListener);
 
+    await api.archiveConversation('thread-archive');
     await api.connect();
     await api.clearGoal();
     await api.compactConversation();
     await api.createConversation({ model: 'gpt-5' });
+    await api.deleteConversation('thread-delete');
     await api.deleteMessage(2);
     await api.deleteQueuedPrompt('queued-1');
     await api.editMessage(1, 'Replacement');
@@ -484,6 +516,7 @@ describe('Codex surface Electron bridge', () => {
     await api.startReview({ target: { type: 'uncommittedChanges' } });
     await api.steerMessage('Keep going');
     await api.steerQueuedPrompt('queued-2');
+    await api.unarchiveConversation('thread-unarchive');
     await api.updateConversationSettings({ modelId: 'gpt-5', approvalPreset: 'ask-for-approval' });
     await api.interrupt();
     await api.getSnapshot();
@@ -494,10 +527,12 @@ describe('Codex surface Electron bridge', () => {
     renderer.emit('codex-surface:state-changed', { ...snapshot, busy: true });
 
     expect(renderer.invoke.mock.calls).toStrictEqual([
+      ['codex-surface:archive-conversation', 'thread-archive'],
       ['codex-surface:connect'],
       ['codex-surface:clear-goal'],
       ['codex-surface:compact-conversation'],
       ['codex-surface:create-conversation', { model: 'gpt-5' }],
+      ['codex-surface:delete-conversation', 'thread-delete'],
       ['codex-surface:delete-message', 2],
       ['codex-surface:delete-queued-prompt', 'queued-1'],
       ['codex-surface:edit-message', 1, 'Replacement'],
@@ -515,6 +550,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:start-review', { target: { type: 'uncommittedChanges' } }],
       ['codex-surface:steer-message', 'Keep going'],
       ['codex-surface:steer-queued-prompt', 'queued-2'],
+      ['codex-surface:unarchive-conversation', 'thread-unarchive'],
       ['codex-surface:update-conversation-settings', { modelId: 'gpt-5', approvalPreset: 'ask-for-approval' }],
       ['codex-surface:interrupt'],
       ['codex-surface:get-snapshot'],

@@ -153,6 +153,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  error: [message: string | null];
   send: [prompt: string];
   steer: [prompt: string];
   attach: [];
@@ -181,6 +182,7 @@ const {
   buttonDisabled: voiceButtonDisabled,
   buttonLabel: voiceButtonLabel,
   buttonTitle: voiceButtonTitle,
+  error: voiceError,
   isRecording,
   isTranscribing,
   recorder,
@@ -191,6 +193,8 @@ const {
   onTranscript: insertTranscript,
   transcribeAudio: props.transcribeAudio,
 });
+
+watch(voiceError, (message) => emit('error', message));
 const {
   activeFileIndex,
   activeSkillIndex,

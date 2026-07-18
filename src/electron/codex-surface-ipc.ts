@@ -28,10 +28,12 @@ import {
 } from './typed-ipc';
 
 const channels = {
+  archiveConversation: 'codex-surface:archive-conversation',
   clearGoal: 'codex-surface:clear-goal',
   compactConversation: 'codex-surface:compact-conversation',
   connect: 'codex-surface:connect',
   createConversation: 'codex-surface:create-conversation',
+  deleteConversation: 'codex-surface:delete-conversation',
   deleteMessage: 'codex-surface:delete-message',
   deleteQueuedPrompt: 'codex-surface:delete-queued-prompt',
   editMessage: 'codex-surface:edit-message',
@@ -51,16 +53,19 @@ const channels = {
   startReview: 'codex-surface:start-review',
   steerMessage: 'codex-surface:steer-message',
   steerQueuedPrompt: 'codex-surface:steer-queued-prompt',
+  unarchiveConversation: 'codex-surface:unarchive-conversation',
   updateConversationSettings: 'codex-surface:update-conversation-settings',
   stateChanged: 'codex-surface:state-changed',
   event: 'codex-surface:event',
 } as const;
 
 type SurfaceRequests = {
+  [channels.archiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.clearGoal]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.compactConversation]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.connect]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.createConversation]: IpcRequest<[options?: CreateCodexRendererConversationOptions], CodexSurfaceSnapshot>;
+  [channels.deleteConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.deleteMessage]: IpcRequest<[index: number], CodexSurfaceSnapshot>;
   [channels.deleteQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
   [channels.editMessage]: IpcRequest<[index: number, content: string], CodexSurfaceSnapshot>;
@@ -86,6 +91,7 @@ type SurfaceRequests = {
   [channels.startReview]: IpcRequest<[options?: StartCodexReviewOptions], CodexSurfaceSnapshot>;
   [channels.steerMessage]: IpcRequest<[prompt: string], CodexSurfaceSnapshot>;
   [channels.steerQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
+  [channels.unarchiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.updateConversationSettings]: IpcRequest<[settings: UpdateCodexConversationSettings], CodexSurfaceSnapshot>;
 };
 
@@ -100,10 +106,12 @@ export function registerCodexSurfaceIpc(
   port: IpcMainPort,
   sender: IpcEventSender,
   surface: Pick<CodexSurface,
+    | 'archiveConversation'
     | 'clearGoal'
     | 'compactConversation'
     | 'connect'
     | 'createConversation'
+    | 'deleteConversation'
     | 'deleteMessage'
     | 'deleteQueuedPrompt'
     | 'editMessage'
@@ -125,13 +133,20 @@ export function registerCodexSurfaceIpc(
     | 'startReview'
     | 'steerMessage'
     | 'steerQueuedPrompt'
+    | 'unarchiveConversation'
     | 'updateConversationSettings'>,
 ): () => void {
   const unregisterHandlers = registerIpcMainHandlers<SurfaceRequests>(strictArityPort(port), {
+    [channels.archiveConversation]: (_event, conversationId) => (
+      surface.archiveConversation(nonEmptyString(conversationId, 'Conversation id'))
+    ),
     [channels.clearGoal]: () => surface.clearGoal(),
     [channels.compactConversation]: () => surface.compactConversation(),
     [channels.connect]: () => surface.connect(),
     [channels.createConversation]: (_event, options) => surface.createConversation(rendererConversationOptions(options)),
+    [channels.deleteConversation]: (_event, conversationId) => (
+      surface.deleteConversation(nonEmptyString(conversationId, 'Conversation id'))
+    ),
     [channels.deleteMessage]: (_event, index) => surface.deleteMessage(messageIndex(index)),
     [channels.deleteQueuedPrompt]: (_event, promptId) => surface.deleteQueuedPrompt(nonEmptyString(promptId, 'Queued prompt id')),
     [channels.editMessage]: (_event, index, content) => surface.editMessage(
@@ -169,6 +184,9 @@ export function registerCodexSurfaceIpc(
     [channels.startReview]: (_event, options) => surface.startReview(rendererReviewOptions(options)),
     [channels.steerMessage]: (_event, prompt) => surface.steerMessage(nonEmptyString(prompt, 'Steer prompt')),
     [channels.steerQueuedPrompt]: (_event, promptId) => surface.steerQueuedPrompt(nonEmptyString(promptId, 'Queued prompt id')),
+    [channels.unarchiveConversation]: (_event, conversationId) => (
+      surface.unarchiveConversation(nonEmptyString(conversationId, 'Conversation id'))
+    ),
     [channels.updateConversationSettings]: (_event, settings) => (
       surface.updateConversationSettings(rendererSettings(settings))
     ),
@@ -537,10 +555,12 @@ function isJsonValue(value: unknown, seen = new Set<object>()): value is CodexSu
 }
 
 const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, maximum: number]> = {
+  [channels.archiveConversation]: [1, 1],
   [channels.clearGoal]: [0, 0],
   [channels.compactConversation]: [0, 0],
   [channels.connect]: [0, 0],
   [channels.createConversation]: [0, 1],
+  [channels.deleteConversation]: [1, 1],
   [channels.deleteMessage]: [1, 1],
   [channels.deleteQueuedPrompt]: [1, 1],
   [channels.editMessage]: [2, 2],
@@ -560,6 +580,7 @@ const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, m
   [channels.startReview]: [0, 1],
   [channels.steerMessage]: [1, 1],
   [channels.steerQueuedPrompt]: [1, 1],
+  [channels.unarchiveConversation]: [1, 1],
   [channels.updateConversationSettings]: [1, 1],
 };
 
@@ -581,10 +602,12 @@ function strictArityPort(port: IpcMainPort): IpcMainPort {
 export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfaceRendererApi {
   const renderer = new TypedIpcRenderer<SurfaceRequests, SurfaceEvents>(port);
   return {
+    archiveConversation: (conversationId) => renderer.invoke(channels.archiveConversation, conversationId),
     clearGoal: () => renderer.invoke(channels.clearGoal),
     compactConversation: () => renderer.invoke(channels.compactConversation),
     connect: () => renderer.invoke(channels.connect),
     createConversation: (options) => renderer.invoke(channels.createConversation, options),
+    deleteConversation: (conversationId) => renderer.invoke(channels.deleteConversation, conversationId),
     deleteMessage: (index) => renderer.invoke(channels.deleteMessage, index),
     deleteQueuedPrompt: (promptId) => renderer.invoke(channels.deleteQueuedPrompt, promptId),
     editMessage: (index, content) => renderer.invoke(channels.editMessage, index, content),
@@ -606,6 +629,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     startReview: (options) => renderer.invoke(channels.startReview, options),
     steerMessage: (prompt) => renderer.invoke(channels.steerMessage, prompt),
     steerQueuedPrompt: (promptId) => renderer.invoke(channels.steerQueuedPrompt, promptId),
+    unarchiveConversation: (conversationId) => renderer.invoke(channels.unarchiveConversation, conversationId),
     updateConversationSettings: (settings) => renderer.invoke(channels.updateConversationSettings, settings),
   };
 }

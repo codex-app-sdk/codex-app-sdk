@@ -137,6 +137,7 @@
             :skill-catalog-status="effectiveSkillCatalogStatus"
             :skills="effectiveSkills"
             :transcribe-audio="transcribeAudio"
+            @error="handleComposerError"
             @attach="selectAttachments"
             @interrupt="interrupt"
             @menu-select="emit('menuSelect', $event)"
@@ -257,14 +258,18 @@ const props = withDefaults(defineProps<{
   attachEnabled: true,
   attachments: () => [],
   autofocus: false,
+  busy: undefined,
   canDeleteMessage: true,
   canEditMessage: true,
   canRetryMessage: true,
+  disabled: undefined,
   emptyDescription: '',
   emptyTitle: 'Start a conversation with Codex',
+  historyLoading: undefined,
   menuItems: () => [],
   modelValue: '',
   placeholder: 'Ask Codex…',
+  planMode: undefined,
 });
 
 defineSlots<{
@@ -308,6 +313,7 @@ const emit = defineEmits<{
   deleteQueuedPrompt: [promptId: string];
   editGoal: [];
   editMessage: [payload: { content: string; index: number }];
+  error: [message: string | null];
   interrupt: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
   openLink: [link: CodexConversationLink];
@@ -649,6 +655,11 @@ async function runSurfaceAction(action: () => Promise<unknown>): Promise<void> {
 
 function setLocalError(error: unknown): void {
   localError.value = error instanceof Error ? error.message : String(error);
+}
+
+function handleComposerError(error: string | null): void {
+  localError.value = error;
+  emit('error', error);
 }
 </script>
 

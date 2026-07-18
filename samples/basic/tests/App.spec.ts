@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexNativeAttachmentInput, CodexNativeRendererApi } from 'codex-app-sdk/electron';
 import type { CodexSurfaceRendererApi, CodexSurfaceSnapshot } from 'codex-app-sdk/surface';
-import App from '../src/App.vue';
+import App from '../src/renderer/App.vue';
 
 describe('basic sample App', () => {
   afterEach(() => {
@@ -19,13 +19,20 @@ describe('basic sample App', () => {
     expect(api.connect).toHaveBeenCalledOnce();
     expect(wrapper.findComponent({ name: 'CodexConversationPane' }).props('surface')).toBeDefined();
     expect(wrapper.get('[aria-label="Conversations"]').text()).toContain('First thread');
+    expect(wrapper.text()).toContain('Start a conversation with Codex');
+    expect(wrapper.text()).not.toContain('This sample asks before protected tool calls');
     expect(wrapper.findAll('[aria-label="Status: active"]')).toHaveLength(2);
 
-    const conversationItems = wrapper.findAll('.conversation-sidebar__item');
+    const conversationItems = wrapper.findAll('.conversation-sidebar__select');
     expect(conversationItems.every((item) => item.attributes('disabled') === undefined)).toBe(true);
     await conversationItems[1]!.trigger('click');
     await flushPromises();
     expect(api.selectConversation).toHaveBeenCalledWith('thread-2');
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await wrapper.findAll('.conversation-sidebar__delete')[1]!.trigger('click');
+    await flushPromises();
+    expect(api.deleteConversation).toHaveBeenCalledWith('thread-2');
 
     await wrapper.get('textarea').setValue('Build a new surface');
     await wrapper.get('form').trigger('submit');
@@ -40,6 +47,13 @@ describe('basic sample App', () => {
 
   it('gets app-server models, permission presets, and plan mode through the bound SDK pane', async () => {
     const api = fakeSurfaceApi();
+    vi.mocked(api.updateConversationSettings).mockImplementation(async (settings) => ({
+      ...snapshot,
+      approvalPreset: settings.approvalPreset ?? snapshot.approvalPreset,
+      planMode: settings.planMode ?? snapshot.planMode,
+      selectedModelId: settings.modelId ?? snapshot.selectedModelId,
+      selectedReasoningEffort: settings.reasoningEffort ?? snapshot.selectedReasoningEffort,
+    }));
     window.codexSurface = api;
     const wrapper = mount(App);
     await flushPromises();
@@ -50,9 +64,20 @@ describe('basic sample App', () => {
     expect(api.updateConversationSettings).toHaveBeenCalledWith({ modelId: 'gpt-5.4-mini' });
 
     await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
-    await wrapper.findAll('[role="menuitemradio"]')[2]!.trigger('click');
+    await wrapper.get('.codex-composer-menu-list__submenu').trigger('mouseenter');
+    const fullAccess = wrapper.findAll('[role="menuitemradio"]')
+      .find((item) => item.text().includes('Full access'))!;
+    await fullAccess.trigger('click');
     await flushPromises();
     expect(api.updateConversationSettings).toHaveBeenCalledWith({ approvalPreset: 'full-access' });
+
+    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+    await wrapper.get('.codex-composer-menu-list__submenu').trigger('mouseenter');
+    expect(wrapper.findAll('[role="menuitemradio"]')
+      .find((item) => item.text().includes('Full access'))!
+      .attributes('aria-checked')).toBe('true');
+    document.body.click();
+    await wrapper.vm.$nextTick();
 
     await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
     await wrapper.get('[role="menuitemcheckbox"]').trigger('click');
@@ -213,10 +238,12 @@ const snapshot: CodexSurfaceSnapshot = {
 
 function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<typeof vi.fn>> {
   return {
+    archiveConversation: vi.fn(async () => snapshot),
     clearGoal: vi.fn(async () => snapshot),
     compactConversation: vi.fn(async () => snapshot),
     connect: vi.fn(async () => snapshot),
     createConversation: vi.fn(async () => snapshot),
+    deleteConversation: vi.fn(async () => snapshot),
     deleteMessage: vi.fn(async () => snapshot),
     deleteQueuedPrompt: vi.fn(async () => snapshot),
     editMessage: vi.fn(async () => snapshot),
@@ -243,6 +270,7 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
     steerMessage: vi.fn(async () => snapshot),
     steerQueuedPrompt: vi.fn(async () => snapshot),
     updateConversationSettings: vi.fn(async () => snapshot),
+    unarchiveConversation: vi.fn(async () => snapshot),
   };
 }
 

@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "skipLibCheck": true,
     "paths": {
       "codex-app-sdk/electron/preload": ["../../src/electron/preload.ts"],
       "codex-app-sdk/electron": ["../../src/electron/index.ts"],
@@ -11,7 +12,6 @@
     "types": ["node", "vitest/globals"]
   },
   "include": [
-    "electron/**/*.ts",
     "src/**/*.ts",
     "src/**/*.vue",
     "tests/**/*.ts",

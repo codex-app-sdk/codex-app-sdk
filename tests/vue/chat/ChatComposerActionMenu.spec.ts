@@ -45,6 +45,36 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(false);
   });
 
+  it('selects an approval preset through the visible hover submenu', async () => {
+    const wrapper = mountMenu({
+      approvalPreset: 'ask-for-approval',
+      approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'],
+      showApprovalMenu: true,
+    });
+
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+    const approvalSubmenu = wrapper.get('.codex-composer-menu-list__submenu');
+    await approvalSubmenu.trigger('mouseenter');
+
+    expect(approvalSubmenu.classes()).toContain('codex-composer-menu-list__submenu--open');
+    const fullAccess = wrapper.findAll('[role="menuitemradio"]')
+      .find((item) => item.text().includes('Full access'))!;
+
+    // Chromium briefly clears focus between pointer-down and focusing the
+    // submenu item. The submenu must remain mounted for the matching click.
+    const approvalTrigger = approvalSubmenu.get('button[role="menuitem"]');
+    (approvalTrigger.element as HTMLButtonElement).blur();
+    await wrapper.vm.$nextTick();
+    (fullAccess.element as HTMLButtonElement).focus();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(approvalSubmenu.classes()).toContain('codex-composer-menu-list__submenu--open');
+    await fullAccess.trigger('click');
+
+    expect(wrapper.emitted('selectApprovalPreset')).toStrictEqual([['full-access']]);
+    expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(false);
+  });
+
   it('disables approval presets unavailable from backend capabilities', async () => {
     const wrapper = mountMenu({
       approvalPreset: 'ask-for-approval',

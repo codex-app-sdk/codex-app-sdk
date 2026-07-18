@@ -11,13 +11,24 @@ This runnable Electron + Vue sample demonstrates the intended SDK boundary:
 - the SDK-native Electron bridge supplies file picking and ingestion, attachment
   previews, image paste/drop, copy, audio capture, and Apple voice transcription;
 - multiple conversations remain live concurrently and the custom sidebar can
-  switch between them independently of another conversation's active turn.
+  switch between them independently of another conversation's active turn;
+- the custom sidebar confirms permanent deletion and calls the SDK's
+  high-level conversation lifecycle API without raw app-server or IPC code.
 
 Those native capabilities require no callbacks or event plumbing in `App.vue`.
 The app only creates one reactive controller, renders its own conversation list,
 and mounts `<CodexConversationPane :surface="surface">`.
 
 No sample file calls an app-server method or imports a generated protocol type.
+
+Application source is split by runtime boundary:
+
+- `src/main` contains the Electron main process and preload entry points;
+- `src/renderer` contains the Vue application, its HTML entry point, components,
+  and styles.
+
+There is no `src/shared` folder yet because the sample has no app-specific code
+that belongs to both runtimes; the SDK already owns their shared contract.
 
 From the SDK repository root:
 
@@ -26,8 +37,8 @@ npm install
 npm run sample:start
 ```
 
-For renderer HMR plus automatic Electron reloads when sample or SDK main/preload
-sources change:
+For renderer HMR, preload reloads, and automatic Electron restarts when sample
+or SDK main-process sources change:
 
 ```bash
 cd samples/basic

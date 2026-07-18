@@ -89,15 +89,20 @@ function renderItem(
         if (enabled) openSubmenus.add(item.id);
       },
       onMouseleave: (event: MouseEvent) => {
-        if (!(event.currentTarget as HTMLElement).contains(document.activeElement)) {
+        const submenu = (event.currentTarget as HTMLElement).querySelector(
+          ':scope > .codex-composer-menu-list__submenu-list',
+        );
+        if (!(submenu instanceof HTMLElement) || !submenu.contains(document.activeElement)) {
           openSubmenus.delete(item.id);
         }
       },
       onFocusout: (event: FocusEvent) => {
         const container = event.currentTarget as HTMLElement;
-        void nextTick(() => {
+        const nextFocus = event.relatedTarget;
+        if (nextFocus instanceof Node && container.contains(nextFocus)) return;
+        window.setTimeout(() => {
           if (!container.contains(document.activeElement)) openSubmenus.delete(item.id);
-        });
+        }, 0);
       },
     }, [
       h('button', {
@@ -109,9 +114,6 @@ function renderItem(
         disabled: !enabled,
         tabindex: firstFocusable ? 0 : -1,
         onClick: () => expanded ? openSubmenus.delete(item.id) : openSubmenus.add(item.id),
-        onFocus: () => {
-          if (enabled) openSubmenus.add(item.id);
-        },
         onKeydown: (event: KeyboardEvent) => {
           if (event.key !== 'ArrowRight' || !enabled) return;
           const trigger = event.currentTarget as HTMLElement;

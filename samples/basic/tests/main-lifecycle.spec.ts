@@ -94,7 +94,7 @@ describe('basic sample main lifecycle', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it('reuses one surface and IPC registration when macOS reopens a window', async () => {
-    await import('../electron/main');
+    await import('../src/main/index');
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
 
     electron.windows[0]!.close();
@@ -120,16 +120,16 @@ describe('basic sample main lifecycle', () => {
   });
 
   it('loads the Vite server during development', async () => {
-    vi.stubEnv('CODEX_SAMPLE_RENDERER_URL', 'http://127.0.0.1:5173/');
-    await import('../electron/main');
+    vi.stubEnv('VITE_DEV_SERVER_URL', 'http://localhost:5173/');
+    await import('../src/main/index');
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
 
-    expect(electron.windows[0]?.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/');
+    expect(electron.windows[0]?.loadURL).toHaveBeenCalledWith('http://localhost:5173/');
     expect(electron.windows[0]?.loadFile).not.toHaveBeenCalled();
   });
 
   it('denies renderer-created windows and opens only allowlisted external schemes', async () => {
-    await import('../electron/main');
+    await import('../src/main/index');
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
     const handler = electron.windows[0]!.windowOpenHandler!;
 
@@ -144,7 +144,7 @@ describe('basic sample main lifecycle', () => {
   });
 
   it('blocks in-renderer navigation and routes safe external destinations to the OS', async () => {
-    await import('../electron/main');
+    await import('../src/main/index');
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
     const preventDefault = vi.fn();
     const handler = electron.windows[0]!.navigationHandlers.get('will-navigate')!;

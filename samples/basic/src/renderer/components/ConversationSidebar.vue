@@ -11,24 +11,39 @@
       {{ loading ? 'Loading threads…' : 'No conversations yet' }}
     </p>
     <nav v-else class="conversation-sidebar__list">
-      <button
+      <div
         v-for="conversation in conversations"
         :key="conversation.id"
         class="conversation-sidebar__item"
         :class="{ 'conversation-sidebar__item--active': conversation.id === activeConversationId }"
-        type="button"
-        :aria-current="conversation.id === activeConversationId ? 'page' : undefined"
-        @click="emit('select', conversation.id)"
       >
-        <span
-          class="conversation-sidebar__status"
-          :class="`conversation-sidebar__status--${conversation.status}`"
-          :aria-label="`Status: ${conversation.status}`"
-          :title="conversation.status"
-        />
-        <span class="conversation-sidebar__title">{{ conversation.title }}</span>
-        <span class="conversation-sidebar__time">{{ relativeTime(conversation.updatedAt) }}</span>
-      </button>
+        <button
+          class="conversation-sidebar__select"
+          type="button"
+          :aria-current="conversation.id === activeConversationId ? 'page' : undefined"
+          @click="emit('select', conversation.id)"
+        >
+          <span
+            class="conversation-sidebar__status"
+            :class="`conversation-sidebar__status--${conversation.status}`"
+            :aria-label="`Status: ${conversation.status}`"
+            :title="conversation.status"
+          />
+          <span class="conversation-sidebar__title">{{ conversation.title }}</span>
+          <span class="conversation-sidebar__time">{{ relativeTime(conversation.updatedAt) }}</span>
+        </button>
+        <button
+          class="conversation-sidebar__delete"
+          type="button"
+          :aria-label="`Delete ${conversation.title}`"
+          title="Delete thread"
+          @click="confirmDelete(conversation)"
+        >
+          <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+            <path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2m2 0-1 12H8L7 7" />
+          </svg>
+        </button>
+      </div>
     </nav>
   </aside>
 </template>
@@ -49,8 +64,17 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{
   create: [];
+  delete: [conversationId: string];
   select: [conversationId: string];
 }>();
+
+function confirmDelete(conversation: CodexConversationSummary): void {
+  const confirmed = window.confirm(
+    `Delete "${conversation.title}"? This permanently deletes the thread and cannot be undone.`,
+  );
+  if (!confirmed) return;
+  emit('delete', conversation.id);
+}
 
 function relativeTime(value: string): string {
   const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60_000));
@@ -87,24 +111,26 @@ function relativeTime(value: string): string {
 }
 
 .conversation-sidebar__new,
-.conversation-sidebar__item {
+.conversation-sidebar__select,
+.conversation-sidebar__delete {
   width: 100%;
   border: 0;
-  border-radius: 9px;
   color: #2a2b29;
   background: transparent;
   font: inherit;
-  text-align: left;
   cursor: pointer;
 }
 
 .conversation-sidebar__new {
+  border-radius: 9px;
   padding: 9px 10px;
   font-weight: 600;
+  text-align: left;
 }
 
 .conversation-sidebar__new:hover,
 .conversation-sidebar__item:hover,
+.conversation-sidebar__item:focus-within,
 .conversation-sidebar__item--active {
   background: #e2e2dd;
 }
@@ -119,11 +145,25 @@ function relativeTime(value: string): string {
 }
 
 .conversation-sidebar__item {
+  position: relative;
+  border-radius: 9px;
+}
+
+.conversation-sidebar__select {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  min-width: 0;
+  grid-template-columns: 8px minmax(0, 1fr) 34px;
   gap: 8px;
   align-items: center;
-  padding: 9px 10px;
+  border-radius: 9px;
+  padding: 9px 8px 9px 10px;
+  text-align: left;
+}
+
+.conversation-sidebar__select:focus-visible,
+.conversation-sidebar__delete:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
 }
 
 .conversation-sidebar__status {
@@ -146,11 +186,58 @@ function relativeTime(value: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
 }
 
 .conversation-sidebar__time {
+  justify-self: end;
   color: #85857e;
   font-size: 12px;
+  pointer-events: none;
+}
+
+.conversation-sidebar__delete {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 3px;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: #85857e;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.conversation-sidebar__delete svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
+.conversation-sidebar__item:hover .conversation-sidebar__time,
+.conversation-sidebar__item:focus-within .conversation-sidebar__time {
+  opacity: 0;
+}
+
+.conversation-sidebar__item:hover .conversation-sidebar__delete,
+.conversation-sidebar__item:focus-within .conversation-sidebar__delete,
+.conversation-sidebar__delete:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.conversation-sidebar__delete:hover,
+.conversation-sidebar__delete:focus-visible {
+  color: #b42318;
+  background: rgb(180 35 24 / 10%);
 }
 
 .conversation-sidebar__empty {

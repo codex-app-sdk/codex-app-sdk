@@ -73,9 +73,10 @@ props and events remain available as additive overrides for provider-neutral or
 fully controlled hosts.
 
 `CodexSurface` exposes stable product operations: connect, list/refresh, create,
-select/read/rename, send/queue/steer, interrupt, compact, start a review, update
-settings, set/clear goals, approve/deny/respond, delete/edit/retry, subscribe,
-and close. Its snapshots include per-thread live state, thread status, context
+select/read/rename, archive/unarchive/permanently delete conversations,
+send/queue/steer, interrupt, compact, start a review, update settings, set/clear
+goals, approve/deny/respond, delete/edit/retry messages, subscribe, and close.
+Its snapshots include per-thread live state, thread status, context
 usage, rate limits, goals, approvals, pending app-server questions, queued
 prompts, and turn git diffs. `connect()` paginates the global, non-archived app-server thread list
 without applying a cwd filter, then resumes the newest thread so the first
@@ -187,7 +188,8 @@ bound `CodexConversationPane`. SDK defaults supply native file picking and
 ingestion, image paste/drop, attachment previews, copy, audio capture and Apple
 speech transcription, models, permissions, plans, goals, and concurrent live
 conversation state without `App.vue` plumbing. It contains no raw app-server or
-IPC plumbing. Run:
+IPC plumbing. The custom list demonstrates a confirmed permanent-delete action
+through the high-level surface API. Run:
 
 ```bash
 npm run sample:start

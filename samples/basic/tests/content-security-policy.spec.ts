@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('basic sample renderer security policy', () => {
   it('ships a restrictive CSP without remote scripts or executable inline script', () => {
-    const html = readFileSync(resolve(import.meta.dirname, '../index.html'), 'utf8');
+    const html = readFileSync(resolve(import.meta.dirname, '../src/renderer/index.html'), 'utf8');
 
     expect(html).toContain('http-equiv="Content-Security-Policy"');
     expect(html).toContain("default-src 'self'");

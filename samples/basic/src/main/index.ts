@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { registerCodexElectronMain } from 'codex-app-sdk/electron';
 import { createCodexSurface, type CodexSurface } from 'codex-app-sdk/node';
 
-const directory = path.dirname(fileURLToPath(import.meta.url));
+const bundleDirectory = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | null = null;
 let surface: CodexSurface | null = null;
 let unregisterSdk: (() => void) | null = null;
@@ -20,15 +20,15 @@ async function createWindow(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      preload: path.join(directory, 'preload.cjs'),
+      preload: path.join(bundleDirectory, 'preload.cjs'),
     },
   });
   installNavigationPolicy(mainWindow.webContents);
-  const rendererUrl = process.env.CODEX_SAMPLE_RENDERER_URL;
+  const rendererUrl = process.env.VITE_DEV_SERVER_URL?.trim();
   if (rendererUrl) {
     await mainWindow.loadURL(rendererUrl);
   } else {
-    await mainWindow.loadFile(path.join(directory, '../dist-renderer/index.html'));
+    await mainWindow.loadFile(path.join(bundleDirectory, '../dist-renderer/index.html'));
   }
   mainWindow.on('closed', () => { mainWindow = null; });
 }

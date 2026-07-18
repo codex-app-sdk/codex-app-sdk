@@ -11,10 +11,6 @@ vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
 }));
 
-vi.mock('webm-to-wav-converter', () => ({
-  getWaveBlob: vi.fn(async (blob: Blob) => new Blob([blob], { type: 'audio/wav' })),
-}));
-
 type ChatComposerProps = {
   disabled: boolean;
   draft?: string;
@@ -414,6 +410,29 @@ describe('ChatComposer', () => {
       locale: navigator.language,
     });
   });
+
+  it('emits transcription failures and clears them when recording is retried', async () => {
+    installAudioRecordingMocks();
+    const transcribeAppleSpeech = vi.fn(async () => ({
+      error: 'No speech was recognized.',
+      text: '',
+    }));
+    const wrapper = mountComposer({ transcribeAudio: transcribeAppleSpeech });
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.emitted('error')).toContainEqual(['No speech was recognized.']);
+    });
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.emitted('error')).toContainEqual([null]);
+    });
+  });
 });
 
 function mountComposer(overrides: Partial<ChatComposerProps & {
@@ -464,6 +483,12 @@ function installAudioRecordingMocks(): void {
     close = vi.fn(async () => undefined);
     createAnalyser = vi.fn(() => analyser);
     createMediaStreamSource = vi.fn(() => source);
+    decodeAudioData = vi.fn(async () => ({
+      length: 1,
+      numberOfChannels: 1,
+      sampleRate: 16_000,
+      getChannelData: () => new Float32Array([0]),
+    } as unknown as AudioBuffer));
     resume = vi.fn(async () => undefined);
   }
 

@@ -32,6 +32,28 @@ describe('CodexConversationPane', () => {
     expect(wrapper.text()).toContain('Start a conversation with Codex');
   });
 
+  it('shows composer failures and exposes them to pane consumers', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages, modelValue: '' },
+    });
+    const composer = wrapper.findComponent({ name: 'CodexComposer' });
+
+    composer.vm.$emit('error', 'Speech transcription failed.');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('Speech transcription failed.');
+    expect(wrapper.emitted('error')).toStrictEqual([['Speech transcription failed.']]);
+
+    composer.vm.$emit('error', null);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.emitted('error')).toStrictEqual([
+      ['Speech transcription failed.'],
+      [null],
+    ]);
+  });
+
   it('owns composer behavior through its public events', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: { busy: false, messages, modelValue: '  Ship it  ' },
@@ -210,6 +232,39 @@ describe('CodexConversationPane', () => {
     expect(wrapper.text()).not.toContain('Bound controller message');
   });
 
+  it('follows bound surface booleans when their controlled props are omitted', async () => {
+    const controller = fakeSurfaceController();
+    const wrapper = mount(CodexConversationPane, { props: { surface: controller } });
+    await vi.waitFor(() => expect(controller.connect).toHaveBeenCalledOnce());
+
+    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+    await wrapper.get('[role="menuitemcheckbox"]').trigger('click');
+    await vi.waitFor(() => expect(controller.updateConversationSettings).toHaveBeenCalledWith({ planMode: true }));
+    expect(wrapper.text()).toContain('Plan');
+    expect(wrapper.get('[role="menuitemcheckbox"]').attributes('aria-checked')).toBe('true');
+
+    await wrapper.get('[aria-label="Disable plan mode"]').trigger('click');
+    await vi.waitFor(() => expect(controller.updateConversationSettings).toHaveBeenLastCalledWith({ planMode: false }));
+    await wrapper.get('textarea').setValue('/plan');
+    await wrapper.get('form').trigger('submit');
+    await vi.waitFor(() => expect(controller.sendMessage).toHaveBeenCalledWith('/plan', undefined));
+    expect(wrapper.text()).toContain('Plan');
+
+    controller.state.busy = true;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.codex-conversation-pane').attributes('aria-busy')).toBe('true');
+
+    controller.state.busy = false;
+    controller.state.historyLoading = true;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[aria-label="Loading conversation"]').exists()).toBe(true);
+
+    controller.state.historyLoading = false;
+    controller.state.status = 'connecting';
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('textarea').attributes()).toHaveProperty('disabled');
+  });
+
   it('exposes slots and extensible composer menu entries', async () => {
     const menuItems: CodexComposerMenuItem<{ source: string }>[] = [{
       id: 'custom-action',
@@ -355,7 +410,7 @@ describe('CodexConversationPane', () => {
   });
 });
 
-function fakeSurfaceController(): CodexSurfaceController {
+function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurfaceSnapshot } {
   const state = reactive<CodexSurfaceSnapshot>({
     status: 'idle',
     conversations: [],
@@ -396,7 +451,14 @@ function fakeSurfaceController(): CodexSurfaceController {
     }];
     return snapshot();
   });
-  const sendMessage = vi.fn(async () => snapshot());
+  const sendMessage = vi.fn(async (prompt: string) => {
+    if (/^\/plan(?:\s|$)/.test(prompt.trim())) state.planMode = true;
+    return snapshot();
+  });
+  const updateConversationSettings = vi.fn(async (settings: { planMode?: boolean }) => {
+    if (typeof settings.planMode === 'boolean') state.planMode = settings.planMode;
+    return snapshot();
+  });
   const action = vi.fn(async () => snapshot());
   return {
     state,
@@ -424,6 +486,6 @@ function fakeSurfaceController(): CodexSurfaceController {
     startReview: action,
     steerMessage: action,
     steerQueuedPrompt: action,
-    updateConversationSettings: action,
-  } as unknown as CodexSurfaceController;
+    updateConversationSettings,
+  } as unknown as CodexSurfaceController & { state: CodexSurfaceSnapshot };
 }

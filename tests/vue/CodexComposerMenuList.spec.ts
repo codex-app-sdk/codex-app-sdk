@@ -82,16 +82,22 @@ describe('CodexComposerMenuList', () => {
     expect(iconWrapper.find('.host-icon').exists()).toBe(true);
   });
 
-  it('reports real submenu state and supports right and left arrow navigation', async () => {
+  it('opens submenus on hover or ArrowRight without opening them on focus', async () => {
     const wrapper = mount(CodexComposerMenuList, {
       attachTo: document.body,
       props: { items },
     });
     const submenuTrigger = wrapper.findAll('button').find((button) => button.text().includes('Approval'))!;
+    const submenu = wrapper.get('.codex-composer-menu-list__submenu');
     expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
 
     await submenuTrigger.trigger('focus');
+    expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
+    await submenu.trigger('mouseenter');
     expect(submenuTrigger.attributes('aria-expanded')).toBe('true');
+    await submenu.trigger('mouseleave');
+    expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
+
     await submenuTrigger.trigger('keydown', { key: 'ArrowRight' });
     const child = wrapper.findAll('button').find((button) => button.text().includes('Ask first'))!;
     expect(document.activeElement).toBe(child.element);

@@ -125,6 +125,60 @@ describe('CodexSurface', () => {
     });
   });
 
+  it('owns archive, unarchive, and permanent deletion lifecycle actions', async () => {
+    const transport = new FakeTransport({
+      'thread/unarchive': (params) => ({
+        thread: thread((params as { threadId: string }).threadId, false),
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const removedEvents: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => {
+      if (event.type === 'conversation.summaryRemoved') removedEvents.push(event);
+    });
+    await surface.connect();
+
+    await surface.archiveConversation(' thread-existing ');
+    expect(lastRequest(transport, 'thread/archive')).toMatchObject({
+      params: { threadId: 'thread-existing' },
+    });
+    expect(surface.getSnapshot()).toMatchObject({ activeConversationId: null, conversations: [] });
+    expect(removedEvents).toStrictEqual([expect.objectContaining({
+      origin: 'action',
+      conversationId: 'thread-existing',
+      payload: { reason: 'archived' },
+    })]);
+
+    transport.emit({ method: 'thread/archived', params: { threadId: 'thread-existing' } });
+    expect(removedEvents).toHaveLength(1);
+
+    await surface.unarchiveConversation('thread-existing');
+    expect(lastRequest(transport, 'thread/unarchive')).toMatchObject({
+      params: { threadId: 'thread-existing' },
+    });
+    expect(surface.getSnapshot().conversations).toEqual([
+      expect.objectContaining({ id: 'thread-existing' }),
+    ]);
+
+    await surface.deleteConversation('thread-existing');
+    expect(lastRequest(transport, 'thread/delete')).toMatchObject({
+      params: { threadId: 'thread-existing' },
+    });
+    expect(surface.getSnapshot().conversations).toStrictEqual([]);
+    expect(removedEvents).toStrictEqual([
+      expect.objectContaining({ payload: { reason: 'archived' } }),
+      expect.objectContaining({
+        origin: 'action',
+        conversationId: 'thread-existing',
+        payload: { reason: 'deleted' },
+      }),
+    ]);
+
+    transport.emit({ method: 'thread/deleted', params: { threadId: 'thread-existing' } });
+    expect(removedEvents).toHaveLength(2);
+    await expect(surface.deleteConversation('   ')).rejects.toThrow('Conversation id cannot be empty');
+  });
+
   it('loads history, sends a message, and reduces streaming events into surface state', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -600,6 +654,18 @@ describe('CodexSurface', () => {
       selectedModelId: 'gpt-mini',
       selectedReasoningEffort: 'high',
     });
+
+    transport.emit({
+      method: 'thread/settings/updated',
+      params: {
+        threadId: 'thread-existing',
+        threadSettings: threadSettings({
+          approvalPolicy: 'on-request',
+          approvalsReviewer: 'guardian_subagent',
+        }),
+      },
+    });
+    expect(surface.getSnapshot().approvalPreset).toBe('approve-for-me');
   });
 
   it('honors explicit main-process policy defaults', async () => {
