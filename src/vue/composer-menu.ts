@@ -31,6 +31,12 @@ export type CodexComposerMenuSeparatorItem = {
   type: 'separator';
 };
 
+export type CodexComposerMenuHeadingItem = {
+  id: string;
+  type: 'heading';
+  label: string;
+};
+
 export type CodexComposerMenuSubmenuItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
   type: 'submenu';
   items: readonly CodexComposerMenuItem<Payload>[];
@@ -39,11 +45,12 @@ export type CodexComposerMenuSubmenuItem<Payload = unknown> = CodexComposerMenuI
 export type CodexComposerMenuItem<Payload = unknown> =
   | CodexComposerMenuActionItem<Payload>
   | CodexComposerMenuCheckboxItem<Payload>
+  | CodexComposerMenuHeadingItem
   | CodexComposerMenuRadioItem<Payload>
   | CodexComposerMenuSeparatorItem
   | CodexComposerMenuSubmenuItem<Payload>;
 
 export type CodexComposerMenuSelectableItem<Payload = unknown> = Exclude<
   CodexComposerMenuItem<Payload>,
-  CodexComposerMenuSeparatorItem | CodexComposerMenuSubmenuItem<Payload>
+  CodexComposerMenuHeadingItem | CodexComposerMenuSeparatorItem | CodexComposerMenuSubmenuItem<Payload>
 >;

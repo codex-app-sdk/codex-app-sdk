@@ -13,6 +13,20 @@ const snapshot: CodexSurfaceSnapshot = {
   activeConversationId: null,
   messages: [],
   approvals: [],
+  models: [],
+  modelCatalogStatus: 'loaded',
+  skills: [],
+  skillCatalogStatus: 'loaded',
+  permissionProfiles: [],
+  approvalPresets: [],
+  approvalPreset: null,
+  selectedModelId: null,
+  selectedReasoningEffort: null,
+  planMode: false,
+  contextUsage: null,
+  goal: null,
+  turnGitDiff: null,
+  queuedPrompts: [],
   busy: false,
   error: null,
 };
@@ -24,14 +38,24 @@ describe('Codex surface Electron bridge', () => {
     let stateListener: ((value: CodexSurfaceSnapshot) => void) | undefined;
     const unsubscribeState = vi.fn();
     const surface = {
+      clearGoal: vi.fn(async () => snapshot),
       connect: vi.fn(async () => snapshot),
       createConversation: vi.fn(async () => snapshot),
+      deleteMessage: vi.fn(async () => snapshot),
+      deleteQueuedPrompt: vi.fn(async () => snapshot),
+      editMessage: vi.fn(async () => snapshot),
       getSnapshot: vi.fn(() => snapshot),
       interrupt: vi.fn(async () => snapshot),
       refreshConversations: vi.fn(async () => snapshot),
+      respondToClientRequest: vi.fn(async () => snapshot),
       resolveApproval: vi.fn(async () => snapshot),
+      retryMessage: vi.fn(async () => snapshot),
+      setGoal: vi.fn(async () => snapshot),
       selectConversation: vi.fn(async () => snapshot),
       sendMessage: vi.fn(async () => snapshot),
+      steerMessage: vi.fn(async () => snapshot),
+      steerQueuedPrompt: vi.fn(async () => snapshot),
+      updateConversationSettings: vi.fn(async () => snapshot),
       onStateChange: vi.fn((listener: (value: CodexSurfaceSnapshot) => void) => {
         stateListener = listener;
         return unsubscribeState;
@@ -40,15 +64,26 @@ describe('Codex surface Electron bridge', () => {
 
     const dispose = registerCodexSurfaceIpc(main, sender, surface);
     expect([...main.handlers.keys()].sort()).toStrictEqual([
+      'codex-surface:clear-goal',
       'codex-surface:connect',
       'codex-surface:create-conversation',
+      'codex-surface:delete-message',
+      'codex-surface:delete-queued-prompt',
+      'codex-surface:edit-message',
       'codex-surface:get-snapshot',
       'codex-surface:interrupt',
       'codex-surface:refresh-conversations',
       'codex-surface:resolve-approval',
+      'codex-surface:respond-to-client-request',
+      'codex-surface:retry-message',
       'codex-surface:select-conversation',
       'codex-surface:send-message',
+      'codex-surface:set-goal',
+      'codex-surface:steer-message',
+      'codex-surface:steer-queued-prompt',
+      'codex-surface:update-conversation-settings',
     ]);
+    await expect(main.call('codex-surface:clear-goal')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', {
       model: 'gpt-5',
@@ -57,6 +92,13 @@ describe('Codex surface Electron bridge', () => {
       permissionMode: 'full-access',
     })).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', { cwd: '/' })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:create-conversation')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:create-conversation', {
+      reasoningEffort: 'high', approvalPreset: 'approve-for-me',
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:delete-message', 2)).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:delete-queued-prompt', 'queued-1')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:edit-message', 1, 'Replacement')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', 'unsafe')).rejects.toThrow(
       'Conversation options must be an object',
     );
@@ -66,24 +108,94 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:create-conversation', { model: '   ' })).rejects.toThrow(
       'Conversation model must be a non-empty string',
     );
+    await expect(main.call('codex-surface:create-conversation', { approvalPreset: 'unsafe' })).rejects.toThrow(
+      'Conversation approval preset is invalid',
+    );
+    await expect(main.call('codex-surface:delete-message', -1)).rejects.toThrow(
+      'Message index must be a non-negative integer',
+    );
+    await expect(main.call('codex-surface:delete-message', 1.5)).rejects.toThrow(
+      'Message index must be a non-negative integer',
+    );
+    await expect(main.call('codex-surface:delete-message', '1')).rejects.toThrow(
+      'Message index must be a non-negative integer',
+    );
     await expect(main.call('codex-surface:get-snapshot')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:interrupt')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:refresh-conversations')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-1', payload: { answers: { target: { answers: ['README.md'] } } },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', { id: 'question-2' })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-3', payload: { answers: {}, cancelled: true, decision: null },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', null)).rejects.toThrow(
+      'Client request response must be an object',
+    );
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: [],
+    })).rejects.toThrow('Client request response payload must be an object');
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: { decision: 'maybe' },
+    })).rejects.toThrow('Client request decision is invalid');
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: { cancelled: 'yes' },
+    })).rejects.toThrow('Client request cancelled flag must be a boolean');
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: { answers: [] },
+    })).rejects.toThrow('Client request answers must be an object');
     await expect(main.call('codex-surface:resolve-approval', 'approval-1', 'approve', 'session')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:set-goal', 'Ship the SDK', 1000)).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:set-goal', 'Ship the SDK')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:set-goal', 'Ship the SDK', null)).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:set-goal', 'Ship the SDK', 0)).rejects.toThrow(
+      'Goal token budget must be a positive number or null',
+    );
+    await expect(main.call('codex-surface:retry-message', 3)).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:select-conversation', 'thread-1')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:send-message', 'Hello', { model: 'gpt-5' })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:steer-message', 'More detail')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:steer-queued-prompt', 'queued-2')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:update-conversation-settings', {
+      modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:update-conversation-settings', {})).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:update-conversation-settings', null)).rejects.toThrow(
+      'Conversation settings must be an object',
+    );
+    await expect(main.call('codex-surface:update-conversation-settings', { approvalPreset: 'unsafe' })).rejects.toThrow(
+      'Conversation approval preset is invalid',
+    );
+    await expect(main.call('codex-surface:update-conversation-settings', { planMode: 'yes' })).rejects.toThrow(
+      'Conversation plan mode must be a boolean',
+    );
     stateListener?.(snapshot);
     expect(surface.connect).toHaveBeenCalledOnce();
+    expect(surface.clearGoal).toHaveBeenCalledOnce();
     expect(surface.createConversation).toHaveBeenNthCalledWith(1, {
       model: 'gpt-5',
     });
     expect(surface.createConversation).toHaveBeenNthCalledWith(2, {});
+    expect(surface.deleteMessage).toHaveBeenCalledWith(2);
+    expect(surface.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
+    expect(surface.editMessage).toHaveBeenCalledWith(1, 'Replacement');
     expect(surface.getSnapshot).toHaveBeenCalledOnce();
     expect(surface.interrupt).toHaveBeenCalledOnce();
     expect(surface.refreshConversations).toHaveBeenCalledOnce();
+    expect(surface.respondToClientRequest).toHaveBeenCalledWith({
+      id: 'question-1', payload: { answers: { target: { answers: ['README.md'] } } },
+    });
     expect(surface.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
+    expect(surface.setGoal).toHaveBeenCalledWith('Ship the SDK', 1000);
+    expect(surface.retryMessage).toHaveBeenCalledWith(3);
     expect(surface.selectConversation).toHaveBeenCalledWith('thread-1');
     expect(surface.sendMessage).toHaveBeenCalledWith('Hello', { model: 'gpt-5' });
+    expect(surface.steerMessage).toHaveBeenCalledWith('More detail');
+    expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2');
+    expect(surface.updateConversationSettings).toHaveBeenCalledWith({
+      modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
+    });
     expect(sender.send).toHaveBeenCalledWith('codex-surface:state-changed', snapshot);
     dispose();
     expect(unsubscribeState).toHaveBeenCalledOnce();
@@ -97,11 +209,21 @@ describe('Codex surface Electron bridge', () => {
     const unsubscribe = api.onStateChange(listener);
 
     await api.connect();
+    await api.clearGoal();
     await api.createConversation({ model: 'gpt-5' });
+    await api.deleteMessage(2);
+    await api.deleteQueuedPrompt('queued-1');
+    await api.editMessage(1, 'Replacement');
     await api.refreshConversations();
+    await api.respondToClientRequest({ id: 'question-1', payload: { answers: {} } });
     await api.resolveApproval('approval-1', 'approve', 'once');
+    await api.setGoal('Ship it', 2000);
+    await api.retryMessage(3);
     await api.selectConversation('thread-2');
     await api.sendMessage('Build it', { model: 'gpt-5' });
+    await api.steerMessage('Keep going');
+    await api.steerQueuedPrompt('queued-2');
+    await api.updateConversationSettings({ modelId: 'gpt-5', approvalPreset: 'ask-for-approval' });
     await api.interrupt();
     await api.getSnapshot();
     renderer.emit('codex-surface:state-changed', snapshot);
@@ -110,11 +232,21 @@ describe('Codex surface Electron bridge', () => {
 
     expect(renderer.invoke.mock.calls).toStrictEqual([
       ['codex-surface:connect'],
+      ['codex-surface:clear-goal'],
       ['codex-surface:create-conversation', { model: 'gpt-5' }],
+      ['codex-surface:delete-message', 2],
+      ['codex-surface:delete-queued-prompt', 'queued-1'],
+      ['codex-surface:edit-message', 1, 'Replacement'],
       ['codex-surface:refresh-conversations'],
+      ['codex-surface:respond-to-client-request', { id: 'question-1', payload: { answers: {} } }],
       ['codex-surface:resolve-approval', 'approval-1', 'approve', 'once'],
+      ['codex-surface:set-goal', 'Ship it', 2000],
+      ['codex-surface:retry-message', 3],
       ['codex-surface:select-conversation', 'thread-2'],
       ['codex-surface:send-message', 'Build it', { model: 'gpt-5' }],
+      ['codex-surface:steer-message', 'Keep going'],
+      ['codex-surface:steer-queued-prompt', 'queued-2'],
+      ['codex-surface:update-conversation-settings', { modelId: 'gpt-5', approvalPreset: 'ask-for-approval' }],
       ['codex-surface:interrupt'],
       ['codex-surface:get-snapshot'],
     ]);

@@ -1,178 +1,359 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '../src/codex';
 import {
   codexItemToSurfaceMessage,
-  codexItemToToolPart,
   codexThreadToSurfaceMessages,
+  codexTurnToSurfaceMessages,
 } from '../src/node/codex-conversation-history';
+import type { v2 } from '../src/codex';
 
-describe('Codex conversation history adapter', () => {
-  it('turns persisted user, assistant, and tool items into stable surface messages', () => {
-    const thread = {
-      id: 'thread-1',
-      turns: [{
-        id: 'turn-1',
-        status: 'completed',
-        startedAt: 1_700_000_000,
-        items: [
-          { type: 'userMessage', id: 'user-item', clientId: 'user-client', content: [{ type: 'text', text: 'Fix it', text_elements: [] }] },
-          { type: 'agentMessage', id: 'agent-item', text: 'Done', phase: null, memoryCitation: null },
-          {
-            type: 'commandExecution', id: 'command-item', command: 'npm test', cwd: '/tmp/project', processId: null,
-            source: 'unifiedExec', status: 'completed', commandActions: [], aggregatedOutput: '42 passed', exitCode: 0,
-            durationMs: 100,
-          },
-        ],
+describe('codexThreadToSurfaceMessages', () => {
+  it('normalizes incomplete history and every persisted user input type', () => {
+    expect(codexThreadToSurfaceMessages({ id: 'empty', turns: null } as unknown as v2.Thread)).toStrictEqual([]);
+    const messages = codexTurnToSurfaceMessages('thread-inputs', {
+      id: 'turn-inputs',
+      status: 'failed',
+      startedAt: null,
+      completedAt: 1_780_000_010,
+      items: [
+        {
+          type: 'userMessage', id: 'user-inputs', clientId: 'client-inputs',
+          content: [
+            null,
+            { type: 'text', text: 'Hello' },
+            { type: 'skill', name: 'review' },
+            { type: 'mention', name: 'README.md' },
+            { type: 'image', url: 'https://example.com/image.png' },
+            { type: 'localImage', path: '/tmp/image.png' },
+            { type: 'unknown', value: 'ignored' },
+          ],
+        },
+        { type: 'userMessage', id: 'empty-user', clientId: null, content: null },
+        { type: 'agentMessage', id: 'empty-agent', text: '' },
+        { type: 'exitedReviewMode', id: 'empty-review', review: '' },
+        { type: 'unknown', id: 'unknown' },
+      ],
+    } as unknown as v2.Turn);
+    expect(messages).toStrictEqual([expect.objectContaining({
+      id: 'client-inputs',
+      status: 'complete',
+      parts: [{
+        type: 'text',
+        text: 'Hello\n$review\n@README.md\n![image](https://example.com/image.png)\n![image](/tmp/image.png)',
       }],
-    } as unknown as v2.Thread;
+    })]);
+  });
 
-    const messages = codexThreadToSurfaceMessages(thread);
+  it('maps individual history items and all turn statuses', () => {
+    const baseTurn = { id: 'turn', startedAt: Number.NaN } as Pick<v2.Turn, 'id' | 'status' | 'startedAt'>;
+    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'inProgress' }, {
+      type: 'agentMessage', id: 'agent', text: 'Streaming', phase: null, memoryCitation: null,
+    })).toMatchObject({ status: 'streaming', createdAt: '1970-01-01T00:00:00.000Z' });
+    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'failed' }, {
+      type: 'exitedReviewMode', id: 'review', review: 'Failed review',
+    })).toMatchObject({ status: 'error', parts: [{ text: 'Failed review' }] });
+    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+      type: 'userMessage', id: 'user', clientId: null, content: [],
+    })).toBeNull();
+    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+      type: 'webSearch', id: 'search', query: '', action: null,
+    })).toMatchObject({
+      status: 'complete', parts: [{ type: 'tool', id: 'search', body: 'web search' }],
+    });
+    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+      type: 'enteredReviewMode', id: 'entered', review: 'changes',
+    })).toBeNull();
+  });
+  it('translates resumed Codex turns into renderer messages in item order', () => {
+    const thread = {
+      id: 'thread-resumed',
+      cwd: '/Users/nbonamy/src/project',
+      turns: [
+        {
+          id: 'turn-1',
+          status: 'completed',
+          startedAt: 1_780_000_000,
+          completedAt: 1_780_000_010,
+          items: [
+            {
+              type: 'userMessage',
+              id: 'user-1',
+              content: [
+                {
+                  type: 'text',
+                  text: 'read README.md',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'agentMessage',
+              id: 'msg-1',
+              text: 'I will read it.',
+            },
+            {
+              type: 'commandExecution',
+              id: 'cmd-read',
+              command: 'sed -n "1,120p" README.md',
+              cwd: '/Users/nbonamy/src/project',
+              status: 'completed',
+              commandActions: [
+                {
+                  type: 'read',
+                  name: 'README.md',
+                  cmd: 'sed -n "1,120p" README.md',
+                },
+              ],
+              aggregatedOutput: '# Project',
+              exitCode: 0,
+              durationMs: 42,
+            },
+            {
+              type: 'agentMessage',
+              id: 'msg-2',
+              text: 'Read README.md.',
+            },
+          ],
+        },
+      ],
+    };
 
-    expect(messages).toStrictEqual([
+    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
       {
-        id: 'user-client',
+        id: 'user-thread-resumed-turn-1-user-1',
         role: 'user',
         status: 'complete',
-        parts: [{ type: 'text', text: 'Fix it' }],
-        createdAt: '2023-11-14T22:13:20.000Z',
-        metadata: { conversationId: 'thread-1', turnId: 'turn-1', itemId: 'user-item' },
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'read README.md' }],
       },
       {
-        id: 'assistant-agent-item',
+        id: 'assistant-turn-1',
         role: 'assistant',
         status: 'complete',
-        parts: [{ type: 'text', text: 'Done' }],
-        createdAt: '2023-11-14T22:13:20.000Z',
-        metadata: { conversationId: 'thread-1', turnId: 'turn-1', itemId: 'agent-item' },
-      },
-      {
-        id: 'assistant-command-item',
-        role: 'assistant',
-        status: 'complete',
-        parts: [{
-          type: 'tool',
-          id: 'command-item',
-          title: 'npm test',
-          kind: 'command',
-          status: 'completed',
-          body: '42 passed',
-          output: '42 passed',
-          metadata: { cwd: '/tmp/project', exitCode: 0 },
-        }],
-        createdAt: '2023-11-14T22:13:20.000Z',
-        metadata: { conversationId: 'thread-1', turnId: 'turn-1', itemId: 'command-item' },
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [
+          { type: 'text', text: 'I will read it.', itemId: 'msg-1' },
+          {
+            type: 'tool',
+            id: 'cmd-read',
+            kind: 'command',
+            title: 'sed -n "1,120p" README.md',
+            status: 'completed',
+            statusText: '{"action":"read","phase":"completed","params":{"names":["README.md"],"target":"README.md"},"source":"codex"}',
+            input: {
+              command: 'sed -n "1,120p" README.md',
+              cwd: '/Users/nbonamy/src/project',
+              commandActions: [
+                {
+                  type: 'read',
+                  name: 'README.md',
+                  cmd: 'sed -n "1,120p" README.md',
+                },
+              ],
+            },
+            output: {
+              exitCode: 0,
+              durationMs: 42,
+            },
+            metadata: {
+              source: undefined,
+              processId: undefined,
+            },
+          },
+          { type: 'text', text: 'Read README.md.', itemId: 'msg-2' },
+        ],
       },
     ]);
   });
 
-  it('maps rich inputs, plans, failures, and unsupported lifecycle items safely', () => {
+  it('does not replay Codex plan items as normal assistant text', () => {
     const thread = {
-      id: 'thread-2',
-      turns: [{
-        id: 'turn-2', status: 'failed', startedAt: null,
-        items: [
-          { type: 'userMessage', id: 'user', clientId: null, content: [
-            { type: 'skill', name: 'review', path: '/review' },
-            { type: 'mention', name: 'app', path: '/app' },
-            { type: 'localImage', path: '/tmp/ui.png' },
-          ] },
-          { type: 'plan', id: 'plan', text: '1. Inspect' },
-          { type: 'contextCompaction', id: 'compact' },
+      id: 'thread-resumed',
+      cwd: '/Users/nbonamy/src/project',
+      turns: [
+        {
+          id: 'turn-1',
+          status: 'completed',
+          startedAt: 1_780_000_000,
+          completedAt: 1_780_000_010,
+          items: [
+            {
+              type: 'userMessage',
+              id: 'user-1',
+              content: [
+                {
+                  type: 'text',
+                  text: 'write a dummy false plan this is a test',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'plan',
+              id: 'turn-1-plan',
+              text: '# Dummy False Plan\n\n- [ ] Do not implement\n',
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
+      {
+        id: 'user-thread-resumed-turn-1-user-1',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'write a dummy false plan this is a test' }],
+      },
+    ]);
+  });
+
+  it('preserves mid-turn steering as a visible marker between assistant segments', () => {
+    const thread = {
+      id: 'thread-steered',
+      cwd: '/Users/nbonamy/src/project',
+      turns: [
+        {
+          id: 'turn-1',
+          status: 'completed',
+          startedAt: 1_780_000_000,
+          completedAt: 1_780_000_010,
+          items: [
+            {
+              type: 'userMessage',
+              id: 'user-1',
+              content: [
+                {
+                  type: 'text',
+                  text: 'read all markdown files',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'agentMessage',
+              id: 'msg-1',
+              text: 'I will inventory the Markdown files.',
+            },
+            {
+              type: 'userMessage',
+              id: 'steer-1',
+              content: [
+                {
+                  type: 'text',
+                  text: 'actually read them too',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'agentMessage',
+              id: 'msg-2',
+              text: 'Reading them now.',
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
+      {
+        id: 'user-thread-steered-turn-1-user-1',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'read all markdown files' }],
+      },
+      {
+        id: 'assistant-turn-1',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [
+          { type: 'text', text: 'I will inventory the Markdown files.', itemId: 'msg-1' },
         ],
-      }],
-    } as unknown as v2.Thread;
-
-    const messages = codexThreadToSurfaceMessages(thread);
-
-    expect(messages).toHaveLength(2);
-    expect(messages[0]?.parts[0]).toMatchObject({ text: '$review\n@app\n![image](/tmp/ui.png)' });
-    expect(messages[1]).toMatchObject({ status: 'error', parts: [{ text: '1. Inspect' }] });
+      },
+      {
+        id: 'user-thread-steered-turn-1-steer-1',
+        kind: 'steer',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'actually read them too' }],
+      },
+      {
+        id: 'assistant-turn-1-segment-1',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [
+          { type: 'text', text: 'Reading them now.', itemId: 'msg-2' },
+        ],
+      },
+    ]);
   });
 
-  it('normalizes the full tool-item vocabulary without leaking protocol shapes', () => {
-    const tool = (item: unknown) => codexItemToToolPart(item as v2.ThreadItem);
-    const cases = [
-      {
-        input: {
-          type: 'commandExecution', id: 'command', command: 'pwd', cwd: '/tmp', processId: null,
-          source: 'unifiedExec', status: 'inProgress', commandActions: [], aggregatedOutput: null, exitCode: null, durationMs: null,
+  it('hydrates completed review output as assistant text instead of hidden tool output', () => {
+    const thread = {
+      id: 'thread-review',
+      cwd: '/Users/nbonamy/src/project',
+      turns: [
+        {
+          id: 'turn-review',
+          status: 'completed',
+          startedAt: 1_780_000_000,
+          completedAt: 1_780_000_010,
+          items: [
+            {
+              type: 'userMessage',
+              id: 'user-review',
+              content: [
+                {
+                  type: 'text',
+                  text: 'current changes',
+                  text_elements: [],
+                },
+              ],
+            },
+            {
+              type: 'enteredReviewMode',
+              id: 'review-1',
+              review: 'current changes',
+            },
+            {
+              type: 'exitedReviewMode',
+              id: 'review-1',
+              review: 'Found one issue.',
+            },
+          ],
         },
-        expected: {
-          type: 'tool', id: 'command', title: 'pwd', kind: 'command', status: 'running',
-          metadata: { cwd: '/tmp', exitCode: null },
-        },
-      },
-      {
-        input: { type: 'fileChange', id: 'file', changes: [{}], status: 'applied' },
-        expected: {
-          type: 'tool', id: 'file', title: 'Changed 1 file', kind: 'file-change', status: 'completed', output: [{}],
-        },
-      },
-      {
-        input: {
-          type: 'mcpToolCall', id: 'mcp', server: 'github', tool: 'search', status: 'failed', arguments: { q: 'sdk' },
-          result: { content: [] }, error: { message: 'offline' }, appContext: null, pluginId: null, durationMs: null,
-        },
-        expected: {
-          type: 'tool', id: 'mcp', title: 'github · search', kind: 'mcp', status: 'failed',
-          input: { q: 'sdk' }, output: { content: [] }, body: 'offline',
-        },
-      },
-      {
-        input: {
-          type: 'dynamicToolCall', id: 'dynamic', namespace: null, tool: 'custom', arguments: {}, status: 'completed',
-          contentItems: [{ type: 'inputText', text: 'done' }], success: false, durationMs: null,
-        },
-        expected: {
-          type: 'tool', id: 'dynamic', title: 'custom', kind: 'tool', status: 'failed', input: {},
-          output: [{ type: 'inputText', text: 'done' }],
-        },
-      },
-      {
-        input: { type: 'reasoning', id: 'reasoning', summary: ['Thinking'], content: ['Details'] },
-        expected: {
-          type: 'tool', id: 'reasoning', title: 'Reasoning', kind: 'reasoning', status: 'completed', body: 'Thinking\nDetails',
-        },
-      },
-      {
-        input: { type: 'webSearch', id: 'search', query: '' },
-        expected: { type: 'tool', id: 'search', title: 'Web search', kind: 'web-search', status: 'completed' },
-      },
-      {
-        input: { type: 'imageView', id: 'view', path: '/tmp/ui.png' },
-        expected: { type: 'tool', id: 'view', title: 'Viewed /tmp/ui.png', kind: 'image', status: 'completed' },
-      },
-      {
-        input: { type: 'imageGeneration', id: 'image', status: 'completed' },
-        expected: { type: 'tool', id: 'image', title: 'Generated image', kind: 'image', status: 'completed' },
-      },
-      {
-        input: { type: 'collabAgentToolCall', id: 'agent', tool: 'spawn', status: 'inProgress' },
-        expected: { type: 'tool', id: 'agent', title: 'Agent spawn', kind: 'agent', status: 'running' },
-      },
-      {
-        input: { type: 'sleep', id: 'sleep', durationMs: 100 },
-        expected: {
-          type: 'tool', id: 'sleep', title: 'Waited', kind: 'wait', status: 'completed', metadata: { durationMs: 100 },
-        },
-      },
-    ];
+      ],
+    };
 
-    for (const { input, expected } of cases) {
-      expect(tool(input)).toStrictEqual(expected);
-    }
-  });
-
-  it('handles empty and alternate message inputs and review output', () => {
-    const turn = { id: 'turn', status: 'interrupted' as const, startedAt: null };
-    expect(codexItemToSurfaceMessage('thread', turn, {
-      type: 'userMessage', id: 'empty', clientId: null, content: [{ type: 'text', text: '', text_elements: [] }],
-    })).toBeNull();
-    expect(codexItemToSurfaceMessage('thread', turn, {
-      type: 'userMessage', id: 'image', clientId: null, content: [{ type: 'image', url: 'https://example.com/ui.png' }],
-    })).toMatchObject({ parts: [{ text: '![image](https://example.com/ui.png)' }] });
-    expect(codexItemToSurfaceMessage('thread', turn, {
-      type: 'exitedReviewMode', id: 'review', review: 'Looks good',
-    })).toMatchObject({ status: 'complete', parts: [{ text: 'Looks good' }] });
+    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
+      {
+        id: 'user-thread-review-turn-review-user-review',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-review',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'current changes' }],
+      },
+      {
+        id: 'assistant-turn-review',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-review',
+        createdAt: '2026-05-28T20:26:40.000Z',
+        parts: [{ type: 'text', text: 'Found one issue.', itemId: 'review-1' }],
+      },
+    ]);
   });
 });

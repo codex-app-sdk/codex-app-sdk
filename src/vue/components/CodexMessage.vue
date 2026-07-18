@@ -1,131 +1,369 @@
 <template>
-  <article
-    class="codex-message"
-    :class="[`codex-message--${message.role}`, `codex-message--${message.status}`]"
-    :aria-busy="message.status === 'streaming' ? 'true' : undefined"
-  >
-    <div class="codex-message__parts">
-      <template v-for="(part, index) in message.parts" :key="partKey(part, index)">
-        <slot v-if="part.type === 'text'" name="text" :part="part" :index="index" :message="message">
-          <p class="codex-message__text">{{ part.text }}</p>
-        </slot>
-        <slot v-else-if="part.type === 'status'" name="status" :part="part" :index="index" :message="message">
-          <p class="codex-message__status">{{ part.text }}</p>
-        </slot>
-        <slot v-else name="tool" :part="part" :index="index" :message="message">
-          <details class="codex-message__tool" :open="part.status === 'running'">
-            <summary class="codex-message__tool-summary">
-              <span>{{ part.title }}</span>
-              <span class="codex-message__tool-status">{{ part.statusText ?? part.status }}</span>
-            </summary>
-            <pre v-if="part.body" class="codex-message__tool-body">{{ part.body }}</pre>
-            <pre v-else-if="part.output !== undefined" class="codex-message__tool-body">{{ formatValue(part.output) }}</pre>
-          </details>
-        </slot>
-      </template>
-      <span v-if="message.status === 'streaming'" class="codex-message__streaming" aria-label="Streaming" />
+  <ChatCompactionMessage
+    v-if="chatMessage.type === 'compaction'"
+    :completed-title="t('chat.compaction.completed')"
+    :running-title="t('chat.compaction.running')"
+    :status="chatMessage.compactionStatus"
+  />
+  <!-- <div v-else-if="message.type === 'steer'" class="chat-message chat-message--steer">
+    <div class="chat-message__steer-line" />
+    <div class="chat-message__steer-body">
+      <span class="chat-message__steer-title">Steered conversation</span>
+      <span class="chat-message__steer-text">{{ message.content }}</span>
     </div>
-  </article>
+  </div> -->
+  <div
+    v-else
+    class="chat-message"
+    :class="[`chat-message--${chatMessage.role}`, { 'chat-message--editing': isEditing }]"
+  >
+    <div class="chat-message__body">
+      <div class="chat-message__stack">
+        <ChatMessageEditor
+          v-if="isEditing"
+          :cancel-label="t('chat.actions.cancel')"
+          :content="chatMessage.content"
+          :input-label="t('chat.actions.editPrompt')"
+          :save-label="t('chat.actions.resubmit')"
+          @cancel="cancelEdit"
+          @save="saveEdit"
+        />
+        <template v-else>
+          <ChatMessageBlock
+            v-for="(block, blockIndex) in blocks"
+            :key="block.type === 'tool' ? block.toolCall.id : `${block.type}-${blockIndex}`"
+            :answered-client-request-ids="answeredClientRequestIds"
+            :block="block"
+            :follow-ups-disabled="followUpsDisabled"
+            @cancel="emit('cancel')"
+            @client-response="emit('client-response', $event)"
+            @send-follow-up="emit('send-follow-up', $event)"
+          />
+          <span
+            v-if="showThinkingIndicator"
+            class="chat-message__thinking text-shimmer"
+            data-label="Thinking"
+          >
+            Thinking
+          </span>
+          <span
+            v-else-if="showStreamingDot"
+            class="chat-message__stream-dot"
+            aria-label="Streaming"
+          />
+        </template>
+      </div>
+      <ChatMessageActions
+        v-if="renderActionSlot"
+        class="chat-message__actions"
+        :class="{ 'chat-message__actions--reserved': reserveActionSlot }"
+        :aria-hidden="reserveActionSlot ? 'true' : undefined"
+        :inert="reserveActionSlot ? '' : undefined"
+        :can-delete="canDeleteMessage"
+        :can-edit="canEditMessage"
+        :can-retry="canRetryMessage"
+        :copied="copied"
+        :message="chatMessage"
+        @copy="copyMessage"
+        @delete="deleteMessage"
+        @edit="startEdit"
+        @quote="emit('quote-message', index)"
+        @retry="retryMessage"
+      />
+      <div v-if="chatMessage.type === 'steer'" class="chat-message--steer">
+        Steered conversation
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import type { SurfaceMessage, SurfaceMessagePart } from '../types';
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { useCodexChatI18n } from '../chat/chat-i18n'
+import type { ClientRequestResponse } from '../chat/contracts'
+import type { Message } from '../chat/types'
+import type { SurfaceMessage } from '../../surface/types'
+import type { MessageBlock } from '../chat/message-blocks'
+import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
+import ChatMessageActions from '../chat/ChatMessageActions.vue'
+import ChatCompactionMessage from '../chat/ChatCompactionMessage.vue'
+import ChatMessageEditor from '../chat/ChatMessageEditor.vue'
+import { computeMessageBlocks } from '../chat/message-blocks'
+import { copyMessageToClipboard } from '../chat/message-actions'
+import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 
-defineProps<{
-  message: SurfaceMessage;
-}>();
+const props = withDefaults(defineProps<{
+  actionsDisabled?: boolean
+  answeredClientRequestIds?: Set<string>
+  canDeleteMessage?: boolean
+  canEditMessage?: boolean
+  canRetryMessage?: boolean
+  followUpsDisabled?: boolean
+  index?: number
+  message: Message | SurfaceMessage
+}>(), {
+  canDeleteMessage: true,
+  canEditMessage: true,
+  canRetryMessage: true,
+  index: 0,
+})
+const emit = defineEmits<{
+  cancel: []
+  'client-response': [response: ClientRequestResponse]
+  'copy-message': [index: number]
+  'delete-message': [index: number]
+  'edit-message': [payload: { content: string; index: number }]
+  'quote-message': [index: number]
+  'review-file': [path: string]
+  'retry-message': [index: number]
+  'send-follow-up': [prompt: string]
+  'undo-change-set': [changeSetId: string]
+}>()
 
-function partKey(part: SurfaceMessagePart, index: number): string {
-  return part.type === 'tool' ? part.id : `${part.type}-${index}`;
+const { t } = useCodexChatI18n()
+const chatMessage = computed(() => chatMessageFromInput(props.message))
+const blocks = computed(() => computeMessageBlocks(chatMessage.value))
+const copied = ref(false)
+const isEditing = ref(false)
+let copyResetTimeout: ReturnType<typeof setTimeout> | null = null
+
+const showActions = computed(() => (
+  chatMessage.value.type !== 'compaction' &&
+  !isEditing.value
+))
+const reserveActionSlot = computed(() => (
+  props.actionsDisabled ||
+  (chatMessage.value.role === 'assistant' && chatMessage.value.streaming === true)
+))
+const renderActionSlot = computed(() => showActions.value)
+const hasVisibleAssistantActivity = computed(() => blocks.value.some(isVisibleAssistantBlock))
+const showThinkingIndicator = computed(() => (
+  chatMessage.value.role === 'assistant' &&
+  chatMessage.value.streaming === true &&
+  !hasVisibleAssistantActivity.value
+))
+const showStreamingDot = computed(() => (
+  chatMessage.value.role === 'assistant' &&
+  chatMessage.value.streaming === true &&
+  hasVisibleAssistantActivity.value
+))
+function startEdit() {
+  if (chatMessage.value.role !== 'user' || !props.canEditMessage) {
+    return
+  }
+
+  isEditing.value = true
 }
 
-function formatValue(value: unknown): string {
-  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+function cancelEdit() {
+  isEditing.value = false
 }
+
+function saveEdit(content: string) {
+  emit('edit-message', { content, index: props.index })
+  cancelEdit()
+}
+
+function deleteMessage() {
+  if (!props.canDeleteMessage) {
+    return
+  }
+
+  emit('delete-message', props.index)
+}
+
+function retryMessage() {
+  if (!props.canRetryMessage) {
+    return
+  }
+
+  emit('retry-message', props.index)
+}
+
+async function copyMessage() {
+  await copyMessageToClipboard(chatMessage.value.content)
+  copied.value = true
+  emit('copy-message', props.index)
+
+  if (copyResetTimeout) {
+    clearTimeout(copyResetTimeout)
+  }
+
+  copyResetTimeout = setTimeout(() => {
+    copied.value = false
+    copyResetTimeout = null
+  }, 1500)
+}
+
+function isVisibleAssistantBlock(block: MessageBlock) {
+  if (block.type === 'text') {
+    return block.content.trim().length > 0
+  }
+
+  return block.type === 'media' || block.type === 'tool' || block.type === 'tool-group'
+}
+
+onBeforeUnmount(() => {
+  if (copyResetTimeout) {
+    clearTimeout(copyResetTimeout)
+  }
+})
 </script>
 
 <style scoped>
-.codex-message {
+.chat-message {
   display: flex;
-  width: 100%;
-  color: var(--codex-text-color, #202124);
 }
 
-.codex-message--user {
+.chat-message--user {
   justify-content: flex-end;
 }
 
-.codex-message--assistant,
-.codex-message--system {
+.chat-message--assistant {
   justify-content: flex-start;
 }
 
-.codex-message__parts {
+.chat-message--steer {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+
+.chat-message__steer-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid var(--color-border);
+}
+
+.chat-message__steer-body {
+  z-index: 1;
+  display: inline-flex;
+  max-width: min(100%, 640px);
+  align-items: baseline;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-6);
+  background: var(--color-surface-lowest);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
+}
+
+.chat-message__steer-title {
+  flex: 0 0 auto;
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.chat-message__steer-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-message__body {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  max-width: 100%;
+}
+
+.chat-message--user .chat-message__body {
+  align-items: flex-end;
+  max-width: 70%;
+}
+
+.chat-message--assistant .chat-message__body {
   align-items: flex-start;
-  gap: var(--codex-space-2, 8px);
-  max-width: var(--codex-message-max-width, min(82%, 760px));
 }
 
-.codex-message--user .codex-message__parts {
-  padding: var(--codex-message-user-padding, 8px 12px);
-  border-radius: var(--codex-message-user-radius, 14px);
-  background: var(--codex-message-user-background, #eef0f2);
+.chat-message--editing .chat-message__body {
+  max-width: unset;
 }
 
-.codex-message__text,
-.codex-message__status {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  line-height: 1.5;
-}
-
-.codex-message__status,
-.codex-message__tool-status {
-  color: var(--codex-muted-text-color, #777b82);
-  font-size: 0.85em;
-}
-
-.codex-message__tool {
-  width: 100%;
-  border: 1px solid var(--codex-border-color, #d8dadd);
-  border-radius: var(--codex-tool-radius, 10px);
-  background: var(--codex-tool-background, #f7f8f9);
-}
-
-.codex-message__tool-summary {
+.chat-message__stack {
   display: flex;
-  justify-content: space-between;
-  gap: var(--codex-space-4, 16px);
-  padding: 8px 10px;
-  cursor: pointer;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 100%;
 }
 
-.codex-message__tool-body {
-  margin: 0;
-  padding: 10px;
-  border-top: 1px solid var(--codex-border-color, #d8dadd);
-  overflow-x: auto;
-  white-space: pre-wrap;
-  font: var(--codex-mono-font, 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace);
+.chat-message--assistant .chat-message__stack {
+  width: 100%;
 }
 
-.codex-message__streaming {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--codex-working-color, #4d7cfe);
-  animation: codex-message-pulse 900ms ease-in-out infinite alternate;
+.chat-message--user .chat-message__stack {
+  background: var(--color-shell-sidebar);
+  border-radius: var(--radius-xl);
+  border-bottom-right-radius: var(--radius-xs);
 }
 
-.codex-message--error {
-  color: var(--codex-error-color, #b42318);
+.chat-message--editing .chat-message__stack {
+  width: 100%;
+  background: transparent;
+  border-radius: 0;
 }
 
-@keyframes codex-message-pulse {
-  to { opacity: 0.28; }
+.chat-message__actions {
+  visibility: hidden;
+}
+
+.chat-message__actions--reserved {
+  pointer-events: none;
+}
+
+.chat-message:hover .chat-message__actions,
+.chat-message:focus-within .chat-message__actions {
+  visibility: visible;
+}
+
+.chat-message:hover .chat-message__actions--reserved,
+.chat-message:focus-within .chat-message__actions--reserved {
+  visibility: hidden;
+}
+
+.chat-message__thinking {
+  align-self: flex-start;
+  overflow: hidden;
+  padding: var(--space-3) 0;
+  font-size: var(--font-size-15);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-20);
+}
+
+.chat-message__stream-dot {
+  display: block;
+  width: var(--space-4);
+  height: var(--space-4);
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  border-radius: 999px;
+  background: var(--color-text-muted);
+  transform-origin: 50% 50%;
+  animation: chat-message-stream-dot 1.15s ease-in-out infinite;
+}
+
+@keyframes chat-message-stream-dot {
+  0%,
+  100% {
+    border-radius: 999px;
+    opacity: 0.48;
+    transform: rotate(0deg) scale(0.72);
+  }
+
+  50% {
+    border-radius: var(--radius-xs);
+    opacity: 1;
+    transform: rotate(180deg) scale(1);
+  }
+
+  75% {
+    border-radius: var(--radius-sm);
+    transform: rotate(270deg) scale(0.86);
+  }
 }
 </style>
-

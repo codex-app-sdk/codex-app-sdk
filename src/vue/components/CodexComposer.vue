@@ -1,139 +1,435 @@
 <template>
-  <form class="codex-composer" @submit.prevent="submit">
+  <form
+    class="chat-composer"
+    :class="{ 'chat-composer--disabled': disabled && !isSending }"
+    aria-label="Prompt composer"
+    @submit.prevent="submitPrompt"
+  >
     <slot name="before" />
-    <textarea
-      ref="textarea"
-      class="codex-composer__input"
-      :autofocus="autofocus"
+    <ChatComposerFileMentionMenu
+      v-if="fileMenuVisible"
+      :active-index="activeFileIndex"
+      :show-hint="fileMenuShowsHint"
+      :visible-files="visibleFiles"
+      @select="selectFile"
+    />
+
+    <ChatComposerSkillMenu
+      v-if="skillMenuVisible"
+      :active-index="activeSkillIndex"
+      :visible-skills="visibleSkills"
+      @select="selectSkill"
+    />
+
+    <ChatComposerSlashMenu
+      v-if="slashMenuVisible"
+      :active-index="activeSlashIndex"
+      :visible-commands="visibleSlashCommands"
+      :visible-skills="visibleSlashSkills"
+      @select-command="selectCommand"
+      @select-skill="selectSlashSkill"
+    />
+
+    <ChatComposerActionMenu
+      :attach-enabled="attachEnabled"
       :disabled="disabled"
+      :items="menuItems"
+      :approval-preset="approvalPreset"
+      :approval-presets="effectiveBackendCapabilities.approvalPresets ?? []"
+      :plan-mode="planMode"
+      :show-approval-menu="effectiveBackendCapabilities.approvals && Boolean(approvalPreset) && (effectiveBackendCapabilities.approvalPresets?.length ?? 0) > 0"
+      :show-plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported'"
+      @attach="$emit('attach')"
+      @select="$emit('menuSelect', $event)"
+      @select-approval-preset="$emit('selectApprovalPreset', $event)"
+      @update:plan-mode="$emit('update:planMode', $event)"
+    >
+      <template v-if="$slots['menu-icon']" #icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
+      <template v-if="$slots['menu-item']" #item="scope"><slot name="menu-item" v-bind="scope" /></template>
+    </ChatComposerActionMenu>
+
+    <ChatComposerVoiceField
+      v-if="isRecording || isTranscribing"
+      :recorder="recorder"
+      :recording="isRecording"
+    />
+    <textarea
+      v-else
+      ref="textareaEl"
+      v-model="prompt"
+      class="chat-composer__input"
       :placeholder="placeholder"
-      :rows="rows"
-      :value="modelValue"
-      @input="updateValue"
-      @keydown="handleKeydown"
+      aria-label="Prompt"
+      rows="1"
+      :disabled="disabled && !isSending"
+      @blur="closeComposerMenusSoon"
+      @click="updateCaretPosition"
+      @input="handleTextareaInput"
+      @keydown="handleTextareaKeydown"
+      @keyup="updateCaretPosition"
+      @select="updateCaretPosition"
     />
     <slot name="after-input" />
-    <CodexComposerSendButton
-      :busy="busy"
-      :disabled="buttonDisabled"
-      :interrupt-label="interruptLabel"
-      :submit-label="submitLabel"
-      @click="handleAction"
-    />
-    <slot name="after" />
+
+    <div class="chat-composer__meta">
+      <slot name="before-meta" />
+      <ChatComposerActiveModes
+        :plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported' && Boolean(planMode)"
+        @disable-plan-mode="$emit('update:planMode', false)"
+      />
+      <ChatContextUsageIndicator :context-usage="contextUsage" />
+      <ChatModelReasoningSelector
+        v-if="effectiveBackendCapabilities.models"
+        :disabled="disabled || isSending"
+        :models="models"
+        :model-catalog-status="modelCatalogStatus"
+        :model-id="selectedModelId"
+        :reasoning-effort="selectedReasoningEffort"
+        :show-reasoning="effectiveBackendCapabilities.reasoningEffort"
+        @update:model-id="$emit('update:modelId', $event)"
+        @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
+      />
+      <ChatComposerVoiceButton
+        :disabled="voiceButtonDisabled"
+        :label="voiceButtonLabel"
+        :recording="isRecording"
+        :title="voiceButtonTitle"
+        @toggle="toggleRecording"
+      />
+      <CodexComposerSendButton
+        class="chat-composer__send"
+        :disabled="sendButtonDisabled"
+        :busy="sendButtonLoading"
+        :submit-label="sendButtonLabel"
+        interrupt-label="Codex is working"
+        @click="handleSendButtonClick"
+      />
+      <slot name="after" />
+    </div>
   </form>
 </template>
 
-<script setup lang="ts">
-import { computed, ref } from 'vue';
+<script setup lang="ts" generic="Payload = unknown">
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import type { AgentContextUsage, AgentFileSearchItem, ApprovalPreset, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, CodexChatTranscription, ReasoningEffort } from '../chat/contracts';
+import { defaultBackendCapabilities } from '../chat/backend-capabilities';
 import CodexComposerSendButton from './CodexComposerSendButton.vue';
+import ChatComposerActiveModes from '../chat/ChatComposerActiveModes.vue';
+import ChatComposerActionMenu from '../chat/ChatComposerActionMenu.vue';
+import ChatComposerVoiceButton from '../chat/ChatComposerVoiceButton.vue';
+import ChatComposerVoiceField from '../chat/ChatComposerVoiceField.vue';
+import ChatContextUsageIndicator from '../chat/ChatContextUsageIndicator.vue';
+import ChatModelReasoningSelector from '../chat/ChatModelReasoningSelector.vue';
+import ChatComposerFileMentionMenu from '../chat/ChatComposerFileMentionMenu.vue';
+import ChatComposerSkillMenu from '../chat/ChatComposerSkillMenu.vue';
+import ChatComposerSlashMenu from '../chat/ChatComposerSlashMenu.vue';
+import { useChatComposerSuggestions } from '../chat/use-chat-composer-suggestions';
+import { useChatComposerVoice } from '../chat/use-chat-composer-voice';
+import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   autofocus?: boolean;
-  busy?: boolean;
-  disabled?: boolean;
-  interruptLabel?: string;
-  modelValue: string;
-  placeholder?: string;
-  rows?: number;
-  submitLabel?: string;
-  submitOnEnter?: boolean;
-}>(), {
-  autofocus: false,
-  busy: false,
-  disabled: false,
-  interruptLabel: 'Interrupt',
-  placeholder: 'Ask Codex…',
-  rows: 1,
-  submitLabel: 'Send',
-  submitOnEnter: true,
-});
-
-const emit = defineEmits<{
-  interrupt: [];
-  submit: [prompt: string];
-  'update:modelValue': [value: string];
+  attachEnabled?: boolean;
+  contextUsage?: AgentContextUsage | null;
+  disabled: boolean;
+  draft?: string;
+  draftRevision?: number;
+  files?: readonly AgentFileSearchItem[];
+  backendCapabilities?: BackendCapabilities;
+  commands?: readonly BackendCommandSummary[];
+  isSending: boolean;
+  menuItems?: readonly CodexComposerMenuItem<Payload>[];
+  modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  models?: readonly BackendModelOption[];
+  placeholder: string;
+  approvalPreset?: ApprovalPreset | null;
+  planMode?: boolean;
+  selectedModelId?: string | null;
+  selectedReasoningEffort?: ReasoningEffort | null;
+  skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
+  skills?: readonly BackendSkillSummary[];
+  transcribeAudio?: CodexChatTranscription;
 }>();
 
-const textarea = ref<HTMLTextAreaElement | null>(null);
-const prompt = computed(() => props.modelValue.trim());
-const buttonDisabled = computed(() => props.disabled || (!props.busy && prompt.value.length === 0));
+const emit = defineEmits<{
+  send: [prompt: string];
+  steer: [prompt: string];
+  attach: [];
+  menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
+  interrupt: [];
+  'update:modelId': [modelId: string];
+  selectApprovalPreset: [preset: ApprovalPreset];
+  'update:planMode': [enabled: boolean];
+  'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
+}>();
 
-function updateValue(event: Event): void {
-  emit('update:modelValue', (event.target as HTMLTextAreaElement).value);
+const CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX = 88;
+
+const prompt = ref('');
+const textareaEl = ref<HTMLTextAreaElement | null>(null);
+const caretPosition = ref(0);
+const effectiveBackendCapabilities = computed(() => props.backendCapabilities ?? defaultBackendCapabilities('codex'));
+
+const hasPrompt = computed(() => Boolean(prompt.value.trim()));
+const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
+const canInterrupt = computed(() => Boolean(props.isSending && !hasPrompt.value && !props.disabled));
+const sendButtonLoading = computed(() => canInterrupt.value);
+const sendButtonDisabled = computed(() => !canSend.value && !canInterrupt.value);
+const sendButtonLabel = computed(() => (props.isSending ? 'Queue prompt' : 'Send prompt'));
+const {
+  buttonDisabled: voiceButtonDisabled,
+  buttonLabel: voiceButtonLabel,
+  buttonTitle: voiceButtonTitle,
+  isRecording,
+  isTranscribing,
+  recorder,
+  toggle: toggleRecording,
+} = useChatComposerVoice({
+  isDisabled: () => props.disabled,
+  isSending: () => props.isSending,
+  onTranscript: insertTranscript,
+  transcribeAudio: props.transcribeAudio,
+});
+const {
+  activeFileIndex,
+  activeSkillIndex,
+  activeSlashIndex,
+  close: closeComposerMenus,
+  closeSoon: closeComposerMenusSoon,
+  fileMenuShowsHint,
+  fileMenuVisible,
+  handleKeydown: handleSuggestionKeydown,
+  selectCommand,
+  selectFile,
+  selectSkill,
+  selectSlashSkill,
+  skillMenuVisible,
+  slashMenuVisible,
+  sync: syncComposerMenus,
+  updateCaretPosition,
+  visibleFiles,
+  visibleSkills,
+  visibleSlashCommands,
+  visibleSlashSkills,
+} = useChatComposerSuggestions({
+  caretPosition,
+  commands: () => props.commands ?? [],
+  disabled: () => props.disabled,
+  files: () => props.files ?? [],
+  isSending: () => props.isSending,
+  onCommandSubmitted: (command) => {
+    emit('send', command);
+    void nextTick(resizeTextarea);
+  },
+  onTextInserted: focusAt,
+  prompt,
+  skills: () => props.skills ?? [],
+  skillsEnabled: () => effectiveBackendCapabilities.value.skills,
+  textarea: textareaEl,
+});
+
+watch(() => props.draftRevision, () => {
+  setComposerText(props.draft ?? '');
+}, { immediate: props.draftRevision !== undefined });
+
+onMounted(() => {
+  if (props.autofocus) {
+    textareaEl.value?.focus();
+  }
+});
+
+function submitPrompt(): void {
+  submitWithIntent('send');
 }
 
-function handleAction(): void {
-  if (props.busy) {
-    if (!props.disabled) {
-      emit('interrupt');
+function handleSendButtonClick(): void {
+  if (canInterrupt.value) {
+    emit('interrupt');
+    return;
+  }
+
+  submitPrompt();
+}
+
+function submitSteer(): void {
+  submitWithIntent('steer');
+}
+
+function submitWithIntent(intent: 'send' | 'steer'): void {
+  const trimmed = prompt.value.trim();
+  if (!canSend.value) {
+    return;
+  }
+
+  prompt.value = '';
+  closeComposerMenus();
+  if (intent === 'send') {
+    emit('send', trimmed);
+  } else {
+    emit('steer', trimmed);
+  }
+  void nextTick(resizeTextarea);
+}
+
+function insertTranscript(text: string): void {
+  const transcript = text.trim();
+  if (!transcript) {
+    return;
+  }
+
+  const textarea = textareaEl.value;
+  const start = textarea?.selectionStart ?? caretPosition.value;
+  const end = textarea?.selectionEnd ?? caretPosition.value;
+  const before = prompt.value.slice(0, start);
+  const after = prompt.value.slice(end);
+  const prefix = before && !/\s$/.test(before) ? ' ' : '';
+  const suffix = after && !/^\s/.test(after) ? ' ' : '';
+  const insertion = `${prefix}${transcript}${suffix}`;
+  const nextCaret = before.length + insertion.length;
+  prompt.value = `${before}${insertion}${after}`;
+  caretPosition.value = nextCaret;
+  closeComposerMenus();
+  void nextTick(() => {
+    textareaEl.value?.focus();
+    textareaEl.value?.setSelectionRange(nextCaret, nextCaret);
+    resizeTextarea();
+  });
+}
+
+function setComposerText(value: string): void {
+  prompt.value = value;
+  const nextCaret = value.length;
+  caretPosition.value = nextCaret;
+  closeComposerMenus();
+  void nextTick(() => {
+    textareaEl.value?.focus();
+    textareaEl.value?.setSelectionRange(nextCaret, nextCaret);
+    resizeTextarea();
+  });
+}
+
+function handleTextareaKeydown(event: KeyboardEvent): void {
+  if (handleSuggestionKeydown(event)) {
+    return;
+  }
+
+  if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    if (effectiveBackendCapabilities.value.planMode !== 'unsupported') {
+      emit('update:planMode', !props.planMode);
     }
     return;
   }
-  submit();
-}
 
-function submit(): void {
-  if (buttonDisabled.value || props.busy) {
+  if (event.key !== 'Enter') {
     return;
   }
-  emit('submit', prompt.value);
-  emit('update:modelValue', '');
-}
 
-function handleKeydown(event: KeyboardEvent): void {
-  const submitShortcut = event.key === 'Enter' && !event.shiftKey && (
-    props.submitOnEnter || event.metaKey || event.ctrlKey
-  );
-  if (!submitShortcut || event.isComposing) {
+  if (event.shiftKey) {
+    resizeTextareaSoon();
     return;
   }
+
   event.preventDefault();
-  submit();
+  if (event.metaKey && !event.ctrlKey && !event.altKey) {
+    submitSteer();
+    return;
+  }
+
+  if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+    submitPrompt();
+  }
 }
 
-function focus(): void {
-  textarea.value?.focus();
+function handleTextareaInput(): void {
+  updateCaretPosition();
+  resizeTextarea();
+  syncComposerMenus();
 }
 
-defineExpose({ focus });
+function focusAt(caret: number): void {
+  void nextTick(() => {
+    textareaEl.value?.focus();
+    textareaEl.value?.setSelectionRange(caret, caret);
+    resizeTextarea();
+  });
+}
+
+function resizeTextarea(): void {
+  const textarea = textareaEl.value;
+  if (!textarea) {
+    return;
+  }
+
+  textarea.style.height = '0px';
+  textarea.style.height = `${Math.min(textarea.scrollHeight, CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX)}px`;
+}
+
+function resizeTextareaSoon(): void {
+  void nextTick(resizeTextarea);
+}
 </script>
 
 <style scoped>
-.codex-composer {
+.chat-composer {
+  --codex-composer-button-background: var(--color-on-surface-variant);
+  --codex-composer-button-foreground: var(--color-surface);
+  --codex-composer-button-hover-background: var(--color-on-surface);
+  --codex-composer-button-size: var(--chat-composer-button-size);
+  --chat-composer-button-size: 36px;
+  --chat-composer-button-size-small: 28px;
+  --chat-composer-input-max-height: calc(var(--line-height-24) + var(--line-height-24) + var(--line-height-24) + var(--space-4) + var(--space-4));
+  position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: var(--codex-space-2, 8px);
+  align-items: center;
+  gap: var(--space-6);
   width: 100%;
-  padding: var(--codex-composer-padding, 10px 12px);
-  border: 1px solid var(--codex-border-color, #d8dadd);
-  border-radius: var(--codex-composer-radius, 16px);
-  color: var(--codex-text-color, #202124);
-  background: var(--codex-composer-background, #fff);
-  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-lowest);
+  box-shadow: var(--shadow-lg);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
-.codex-composer:focus-within {
-  border-color: var(--codex-focus-color, #6a6f76);
-  box-shadow: 0 0 0 2px var(--codex-focus-ring, rgb(0 0 0 / 8%));
+.chat-composer:focus-within {
+  box-shadow: 0 0 var(--space-6) var(--space-2) var(--color-surface-low), var(--shadow-md);
 }
 
-.codex-composer__input {
+.chat-composer--disabled {
+  opacity: 0.62;
+}
+
+.chat-composer__input {
   flex: 1 1 auto;
   min-width: 0;
-  max-height: var(--codex-composer-max-height, 240px);
-  padding: 7px 2px;
+  max-height: var(--chat-composer-input-max-height);
+  padding: var(--space-4) 0;
   border: 0;
   outline: 0;
   resize: none;
-  color: inherit;
+  overflow-y: auto;
+  color: var(--color-text);
   background: transparent;
   font: inherit;
-  line-height: 1.45;
+  font-size: var(--font-size-15);
+  line-height: var(--line-height-24);
 }
 
-.codex-composer__input::placeholder {
-  color: var(--codex-muted-text-color, #777b82);
+.chat-composer__input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.chat-composer__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .chat-composer {
+    border-radius: var(--radius-2xl);
+  }
 }
 </style>
-

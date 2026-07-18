@@ -37,7 +37,7 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('update:modelValue')).toContainEqual(['']);
 
     await wrapper.setProps({ busy: true, modelValue: '' });
-    await wrapper.get('button[aria-label="Interrupt"]').trigger('click');
+    await wrapper.get('button[aria-label="Codex is working"]').trigger('click');
     expect(wrapper.emitted('interrupt')).toHaveLength(1);
   });
 
@@ -60,7 +60,7 @@ describe('CodexConversationPane', () => {
     expect(wrapper.get('.custom-empty').text()).toBe('Pick a prompt');
     expect(wrapper.get('.custom-toolbar').text()).toBe('Toolbar');
 
-    await wrapper.get('.codex-composer-menu__trigger').trigger('click');
+    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
     await wrapper.findAll('button').find((button) => button.text().includes('Custom action'))!.trigger('click');
     expect(wrapper.emitted('menuSelect')?.[0]).toStrictEqual([menuItems[0]]);
   });

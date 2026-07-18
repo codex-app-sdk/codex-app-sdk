@@ -7,6 +7,7 @@ import { CodexComposerMenuList, type CodexComposerMenuItem } from '../../src/vue
 
 describe('CodexComposerMenuList', () => {
   const items: CodexComposerMenuItem<{ source: string }>[] = [
+    { id: 'heading', type: 'heading', label: 'Actions' },
     { id: 'separator', type: 'separator' },
     {
       id: 'custom-tool',
@@ -42,6 +43,7 @@ describe('CodexComposerMenuList', () => {
     });
 
     expect(wrapper.get('[role="menu"]').attributes('aria-label')).toBe('Prompt actions');
+    expect(wrapper.get('.codex-composer-menu-list__heading').text()).toBe('Actions');
     expect(wrapper.find('[role="separator"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Provided by the host application');
     expect(wrapper.text()).toContain('Ask first');
@@ -49,7 +51,7 @@ describe('CodexComposerMenuList', () => {
     const customAction = wrapper.findAll('button').find((button) => button.text().includes('Run custom tool'))!;
     await customAction.trigger('click');
 
-    expect(wrapper.emitted('select')?.[0]).toStrictEqual([items[1]]);
+    expect(wrapper.emitted('select')?.[0]).toStrictEqual([items[2]]);
   });
 
   it('supports host item and icon slots while suppressing disabled selection', async () => {

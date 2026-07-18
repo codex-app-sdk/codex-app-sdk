@@ -24,15 +24,17 @@ async function createWindow(): Promise<void> {
       preload: path.join(directory, 'preload.cjs'),
     },
   });
-  await mainWindow.loadFile(path.join(directory, '../dist-renderer/index.html'));
+  const rendererUrl = process.env.CODEX_SAMPLE_RENDERER_URL;
+  if (rendererUrl) {
+    await mainWindow.loadURL(rendererUrl);
+  } else {
+    await mainWindow.loadFile(path.join(directory, '../dist-renderer/index.html'));
+  }
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
 app.whenReady().then(async () => {
   surface = createCodexSurface({
-    cwd: process.env.CODEX_SAMPLE_CWD || process.cwd(),
-    permissionMode: 'read-only',
-    approvalMode: 'never',
     clientInfo: { name: 'codex_sdk_basic_sample', title: 'Codex SDK Basic Sample', version: '0.1.0' },
   });
   unregisterSurfaceIpc = registerCodexSurfaceIpc(ipcMain, {

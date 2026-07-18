@@ -41,6 +41,7 @@ function renderMenu(
   className = 'codex-composer-menu-list',
 ): VNode {
   const firstFocusableId = items.find((item) => item.type !== 'separator'
+    && item.type !== 'heading'
     && !item.disabled
     && (item.type !== 'submenu' || item.items.length > 0))?.id;
   return h('div', {
@@ -64,6 +65,14 @@ function renderItem(
       class: 'codex-composer-menu-list__separator',
       role: 'separator',
     });
+  }
+
+  if (item.type === 'heading') {
+    return h('div', {
+      key: item.id,
+      class: 'codex-composer-menu-list__heading',
+      role: 'presentation',
+    }, item.label);
   }
 
   if (item.type === 'submenu') {
@@ -218,7 +227,7 @@ function renderContent(item: CodexComposerMenuItemBase<unknown>, slots: Slots): 
     h('span', { class: 'codex-composer-menu-list__copy' }, [
       h('span', { class: 'codex-composer-menu-list__label' }, item.label),
       item.description
-        ? h('span', { class: 'codex-composer-menu-list__description' }, item.description)
+        ? h('span', { class: 'codex-composer-menu-list__description' }, ` • ${item.description}`)
         : null,
     ]),
     item.value

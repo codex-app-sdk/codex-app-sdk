@@ -33,52 +33,57 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 .codex-composer-menu-list {
   display: flex;
   flex-direction: column;
-  min-width: var(--codex-composer-menu-width, 220px);
+  width: var(--codex-composer-menu-width, 220px);
   padding: var(--codex-composer-menu-padding, 4px);
-  border: 1px solid var(--codex-border-color, #d8dadd);
+  border: 1px solid var(--codex-border-color, #dedede);
   border-radius: var(--codex-composer-menu-radius, 12px);
-  color: var(--codex-text-color, #202124);
+  color: var(--codex-text-color, #0d0d0d);
   background: var(--codex-surface-color, #fff);
-  box-shadow: var(--codex-composer-menu-shadow, 0 12px 32px rgb(0 0 0 / 14%));
+  box-shadow: var(--codex-composer-menu-shadow, 0 4px 6px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 5%));
   box-sizing: border-box;
+  font-family: var(--codex-font-family, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: var(--codex-composer-menu-font-size, 13px);
+  line-height: 18px;
 }
 
 .codex-composer-menu-list__item {
   display: flex;
   align-items: center;
-  gap: var(--codex-space-2, 8px);
+  gap: var(--codex-space-3, 6px);
   width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
+  padding: 4px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--codex-composer-menu-item-radius, 12px);
   color: inherit;
   background: transparent;
-  font: inherit;
+  font-family: inherit;
+  font-size: var(--codex-composer-menu-item-font-size, 14px);
+  line-height: 18px;
   text-align: left;
   cursor: pointer;
 }
 
 .codex-composer-menu-list__item:hover:not(:disabled),
 .codex-composer-menu-list__item:focus-visible {
-  background: var(--codex-hover-color, rgb(0 0 0 / 6%));
+  background: var(--codex-hover-color, #f4f4f4);
   outline: none;
 }
 
 .codex-composer-menu-list__item:disabled {
+  color: var(--codex-muted-text-color, #666);
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.58;
 }
 
 .codex-composer-menu-list__item--danger {
-  color: var(--codex-danger-color, #b3261e);
+  color: var(--codex-danger-color, #d5351f);
 }
 
 .codex-composer-menu-list__icon,
 .codex-composer-menu-list__chevron,
 .codex-composer-menu-list__selection {
-  width: 18px;
-  height: 18px;
+  width: var(--codex-composer-menu-icon-size, 16px);
+  height: var(--codex-composer-menu-icon-size, 16px);
   flex: 0 0 auto;
 }
 
@@ -87,10 +92,10 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 }
 
 .codex-composer-menu-list__copy {
-  display: flex;
   min-width: 0;
   flex: 1 1 auto;
-  flex-direction: column;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .codex-composer-menu-list__label {
@@ -99,8 +104,8 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 
 .codex-composer-menu-list__description,
 .codex-composer-menu-list__value {
-  color: var(--codex-muted-text-color, #777b82);
-  font-size: 0.85em;
+  color: var(--codex-muted-text-color, #666);
+  font-size: var(--codex-composer-menu-description-font-size, 12px);
 }
 
 .codex-composer-menu-list__value {
@@ -112,8 +117,15 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 
 .codex-composer-menu-list__separator {
   height: 1px;
-  margin: 4px;
-  background: var(--codex-border-color, #d8dadd);
+  margin: 4px 2px;
+  background: var(--codex-border-color, #dedede);
+}
+
+.codex-composer-menu-list__heading {
+  padding: 6px 8px 4px;
+  color: var(--codex-muted-text-color, #666);
+  font-size: var(--codex-composer-menu-heading-font-size, 13px);
+  line-height: 18px;
 }
 
 .codex-composer-menu-list__submenu {

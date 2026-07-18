@@ -6,6 +6,7 @@
   "main": "dist-main/main.js",
   "scripts": {
     "build": "vite build && vite build --config vite.main.config.ts && vite build --config vite.preload.config.ts",
+    "dev": "node scripts/dev.mjs",
     "start": "npm run build && electron .",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit"

@@ -1,78 +1,156 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
-import { CodexMessage, type SurfaceMessage } from '../../src/vue';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import ChatCompactionMessage from '../../src/vue/chat/ChatCompactionMessage.vue';
+import CodexMessage from '../../src/vue/components/CodexMessage.vue';
+import ChatMessageEditor from '../../src/vue/chat/ChatMessageEditor.vue';
 
-const messages: SurfaceMessage[] = [
-  {
-    id: 'user-1',
-    role: 'user',
-    status: 'complete',
-    parts: [{ type: 'text', text: 'Build a surface' }],
-  },
-  {
-    id: 'assistant-1',
-    role: 'assistant',
-    status: 'streaming',
-    parts: [
-      { type: 'status', text: 'Working' },
-      {
-        type: 'tool',
-        id: 'tool-1',
-        title: 'Inspect repository',
-        status: 'running',
-        output: { files: 12 },
-      },
-    ],
-  },
-];
+const clipboardWriteText = vi.fn();
+
+beforeEach(() => {
+  clipboardWriteText.mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: clipboardWriteText },
+  });
+  vi.stubGlobal('ClipboardItem', undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+function mountMessage(props: Record<string, unknown>) {
+  return mount(CodexMessage, {
+    props: props as never,
+  });
+}
 
 describe('CodexMessage', () => {
-  it('renders safe text, status, tools, and streaming state', () => {
-    const wrapper = mount(CodexMessage, { props: { message: messages[1]! } });
+  it('delegates compaction presentation to the dedicated component', () => {
+    const wrapper = mountMessage({
+      message: { role: 'assistant', content: '', compactionStatus: 'running', type: 'compaction' },
+    });
 
-    expect(wrapper.text()).toContain('Working');
-    expect(wrapper.text()).toContain('Inspect repository');
-    expect(wrapper.text()).toContain('"files": 12');
-    expect(wrapper.attributes('aria-busy')).toBe('true');
-    expect(wrapper.find('[aria-label="Streaming"]').exists()).toBe(true);
+    expect(wrapper.getComponent(ChatCompactionMessage).props()).toMatchObject({
+      completedTitle: 'Context compacted',
+      runningTitle: 'Compacting context',
+      status: 'running',
+    });
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
   });
 
-  it('supports product-specific rendering through typed slots', () => {
-    const wrapper = mount(CodexMessage, {
-      props: { message: messages[0]! },
-      slots: {
-        text: ({ part }: { part: { text: string } }) => `CUSTOM ${part.text}`,
-      },
+  it('renders thinking for empty streaming assistant messages', () => {
+    const wrapper = mountMessage({
+      message: { role: 'assistant', content: '', streaming: true, toolCalls: [] },
     });
-    expect(wrapper.text()).toBe('CUSTOM Build a surface');
+
+    expect(wrapper.text()).toContain('Thinking');
+    expect(wrapper.get('.chat-message__thinking').classes()).toContain('text-shimmer');
   });
 
-  it('renders tool body and string output fallbacks and supports all part slots', () => {
-    const fallback = mount(CodexMessage, {
-      props: {
-        message: {
-          id: 'tools', role: 'assistant', status: 'error', parts: [
-            { type: 'tool', id: 'body', title: 'Body', status: 'failed', statusText: 'Failed', body: 'stderr' },
-            { type: 'tool', id: 'string', title: 'String', status: 'completed', output: 'plain output' },
-          ],
-        },
+  it('renders the thinking shimmer directly from an app-server surface placeholder', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-turn-live',
+        role: 'assistant',
+        status: 'streaming',
+        parts: [],
+        turnId: 'turn-live',
       },
     });
-    expect(fallback.text()).toContain('Failed');
-    expect(fallback.text()).toContain('stderr');
-    expect(fallback.text()).toContain('plain output');
-    expect(fallback.attributes('aria-busy')).toBeUndefined();
 
-    const slotted = mount(CodexMessage, {
-      props: { message: messages[1]! },
-      slots: {
-        status: 'CUSTOM STATUS',
-        tool: 'CUSTOM TOOL',
+    expect(wrapper.get('.chat-message__thinking').text()).toBe('Thinking');
+    expect(wrapper.get('.chat-message__thinking').classes()).toContain('text-shimmer');
+    expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+  });
+
+  it('applies the SDK base markdown styles to rendered messages', () => {
+    const wrapper = mountMessage({
+      message: { role: 'assistant', content: 'Hello **world**' },
+    });
+
+    expect(wrapper.get('.chat-message-block--text').classes()).toContain('codex-markdown');
+  });
+
+  it('hides unsupported user mutation actions while keeping copy and quote', () => {
+    const wrapper = mountMessage({
+      canDeleteMessage: false,
+      canEditMessage: false,
+      index: 0,
+      message: { id: 'user-1', role: 'user', content: 'Inspect the composer.' },
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
+  it('hides unsupported assistant mutation actions while keeping copy', () => {
+    const wrapper = mountMessage({
+      canDeleteMessage: false,
+      canRetryMessage: false,
+      index: 1,
+      message: { id: 'assistant-1', role: 'assistant', content: 'Checking now.' },
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
+  it('routes user actions and editor output through its public events', async () => {
+    const wrapper = mountMessage({
+      index: 2,
+      message: { role: 'user', content: 'Old prompt', createdAt: new Date().toISOString() },
+    });
+
+    await wrapper.find('[aria-label="Quote"]').trigger('click');
+    await wrapper.find('[aria-label="Delete"]').trigger('click');
+    await wrapper.find('[aria-label="Edit"]').trigger('click');
+    wrapper.getComponent(ChatMessageEditor).vm.$emit('save', 'New prompt');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('quote-message')).toStrictEqual([[2]]);
+    expect(wrapper.emitted('delete-message')).toStrictEqual([[2]]);
+    expect(wrapper.emitted('edit-message')).toStrictEqual([[{ content: 'New prompt', index: 2 }]]);
+  });
+
+  it('copies messages without tool markers or follow-up chips', async () => {
+    const wrapper = mountMessage({
+      index: 4,
+      message: {
+        role: 'assistant',
+        content: 'Done.<tool id="tool-1"></tool>\n\n<follow-up>Do another thing</follow-up>',
       },
     });
-    expect(slotted.text()).toContain('CUSTOM STATUS');
-    expect(slotted.text()).toContain('CUSTOM TOOL');
+
+    await wrapper.find('[aria-label="Copy"]').trigger('click');
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('Done.');
+    expect(wrapper.emitted('copy-message')).toStrictEqual([[4]]);
+  });
+
+  it('renders assistant retry actions and reserves them while streaming', async () => {
+    const wrapper = mountMessage({
+      index: 5,
+      message: { role: 'assistant', content: 'Answer', createdAt: new Date().toISOString() },
+    });
+    const streaming = mountMessage({
+      message: { role: 'assistant', content: 'Answer', streaming: true },
+    });
+
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
+    await wrapper.find('[aria-label="Retry"]').trigger('click');
+    await wrapper.find('[aria-label="Delete"]').trigger('click');
+    expect(wrapper.emitted('retry-message')).toStrictEqual([[5]]);
+    expect(wrapper.emitted('delete-message')).toStrictEqual([[5]]);
+    expect(streaming.get('.chat-message__actions').classes()).toContain('chat-message__actions--reserved');
+    expect(streaming.get('.chat-message__actions').attributes('aria-hidden')).toBe('true');
   });
 });

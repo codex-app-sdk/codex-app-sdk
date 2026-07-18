@@ -25,11 +25,7 @@ import { ipcMain } from 'electron';
 import { registerCodexSurfaceIpc } from 'codex-app-sdk/electron';
 import { createCodexSurface } from 'codex-app-sdk/node';
 
-const surface = createCodexSurface({
-  cwd: '/absolute/path/to/project',
-  permissionMode: 'read-only',
-  approvalMode: 'never',
-});
+const surface = createCodexSurface();
 
 const disposeIpc = registerCodexSurfaceIpc(ipcMain, window.webContents, surface);
 ```
@@ -47,48 +43,74 @@ contextBridge.exposeInMainWorld(
 );
 ```
 
-Filesystem roots, sandbox mode, and approval policy are main-process policy.
-The renderer bridge deliberately cannot override them; renderer-created
-conversations may select only a model. The main IPC adapter also strips unknown
-runtime fields before calling the surface.
+The main-process surface loads app-server's model and skill catalogs, permission
+profiles, goals, and persisted threads. Renderer settings updates are validated against that
+catalog before the surface sends typed `thread/settings/update` requests. The
+main IPC adapter strips unknown runtime fields before calling the surface.
 
 Vue binds the bridge to reactive state and uses the SDK conversation pane:
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
 import 'codex-app-sdk/styles.css';
 
 const draft = ref('');
-const { state, connect, sendMessage, interrupt } = useCodexSurface(window.codexSurface);
-void connect();
+const surface = useCodexSurface(window.codexSurface);
+const { state, connect, selectConversation, sendMessage } = surface;
+onMounted(connect);
 </script>
 
 <template>
+  <MyConversationList
+    :conversations="state.conversations"
+    @select="selectConversation"
+  />
   <CodexConversationPane
     v-model="draft"
+    :approvals="state.approvals"
     :busy="state.busy"
+    :context-usage="state.contextUsage"
+    :goal="state.goal"
     :messages="state.messages"
-    @interrupt="interrupt"
+    :models="state.models"
+    :queued-prompts="state.queuedPrompts"
+    :skills="state.skills"
+    @client-response="surface.respondToClientRequest"
+    @delete-message="surface.deleteMessage"
+    @delete-queued-prompt="surface.deleteQueuedPrompt"
+    @edit-message="({ index, content }) => surface.editMessage(index, content)"
+    @interrupt="surface.interrupt"
+    @retry-message="surface.retryMessage"
+    @steer="surface.steerMessage"
+    @steer-queued-prompt="surface.steerQueuedPrompt"
     @submit="sendMessage"
   />
 </template>
 ```
 
 `CodexSurface` exposes stable product operations: connect, list/refresh, create,
-select, send, interrupt, approve/deny, subscribe, and close. With
-`approvalMode: 'ask'`, command, file-change, and permission requests appear as
-serializable `state.approvals` and are answered through `resolveApproval`; apps
-never handle server-request responders. Approval objects include the exact
-requested filesystem/network access and the scopes the server permits, so hosts
-can present an informed and valid choice. The runtime translates persisted history
-and live user, assistant, command, file-change, MCP, reasoning, search, image,
-and agent items into the SDK's serializable surface model.
+select, send/queue/steer, interrupt, update settings, set/clear goals,
+approve/deny/respond, delete/edit/retry, subscribe, and close. `connect()` paginates the global, non-archived app-server thread list
+without applying a cwd filter, then resumes the newest thread so the first
+snapshot already contains the real conversation history. By default the SDK does
+not override app-server's working directory; a host may pass `cwd` explicitly for
+a deliberately project-scoped new conversation. It never restricts conversation
+discovery. `conversationLimit` can explicitly cap the total loaded list. Command,
+file-change, and permission requests appear as serializable `state.approvals`
+and are answered through `resolveApproval`; apps never handle server-request
+responders. Approval objects include the exact requested filesystem/network
+access and the scopes the server permits. The runtime translates persisted
+history and live user, assistant, command, file-change, MCP, plan, search,
+image, compaction, raw response, and agent items into the SDK's serializable
+surface model. Reasoning remains internal while the empty streaming assistant
+placeholder drives the standard Thinking shimmer.
 
-The [basic Electron + Vue sample](./samples/basic) proves the boundary with a
-sample-owned conversation sidebar and an SDK-owned conversation pane. It also
-adds a sample-specific composer menu entry to demonstrate extensibility. Run:
+The [basic Electron + Vue sample](./samples/basic) proves the complete boundary:
+its custom left pane renders the app-server conversation list from the SDK's
+reactive state, while its right pane configures and customizes
+`CodexConversationPane`. It contains no raw app-server or IPC plumbing. Run:
 
 ```bash
 npm run sample:start
@@ -189,10 +211,20 @@ import { CodexComposer, CodexMessageList } from 'codex-app-sdk/vue';
 import 'codex-app-sdk/styles.css';
 ```
 
-`CodexConversationPane` composes message-list, composer, error, header, and empty
-states plus app-owned approval prompts. It forwards header, empty-state,
+`useCodexSurface` is the app-server-backed reactive controller. Applications own
+their shell and list/navigation UI, then bind the controller's state and actions
+to `CodexConversationPane`. The pane composes message-list, composer shelf,
+goals, queued prompts, error, header, and empty states plus app-owned approval
+prompts. It forwards header, empty-state,
 message, approval, composer, and menu slots, and accepts custom composer menu
 entries without requiring a fork.
+
+The SDK stylesheet owns the complete default presentation of every SDK-rendered
+component: typography, spacing, icons, menus, message blocks, composer states,
+and interaction feedback. Host applications own shell and navigation styling,
+plus the content of customization slots. Apps can theme SDK components through
+the documented `--codex-*` variables; the sample does not patch component
+internals.
 
 `CodexComposerMenu` accepts nested action, checkbox, radio, separator, submenu,
 and custom entries. Typed payloads let a host application contribute its own

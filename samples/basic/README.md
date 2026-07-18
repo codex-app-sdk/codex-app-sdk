@@ -1,9 +1,13 @@
 # Basic Codex surface
 
-This runnable Electron + Vue sample has two panes:
+This runnable Electron + Vue sample demonstrates the intended SDK boundary:
 
-- `ConversationSidebar.vue` is sample-owned presentation fed by SDK conversation data.
-- `CodexConversationPane` is imported directly from the SDK and handles messages, composing, interrupting, empty/error states, and extensible composer actions.
+- the custom left pane renders the app-server conversation list exposed by
+  `useCodexSurface`;
+- the right pane uses and customizes the SDK's `CodexConversationPane`;
+- the SDK transport, state, and eventing handle history, streaming, models,
+  reasoning, permissions, goals, skills, plan mode, approvals, app-server user
+  input, message rollback actions, queued prompts, steering, interruption, and sending.
 
 No sample file calls an app-server method or imports a generated protocol type.
 
@@ -14,12 +18,18 @@ npm install
 npm run sample:start
 ```
 
-The sample uses the current directory as its project. Set `CODEX_SAMPLE_CWD` to point it elsewhere:
+For renderer HMR plus automatic Electron reloads when sample or SDK main/preload
+sources change:
 
 ```bash
-CODEX_SAMPLE_CWD=/absolute/path/to/project npm run sample:start
+cd samples/basic
+npm run dev
 ```
 
-The surface defaults to read-only access with no approval prompts. The SDK pane
-already renders and resolves approvals, so change `permissionMode` and
-`approvalMode` in `electron/main.ts` when you want to enable them.
+The sample does not send a cwd override. App-server owns the session working
+directory and the conversation list is loaded globally from the active Codex home.
+
+The renderer contains no raw app-server or IPC glue. `App.vue` binds the typed
+preload API with `useCodexSurface`, owns the two-pane layout, and passes the
+resulting state and actions into the SDK pane. Permission choices are validated
+by the main-process surface against the profiles reported by app-server.

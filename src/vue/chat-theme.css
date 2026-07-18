@@ -1,0 +1,92 @@
+:where(
+  .codex-chat-theme,
+  .codex-conversation-pane,
+  .codex-message-list,
+  .chat-composer,
+  .chat-message
+) {
+  --color-background: var(--codex-background-color, #f9f9f9);
+  --color-text: var(--codex-text-color, #0d0d0d);
+  --color-text-muted: var(--codex-muted-text-color, #666);
+  --color-border: var(--codex-border-color, #dedede);
+  --color-border-strong: var(--codex-strong-border-color, #b0b0b0);
+  --color-error: var(--codex-danger-color, #d5351f);
+  --color-warning: var(--codex-warning-color, #d97708);
+  --color-success: var(--codex-success-color, #079669);
+  --color-primary: var(--codex-primary-color, #1b4fb2);
+  --color-primary-container: var(--codex-primary-container-color, #eff4ff);
+  --color-secondary: var(--codex-secondary-color, #0c72ee);
+  --color-secondary-container: var(--codex-secondary-container-color, #ebf8ff);
+  --color-on-primary: var(--codex-on-primary-color, #fff);
+  --color-on-primary-container: var(--codex-on-primary-container-color, #1e4b97);
+  --color-on-secondary-container: var(--codex-on-secondary-container-color, #1159bc);
+  --color-on-surface: var(--codex-text-color, #0d0d0d);
+  --color-on-surface-variant: var(--codex-muted-text-color, #666);
+  --color-outline: var(--codex-strong-border-color, #b0b0b0);
+  --color-overlay: var(--codex-overlay-color, rgb(15 23 42 / 48%));
+  --color-surface-lowest: var(--codex-surface-color, #fff);
+  --color-surface: var(--codex-app-surface-color, #f9f9f9);
+  --color-surface-base: var(--codex-surface-raised-color, #efefef);
+  --color-surface-low: var(--codex-hover-color, #f4f4f4);
+  --color-surface-high: var(--codex-surface-high-color, #e8e8e8);
+  --color-surface-highest: var(--codex-surface-highest-color, #e0e0e0);
+  --color-shell-main: var(--codex-shell-main-color, #fff);
+  --color-shell-sidebar: var(--codex-shell-sidebar-color, #f4f4f4);
+
+  --font-family-base: var(--codex-font-family, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --font-family-mono: var(--codex-mono-font-family, "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace);
+  --font-size-8: 8px;
+  --font-size-9: 9px;
+  --font-size-10: 10px;
+  --font-size-11: 11px;
+  --font-size-12: 12px;
+  --font-size-13: 13px;
+  --font-size-14: 14px;
+  --font-size-15: 15px;
+  --font-size-16: 16px;
+  --font-size-18: 18px;
+  --font-size-20: 20px;
+  --font-size-24: 24px;
+  --font-weight-xlight: 200;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-16: 16px;
+  --line-height-18: 18px;
+  --line-height-20: 20px;
+  --line-height-22: 22px;
+  --line-height-24: 24px;
+  --line-height-28: 28px;
+  --line-height-32: 32px;
+
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-6: 12px;
+  --space-8: 16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-16: 32px;
+  --space-20: 40px;
+  --space-24: 48px;
+  --space-32: 64px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+  --icon-xl: 24px;
+  --icon-xxl: 32px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 100px;
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 8%);
+  --shadow-md: 0 3px 8px rgb(0 0 0 / 8%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 10%);
+  --shadow-menu: 0 4px 6px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 5%);
+}

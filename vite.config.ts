@@ -1,6 +1,15 @@
 import { fileURLToPath, URL } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
+import packageJson from './package.json' with { type: 'json' };
+
+const packageDependencies = Object.keys(packageJson.dependencies);
+
+function isExternalDependency(id: string): boolean {
+  return id.startsWith('node:')
+    || id === 'vue'
+    || packageDependencies.some((dependency) => id === dependency || id.startsWith(`${dependency}/`));
+}
 
 export default defineConfig({
   plugins: [vue()],
@@ -18,7 +27,7 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      external: [/^node:/, 'vue'],
+      external: isExternalDependency,
       output: {
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',

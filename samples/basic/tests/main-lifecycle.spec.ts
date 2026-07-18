@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const electron = vi.hoisted(() => {
   const appHandlers = new Map<string, () => void>();
@@ -13,6 +13,7 @@ const electron = vi.hoisted(() => {
 
     readonly webContents = { send: vi.fn() };
     readonly loadFile = vi.fn(async () => undefined);
+    readonly loadURL = vi.fn(async () => undefined);
     readonly handlers = new Map<string, () => void>();
 
     constructor(_options: unknown) {
@@ -74,6 +75,8 @@ describe('basic sample main lifecycle', () => {
     electron.reset();
   });
 
+  afterEach(() => vi.unstubAllEnvs());
+
   it('reuses one surface and IPC registration when macOS reopens a window', async () => {
     await import('../electron/main');
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
@@ -83,11 +86,23 @@ describe('basic sample main lifecycle', () => {
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
 
     expect(sdk.createCodexSurface).toHaveBeenCalledOnce();
+    expect(sdk.createCodexSurface).toHaveBeenCalledWith({
+      clientInfo: { name: 'codex_sdk_basic_sample', title: 'Codex SDK Basic Sample', version: '0.1.0' },
+    });
     expect(sdk.registerCodexSurfaceIpc).toHaveBeenCalledOnce();
     expect(electron.windows[0]?.loadFile).toHaveBeenCalledOnce();
 
     electron.appHandlers.get('before-quit')?.();
     expect(sdk.registerCodexSurfaceIpc.mock.results[0]?.value).toHaveBeenCalledOnce();
     expect(sdk.surface.close).toHaveBeenCalledOnce();
+  });
+
+  it('loads the Vite server during development', async () => {
+    vi.stubEnv('CODEX_SAMPLE_RENDERER_URL', 'http://127.0.0.1:5173/');
+    await import('../electron/main');
+    await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
+
+    expect(electron.windows[0]?.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/');
+    expect(electron.windows[0]?.loadFile).not.toHaveBeenCalled();
   });
 });
