@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  codexItemToMediaPart,
   codexItemToSurfaceMessage,
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
 } from '../src/node/codex-conversation-history';
 import type { v2 } from '../src/codex';
+
+const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 describe('codexThreadToSurfaceMessages', () => {
   it('normalizes incomplete history and every persisted user input type', () => {
@@ -94,6 +97,77 @@ describe('codexThreadToSurfaceMessages', () => {
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'enteredReviewMode', id: 'entered', review: 'changes',
     })).toBeNull();
+  });
+
+  it('projects completed generated images as first-class media for restored history', () => {
+    const completed = {
+      type: 'imageGeneration',
+      id: 'generated-image',
+      status: 'completed',
+      revisedPrompt: 'A friendly logistics map',
+      result: pngBase64,
+      savedPath: '/tmp/generated image.png',
+    } as unknown as v2.ThreadItem;
+
+    expect(codexItemToMediaPart(completed)).toStrictEqual({
+      type: 'media',
+      itemId: 'generated-image',
+      media: {
+        url: `data:image/png;base64,${pngBase64}`,
+        alt: 'Generated image',
+        title: 'Generated image',
+        mimeType: 'image/png',
+        prompt: 'A friendly logistics map',
+      },
+    });
+    expect(codexItemToSurfaceMessage('thread', {
+      id: 'turn', status: 'completed', startedAt: 1,
+    }, completed)).toMatchObject({
+      parts: [
+        { type: 'tool', id: 'generated-image', status: 'completed' },
+        {
+          type: 'media', itemId: 'generated-image',
+          media: { url: `data:image/png;base64,${pngBase64}`, prompt: 'A friendly logistics map' },
+        },
+      ],
+    });
+    expect(codexTurnToSurfaceMessages('thread', {
+      id: 'turn', status: 'completed', startedAt: 1, completedAt: 2,
+      items: [
+        completed,
+        { type: 'agentMessage', id: 'agent-after-image', text: 'Here it is.' },
+      ],
+    } as unknown as v2.Turn)[0]?.parts.map((part) => part.type)).toStrictEqual([
+      'tool', 'media', 'text',
+    ]);
+
+    expect(codexItemToMediaPart({
+      ...completed, savedPath: undefined, revisedPrompt: null,
+    } as unknown as v2.ThreadItem)).toMatchObject({
+      media: { url: `data:image/png;base64,${pngBase64}`, mimeType: 'image/png' },
+    });
+    expect(codexItemToMediaPart({
+      ...completed, status: 'inProgress', savedPath: undefined,
+    } as unknown as v2.ThreadItem)).toBeNull();
+    expect(codexItemToMediaPart({
+      ...completed, status: 'failed', savedPath: undefined,
+    } as unknown as v2.ThreadItem)).toBeNull();
+    expect(codexItemToMediaPart({
+      ...completed, result: 'not base64', savedPath: undefined,
+    } as unknown as v2.ThreadItem)).toBeNull();
+    expect(codexItemToMediaPart({
+      ...completed, result: 'aW1hZ2U=', savedPath: undefined,
+    } as unknown as v2.ThreadItem)).toBeNull();
+    expect(codexItemToMediaPart({
+      ...completed, result: '',
+    } as unknown as v2.ThreadItem)).toMatchObject({
+      media: { url: 'file:///tmp/generated%20image.png', mimeType: 'image/png' },
+    });
+    expect(codexItemToMediaPart({
+      ...completed, savedPath: '/tmp/generated.svg',
+    } as unknown as v2.ThreadItem)).toMatchObject({
+      media: { url: `data:image/png;base64,${pngBase64}` },
+    });
   });
   it('translates resumed Codex turns into renderer messages in item order', () => {
     const thread = {

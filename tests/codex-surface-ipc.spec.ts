@@ -9,6 +9,13 @@ import type { CodexSurfaceEvent, CodexSurfaceSnapshot } from '../src/surface';
 
 const snapshot: CodexSurfaceSnapshot = {
   status: 'ready',
+  authentication: {
+    status: 'loaded',
+    account: { type: 'chatgpt', email: 'test@example.test', planType: 'pro' },
+    requiresOpenaiAuth: true,
+    error: null,
+    login: { status: 'idle', loginId: null, authUrl: null, error: null },
+  },
   conversations: [],
   activeConversationId: null,
   messages: [],
@@ -62,6 +69,7 @@ describe('Codex surface Electron bridge', () => {
     const unsubscribeEvents = vi.fn();
     const surface = {
       archiveConversation: vi.fn(async () => snapshot),
+      cancelLogin: vi.fn(async () => snapshot),
       clearGoal: vi.fn(async () => snapshot),
       compactConversation: vi.fn(async () => snapshot),
       connect: vi.fn(async () => snapshot),
@@ -74,7 +82,9 @@ describe('Codex surface Electron bridge', () => {
       interrupt: vi.fn(async () => snapshot),
       listConversations: vi.fn(async () => []),
       listModels: vi.fn(async () => []),
+      logout: vi.fn(async () => snapshot),
       readConversationHistory: vi.fn(async () => history),
+      refreshAccount: vi.fn(async () => snapshot),
       refreshConversations: vi.fn(async () => snapshot),
       renameConversation: vi.fn(async () => snapshot),
       respondToClientRequest: vi.fn(async () => snapshot),
@@ -84,6 +94,9 @@ describe('Codex surface Electron bridge', () => {
       selectConversation: vi.fn(async () => snapshot),
       sendMessage: vi.fn(async () => snapshot),
       startReview: vi.fn(async () => snapshot),
+      startChatGptLogin: vi.fn(async () => ({
+        loginId: 'login-1', authUrl: 'https://auth.example.test/login',
+      })),
       steerMessage: vi.fn(async () => snapshot),
       steerQueuedPrompt: vi.fn(async () => snapshot),
       unarchiveConversation: vi.fn(async () => snapshot),
@@ -101,6 +114,7 @@ describe('Codex surface Electron bridge', () => {
     const dispose = registerCodexSurfaceIpc(main, sender, surface);
     expect([...main.handlers.keys()].sort()).toStrictEqual([
       'codex-surface:archive-conversation',
+      'codex-surface:cancel-login',
       'codex-surface:clear-goal',
       'codex-surface:compact-conversation',
       'codex-surface:connect',
@@ -113,7 +127,9 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:interrupt',
       'codex-surface:list-conversations',
       'codex-surface:list-models',
+      'codex-surface:logout',
       'codex-surface:read-conversation-history',
+      'codex-surface:refresh-account',
       'codex-surface:refresh-conversations',
       'codex-surface:rename-conversation',
       'codex-surface:resolve-approval',
@@ -122,6 +138,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:select-conversation',
       'codex-surface:send-message',
       'codex-surface:set-goal',
+      'codex-surface:start-chatgpt-login',
       'codex-surface:start-review',
       'codex-surface:steer-message',
       'codex-surface:steer-queued-prompt',
@@ -129,15 +146,25 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:update-conversation-settings',
     ]);
     await expect(main.call('codex-surface:archive-conversation', 'thread-archive')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:cancel-login', 'login-1')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:cancel-login')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:clear-goal')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:compact-conversation')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:logout')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:refresh-account')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-chatgpt-login')).resolves.toStrictEqual({
+      loginId: 'login-1', authUrl: 'https://auth.example.test/login',
+    });
     await expect(main.call('codex-surface:create-conversation', {
       model: 'gpt-5',
     })).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', { cwd: '/' })).rejects.toThrow(
       'Conversation options contains unsupported property "cwd"',
     );
+    await expect(main.call('codex-surface:create-conversation', {
+      mcpServers: [{ name: 'renderer', transport: { type: 'http', url: 'http://127.0.0.1/mcp' } }],
+    })).rejects.toThrow('Conversation options contains unsupported property "mcpServers"');
     await expect(main.call('codex-surface:create-conversation')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', {
       reasoningEffort: 'high', approvalPreset: 'approve-for-me',
@@ -410,6 +437,9 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:connect', 'unexpected')).rejects.toThrow(
       'codex-surface:connect received an invalid number of arguments',
     );
+    await expect(main.call('codex-surface:start-chatgpt-login', 'unexpected')).rejects.toThrow(
+      'codex-surface:start-chatgpt-login received an invalid number of arguments',
+    );
     await expect(main.call('codex-surface:send-message')).rejects.toThrow(
       'codex-surface:send-message received an invalid number of arguments',
     );
@@ -424,6 +454,8 @@ describe('Codex surface Electron bridge', () => {
     );
     stateListener?.(snapshot);
     expect(surface.archiveConversation).toHaveBeenCalledWith('thread-archive');
+    expect(surface.cancelLogin).toHaveBeenNthCalledWith(1, 'login-1');
+    expect(surface.cancelLogin).toHaveBeenNthCalledWith(2, undefined);
     expect(surface.connect).toHaveBeenCalledOnce();
     expect(surface.clearGoal).toHaveBeenCalledOnce();
     expect(surface.createConversation).toHaveBeenNthCalledWith(1, {
@@ -439,6 +471,9 @@ describe('Codex surface Electron bridge', () => {
     expect(surface.listConversations).toHaveBeenCalledWith({
       cwd: ['/tmp/a', '/tmp/b'], limit: 20, archived: false, searchTerm: 'SDK',
     });
+    expect(surface.logout).toHaveBeenCalledOnce();
+    expect(surface.refreshAccount).toHaveBeenCalledOnce();
+    expect(surface.startChatGptLogin).toHaveBeenCalledOnce();
     expect(surface.readConversationHistory).toHaveBeenNthCalledWith(1, 'thread-1');
     expect(surface.readConversationHistory).toHaveBeenNthCalledWith(2, undefined);
     expect(surface.refreshConversations).toHaveBeenCalledOnce();
@@ -496,6 +531,7 @@ describe('Codex surface Electron bridge', () => {
     const unsubscribeEvent = api.onEvent(eventListener);
 
     await api.archiveConversation('thread-archive');
+    await api.cancelLogin('login-1');
     await api.connect();
     await api.clearGoal();
     await api.compactConversation();
@@ -507,6 +543,8 @@ describe('Codex surface Electron bridge', () => {
     await api.readConversationHistory('thread-2');
     await api.listConversations({ cwd: '/tmp/project', limit: 10 });
     await api.listModels({ includeHidden: true, forceReload: true });
+    await api.logout();
+    await api.refreshAccount();
     await api.refreshConversations();
     await api.renameConversation('Renamed');
     await api.respondToClientRequest({ id: 'question-1', payload: { answers: {} } });
@@ -515,6 +553,7 @@ describe('Codex surface Electron bridge', () => {
     await api.retryMessage(3);
     await api.selectConversation('thread-2');
     await api.sendMessage('Build it', { model: 'gpt-5' });
+    await api.startChatGptLogin();
     await api.startReview({ target: { type: 'uncommittedChanges' } });
     await api.steerMessage('Keep going');
     await api.steerQueuedPrompt('queued-2');
@@ -530,6 +569,7 @@ describe('Codex surface Electron bridge', () => {
 
     expect(renderer.invoke.mock.calls).toStrictEqual([
       ['codex-surface:archive-conversation', 'thread-archive'],
+      ['codex-surface:cancel-login', 'login-1'],
       ['codex-surface:connect'],
       ['codex-surface:clear-goal'],
       ['codex-surface:compact-conversation'],
@@ -541,6 +581,8 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:read-conversation-history', 'thread-2'],
       ['codex-surface:list-conversations', { cwd: '/tmp/project', limit: 10 }],
       ['codex-surface:list-models', { includeHidden: true, forceReload: true }],
+      ['codex-surface:logout'],
+      ['codex-surface:refresh-account'],
       ['codex-surface:refresh-conversations'],
       ['codex-surface:rename-conversation', 'Renamed'],
       ['codex-surface:respond-to-client-request', { id: 'question-1', payload: { answers: {} } }],
@@ -549,6 +591,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:retry-message', 3],
       ['codex-surface:select-conversation', 'thread-2'],
       ['codex-surface:send-message', 'Build it', { model: 'gpt-5' }],
+      ['codex-surface:start-chatgpt-login'],
       ['codex-surface:start-review', { target: { type: 'uncommittedChanges' } }],
       ['codex-surface:steer-message', 'Keep going'],
       ['codex-surface:steer-queued-prompt', 'queued-2'],

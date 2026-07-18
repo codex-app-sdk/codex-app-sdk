@@ -34,6 +34,7 @@ describe('useCodexSurface', () => {
       void surface.createConversation({ cwd: '/tmp/sdk-project' });
     }
     await surface.archiveConversation('thread-archive');
+    await surface.cancelLogin('login-1');
     await surface.createConversation(conversationOptions);
     await surface.compactConversation();
     await surface.deleteConversation('thread-delete');
@@ -51,6 +52,11 @@ describe('useCodexSurface', () => {
     await surface.unarchiveConversation('thread-unarchive');
     await surface.updateConversationSettings({ modelId: 'gpt-5', planMode: true });
     await surface.interrupt();
+    await surface.logout();
+    await surface.refreshAccount();
+    await expect(surface.startChatGptLogin()).resolves.toStrictEqual({
+      loginId: 'login-1', authUrl: 'https://auth.example.test/login',
+    });
     await surface.refreshConversations();
     await surface.respondToClientRequest({ id: 'question-1', payload: { answers: {} } });
     expect(surface.answeredClientRequestIds.has('question-1')).toBe(true);
@@ -61,6 +67,7 @@ describe('useCodexSurface', () => {
 
     expect(api.onStateChange).toHaveBeenCalledOnce();
     expect(api.archiveConversation).toHaveBeenCalledWith('thread-archive');
+    expect(api.cancelLogin).toHaveBeenCalledWith('login-1');
     expect(api.createConversation).toHaveBeenCalledWith(conversationOptions);
     expect(api.compactConversation).toHaveBeenCalledWith();
     expect(api.deleteConversation).toHaveBeenCalledWith('thread-delete');
@@ -76,6 +83,9 @@ describe('useCodexSurface', () => {
     expect(api.unarchiveConversation).toHaveBeenCalledWith('thread-unarchive');
     expect(api.updateConversationSettings).toHaveBeenCalledWith({ modelId: 'gpt-5', planMode: true });
     expect(api.interrupt).toHaveBeenCalledWith();
+    expect(api.logout).toHaveBeenCalledWith();
+    expect(api.refreshAccount).toHaveBeenCalledWith();
+    expect(api.startChatGptLogin).toHaveBeenCalledWith();
     expect(api.refreshConversations).toHaveBeenCalledWith();
     expect(api.respondToClientRequest).toHaveBeenCalledWith({ id: 'question-1', payload: { answers: {} } });
     expect(api.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
@@ -131,6 +141,13 @@ describe('useCodexSurface', () => {
 
 const readySnapshot: CodexSurfaceSnapshot = {
   status: 'ready',
+  authentication: {
+    status: 'loaded',
+    account: { type: 'chatgpt', email: 'test@example.test', planType: 'pro' },
+    requiresOpenaiAuth: true,
+    error: null,
+    login: { status: 'idle', loginId: null, authUrl: null, error: null },
+  },
   conversations: [],
   activeConversationId: null,
   messages: [],
@@ -165,6 +182,7 @@ function fakeApi(
 ): CodexSurfaceRendererApi & { [key: string]: ReturnType<typeof vi.fn> | unknown } {
   return {
     archiveConversation: vi.fn(async () => readySnapshot),
+    cancelLogin: vi.fn(async () => readySnapshot),
     clearGoal: vi.fn(async () => readySnapshot),
     compactConversation: vi.fn(async () => readySnapshot),
     connect: vi.fn(async () => readySnapshot),
@@ -177,6 +195,7 @@ function fakeApi(
     interrupt: vi.fn(async () => readySnapshot),
     listConversations: vi.fn(async () => []),
     listModels: vi.fn(async () => []),
+    logout: vi.fn(async () => readySnapshot),
     onEvent: vi.fn(() => () => undefined),
     onStateChange: vi.fn(subscribe),
     readConversationHistory: vi.fn(async (conversationId = 'thread-1') => ({
@@ -184,6 +203,7 @@ function fakeApi(
       messages: [],
       threadStatus: null,
     })),
+    refreshAccount: vi.fn(async () => readySnapshot),
     refreshConversations: vi.fn(async () => readySnapshot),
     renameConversation: vi.fn(async () => readySnapshot),
     respondToClientRequest: vi.fn(async (response) => ({
@@ -196,6 +216,9 @@ function fakeApi(
     selectConversation: vi.fn(async () => readySnapshot),
     sendMessage: vi.fn(async () => readySnapshot),
     startReview: vi.fn(async () => readySnapshot),
+    startChatGptLogin: vi.fn(async () => ({
+      loginId: 'login-1', authUrl: 'https://auth.example.test/login',
+    })),
     steerMessage: vi.fn(async () => readySnapshot),
     steerQueuedPrompt: vi.fn(async () => readySnapshot),
     unarchiveConversation: vi.fn(async () => readySnapshot),

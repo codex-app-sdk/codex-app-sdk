@@ -1,5 +1,6 @@
 <template>
   <CodexComposerMenu
+    v-if="menuItems.length > 0"
     class="chat-composer-action-menu__root"
     menu-class="chat-composer-action-menu"
     aria-label="Composer actions"
@@ -105,17 +106,18 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
 
   items.push(...props.items);
 
-  items.push(
-    { id: 'group-attach', type: 'separator' },
-    {
+  if (props.attachEnabled) {
+    if (items.length > 0 && items.at(-1)?.type !== 'separator') {
+      items.push({ id: 'group-attach', type: 'separator' });
+    }
+    items.push({
       id: 'attach',
       type: 'action',
       label: 'Add Files & Photos',
       icon: PaperclipIcon,
-      disabled: !props.attachEnabled,
       payload: { kind: 'attach' },
-    },
-  );
+    });
+  }
 
   return items;
 });
@@ -156,7 +158,6 @@ function isComposerMenuAction(value: unknown): value is ComposerMenuAction {
 <style scoped>
 .chat-composer-action-menu__root {
   --codex-border-color: var(--color-border);
-  --codex-composer-button-size: var(--chat-composer-button-size, 36px);
   --codex-composer-menu-radius: var(--radius-xl);
   --codex-composer-menu-shadow: var(--shadow-menu);
   --codex-hover-color: var(--color-surface-low);
@@ -169,8 +170,8 @@ function isComposerMenuAction(value: unknown): value is ComposerMenuAction {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--chat-composer-button-size, 36px);
-  height: var(--chat-composer-button-size, 36px);
+  width: var(--chat-composer-control-size, 36px);
+  height: var(--chat-composer-control-size, 36px);
   border: 0;
   border-radius: var(--radius-full);
   color: var(--color-text-muted);

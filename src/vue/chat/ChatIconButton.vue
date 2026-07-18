@@ -36,8 +36,8 @@ defineProps<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-12);
-  height: var(--space-12);
+  width: var(--chat-message-action-control-size, var(--space-12));
+  height: var(--chat-message-action-control-size, var(--space-12));
   padding: var(--space-2);
   border: 0;
   border-radius: var(--radius-lg);

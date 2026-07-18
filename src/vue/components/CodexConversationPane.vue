@@ -31,6 +31,7 @@
         :follow-ups-disabled="effectiveFollowUpsDisabled"
         :messages="effectiveMessages"
         :plugins="effectivePlugins"
+        :presentation="effectivePresentation"
         :reset-key="effectiveConversationKey"
         :skills="effectiveSkills"
         @cancel="cancel"
@@ -79,6 +80,7 @@
           <ChatComposerShelf
             class="codex-conversation-pane__composer-shelf"
             :goal="effectiveGoal"
+            :presentation="effectivePresentation.shelf"
             :queued-prompts="effectiveQueuedPrompts"
             :turn-git-diff="effectiveTurnGitDiff"
             @clear-goal="clearGoal"
@@ -134,6 +136,7 @@
             :placeholder="placeholder"
             :approval-preset="effectiveApprovalPreset"
             :plan-mode="effectivePlanMode"
+            :presentation="effectivePresentation"
             :selected-model-id="effectiveSelectedModelId"
             :selected-reasoning-effort="effectiveSelectedReasoningEffort"
             :skill-catalog-status="effectiveSkillCatalogStatus"
@@ -186,6 +189,7 @@ import type {
   ApprovalPreset,
   CodexCapabilities,
   CodexCommandSummary,
+  CodexConversationPresentation,
   CodexModelOption,
   CodexSkillSummary,
   ClientRequestResponse,
@@ -195,6 +199,7 @@ import type {
   ThreadGoal,
   TurnGitDiff,
 } from '../chat/contracts';
+import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands } from '../chat/codex-commands';
 import { codexConversationLinkFromHref } from '../chat/conversation-links';
@@ -250,6 +255,7 @@ const props = withDefaults(defineProps<{
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
   plugins?: readonly CodexSurfacePlugin[];
+  presentation?: CodexConversationPresentation;
   queuedPrompts?: readonly QueuedChatPrompt[];
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
@@ -376,6 +382,7 @@ const effectiveApprovalPreset = computed(() => (
 ));
 const effectivePlanMode = computed(() => props.planMode ?? surfaceState.value?.planMode);
 const effectivePlugins = computed(() => props.plugins ?? surfaceState.value?.plugins);
+const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
 const effectiveQueuedPrompts = computed(() => props.queuedPrompts ?? surfaceState.value?.queuedPrompts ?? []);
 const effectiveSelectedModelId = computed(() => (
   props.selectedModelId !== undefined ? props.selectedModelId : surfaceState.value?.selectedModelId

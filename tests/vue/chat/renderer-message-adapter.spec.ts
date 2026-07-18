@@ -234,6 +234,37 @@ describe('renderer message adapter', () => {
     ]);
   });
 
+  it('preserves generated media as an ordered renderer part', () => {
+    const rendererMessage: SurfaceMessage = {
+      id: 'assistant-generated',
+      parts: [{
+        type: 'media',
+        itemId: 'image-1',
+        media: {
+          url: 'file:///tmp/generated.png',
+          alt: 'Generated image',
+          mimeType: 'image/png',
+          prompt: 'Draw a polished dashboard',
+          title: 'Generated image',
+        },
+      }],
+      role: 'assistant',
+      status: 'complete',
+    };
+
+    expect(surfaceMessageToChatMessage(rendererMessage)).toMatchObject({
+      content: '',
+      parts: [{
+        type: 'media',
+        media: {
+          url: 'file:///tmp/generated.png',
+          prompt: 'Draw a polished dashboard',
+        },
+      }],
+      toolCalls: [],
+    });
+  });
+
   it('preserves ordered user attachments without flattening filenames into editable text', () => {
     const rendererMessage: SurfaceMessage = {
       createdAt: '2026-07-18T00:00:00.000Z',

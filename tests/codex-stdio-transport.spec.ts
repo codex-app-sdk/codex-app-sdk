@@ -74,6 +74,33 @@ describe('CodexAppServerStdioTransport', () => {
     expect(child.stderr.setEncoding).toHaveBeenCalledWith('utf8');
   });
 
+  it('keeps CODEX_HOME isolated per transport and overrides only each child environment', async () => {
+    const firstChild = createFakeChild();
+    const secondChild = createFakeChild();
+    spawnMock.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
+    const inheritedHome = process.env.CODEX_HOME;
+    const discovery = { execFileSync: vi.fn(() => ''), existsSync: vi.fn(() => false) };
+
+    await new CodexAppServerStdioTransport({
+      codexHome: '/tmp/codex-home-a',
+      env: { CODEX_HOME: '/tmp/inherited-a' },
+      executableDiscovery: discovery,
+    }).start();
+    await new CodexAppServerStdioTransport({
+      codexHome: '/tmp/codex-home-b',
+      env: { CODEX_HOME: '/tmp/inherited-b' },
+      executableDiscovery: discovery,
+    }).start();
+
+    expect(spawnMock.mock.calls[0]?.[2]).toMatchObject({
+      env: expect.objectContaining({ CODEX_HOME: '/tmp/codex-home-a' }),
+    });
+    expect(spawnMock.mock.calls[1]?.[2]).toMatchObject({
+      env: expect.objectContaining({ CODEX_HOME: '/tmp/codex-home-b' }),
+    });
+    expect(process.env.CODEX_HOME).toBe(inheritedHome);
+  });
+
   it('frames partial and multiple JSONL messages and reports malformed lines', async () => {
     const child = createFakeChild();
     spawnMock.mockReturnValue(child);

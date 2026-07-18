@@ -1,3 +1,5 @@
+import type { CodexSpeechTranscriptionResult as NativeSpeechTranscriptionResult } from '../../native/types';
+
 export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
 
 export type ReasoningEffort = string;
@@ -86,6 +88,101 @@ export type CodexContextUsage = {
   usedPercent: number | null;
 };
 
+export type CodexComposerPresentation = {
+  actionMenu?: boolean;
+  contextUsage?: boolean;
+  voice?: boolean;
+};
+
+export type CodexComposerShelfPresentation = {
+  goal?: boolean;
+  queuedPrompts?: boolean;
+  turnGitDiff?: boolean;
+};
+
+export type CodexMessageActionsPresentation = {
+  copy?: boolean;
+  delete?: boolean;
+  edit?: boolean;
+  quote?: boolean;
+  retry?: boolean;
+};
+
+export type CodexMessagesPresentation = {
+  actions?: CodexMessageActionsPresentation;
+  toolBlocks?: boolean;
+};
+
+/**
+ * Controls the optional presentation supplied by the default conversation UI.
+ * Omitted values preserve the full SDK experience. This never changes surface
+ * capabilities or the operations available through the surface controller.
+ */
+export type CodexConversationPresentation = {
+  composer?: CodexComposerPresentation;
+  messages?: CodexMessagesPresentation;
+  shelf?: CodexComposerShelfPresentation;
+};
+
+export type ResolvedCodexConversationPresentation = {
+  readonly composer: Readonly<Required<CodexComposerPresentation>>;
+  readonly messages: {
+    readonly actions: Readonly<Required<CodexMessageActionsPresentation>>;
+    readonly toolBlocks: boolean;
+  };
+  readonly shelf: Readonly<Required<CodexComposerShelfPresentation>>;
+};
+
+export const defaultCodexConversationPresentation: ResolvedCodexConversationPresentation = Object.freeze({
+  composer: Object.freeze({
+    actionMenu: true,
+    contextUsage: true,
+    voice: true,
+  }),
+  messages: Object.freeze({
+    actions: Object.freeze({
+      copy: true,
+      delete: true,
+      edit: true,
+      quote: true,
+      retry: true,
+    }),
+    toolBlocks: true,
+  }),
+  shelf: Object.freeze({
+    goal: true,
+    queuedPrompts: true,
+    turnGitDiff: true,
+  }),
+});
+
+export function resolveCodexConversationPresentation(
+  presentation?: CodexConversationPresentation,
+): ResolvedCodexConversationPresentation {
+  return {
+    composer: {
+      actionMenu: presentation?.composer?.actionMenu ?? defaultCodexConversationPresentation.composer.actionMenu,
+      contextUsage: presentation?.composer?.contextUsage ?? defaultCodexConversationPresentation.composer.contextUsage,
+      voice: presentation?.composer?.voice ?? defaultCodexConversationPresentation.composer.voice,
+    },
+    messages: {
+      actions: {
+        copy: presentation?.messages?.actions?.copy ?? defaultCodexConversationPresentation.messages.actions.copy,
+        delete: presentation?.messages?.actions?.delete ?? defaultCodexConversationPresentation.messages.actions.delete,
+        edit: presentation?.messages?.actions?.edit ?? defaultCodexConversationPresentation.messages.actions.edit,
+        quote: presentation?.messages?.actions?.quote ?? defaultCodexConversationPresentation.messages.actions.quote,
+        retry: presentation?.messages?.actions?.retry ?? defaultCodexConversationPresentation.messages.actions.retry,
+      },
+      toolBlocks: presentation?.messages?.toolBlocks ?? defaultCodexConversationPresentation.messages.toolBlocks,
+    },
+    shelf: {
+      goal: presentation?.shelf?.goal ?? defaultCodexConversationPresentation.shelf.goal,
+      queuedPrompts: presentation?.shelf?.queuedPrompts ?? defaultCodexConversationPresentation.shelf.queuedPrompts,
+      turnGitDiff: presentation?.shelf?.turnGitDiff ?? defaultCodexConversationPresentation.shelf.turnGitDiff,
+    },
+  };
+}
+
 export type ToolConfirmationDecision =
   | 'allow'
   | 'allow_conversation'
@@ -151,4 +248,3 @@ export type CodexChatTranscription = (
   audioData: ArrayBuffer,
   options?: { locale?: string },
 ) => Promise<CodexSpeechTranscriptionResult>;
-import type { CodexSpeechTranscriptionResult as NativeSpeechTranscriptionResult } from '../../native/types';

@@ -82,11 +82,12 @@
           :class="{ 'chat-message__actions--reserved': reserveActionSlot }"
           :aria-hidden="reserveActionSlot ? 'true' : undefined"
           :inert="reserveActionSlot ? '' : undefined"
-          :can-delete="canDeleteMessage"
-          :can-edit="canEditMessage"
-          :can-retry="canRetryMessage"
+          :can-delete="canDelete"
+          :can-edit="canEdit"
+          :can-retry="canRetry"
           :copied="copied"
           :message="chatMessage"
+          :presentation="effectivePresentation.messages.actions"
           @copy="copyMessage"
           @delete="deleteMessage"
           @edit="startEdit"
@@ -104,7 +105,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useCodexChatI18n } from '../chat/chat-i18n'
-import type { ClientRequestResponse } from '../chat/contracts'
+import type { ClientRequestResponse, CodexConversationPresentation } from '../chat/contracts'
+import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
 import type { MessageBlock } from '../chat/message-blocks'
@@ -126,6 +128,7 @@ const props = withDefaults(defineProps<{
   index?: number
   message: Message | SurfaceMessage
   plugins?: readonly CodexSurfacePlugin[]
+  presentation?: CodexConversationPresentation
   skills?: readonly CodexSurfaceSkill[]
 }>(), {
   canDeleteMessage: true,
@@ -167,7 +170,10 @@ const emit = defineEmits<{
 
 const { t } = useCodexChatI18n()
 const chatMessage = computed(() => chatMessageFromInput(props.message))
-const blocks = computed(() => computeMessageBlocks(chatMessage.value))
+const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
+const blocks = computed(() => computeMessageBlocks(chatMessage.value).filter((block) => (
+  effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
+)))
 const visibleUserContent = computed(() => stripMessageContext(chatMessage.value.content))
 const copied = ref(false)
 const isEditing = ref(false)
@@ -182,6 +188,9 @@ const reserveActionSlot = computed(() => (
   (chatMessage.value.role === 'assistant' && chatMessage.value.streaming === true)
 ))
 const renderActionSlot = computed(() => showActions.value)
+const canDelete = computed(() => props.canDeleteMessage && effectivePresentation.value.messages.actions.delete)
+const canEdit = computed(() => props.canEditMessage && effectivePresentation.value.messages.actions.edit)
+const canRetry = computed(() => props.canRetryMessage && effectivePresentation.value.messages.actions.retry)
 const hasVisibleAssistantActivity = computed(() => blocks.value.some(isVisibleAssistantBlock))
 const showThinkingIndicator = computed(() => (
   chatMessage.value.role === 'assistant' &&
@@ -194,7 +203,7 @@ const showStreamingDot = computed(() => (
   hasVisibleAssistantActivity.value
 ))
 function startEdit() {
-  if (chatMessage.value.role !== 'user' || !props.canEditMessage) {
+  if (chatMessage.value.role !== 'user' || !canEdit.value) {
     return
   }
 
@@ -211,7 +220,7 @@ function saveEdit(content: string) {
 }
 
 function deleteMessage() {
-  if (!props.canDeleteMessage) {
+  if (!canDelete.value) {
     return
   }
 
@@ -219,7 +228,7 @@ function deleteMessage() {
 }
 
 function retryMessage() {
-  if (!props.canRetryMessage) {
+  if (!canRetry.value) {
     return
   }
 
@@ -376,9 +385,9 @@ onBeforeUnmount(() => {
   align-self: flex-start;
   overflow: hidden;
   padding: var(--space-3) 0;
-  font-size: var(--font-size-15);
+  font-size: var(--chat-message-font-size, var(--font-size-15));
   font-weight: var(--font-weight-light);
-  line-height: var(--line-height-20);
+  line-height: var(--chat-message-line-height, var(--line-height-20));
 }
 
 .chat-message__stream-dot {

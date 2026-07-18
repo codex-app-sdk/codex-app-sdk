@@ -128,11 +128,18 @@ describe('package boundary', () => {
     expect(theme).toContain(':where(.codex-chat-theme)');
     expect(theme).toContain('.codex-chat-theme--dark');
     expect(theme).toContain('.codex-chat-theme--system');
+    expect(theme).toContain('--chat-message-font-size: var(--codex-message-font-size');
+    expect(theme).toContain('--chat-composer-font-size: var(--codex-composer-font-size');
+    expect(theme).toContain('--chat-menu-font-size: var(--codex-menu-font-size');
+    expect(theme).toContain('--chat-composer-control-size: var(--codex-composer-control-size');
+    expect(theme).toContain('--chat-message-action-control-size: var(--codex-message-action-control-size');
     expect(viteConfig).toContain("new URL('./scripts/vue-entry.mjs'");
     expect(vueBuildEntry).toContain("import '../src/vue/styles.css';");
     expect(JSON.parse(packageManifest).scripts.build).toContain('node scripts/verify-package-css.mjs');
     expect(bundleVerifier).toContain("'@media (prefers-color-scheme:dark)'");
     expect(bundleVerifier).toContain("'--font-size-15:15px'");
+    expect(bundleVerifier).toContain("'--codex-message-font-size'");
+    expect(bundleVerifier).toContain("'--codex-composer-control-size'");
 
     const shippedStyles = `${base}\n${theme}`;
     expect(shippedStyles).not.toMatch(/(^|\n)\s*(?:\*|html|body|#app|:root|\.el-)/);

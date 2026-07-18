@@ -26,6 +26,11 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
         type: 'attachment',
         attachment: { ...part.attachment },
       });
+    } else if (part.type === 'media') {
+      parts.push({
+        type: 'media',
+        media: { ...part.media },
+      });
     } else {
       contentParts.push(part.text);
       parts.push({ type: 'text', content: part.text });

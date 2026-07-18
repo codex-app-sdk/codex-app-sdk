@@ -177,6 +177,13 @@ describe('basic sample App', () => {
 
 const snapshot: CodexSurfaceSnapshot = {
   status: 'ready',
+  authentication: {
+    status: 'loaded',
+    account: { type: 'chatgpt', email: 'test@example.test', planType: 'pro' },
+    requiresOpenaiAuth: true,
+    error: null,
+    login: { status: 'idle', loginId: null, authUrl: null, error: null },
+  },
   conversations: [{
     id: 'thread-1',
     title: 'First thread',
@@ -241,6 +248,7 @@ const snapshot: CodexSurfaceSnapshot = {
 function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<typeof vi.fn>> {
   return {
     archiveConversation: vi.fn(async () => snapshot),
+    cancelLogin: vi.fn(async () => snapshot),
     clearGoal: vi.fn(async () => snapshot),
     compactConversation: vi.fn(async () => snapshot),
     connect: vi.fn(async () => snapshot),
@@ -253,6 +261,7 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
     interrupt: vi.fn(async () => snapshot),
     listConversations: vi.fn(async () => snapshot.conversations),
     listModels: vi.fn(async () => snapshot.models),
+    logout: vi.fn(async () => snapshot),
     onEvent: vi.fn(() => vi.fn()),
     onStateChange: vi.fn(() => vi.fn()),
     readConversationHistory: vi.fn(async (conversationId = 'thread-1') => ({
@@ -260,6 +269,7 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
       messages: [],
       threadStatus: null,
     })),
+    refreshAccount: vi.fn(async () => snapshot),
     refreshConversations: vi.fn(async () => snapshot),
     renameConversation: vi.fn(async () => snapshot),
     respondToClientRequest: vi.fn(async () => snapshot),
@@ -269,6 +279,9 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
     selectConversation: vi.fn(async () => ({ ...snapshot, activeConversationId: 'thread-1' })),
     sendMessage: vi.fn(async () => snapshot),
     startReview: vi.fn(async () => snapshot),
+    startChatGptLogin: vi.fn(async () => ({
+      loginId: 'login-1', authUrl: 'https://auth.example.test/login',
+    })),
     steerMessage: vi.fn(async () => snapshot),
     steerQueuedPrompt: vi.fn(async () => snapshot),
     updateConversationSettings: vi.fn(async () => snapshot),

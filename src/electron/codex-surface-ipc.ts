@@ -5,6 +5,7 @@ import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfaceAskUserAnswers,
+  CodexSurfaceChatGptLogin,
   CodexSurfaceClientRequestResponse,
   CodexSurfaceEvent,
   CodexSurfaceJsonValue,
@@ -29,6 +30,7 @@ import {
 
 const channels = {
   archiveConversation: 'codex-surface:archive-conversation',
+  cancelLogin: 'codex-surface:cancel-login',
   clearGoal: 'codex-surface:clear-goal',
   compactConversation: 'codex-surface:compact-conversation',
   connect: 'codex-surface:connect',
@@ -41,7 +43,9 @@ const channels = {
   interrupt: 'codex-surface:interrupt',
   listConversations: 'codex-surface:list-conversations',
   listModels: 'codex-surface:list-models',
+  logout: 'codex-surface:logout',
   readConversationHistory: 'codex-surface:read-conversation-history',
+  refreshAccount: 'codex-surface:refresh-account',
   refreshConversations: 'codex-surface:refresh-conversations',
   renameConversation: 'codex-surface:rename-conversation',
   respondToClientRequest: 'codex-surface:respond-to-client-request',
@@ -51,6 +55,7 @@ const channels = {
   selectConversation: 'codex-surface:select-conversation',
   sendMessage: 'codex-surface:send-message',
   startReview: 'codex-surface:start-review',
+  startChatGptLogin: 'codex-surface:start-chatgpt-login',
   steerMessage: 'codex-surface:steer-message',
   steerQueuedPrompt: 'codex-surface:steer-queued-prompt',
   unarchiveConversation: 'codex-surface:unarchive-conversation',
@@ -61,6 +66,7 @@ const channels = {
 
 type SurfaceRequests = {
   [channels.archiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
+  [channels.cancelLogin]: IpcRequest<[loginId?: string], CodexSurfaceSnapshot>;
   [channels.clearGoal]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.compactConversation]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.connect]: IpcRequest<[], CodexSurfaceSnapshot>;
@@ -75,7 +81,9 @@ type SurfaceRequests = {
     options?: ListCodexConversationsOptions,
   ], CodexConversationSummary[]>;
   [channels.listModels]: IpcRequest<[options?: ListCodexModelsOptions], CodexSurfaceModel[]>;
+  [channels.logout]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.readConversationHistory]: IpcRequest<[conversationId?: string], CodexConversationHistory>;
+  [channels.refreshAccount]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.refreshConversations]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.renameConversation]: IpcRequest<[title: string], CodexSurfaceSnapshot>;
   [channels.respondToClientRequest]: IpcRequest<[response: CodexSurfaceClientRequestResponse], CodexSurfaceSnapshot>;
@@ -89,6 +97,7 @@ type SurfaceRequests = {
   [channels.selectConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.sendMessage]: IpcRequest<[prompt: string, options?: SendCodexMessageOptions], CodexSurfaceSnapshot>;
   [channels.startReview]: IpcRequest<[options?: StartCodexReviewOptions], CodexSurfaceSnapshot>;
+  [channels.startChatGptLogin]: IpcRequest<[], CodexSurfaceChatGptLogin>;
   [channels.steerMessage]: IpcRequest<[prompt: string], CodexSurfaceSnapshot>;
   [channels.steerQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
   [channels.unarchiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
@@ -107,6 +116,7 @@ export function registerCodexSurfaceIpc(
   sender: IpcEventSender,
   surface: Pick<CodexSurface,
     | 'archiveConversation'
+    | 'cancelLogin'
     | 'clearGoal'
     | 'compactConversation'
     | 'connect'
@@ -119,9 +129,11 @@ export function registerCodexSurfaceIpc(
     | 'interrupt'
     | 'listConversations'
     | 'listModels'
+    | 'logout'
     | 'onEvent'
     | 'onStateChange'
     | 'readConversationHistory'
+    | 'refreshAccount'
     | 'refreshConversations'
     | 'renameConversation'
     | 'respondToClientRequest'
@@ -131,6 +143,7 @@ export function registerCodexSurfaceIpc(
     | 'selectConversation'
     | 'sendMessage'
     | 'startReview'
+    | 'startChatGptLogin'
     | 'steerMessage'
     | 'steerQueuedPrompt'
     | 'unarchiveConversation'
@@ -139,6 +152,9 @@ export function registerCodexSurfaceIpc(
   const unregisterHandlers = registerIpcMainHandlers<SurfaceRequests>(strictArityPort(port), {
     [channels.archiveConversation]: (_event, conversationId) => (
       surface.archiveConversation(nonEmptyString(conversationId, 'Conversation id'))
+    ),
+    [channels.cancelLogin]: (_event, loginId) => surface.cancelLogin(
+      optionalNonEmptyString(loginId, 'Login id'),
     ),
     [channels.clearGoal]: () => surface.clearGoal(),
     [channels.compactConversation]: () => surface.compactConversation(),
@@ -159,9 +175,11 @@ export function registerCodexSurfaceIpc(
       rendererListConversationsOptions(options),
     ),
     [channels.listModels]: (_event, options) => surface.listModels(rendererListModelsOptions(options)),
+    [channels.logout]: () => surface.logout(),
     [channels.readConversationHistory]: (_event, conversationId) => (
       surface.readConversationHistory(optionalNonEmptyString(conversationId, 'Conversation id'))
     ),
+    [channels.refreshAccount]: () => surface.refreshAccount(),
     [channels.refreshConversations]: () => surface.refreshConversations(),
     [channels.renameConversation]: (_event, title) => surface.renameConversation(nonEmptyString(title, 'Conversation title')),
     [channels.respondToClientRequest]: (_event, response) => surface.respondToClientRequest(clientRequestResponse(response)),
@@ -182,6 +200,7 @@ export function registerCodexSurfaceIpc(
       rendererSendOptions(options),
     ),
     [channels.startReview]: (_event, options) => surface.startReview(rendererReviewOptions(options)),
+    [channels.startChatGptLogin]: () => surface.startChatGptLogin(),
     [channels.steerMessage]: (_event, prompt) => surface.steerMessage(nonEmptyString(prompt, 'Steer prompt')),
     [channels.steerQueuedPrompt]: (_event, promptId) => surface.steerQueuedPrompt(nonEmptyString(promptId, 'Queued prompt id')),
     [channels.unarchiveConversation]: (_event, conversationId) => (
@@ -556,6 +575,7 @@ function isJsonValue(value: unknown, seen = new Set<object>()): value is CodexSu
 
 const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, maximum: number]> = {
   [channels.archiveConversation]: [1, 1],
+  [channels.cancelLogin]: [0, 1],
   [channels.clearGoal]: [0, 0],
   [channels.compactConversation]: [0, 0],
   [channels.connect]: [0, 0],
@@ -568,7 +588,9 @@ const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, m
   [channels.interrupt]: [0, 0],
   [channels.listConversations]: [0, 1],
   [channels.listModels]: [0, 1],
+  [channels.logout]: [0, 0],
   [channels.readConversationHistory]: [0, 1],
+  [channels.refreshAccount]: [0, 0],
   [channels.refreshConversations]: [0, 0],
   [channels.renameConversation]: [1, 1],
   [channels.respondToClientRequest]: [1, 1],
@@ -578,6 +600,7 @@ const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, m
   [channels.selectConversation]: [1, 1],
   [channels.sendMessage]: [1, 2],
   [channels.startReview]: [0, 1],
+  [channels.startChatGptLogin]: [0, 0],
   [channels.steerMessage]: [1, 1],
   [channels.steerQueuedPrompt]: [1, 1],
   [channels.unarchiveConversation]: [1, 1],
@@ -603,6 +626,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
   const renderer = new TypedIpcRenderer<SurfaceRequests, SurfaceEvents>(port);
   return {
     archiveConversation: (conversationId) => renderer.invoke(channels.archiveConversation, conversationId),
+    cancelLogin: (loginId) => renderer.invoke(channels.cancelLogin, loginId),
     clearGoal: () => renderer.invoke(channels.clearGoal),
     compactConversation: () => renderer.invoke(channels.compactConversation),
     connect: () => renderer.invoke(channels.connect),
@@ -615,9 +639,11 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     interrupt: () => renderer.invoke(channels.interrupt),
     listConversations: (options) => renderer.invoke(channels.listConversations, options),
     listModels: (options) => renderer.invoke(channels.listModels, options),
+    logout: () => renderer.invoke(channels.logout),
     onEvent: (listener) => renderer.on(channels.event, listener),
     onStateChange: (listener) => renderer.on(channels.stateChanged, listener),
     readConversationHistory: (conversationId) => renderer.invoke(channels.readConversationHistory, conversationId),
+    refreshAccount: () => renderer.invoke(channels.refreshAccount),
     refreshConversations: () => renderer.invoke(channels.refreshConversations),
     renameConversation: (title) => renderer.invoke(channels.renameConversation, title),
     respondToClientRequest: (response) => renderer.invoke(channels.respondToClientRequest, response),
@@ -627,6 +653,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     selectConversation: (conversationId) => renderer.invoke(channels.selectConversation, conversationId),
     sendMessage: (prompt, options) => renderer.invoke(channels.sendMessage, prompt, options),
     startReview: (options) => renderer.invoke(channels.startReview, options),
+    startChatGptLogin: () => renderer.invoke(channels.startChatGptLogin),
     steerMessage: (prompt) => renderer.invoke(channels.steerMessage, prompt),
     steerQueuedPrompt: (promptId) => renderer.invoke(channels.steerQueuedPrompt, promptId),
     unarchiveConversation: (conversationId) => renderer.invoke(channels.unarchiveConversation, conversationId),

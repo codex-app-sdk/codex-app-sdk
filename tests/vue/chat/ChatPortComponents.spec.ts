@@ -243,6 +243,34 @@ describe('ported id8 chat components', () => {
     expect(wrapper.text()).toContain('-23');
   });
 
+  it('independently controls the default composer shelf sections', async () => {
+    const wrapper = mount(ChatComposerShelf, {
+      props: {
+        goal: {
+          threadId: 'thread-1', objective: 'Ship it', status: 'active', tokenBudget: null,
+          tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0,
+        },
+        presentation: { goal: false, queuedPrompts: true, turnGitDiff: false },
+        queuedPrompts: [{ id: 'prompt-1', text: 'Run the tests' }],
+        turnGitDiff: {
+          turnId: 'turn-1', addedLines: 5, removedLines: 2, updatedAt: '2026-06-11T10:00:00.000Z',
+        },
+      },
+    });
+
+    expect(wrapper.find('.chat-queued-prompts').exists()).toBe(true);
+    expect(wrapper.find('.chat-goal').exists()).toBe(false);
+    expect(wrapper.find('.chat-turn-git-info').exists()).toBe(false);
+
+    await wrapper.setProps({ presentation: { goal: true, queuedPrompts: false, turnGitDiff: true } });
+    expect(wrapper.find('.chat-queued-prompts').exists()).toBe(false);
+    expect(wrapper.find('.chat-goal').exists()).toBe(true);
+    expect(wrapper.find('.chat-turn-git-info').exists()).toBe(true);
+
+    await wrapper.setProps({ presentation: { goal: false, queuedPrompts: false, turnGitDiff: false } });
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+  });
+
   it('renders collapsible tool calls with params and result', async () => {
     const wrapper = mount(ChatToolCall, {
       props: {

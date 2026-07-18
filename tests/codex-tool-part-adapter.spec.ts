@@ -464,7 +464,7 @@ describe('tool-part-adapter', () => {
     });
     expect(codexThreadItemToToolPart({
       type: 'imageGeneration', id: 'image-result', status: 'success', result: 'inline-image',
-    })).toMatchObject({ status: 'completed', body: undefined, output: 'inline-image' });
+    })).toMatchObject({ status: 'completed', body: undefined, output: undefined });
     expect(codexThreadItemToToolPart({
       type: 'webSearch', id: 'web-default', query: '   ', action: { type: 'openPage' },
     })).toMatchObject({ body: 'web search', input: { type: 'openPage' } });

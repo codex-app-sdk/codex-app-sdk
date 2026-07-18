@@ -124,6 +124,27 @@ describe('message block computation', () => {
     ]);
   });
 
+  it('keeps first-class generated media independent from technical tool blocks', () => {
+    const media = {
+      url: 'file:///tmp/generated.png',
+      mimeType: 'image/png',
+      prompt: 'Draw a route map',
+      title: 'Generated image',
+    };
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '',
+      parts: [
+        { type: 'tool', toolCall: completedTool },
+        { type: 'media', media },
+      ],
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'tool-group', toolCalls: [completedTool] },
+      { type: 'media', media },
+    ]);
+  });
+
   it('keeps user text and attachment previews in their original order', () => {
     const image = {
       kind: 'image' as const,

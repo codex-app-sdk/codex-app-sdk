@@ -51,14 +51,15 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   align-items: center;
   gap: var(--codex-space-3, 6px);
   width: 100%;
+  min-height: var(--chat-menu-control-min-height, 26px);
   padding: 4px 8px;
   border: 0;
   border-radius: var(--codex-composer-menu-item-radius, 12px);
   color: inherit;
   background: transparent;
   font-family: inherit;
-  font-size: var(--codex-composer-menu-item-font-size, 14px);
-  line-height: 18px;
+  font-size: var(--codex-composer-menu-item-font-size, var(--chat-menu-font-size, 14px));
+  line-height: var(--chat-menu-line-height, 18px);
   text-align: left;
   cursor: pointer;
 }
@@ -105,7 +106,7 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 .codex-composer-menu-list__description,
 .codex-composer-menu-list__value {
   color: var(--codex-muted-text-color, var(--color-text-muted, #666));
-  font-size: var(--codex-composer-menu-description-font-size, 12px);
+  font-size: var(--codex-composer-menu-description-font-size, var(--chat-menu-description-font-size, 12px));
 }
 
 .codex-composer-menu-list__value {

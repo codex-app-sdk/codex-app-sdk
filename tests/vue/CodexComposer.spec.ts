@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import CodexComposer from '../../src/vue/components/CodexComposer.vue';
 import { codexCommands } from '../../src/vue/chat/codex-commands';
-import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../../src/vue/chat/contracts';
+import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../../src/vue/chat/contracts';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
@@ -221,6 +221,41 @@ describe('ChatComposer', () => {
     expect(wrapper.find('.chat-context-usage').exists()).toBe(true);
     expect(wrapper.find('.chat-context-usage').attributes('title')).toBeUndefined();
     expect(wrapper.find('.chat-context-usage__popover').text()).toContain('25% used (75% left)');
+  });
+
+  it('hides unavailable voice input and supports a minimal composer presentation', () => {
+    const contextUsage: CodexContextUsage = {
+      totalTokens: 50_000,
+      inputTokens: 40_000,
+      cachedInputTokens: 10_000,
+      outputTokens: 8_000,
+      reasoningOutputTokens: 2_000,
+      lastTotalTokens: 50_000,
+      modelContextWindow: 200_000,
+      usedPercent: 25,
+    };
+    const unavailable = mountComposer({ contextUsage });
+    const full = mountComposer({
+      contextUsage,
+      transcribeAudio: vi.fn(async () => ({ text: 'hello' })),
+    });
+    const minimal = mountComposer({
+      contextUsage,
+      presentation: {
+        composer: { actionMenu: false, contextUsage: false, voice: false },
+      },
+      transcribeAudio: vi.fn(async () => ({ text: 'hello' })),
+    });
+
+    expect(unavailable.find('.chat-composer__voice').exists()).toBe(false);
+    expect(full.find('.chat-composer-action-menu__root').exists()).toBe(true);
+    expect(full.find('.chat-context-usage').exists()).toBe(true);
+    expect(full.find('.chat-composer__voice').exists()).toBe(true);
+    expect(minimal.find('.chat-composer-action-menu__root').exists()).toBe(false);
+    expect(minimal.find('.chat-context-usage').exists()).toBe(false);
+    expect(minimal.find('.chat-composer__voice').exists()).toBe(false);
+    expect(minimal.find('textarea').exists()).toBe(true);
+    expect(minimal.find('.chat-composer__send').exists()).toBe(true);
   });
 
   it('opens a dollar skill menu, filters skills, and inserts the selected skill', async () => {
@@ -440,6 +475,7 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
   commands: readonly CodexCommandSummary[];
   models: CodexModelOption[];
   planMode: boolean;
+  presentation: CodexConversationPresentation;
   selectedModelId: string;
   selectedReasoningEffort: string;
   files: CodexFileSearchItem[];

@@ -169,6 +169,75 @@ describe('CodexMessage', () => {
     expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
   });
 
+  it('combines message capabilities with presentation action visibility', () => {
+    const wrapper = mountMessage({
+      canDeleteMessage: false,
+      canEditMessage: true,
+      message: { id: 'user-1', role: 'user', content: 'Inspect the composer.' },
+      presentation: {
+        messages: {
+          actions: { copy: false, delete: true, edit: false, quote: false, retry: true },
+        },
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
+  it('suppresses tool blocks without removing neighboring assistant content', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-tools',
+        role: 'assistant',
+        content: 'Before.<tool id="tool-1"></tool>After.',
+        toolCalls: [{
+          args: {}, done: true, function: 'shell', id: 'tool-1', result: 'ok', state: 'completed',
+        }],
+      },
+      presentation: { messages: { toolBlocks: false } },
+    });
+
+    expect(wrapper.text()).toContain('Before.');
+    expect(wrapper.text()).toContain('After.');
+    expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+    expect(wrapper.find('.chat-tool-group').exists()).toBe(false);
+  });
+
+  it('keeps generated media visible when technical tool blocks are suppressed', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-generated',
+        role: 'assistant',
+        status: 'complete',
+        parts: [
+          {
+            type: 'tool', id: 'image-1', kind: 'dynamic', title: 'image_generation',
+            status: 'completed',
+          },
+          {
+            type: 'media', itemId: 'image-1',
+            media: {
+              url: 'data:image/png;base64,aW1hZ2U=',
+              mimeType: 'image/png',
+              prompt: 'Draw a route map',
+              title: 'Generated image',
+            },
+          },
+        ],
+      },
+      presentation: { messages: { toolBlocks: false } },
+    });
+
+    expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+    expect(wrapper.find('.chat-tool-group').exists()).toBe(false);
+    expect(wrapper.get('.chat-media-block__image').attributes('src'))
+      .toBe('data:image/png;base64,aW1hZ2U=');
+    expect(wrapper.text()).toContain('Generated image');
+  });
+
   it('routes user actions and editor output through its public events', async () => {
     const wrapper = mountMessage({
       index: 2,

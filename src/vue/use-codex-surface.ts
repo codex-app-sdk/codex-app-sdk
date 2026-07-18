@@ -17,6 +17,13 @@ import type {
 
 const initialState: CodexSurfaceSnapshot = {
   status: 'idle',
+  authentication: {
+    status: 'notLoaded',
+    account: null,
+    requiresOpenaiAuth: null,
+    error: null,
+    login: { status: 'idle', loginId: null, authUrl: null, error: null },
+  },
   conversations: [],
   activeConversationId: null,
   messages: [],
@@ -90,6 +97,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
       return () => eventListeners.delete(listener);
     },
     archiveConversation: (conversationId: string) => run(() => api.archiveConversation(conversationId)),
+    cancelLogin: (loginId?: string) => run(() => api.cancelLogin(loginId)),
     clearGoal: () => run(() => api.clearGoal()),
     compactConversation: () => run(() => api.compactConversation()),
     connect: () => {
@@ -104,9 +112,11 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     interrupt: () => run(() => api.interrupt()),
     listConversations: (options?: ListCodexConversationsOptions) => api.listConversations(options),
     listModels: (options?: ListCodexModelsOptions) => api.listModels(options),
+    logout: () => run(() => api.logout()),
     readConversationHistory: (conversationId?: string): Promise<CodexConversationHistory> => (
       api.readConversationHistory(conversationId)
     ),
+    refreshAccount: () => run(() => api.refreshAccount()),
     refreshConversations: () => run(() => api.refreshConversations()),
     renameConversation: (title: string) => run(() => api.renameConversation(title)),
     respondToClientRequest: (response: CodexSurfaceClientRequestResponse) => {
@@ -123,6 +133,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     selectConversation: (conversationId: string) => run(() => api.selectConversation(conversationId)),
     sendMessage: (prompt: string, options?: SendCodexMessageOptions) => run(() => api.sendMessage(prompt, options)),
     startReview: (options?: StartCodexReviewOptions) => run(() => api.startReview(options)),
+    startChatGptLogin: () => api.startChatGptLogin(),
     steerMessage: (prompt: string) => run(() => api.steerMessage(prompt)),
     steerQueuedPrompt: (promptId: string) => run(() => api.steerQueuedPrompt(promptId)),
     unarchiveConversation: (conversationId: string) => run(() => api.unarchiveConversation(conversationId)),

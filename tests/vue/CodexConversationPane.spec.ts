@@ -457,6 +457,66 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('openLink')).toBeUndefined();
   });
 
+  it('routes a minimal presentation through messages, shelf, and composer', () => {
+    const toolSlot = vi.fn(() => h('div', { class: 'custom-tool' }, 'Custom tool'));
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        contextUsage: {
+          cachedInputTokens: 10_000,
+          inputTokens: 40_000,
+          lastTotalTokens: 50_000,
+          modelContextWindow: 200_000,
+          outputTokens: 8_000,
+          reasoningOutputTokens: 2_000,
+          totalTokens: 50_000,
+          usedPercent: 25,
+        },
+        goal: {
+          threadId: 'thread-1', objective: 'Ship it', status: 'active', tokenBudget: null,
+          tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0,
+        },
+        messages: [{
+          id: 'assistant-tools',
+          role: 'assistant',
+          content: 'Visible before.<tool id="tool-1"></tool>Visible after.',
+          toolCalls: [{
+            args: {}, done: true, function: 'shell', id: 'tool-1', result: 'ok', state: 'completed',
+          }],
+        }],
+        modelValue: '',
+        presentation: {
+          composer: { actionMenu: false, contextUsage: false, voice: false },
+          shelf: { goal: false, queuedPrompts: false, turnGitDiff: false },
+          messages: {
+            actions: { copy: false, delete: false, edit: false, quote: false, retry: false },
+            toolBlocks: false,
+          },
+        },
+        queuedPrompts: [{ id: 'prompt-1', text: 'Run the tests' }],
+        transcribeAudio: vi.fn(async () => ({ text: 'hello' })),
+        turnGitDiff: {
+          turnId: 'turn-1', addedLines: 5, removedLines: 2, updatedAt: '2026-06-11T10:00:00.000Z',
+        },
+      },
+      slots: { 'message-tool': toolSlot },
+    });
+
+    expect(wrapper.text()).toContain('Visible before.');
+    expect(wrapper.text()).toContain('Visible after.');
+    expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+    expect(wrapper.find('.chat-tool-group').exists()).toBe(false);
+    expect(toolSlot).not.toHaveBeenCalled();
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer-action-menu__root').exists()).toBe(false);
+    expect(wrapper.find('.chat-context-usage').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer__voice').exists()).toBe(false);
+    expect(wrapper.find('textarea').exists()).toBe(true);
+    expect(wrapper.find('.chat-composer__send').exists()).toBe(true);
+  });
+
   it('passes typed message tool and action slots through the whole pane', () => {
     const wrapper = mount(CodexConversationPane, {
       props: {
@@ -481,6 +541,13 @@ describe('CodexConversationPane', () => {
 function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurfaceSnapshot } {
   const state = reactive<CodexSurfaceSnapshot>({
     status: 'idle',
+    authentication: {
+      status: 'notLoaded',
+      account: null,
+      requiresOpenaiAuth: null,
+      error: null,
+      login: { status: 'idle', loginId: null, authUrl: null, error: null },
+    },
     conversations: [],
     activeConversationId: null,
     messages: [],

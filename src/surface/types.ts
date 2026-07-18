@@ -22,6 +22,20 @@ export type SurfaceMessageAttachmentPart = {
   attachment: SurfaceMessageAttachment;
 };
 
+export type SurfaceMessageMedia = {
+  url: string;
+  alt?: string;
+  mimeType?: string;
+  prompt?: string;
+  title?: string;
+};
+
+export type SurfaceMessageMediaPart = {
+  type: 'media';
+  media: SurfaceMessageMedia;
+  itemId?: string;
+};
+
 export type SurfaceMessageToolPart = {
   type: 'tool';
   id: string;
@@ -51,6 +65,7 @@ export type SurfaceMessageToolPartUpdate = {
 
 export type SurfaceMessagePart =
   | SurfaceMessageAttachmentPart
+  | SurfaceMessageMediaPart
   | SurfaceMessageTextPart
   | SurfaceMessageStatusPart
   | SurfaceMessageToolPart;
@@ -313,8 +328,47 @@ export type CodexSurfaceRateLimits = {
 
 export type CodexSurfaceStatus = 'idle' | 'connecting' | 'ready' | 'error';
 
+export type CodexSurfaceAccount =
+  | { type: 'apiKey' }
+  | { type: 'chatgpt'; email: string | null; planType: string }
+  | { type: 'amazonBedrock'; credentialSource: 'codexManaged' | 'awsManaged' };
+
+export type CodexSurfaceLoginStatus =
+  | 'idle'
+  | 'starting'
+  | 'pending'
+  | 'completed'
+  | 'cancelled'
+  | 'error';
+
+export type CodexSurfaceLoginState = {
+  status: CodexSurfaceLoginStatus;
+  loginId: string | null;
+  authUrl: string | null;
+  error: string | null;
+};
+
+/**
+ * Protocol-free projection of `account/read` plus the active managed login.
+ * `requiresOpenaiAuth` deliberately preserves the app-server field; signed-out
+ * hosts should check for a loaded `account === null && requiresOpenaiAuth`.
+ */
+export type CodexSurfaceAuthentication = {
+  status: CodexSurfaceCatalogStatus;
+  account: CodexSurfaceAccount | null;
+  requiresOpenaiAuth: boolean | null;
+  error: string | null;
+  login: CodexSurfaceLoginState;
+};
+
+export type CodexSurfaceChatGptLogin = {
+  loginId: string;
+  authUrl: string;
+};
+
 export type CodexSurfaceSnapshot = {
   status: CodexSurfaceStatus;
+  authentication: CodexSurfaceAuthentication;
   conversations: CodexConversationSummary[];
   activeConversationId: string | null;
   messages: SurfaceMessage[];
@@ -395,6 +449,9 @@ export type CodexSurfaceEvent =
   | CodexSurfaceEventEnvelope<'surface.statusChanged', {
     status: CodexSurfaceStatus;
     error: string | null;
+  }>
+  | CodexSurfaceEventEnvelope<'authentication.changed', {
+    authentication: CodexSurfaceAuthentication;
   }>
   | CodexSurfaceEventEnvelope<'catalog.modelsChanged', {
     models: readonly CodexSurfaceModel[];
@@ -628,6 +685,10 @@ export type UpdateCodexConversationSettings = {
 
 export type CodexSurfaceApi = {
   connect(): Promise<CodexSurfaceSnapshot>;
+  refreshAccount(): Promise<CodexSurfaceSnapshot>;
+  startChatGptLogin(): Promise<CodexSurfaceChatGptLogin>;
+  cancelLogin(loginId?: string): Promise<CodexSurfaceSnapshot>;
+  logout(): Promise<CodexSurfaceSnapshot>;
   clearGoal(): Promise<CodexSurfaceSnapshot>;
   refreshConversations(): Promise<CodexSurfaceSnapshot>;
   listConversations(options?: ListCodexConversationsOptions): Promise<CodexConversationSummary[]>;

@@ -116,6 +116,23 @@ describe('ChatComposerActionMenu', () => {
 
     expect(wrapper.emitted('attach')).toStrictEqual([[]]);
   });
+
+  it('renders no action-menu root when every menu source is empty', () => {
+    const wrapper = mountMenu({ attachEnabled: false, showPlanMode: false });
+
+    expect(wrapper.find('.chat-composer-action-menu__root').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer-action-menu__button').exists()).toBe(false);
+  });
+
+  it('omits the attachment item and its separator when attachments are unavailable', async () => {
+    const wrapper = mountMenu({ attachEnabled: false, showPlanMode: true });
+
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+
+    expect(wrapper.text()).toContain('Plan mode');
+    expect(wrapper.text()).not.toContain('Add Files & Photos');
+    expect(wrapper.find('.codex-composer-menu-list__separator').exists()).toBe(false);
+  });
 });
 
 function mountMenu(props: Partial<{
@@ -126,6 +143,7 @@ function mountMenu(props: Partial<{
   items: { id: string; type: 'custom'; label: string; payload: { source: string } }[];
   planMode: boolean;
   showApprovalMenu: boolean;
+  showPlanMode: boolean;
 }> = {}) {
   return mount(ChatComposerActionMenu, {
     props: {

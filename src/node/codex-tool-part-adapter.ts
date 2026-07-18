@@ -135,7 +135,7 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
       input: {
         revisedPrompt: item.revisedPrompt,
       },
-      output: item.savedPath ?? item.result,
+      output: item.savedPath,
       metadata: {
         savedPath: item.savedPath,
       },

@@ -32,6 +32,9 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
         if (part.type === 'attachment') {
           return [{ type: 'attachment', attachment: part.attachment }]
         }
+        if (part.type === 'media') {
+          return [{ type: 'media', media: part.media }]
+        }
         if (part.type === 'text') {
           const content = stripMessageContext(part.content)
           return content ? [{ type: 'user-text', content }] : []
@@ -75,6 +78,11 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
 
     if (part.type === 'attachment') {
       blocks.push({ type: 'attachment', attachment: part.attachment })
+      continue
+    }
+
+    if (part.type === 'media') {
+      blocks.push({ type: 'media', media: part.media })
       continue
     }
 

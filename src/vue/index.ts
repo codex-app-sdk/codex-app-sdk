@@ -42,6 +42,10 @@ export { default as CodexTurnGitInfo } from './chat/ChatTurnGitInfo.vue';
 export { default as CodexUserText } from './chat/ChatUserText.vue';
 export { codexCapabilities } from './chat/codex-capabilities';
 export { codexCommands } from './chat/codex-commands';
+export {
+  defaultCodexConversationPresentation,
+  resolveCodexConversationPresentation,
+} from './chat/contracts';
 export { approvalPresetOptions, defaultApprovalPreset, isApprovalPreset } from './chat/approval-presets';
 export { defaultCodexChatTranslate, provideCodexChatTranslate } from './chat/chat-i18n';
 export {
@@ -76,6 +80,9 @@ export type {
 } from './composer-menu';
 export type {
   CodexContextUsage,
+  CodexComposerPresentation,
+  CodexComposerShelfPresentation,
+  CodexConversationPresentation,
   CodexConversationLink,
   CodexFileSearchItem,
   CodexSpeechTranscriptionResult,
@@ -86,12 +93,15 @@ export type {
   CodexCapabilities,
   CodexCommandSummary,
   CodexModelOption,
+  CodexMessageActionsPresentation,
+  CodexMessagesPresentation,
   CodexReasoningEffortOption,
   CodexSkillSummary,
   ClientRequestResponse,
   CodexChatTranscription,
   PromptSkillInput,
   ReasoningEffort,
+  ResolvedCodexConversationPresentation,
   ThreadGoal,
   ThreadGoalStatus,
   ToolConfirmationDecision,
@@ -114,6 +124,8 @@ export type {
   SurfaceMessage,
   SurfaceMessageAttachment,
   SurfaceMessageAttachmentPart,
+  SurfaceMessageMedia,
+  SurfaceMessageMediaPart,
   SurfaceMessagePart,
   SurfaceMessageStatusPart,
   SurfaceMessageTextPart,

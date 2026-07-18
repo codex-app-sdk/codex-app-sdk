@@ -4,6 +4,8 @@ import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '../src/surface';
 
+const generatedPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
 class FakeTransport implements RpcTransport {
   readonly sent: RpcMessage[] = [];
   readonly close = vi.fn(async () => undefined);
@@ -54,6 +56,24 @@ class FakeTransport implements RpcTransport {
 }
 
 describe('CodexSurface', () => {
+  it('validates the trusted top-level CODEX_HOME seam and rejects transport conflicts', () => {
+    const client = new CodexAppServerClient(new FakeTransport());
+    expect(() => new CodexSurface({ client, codexHome: 'relative/home' })).toThrow(
+      'codexHome must be an absolute path',
+    );
+    expect(() => new CodexSurface({ client, codexHome: '   ' })).toThrow('codexHome cannot be empty');
+    expect(() => new CodexSurface({
+      client,
+      codexHome: '/tmp/codex-a',
+      transport: { codexHome: '/tmp/codex-b' },
+    })).toThrow('codexHome conflicts with transport.codexHome');
+    expect(() => new CodexSurface({
+      client,
+      codexHome: '/tmp/codex-a',
+      transport: { codexHome: '/tmp/codex-a' },
+    })).not.toThrow();
+  });
+
   it('enters an error state after disconnect and reconnects the app-server', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -68,6 +88,43 @@ describe('CodexSurface', () => {
 
     await expect(surface.connect()).resolves.toMatchObject({ status: 'ready', error: null });
     expect(transport.start).toHaveBeenCalledTimes(2);
+    expect(requestsFor(transport, 'account/read')).toHaveLength(2);
+    expect(requestsFor(transport, 'thread/list')).toHaveLength(2);
+    expect(requestsFor(transport, 'thread/resume')).toHaveLength(2);
+
+    await surface.sendMessage('Message after reconnect');
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({
+      params: expect.objectContaining({ threadId: 'thread-existing' }),
+    });
+  });
+
+  it('clears authenticated state when a restarted app-server reports a signed-out account', async () => {
+    let account: Record<string, unknown> | null = {
+      type: 'chatgpt', email: 'before@example.test', planType: 'pro',
+    };
+    const transport = new FakeTransport({
+      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    expect(surface.getSnapshot().conversations).toHaveLength(1);
+
+    transport.fail(new Error('restart'));
+    account = null;
+    await surface.connect();
+
+    expect(surface.getSnapshot()).toMatchObject({
+      status: 'ready',
+      authentication: { account: null, requiresOpenaiAuth: true },
+      conversations: [],
+      activeConversationId: null,
+      messages: [],
+      models: [],
+      modelCatalogStatus: 'notLoaded',
+      plugins: [],
+      pluginCatalogStatus: 'notLoaded',
+    });
+    expect(requestsFor(transport, 'thread/list')).toHaveLength(1);
   });
 
   it('bootstraps Codex and exposes conversation summaries without protocol details', async () => {
@@ -94,10 +151,11 @@ describe('CodexSurface', () => {
       approvalPreset: 'ask-for-approval',
     });
     expect(transport.sent.map((message) => 'method' in message ? message.method : null)).toStrictEqual([
-      'initialize', 'initialized', 'model/list', 'skills/list', 'permissionProfile/list', 'account/rateLimits/read',
-      'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get', 'thread/turns/list',
+      'initialize', 'initialized', 'account/read', 'model/list', 'skills/list', 'permissionProfile/list',
+      'account/rateLimits/read', 'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get', 'thread/turns/list',
       'plugin/installed',
     ]);
+    expect(lastRequest(transport, 'account/read')).toMatchObject({ params: { refreshToken: false } });
     expect(lastRequest(transport, 'thread/resume')).toMatchObject({
       params: {
         threadId: 'thread-existing',
@@ -204,6 +262,342 @@ describe('CodexSurface', () => {
 
     pendingPlugins.resolve({ marketplaces: [], marketplaceLoadErrors: [] });
     await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('loaded'));
+  });
+
+  it('connects signed out and becomes fully usable after managed ChatGPT login completes', async () => {
+    let account: Record<string, unknown> | null = null;
+    const transport = new FakeTransport({
+      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+      'account/login/start': () => ({
+        type: 'chatgpt',
+        loginId: 'login-1',
+        authUrl: 'https://auth.example.test/login',
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await expect(surface.connect()).resolves.toMatchObject({
+      status: 'ready',
+      authentication: {
+        status: 'loaded',
+        account: null,
+        requiresOpenaiAuth: true,
+        error: null,
+      },
+      conversations: [],
+      modelCatalogStatus: 'notLoaded',
+    });
+    expect(requestsFor(transport, 'thread/list')).toHaveLength(0);
+
+    await expect(surface.startChatGptLogin()).resolves.toStrictEqual({
+      loginId: 'login-1',
+      authUrl: 'https://auth.example.test/login',
+    });
+    expect(lastRequest(transport, 'account/login/start')).toMatchObject({
+      params: { type: 'chatgpt' },
+    });
+    expect(surface.getSnapshot().authentication.login).toMatchObject({
+      status: 'pending',
+      loginId: 'login-1',
+    });
+
+    account = { type: 'chatgpt', email: 'kid@example.test', planType: 'plus' };
+    transport.emit({
+      method: 'account/login/completed',
+      params: { loginId: 'login-1', success: true, error: null },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      status: 'ready',
+      authentication: {
+        account: { type: 'chatgpt', email: 'kid@example.test', planType: 'plus' },
+        requiresOpenaiAuth: true,
+        login: { status: 'completed', loginId: 'login-1', error: null },
+      },
+      modelCatalogStatus: 'loaded',
+      conversations: [{ id: 'thread-existing' }],
+    }));
+
+    await surface.createConversation();
+    await surface.sendMessage('Hello after login');
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({
+      params: expect.objectContaining({ threadId: 'thread-new' }),
+    });
+  });
+
+  it('gates immediate post-login sends until auth-dependent catalogs finish loading', async () => {
+    let account: Record<string, unknown> | null = null;
+    const models = deferred<unknown>();
+    const transport = new FakeTransport({
+      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+      'model/list': () => models.promise,
+      'thread/list': () => ({ data: [], nextCursor: null }),
+    });
+    const surface = new CodexSurface({
+      autoSelectFirstConversation: false,
+      client: new CodexAppServerClient(transport),
+      conversationDefaults: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' },
+    });
+    await surface.connect();
+
+    account = { type: 'chatgpt', email: 'kid@example.test', planType: 'plus' };
+    transport.emit({
+      method: 'account/login/completed',
+      params: { loginId: 'login-immediate', success: true, error: null },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toMatchObject({
+      type: 'chatgpt',
+      email: 'kid@example.test',
+    }));
+
+    const send = surface.sendMessage('Hello immediately');
+    expect(lastRequest(transport, 'thread/start')).toBeUndefined();
+    models.resolve({
+      data: [testModel('gpt-5.6-terra', 'gpt-5.6-terra', true)],
+      nextCursor: null,
+    });
+    await send;
+
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: { model: 'gpt-5.6-terra' },
+    });
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({
+      params: expect.objectContaining({
+        threadId: 'thread-new',
+        model: 'gpt-5.6-terra',
+        effort: 'medium',
+      }),
+    });
+  });
+
+  it('invalidates local conversation state when the authoritative account identity changes', async () => {
+    let account = { type: 'chatgpt', email: 'account-a@example.test', planType: 'pro' };
+    const transport = new FakeTransport({
+      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+      'thread/list': () => ({
+        data: account.email.startsWith('account-a') ? [thread('thread-existing', false)] : [],
+        nextCursor: null,
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    expect(surface.getSnapshot()).toMatchObject({
+      activeConversationId: 'thread-existing',
+      messages: expect.arrayContaining([expect.objectContaining({ role: 'user' })]),
+    });
+
+    account = { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' };
+    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: 'plus' } });
+
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      authentication: {
+        account: { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' },
+      },
+      conversations: [],
+      activeConversationId: null,
+      messages: [],
+    }));
+    expect(requestsFor(transport, 'thread/list')).toHaveLength(2);
+  });
+
+  it('retains account identity across account/read errors so a later account switch still invalidates state', async () => {
+    let account = { type: 'chatgpt', email: 'account-a@example.test', planType: 'pro' };
+    let failAccountRead = false;
+    const transport = new FakeTransport({
+      'account/read': () => {
+        if (failAccountRead) throw new Error('account temporarily unavailable');
+        return { account, requiresOpenaiAuth: true };
+      },
+      'thread/list': () => ({
+        data: account.email.startsWith('account-a') ? [thread('thread-existing', false)] : [],
+        nextCursor: null,
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    expect(surface.getSnapshot().activeConversationId).toBe('thread-existing');
+
+    failAccountRead = true;
+    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: 'pro' } });
+    await vi.waitFor(() => expect(surface.getSnapshot().authentication).toMatchObject({
+      status: 'error',
+      account: { email: 'account-a@example.test' },
+      error: 'account temporarily unavailable',
+    }));
+
+    failAccountRead = false;
+    account = { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' };
+    await surface.refreshAccount();
+    expect(surface.getSnapshot()).toMatchObject({
+      authentication: { account: { email: 'account-b@example.test' } },
+      conversations: [],
+      activeConversationId: null,
+      messages: [],
+    });
+  });
+
+  it('does not invalidate conversation state for metadata changes on the same account', async () => {
+    let account = { type: 'chatgpt', email: 'same@example.test', planType: 'plus' };
+    const transport = new FakeTransport({
+      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    const messages = surface.getSnapshot().messages;
+    const resumeCount = requestsFor(transport, 'thread/resume').length;
+
+    account = { type: 'chatgpt', email: 'same@example.test', planType: 'pro' };
+    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: 'pro' } });
+    await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toMatchObject({ planType: 'pro' }));
+
+    expect(surface.getSnapshot()).toMatchObject({
+      activeConversationId: 'thread-existing',
+      messages,
+    });
+    expect(requestsFor(transport, 'thread/resume')).toHaveLength(resumeCount);
+  });
+
+  it('deduplicates concurrent managed ChatGPT login starts', async () => {
+    const login = deferred<unknown>();
+    const transport = new FakeTransport({
+      'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
+      'account/login/start': () => login.promise,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    const first = surface.startChatGptLogin();
+    const second = surface.startChatGptLogin();
+    await vi.waitFor(() => expect(requestsFor(transport, 'account/login/start')).toHaveLength(1));
+    login.resolve({
+      type: 'chatgpt',
+      loginId: 'login-shared',
+      authUrl: 'https://auth.example.test/login',
+    });
+
+    await expect(Promise.all([first, second])).resolves.toStrictEqual([
+      { loginId: 'login-shared', authUrl: 'https://auth.example.test/login' },
+      { loginId: 'login-shared', authUrl: 'https://auth.example.test/login' },
+    ]);
+    expect(requestsFor(transport, 'account/login/start')).toHaveLength(1);
+  });
+
+  it('runs a trailing authoritative account refresh when login completes during an older refresh', async () => {
+    const staleRefresh = deferred<unknown>();
+    let accountReadCount = 0;
+    const transport = new FakeTransport({
+      'account/read': () => {
+        accountReadCount += 1;
+        if (accountReadCount === 1) return { account: null, requiresOpenaiAuth: true };
+        if (accountReadCount === 2) return staleRefresh.promise;
+        return {
+          account: { type: 'chatgpt', email: 'fresh@example.test', planType: 'plus' },
+          requiresOpenaiAuth: true,
+        };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: null } });
+    await vi.waitFor(() => expect(requestsFor(transport, 'account/read')).toHaveLength(2));
+    transport.emit({
+      method: 'account/login/completed',
+      params: { loginId: 'login-trailing', success: true, error: null },
+    });
+    staleRefresh.resolve({ account: null, requiresOpenaiAuth: true });
+
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      authentication: {
+        account: { type: 'chatgpt', email: 'fresh@example.test', planType: 'plus' },
+        login: { status: 'completed', loginId: 'login-trailing' },
+      },
+      modelCatalogStatus: 'loaded',
+    }));
+    expect(requestsFor(transport, 'account/read')).toHaveLength(3);
+  });
+
+  it('still runs the trailing account refresh when the superseded refresh rejects', async () => {
+    const staleRefresh = deferred<unknown>();
+    let accountReadCount = 0;
+    const transport = new FakeTransport({
+      'account/read': () => {
+        accountReadCount += 1;
+        if (accountReadCount === 1) return { account: null, requiresOpenaiAuth: true };
+        if (accountReadCount === 2) return staleRefresh.promise;
+        return {
+          account: { type: 'chatgpt', email: 'recovered@example.test', planType: 'plus' },
+          requiresOpenaiAuth: true,
+        };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: null } });
+    await vi.waitFor(() => expect(requestsFor(transport, 'account/read')).toHaveLength(2));
+    transport.emit({
+      method: 'account/login/completed',
+      params: { loginId: 'login-after-error', success: true, error: null },
+    });
+    staleRefresh.reject(new Error('superseded account read failed'));
+
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      authentication: {
+        status: 'loaded',
+        account: { type: 'chatgpt', email: 'recovered@example.test' },
+        login: { status: 'completed', loginId: 'login-after-error' },
+      },
+      modelCatalogStatus: 'loaded',
+    }));
+    expect(requestsFor(transport, 'account/read')).toHaveLength(3);
+  });
+
+  it('refreshes the full authoritative account projection on account updates', async () => {
+    let account: Record<string, unknown> = {
+      type: 'chatgpt', email: 'before@example.test', planType: 'pro',
+    };
+    const transport = new FakeTransport({
+      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    account = { type: 'apiKey' };
+    transport.emit({ method: 'account/updated', params: { authMode: 'apikey', planType: null } });
+    await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toStrictEqual({ type: 'apiKey' }));
+    expect(requestsFor(transport, 'account/read')).toHaveLength(2);
+    expect(transport.sent.some((message) => 'method' in message && message.method === 'getAuthStatus')).toBe(false);
+  });
+
+  it('validates managed login responses and exposes cancellation and logout state', async () => {
+    let signedOut = false;
+    const transport = new FakeTransport({
+      'account/read': () => signedOut
+        ? { account: null, requiresOpenaiAuth: true }
+        : { account: { type: 'apiKey' }, requiresOpenaiAuth: true },
+      'account/login/start': () => ({ type: 'chatgpt', loginId: 'login-2', authUrl: 'file:///tmp/nope' }),
+      'account/login/cancel': () => ({ status: 'canceled' }),
+      'account/logout': () => {
+        signedOut = true;
+        return {};
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    await expect(surface.startChatGptLogin()).rejects.toThrow('unsupported authentication URL scheme');
+    expect(surface.getSnapshot().authentication.login.status).toBe('error');
+    await surface.cancelLogin('login-2');
+    expect(lastRequest(transport, 'account/login/cancel')).toMatchObject({ params: { loginId: 'login-2' } });
+    expect(surface.getSnapshot().authentication.login.status).toBe('cancelled');
+
+    await surface.logout();
+    expect(lastRequest(transport, 'account/logout')).toBeDefined();
+    expect(surface.getSnapshot()).toMatchObject({
+      authentication: { account: null, requiresOpenaiAuth: true },
+      conversations: [],
+      models: [],
+    });
   });
 
   it('retries a transient plugin catalog failure on an explicit conversation refresh', async () => {
@@ -896,6 +1290,54 @@ describe('CodexSurface', () => {
     expect(lastRequest(fresh.transport, 'turn/start')).toMatchObject({ params: { threadId: 'thread-existing' } });
   });
 
+  it('applies host conversation defaults to explicit and automatic thread creation', async () => {
+    const responses = {
+      'model/list': () => ({
+        data: [testModel('gpt-5.6-terra', 'gpt-5.6-terra', true)],
+        nextCursor: null,
+      }),
+      'thread/list': () => ({ data: [], nextCursor: null }),
+    };
+    const createTransport = new FakeTransport(responses);
+    const createSurface = new CodexSurface({
+      autoSelectFirstConversation: false,
+      client: new CodexAppServerClient(createTransport),
+      conversationDefaults: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' },
+    });
+    await createSurface.connect();
+    await createSurface.createConversation();
+    expect(lastRequest(createTransport, 'thread/start')).toMatchObject({
+      params: { model: 'gpt-5.6-terra' },
+    });
+    expect(lastRequest(createTransport, 'thread/settings/update')).toMatchObject({
+      params: {
+        threadId: 'thread-new',
+        effort: 'medium',
+        collaborationMode: {
+          mode: 'default',
+          settings: { model: 'gpt-5.6-terra', reasoning_effort: 'medium' },
+        },
+      },
+    });
+
+    const automaticTransport = new FakeTransport(responses);
+    const automaticSurface = new CodexSurface({
+      autoSelectFirstConversation: false,
+      client: new CodexAppServerClient(automaticTransport),
+      conversationDefaults: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' },
+    });
+    await automaticSurface.connect();
+    await automaticSurface.sendMessage('Hello Terra');
+    expect(lastRequest(automaticTransport, 'thread/start')).toMatchObject({
+      params: { model: 'gpt-5.6-terra' },
+    });
+    expect(lastRequest(automaticTransport, 'turn/start')).toMatchObject({
+      params: {
+        threadId: 'thread-new', model: 'gpt-5.6-terra', effort: 'medium',
+      },
+    });
+  });
+
   it('updates model, reasoning, plan mode, and permissions through app-server settings', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -1215,6 +1657,99 @@ describe('CodexSurface', () => {
     await surface.close();
     expect(transport.close).toHaveBeenCalledOnce();
     await expect(surface.connect()).rejects.toThrow('Codex surface is closed');
+  });
+
+  it('projects live generated images once while preserving technical tool events', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-image', startedAtMs: 1,
+        item: {
+          type: 'imageGeneration', id: 'image-live', status: 'inProgress',
+          revisedPrompt: null, result: '',
+        },
+      },
+    });
+    expect(surface.getSnapshot().messages.find((message) => (
+      message.parts.some((part) => part.type === 'tool' && part.id === 'image-live')
+    ))?.parts).toStrictEqual([
+      expect.objectContaining({ type: 'tool', id: 'image-live', status: 'running' }),
+    ]);
+
+    transport.emit({
+      method: 'rawResponseItem/completed',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-image',
+        item: {
+          type: 'image_generation_call', id: 'image-live', status: 'completed',
+          revised_prompt: 'Draw the route map', result: generatedPngBase64,
+        },
+      },
+    });
+    expect(JSON.stringify(surface.getSnapshot())).not.toContain(generatedPngBase64);
+
+    const completedItem = {
+      type: 'imageGeneration', id: 'image-live', status: 'completed',
+      revisedPrompt: 'Draw the route map', result: generatedPngBase64,
+      savedPath: '/tmp/generated route.png',
+    };
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-image', completedAtMs: 2,
+        item: completedItem,
+      },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-image', completedAtMs: 2,
+        item: completedItem,
+      },
+    });
+
+    const message = surface.getSnapshot().messages.find((candidate) => (
+      candidate.parts.some((part) => part.type === 'tool' && part.id === 'image-live')
+    ));
+    expect(message?.parts).toStrictEqual([
+      expect.objectContaining({
+        type: 'tool', id: 'image-live', status: 'completed', output: '/tmp/generated route.png',
+      }),
+      {
+        type: 'media',
+        itemId: 'image-live',
+        media: {
+          url: `data:image/png;base64,${generatedPngBase64}`,
+          alt: 'Generated image',
+          mimeType: 'image/png',
+          prompt: 'Draw the route map',
+          title: 'Generated image',
+        },
+      },
+    ]);
+    expect(message?.parts.filter((part) => part.type === 'media')).toHaveLength(1);
+    expect(JSON.stringify(message?.parts.find((part) => part.type === 'tool'))).not.toContain(generatedPngBase64);
+    expect(JSON.stringify(surface.getSnapshot()).split(generatedPngBase64)).toHaveLength(2);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'tool.completed',
+        payload: expect.objectContaining({ toolPart: expect.objectContaining({ id: 'image-live' }) }),
+      }),
+      expect.objectContaining({
+        type: 'message.updated',
+        payload: expect.objectContaining({
+          message: expect.objectContaining({
+            parts: expect.arrayContaining([expect.objectContaining({ type: 'media', itemId: 'image-live' })]),
+          }),
+        }),
+      }),
+    ]));
+    expect(events.filter((event) => event.type === 'message.updated')).toHaveLength(1);
   });
 
   it('reduces started, replaced, ignored, and failed lifecycle variants', async () => {
@@ -1571,10 +2106,11 @@ describe('CodexSurface', () => {
     const goalSurface = new CodexSurface({
       autoSelectFirstConversation: false,
       client: new CodexAppServerClient(goalTransport),
+      conversationDefaults: { model: 'gpt-5', reasoningEffort: 'medium' },
     });
     await goalSurface.connect();
     await goalSurface.sendMessage('/goal Ship it');
-    expect(lastRequest(goalTransport, 'thread/start')).toBeDefined();
+    expect(lastRequest(goalTransport, 'thread/start')).toMatchObject({ params: { model: 'gpt-5' } });
     expect(lastRequest(goalTransport, 'thread/goal/set')).toMatchObject({
       params: { threadId: 'thread-new', objective: 'Ship it' },
     });
@@ -1587,10 +2123,11 @@ describe('CodexSurface', () => {
     const reviewSurface = new CodexSurface({
       autoSelectFirstConversation: false,
       client: new CodexAppServerClient(reviewTransport),
+      conversationDefaults: { model: 'gpt-5', reasoningEffort: 'medium' },
     });
     await reviewSurface.connect();
     await reviewSurface.sendMessage('/review focus on regressions');
-    expect(lastRequest(reviewTransport, 'thread/start')).toBeDefined();
+    expect(lastRequest(reviewTransport, 'thread/start')).toMatchObject({ params: { model: 'gpt-5' } });
     expect(lastRequest(reviewTransport, 'review/start')).toMatchObject({
       params: {
         threadId: 'thread-new', delivery: 'inline',
@@ -2323,6 +2860,146 @@ describe('CodexSurface', () => {
     }));
   });
 
+  it('applies typed main-process MCP servers on conversation start and resume', async () => {
+    const transport = new FakeTransport({
+      'thread/list': () => ({ data: [thread('thread-existing', false)], nextCursor: null }),
+      'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
+    });
+    const surface = new CodexSurface({
+      autoSelectFirstConversation: false,
+      client: new CodexAppServerClient(transport),
+      mcpServers: [{
+        name: 'relay',
+        transport: { type: 'http', url: 'http://127.0.0.1:8767/mcp' },
+        toolApprovalMode: 'approve',
+        required: true,
+        enabledTools: ['get_shipments', 'update_shipment'],
+        startupTimeoutMs: 12_500,
+        toolTimeoutMs: 30_000,
+      }],
+    });
+    await surface.connect();
+
+    await surface.createConversation();
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: {
+        config: {
+          'mcp_servers.relay': {
+            url: 'http://127.0.0.1:8767/mcp',
+            default_tools_approval_mode: 'approve',
+            required: true,
+            enabled_tools: ['get_shipments', 'update_shipment'],
+            startup_timeout_sec: 12.5,
+            tool_timeout_sec: 30,
+          },
+        },
+      },
+    });
+
+    await surface.conversation('thread-existing').load();
+    expect(lastRequest(transport, 'thread/resume')).toMatchObject({
+      params: {
+        threadId: 'thread-existing',
+        config: {
+          'mcp_servers.relay': expect.objectContaining({ url: 'http://127.0.0.1:8767/mcp' }),
+        },
+      },
+    });
+    expect(JSON.stringify(surface.getSnapshot())).not.toContain('127.0.0.1:8767');
+  });
+
+  it('supports stdio MCP definitions and per-conversation replacement or disabling', async () => {
+    const transport = new FakeTransport({
+      'thread/list': () => ({ data: [thread('thread-existing', false)], nextCursor: null }),
+      'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
+    });
+    const surface = new CodexSurface({
+      autoSelectFirstConversation: false,
+      client: new CodexAppServerClient(transport),
+      mcpServers: [{ name: 'default_server', transport: { type: 'http', url: 'http://127.0.0.1:9000/mcp' } }],
+    });
+    await surface.connect();
+
+    await surface.createConversation({}, {
+      mcpServers: [{
+        name: 'shipment_worker',
+        transport: {
+          type: 'stdio',
+          command: '/usr/bin/node',
+          args: ['/opt/relay/mcp.mjs'],
+          cwd: '/opt/relay',
+          env: { RELAY_MODE: 'test' },
+          envVars: ['RELAY_TOKEN'],
+        },
+        toolApprovalMode: 'prompt',
+      }],
+    });
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: {
+        config: {
+          'mcp_servers.shipment_worker': {
+            command: '/usr/bin/node',
+            args: ['/opt/relay/mcp.mjs'],
+            cwd: '/opt/relay',
+            env: { RELAY_MODE: 'test' },
+            env_vars: ['RELAY_TOKEN'],
+            default_tools_approval_mode: 'prompt',
+          },
+        },
+      },
+    });
+    expect(lastRequest(transport, 'thread/start')).not.toMatchObject({
+      params: { config: { 'mcp_servers.default_server': expect.anything() } },
+    });
+
+    await surface.conversation('thread-existing').load({ mcpServers: [] });
+    expect(lastRequest(transport, 'thread/resume')).toMatchObject({ params: { threadId: 'thread-existing' } });
+    expect(lastRequest(transport, 'thread/resume')).not.toHaveProperty('params.config');
+  });
+
+  it('validates typed MCP definitions and raw-config collisions', async () => {
+    const client = () => new CodexAppServerClient(new FakeTransport({
+      'thread/list': () => ({ data: [], nextCursor: null }),
+    }));
+    expect(() => new CodexSurface({
+      client: client(),
+      mcpServers: [{ name: 'bad.name', transport: { type: 'http', url: 'http://127.0.0.1/mcp' } }],
+    })).toThrow('name must match');
+    expect(() => new CodexSurface({
+      client: client(),
+      mcpServers: [
+        { name: 'duplicate', transport: { type: 'http', url: 'http://127.0.0.1/a' } },
+        { name: 'duplicate', transport: { type: 'http', url: 'http://127.0.0.1/b' } },
+      ],
+    })).toThrow("Duplicate Codex MCP server 'duplicate'");
+    expect(() => new CodexSurface({
+      client: client(),
+      mcpServers: [{ name: 'invalid_url', transport: { type: 'http', url: 'file:///tmp/mcp' } }],
+    })).toThrow('URL must use HTTP or HTTPS');
+    expect(() => new CodexSurface({
+      client: client(),
+      mcpServers: [{
+        name: 'invalid_cwd', transport: { type: 'stdio', command: 'node', cwd: 'relative' },
+      }],
+    })).toThrow('cwd must be an absolute path');
+    expect(() => new CodexSurface({
+      client: client(),
+      mcpServers: [{
+        name: 'invalid_timeout', transport: { type: 'stdio', command: 'node' }, startupTimeoutMs: 0,
+      }],
+    })).toThrow('startup timeout must be a positive finite number');
+
+    const surface = new CodexSurface({
+      autoSelectFirstConversation: false,
+      client: client(),
+      mcpServers: [{ name: 'relay', transport: { type: 'http', url: 'http://127.0.0.1/mcp' } }],
+    });
+    await surface.connect();
+    await expect(surface.createConversation({
+      config: { 'mcp_servers.relay.url': 'http://127.0.0.1:9999/mcp' },
+    })).rejects.toThrow("conflicts with its typed definition");
+  });
+
   it('provides scoped conversation discovery, skill catalogs, attachments, and direct rollback', async () => {
     const transport = new FakeTransport({
       'thread/list': (params) => ({
@@ -2993,7 +3670,6 @@ describe('CodexSurface', () => {
       'item/fileChange/outputDelta',
       'mcpServer/oauthLogin/completed',
       'mcpServer/startupStatus/updated',
-      'account/updated',
       'app/list/updated',
       'remoteControl/status/changed',
       'externalAgentConfig/import/progress',
@@ -3018,7 +3694,6 @@ describe('CodexSurface', () => {
       'thread/realtime/closed',
       'windows/worldWritableWarning',
       'windowsSandbox/setupCompleted',
-      'account/login/completed',
     ];
     for (const method of ignoredMethods) transport.emit({ method, params: {} });
     expect(surface.getSnapshot()).toStrictEqual(before);
@@ -3108,6 +3783,10 @@ function createSurface(): { surface: CodexSurface; transport: FakeTransport } {
 function responseFor(method: string, params: unknown): unknown {
   switch (method) {
     case 'initialize': return { userAgent: 'test' };
+    case 'account/read': return {
+      account: { type: 'chatgpt', email: 'test@example.test', planType: 'pro' },
+      requiresOpenaiAuth: true,
+    };
     case 'model/list': return {
       data: [
         {
@@ -3267,6 +3946,10 @@ function lastRequest(transport: FakeTransport, method: string): RpcMessage | und
     if (message && 'method' in message && message.method === method) return message;
   }
   return undefined;
+}
+
+function requestsFor(transport: FakeTransport, method: string): RpcMessage[] {
+  return transport.sent.filter((message) => 'method' in message && message.method === method);
 }
 
 function lastResponse(transport: FakeTransport, id: string | number): RpcMessage | undefined {

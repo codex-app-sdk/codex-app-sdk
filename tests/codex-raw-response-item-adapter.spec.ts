@@ -83,12 +83,19 @@ describe('rawResponseItemToEvent', () => {
     expect(adapt({ type: 'web_search_call', action: null })).toMatchObject({
       payload: { toolPart: { body: 'web search' } },
     });
-    expect(adapt({
+    const imageEvent = adapt({
       type: 'image_generation_call', id: 'image-1', status: 'completed', revised_prompt: 'A polished UI', result: 'png-data',
-    })).toMatchObject({
-      type: 'item.completed',
-      payload: { toolPart: { id: 'image-1', title: 'image_generation', status: 'completed', body: 'png-data' } },
     });
+    expect(imageEvent).toMatchObject({
+      type: 'item.completed',
+      payload: {
+        toolPart: {
+          id: 'image-1', title: 'image_generation', status: 'completed', body: undefined,
+          input: { revisedPrompt: 'A polished UI' },
+        },
+      },
+    });
+    expect(JSON.stringify(imageEvent)).not.toContain('png-data');
     expect(adapt({ type: 'image_generation_call', status: 'failed', result: '' })).toMatchObject({
       payload: { toolPart: { id: 'raw-image_generation_call', status: 'failed' } },
     });

@@ -33,8 +33,8 @@ const emit = defineEmits<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--chat-composer-button-size-small, 28px);
-  height: var(--chat-composer-button-size-small, 28px);
+  width: var(--chat-composer-compact-control-size, var(--chat-composer-button-size-small, 28px));
+  height: var(--chat-composer-compact-control-size, var(--chat-composer-button-size-small, 28px));
   border: 0;
   border-radius: var(--radius-full);
   color: var(--color-text-muted);

@@ -31,6 +31,7 @@
     />
 
     <ChatComposerActionMenu
+      v-if="effectivePresentation.composer.actionMenu"
       :attach-enabled="attachEnabled"
       :disabled="disabled"
       :items="menuItems"
@@ -49,7 +50,7 @@
     </ChatComposerActionMenu>
 
     <ChatComposerVoiceField
-      v-if="isRecording || isTranscribing"
+      v-if="voiceVisible && (isRecording || isTranscribing)"
       :recorder="recorder"
       :recording="isRecording"
     />
@@ -77,7 +78,10 @@
         :plan-mode="effectiveCodexCapabilities.planMode && Boolean(planMode)"
         @disable-plan-mode="$emit('update:planMode', false)"
       />
-      <ChatContextUsageIndicator :context-usage="contextUsage" />
+      <ChatContextUsageIndicator
+        v-if="effectivePresentation.composer.contextUsage"
+        :context-usage="contextUsage"
+      />
       <ChatModelReasoningSelector
         v-if="effectiveCodexCapabilities.models"
         :disabled="disabled || isSending"
@@ -90,6 +94,7 @@
         @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
       />
       <ChatComposerVoiceButton
+        v-if="voiceVisible"
         :disabled="voiceButtonDisabled"
         :label="voiceButtonLabel"
         :recording="isRecording"
@@ -111,7 +116,8 @@
 
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapabilities, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription, ReasoningEffort } from '../chat/contracts';
+import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapabilities, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription, CodexConversationPresentation, ReasoningEffort } from '../chat/contracts';
+import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands } from '../chat/codex-commands';
 import CodexComposerSendButton from './CodexComposerSendButton.vue';
@@ -127,6 +133,7 @@ import ChatComposerSlashMenu from '../chat/ChatComposerSlashMenu.vue';
 import { useChatComposerSuggestions } from '../chat/use-chat-composer-suggestions';
 import { useChatComposerVoice } from '../chat/use-chat-composer-voice';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
+import { getCodexNativeRendererApi } from '../native-capabilities';
 
 const props = defineProps<{
   autofocus?: boolean;
@@ -145,6 +152,7 @@ const props = defineProps<{
   placeholder: string;
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
+  presentation?: CodexConversationPresentation;
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -165,12 +173,17 @@ const emit = defineEmits<{
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();
 
-const CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX = 88;
+const DEFAULT_CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX = 88;
 
 const prompt = ref('');
 const textareaEl = ref<HTMLTextAreaElement | null>(null);
 const caretPosition = ref(0);
 const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCapabilities);
+const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
+const voiceVisible = computed(() => (
+  effectivePresentation.value.composer.voice
+  && Boolean(props.transcribeAudio || getCodexNativeRendererApi()?.capabilities.transcription)
+));
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
@@ -367,7 +380,11 @@ function resizeTextarea(): void {
   }
 
   textarea.style.height = '0px';
-  textarea.style.height = `${Math.min(textarea.scrollHeight, CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX)}px`;
+  const cssMaxHeight = Number.parseFloat(window.getComputedStyle(textarea).maxHeight || '');
+  const maxHeight = Number.isFinite(cssMaxHeight) && cssMaxHeight > 0
+    ? cssMaxHeight
+    : DEFAULT_CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX;
+  textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
 }
 
 function resizeTextareaSoon(): void {
@@ -380,10 +397,15 @@ function resizeTextareaSoon(): void {
   --codex-composer-button-background: var(--color-on-surface-variant);
   --codex-composer-button-foreground: var(--color-surface);
   --codex-composer-button-hover-background: var(--color-on-surface);
-  --codex-composer-button-size: var(--chat-composer-button-size);
-  --chat-composer-button-size: 36px;
-  --chat-composer-button-size-small: 28px;
-  --chat-composer-input-max-height: calc(var(--line-height-24) + var(--line-height-24) + var(--line-height-24) + var(--space-4) + var(--space-4));
+  --chat-composer-button-size: var(--chat-composer-control-size, 36px);
+  --chat-composer-button-size-small: var(--chat-composer-compact-control-size, 28px);
+  --chat-composer-input-max-height: calc(
+    var(--chat-composer-line-height, var(--line-height-24))
+    + var(--chat-composer-line-height, var(--line-height-24))
+    + var(--chat-composer-line-height, var(--line-height-24))
+    + var(--space-4)
+    + var(--space-4)
+  );
   position: relative;
   display: flex;
   align-items: center;
@@ -417,8 +439,8 @@ function resizeTextareaSoon(): void {
   color: var(--color-text);
   background: transparent;
   font: inherit;
-  font-size: var(--font-size-15);
-  line-height: var(--line-height-24);
+  font-size: var(--chat-composer-font-size, var(--font-size-15));
+  line-height: var(--chat-composer-line-height, var(--line-height-24));
 }
 
 .chat-composer__input::placeholder {

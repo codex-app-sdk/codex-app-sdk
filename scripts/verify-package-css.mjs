@@ -12,6 +12,11 @@ const requiredMarkers = [
   '.codex-chat-theme--system',
   '@media (prefers-color-scheme:dark)',
   '--font-size-15:15px',
+  '--codex-message-font-size',
+  '--codex-composer-font-size',
+  '--codex-menu-font-size',
+  '--codex-composer-control-size',
+  '--codex-message-action-control-size',
   '.codex-composer-menu-list__switch',
   '.codex-conversation-pane',
 ];

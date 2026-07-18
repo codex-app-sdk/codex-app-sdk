@@ -1,15 +1,17 @@
 <template>
   <div v-if="visible" class="codex-chat-theme chat-composer-shelf">
     <ChatTurnGitInfo
-      v-if="turnGitDiff"
-      :diff="turnGitDiff"
+      v-if="visibleTurnGitDiff"
+      :diff="visibleTurnGitDiff"
     />
     <ChatQueuedPrompts
+      v-if="showQueuedPrompts"
       :prompts="queuedPrompts"
       @delete="$emit('deleteQueuedPrompt', $event)"
       @steer="$emit('steerQueuedPrompt', $event)"
     />
     <ChatGoal
+      v-if="showGoal"
       :goal="goal"
       @clear="$emit('clearGoal')"
       @edit="$emit('editGoal')"
@@ -19,7 +21,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ThreadGoal, TurnGitDiff } from './contracts';
+import type { CodexComposerShelfPresentation, ThreadGoal, TurnGitDiff } from './contracts';
 import ChatGoal from './ChatGoal.vue';
 import ChatQueuedPrompts from './ChatQueuedPrompts.vue';
 import ChatTurnGitInfo from './ChatTurnGitInfo.vue';
@@ -27,6 +29,7 @@ import type { QueuedChatPrompt } from './queued-prompts';
 
 const props = defineProps<{
   goal: ThreadGoal | null;
+  presentation?: CodexComposerShelfPresentation;
   queuedPrompts: readonly QueuedChatPrompt[];
   turnGitDiff?: TurnGitDiff | null;
 }>();
@@ -38,7 +41,14 @@ defineEmits<{
   steerQueuedPrompt: [promptId: string];
 }>();
 
-const visible = computed(() => Boolean(props.goal || props.turnGitDiff) || props.queuedPrompts.length > 0);
+const showGoal = computed(() => props.presentation?.goal !== false && Boolean(props.goal));
+const showQueuedPrompts = computed(() => (
+  props.presentation?.queuedPrompts !== false && props.queuedPrompts.length > 0
+));
+const visibleTurnGitDiff = computed(() => (
+  props.presentation?.turnGitDiff === false ? null : props.turnGitDiff ?? null
+));
+const visible = computed(() => showGoal.value || showQueuedPrompts.value || Boolean(visibleTurnGitDiff.value));
 </script>
 
 <style scoped>

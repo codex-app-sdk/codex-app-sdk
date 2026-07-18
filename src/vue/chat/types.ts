@@ -43,6 +43,7 @@ export type MessageAttachment = {
 
 export type MessagePart =
   | { type: 'attachment'; attachment: MessageAttachment }
+  | { type: 'media'; media: MessageMedia }
   | { type: 'text'; content: string }
   | { type: 'tool'; toolCall: MessageToolCall };
 

@@ -122,7 +122,7 @@ export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseIt
       arguments: {
         revisedPrompt: item.revised_prompt,
       },
-      contentItems: item.result ? [{ type: 'inputText', text: String(item.result) }] : null,
+      contentItems: null,
       success: item.status === 'completed',
       durationMs: null,
     });

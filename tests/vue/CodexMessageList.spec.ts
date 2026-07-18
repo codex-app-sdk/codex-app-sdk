@@ -88,6 +88,28 @@ describe('CodexMessageList', () => {
     expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
   });
 
+  it('routes conversation presentation to message actions and tool blocks', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages,
+        presentation: {
+          messages: {
+            actions: { copy: false, delete: false, edit: false, quote: false, retry: false },
+            toolBlocks: false,
+          },
+        },
+      },
+    });
+
+    expect(wrapper.text()).toContain('Please inspect the composer.');
+    expect(wrapper.text()).toContain('I am checking it now.');
+    expect(wrapper.find('.chat-tool-group').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Quote"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
   it('forwards message action events from chat messages', async () => {
     const wrapper = mount(CodexMessageList, {
       props: {

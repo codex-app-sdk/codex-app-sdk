@@ -6,11 +6,21 @@ import { pathToFileURL } from 'node:url';
 import type {
   SurfaceMessage,
   SurfaceMessageAttachment,
+  SurfaceMessageMediaPart,
   SurfaceMessagePart,
 } from '../surface/types';
 import { codexThreadItemToToolPart } from './codex-tool-part-adapter';
 
 export { codexThreadItemToToolPart as codexItemToToolPart } from './codex-tool-part-adapter';
+
+const MAX_INLINE_GENERATED_IMAGE_BYTES = 16 * 1024 * 1024;
+const supportedGeneratedImageMimeTypes = new Set([
+  'image/avif',
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
 
 export function codexThreadToSurfaceMessages(thread: Thread): SurfaceMessage[] {
   const turns = Array.isArray(thread.turns) ? thread.turns : [];
@@ -86,6 +96,11 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       sawAssistantActivity = true;
       assistantParts.push(toolPart);
     }
+    const mediaPart = codexItemToMediaPart(item);
+    if (mediaPart) {
+      sawAssistantActivity = true;
+      assistantParts.push(mediaPart);
+    }
   }
 
   flushAssistantMessage();
@@ -124,16 +139,51 @@ export function codexItemToSurfaceMessage(
     } : null;
   }
 
+  const parts: SurfaceMessagePart[] = [];
   const toolPart = codexThreadItemToToolPart(item);
-  return toolPart ? {
+  if (toolPart) parts.push(toolPart);
+  const mediaPart = codexItemToMediaPart(item);
+  if (mediaPart) parts.push(mediaPart);
+  return parts.length > 0 ? {
     id: `assistant-${item.id}`,
     role: 'assistant',
     status: surfaceMessageStatus(turn.status),
     turnId: turn.id,
-    parts: [toolPart],
+    parts,
     createdAt,
     metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
   } : null;
+}
+
+export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart | null {
+  if (item.type !== 'imageGeneration') return null;
+  const toolPart = codexThreadItemToToolPart(item);
+  if (toolPart?.status !== 'completed') return null;
+
+  const candidatePath = typeof item.savedPath === 'string' && isAbsolute(item.savedPath)
+    ? item.savedPath
+    : null;
+  const savedPathMimeType = candidatePath ? mimeTypeForSource(candidatePath) : undefined;
+  const savedPath = savedPathMimeType && supportedGeneratedImageMimeTypes.has(savedPathMimeType)
+    ? candidatePath
+    : null;
+  const result = typeof item.result === 'string' ? item.result.trim() : '';
+  const inlineImage = imageDataUrl(result);
+  const url = inlineImage?.url ?? (savedPath ? pathToFileURL(savedPath).href : undefined);
+  if (!url) return null;
+
+  const prompt = typeof item.revisedPrompt === 'string' ? item.revisedPrompt.trim() : '';
+  return {
+    type: 'media',
+    itemId: item.id,
+    media: {
+      url,
+      alt: 'Generated image',
+      title: 'Generated image',
+      mimeType: inlineImage?.mimeType ?? savedPathMimeType ?? 'image/png',
+      ...(prompt ? { prompt } : {}),
+    },
+  };
 }
 
 function userMessageParts(item: Extract<ThreadItem, { type: 'userMessage' }>): SurfaceMessagePart[] {
@@ -237,6 +287,40 @@ function mimeTypeForSource(source: string): string | undefined {
     svg: 'image/svg+xml',
     webp: 'image/webp',
   } as Record<string, string>)[extension];
+}
+
+function imageDataUrl(result: string): { url: string; mimeType: string } | null {
+  if (!result) return null;
+  const dataUrlMatch = /^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/=\s]+)$/i.exec(result);
+  const compact = (dataUrlMatch?.[1] ?? result).replace(/\s+/g, '');
+  const maxEncodedLength = Math.ceil(MAX_INLINE_GENERATED_IMAGE_BYTES / 3) * 4 + 4;
+  if (
+    !compact
+    || compact.length > maxEncodedLength
+    || compact.length % 4 !== 0
+    || !/^[a-z0-9+/]+={0,2}$/i.test(compact)
+  ) {
+    return null;
+  }
+  const bytes = Buffer.from(compact, 'base64');
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_INLINE_GENERATED_IMAGE_BYTES) return null;
+  const mimeType = generatedImageMimeType(bytes);
+  if (!mimeType) return null;
+  return { url: `data:${mimeType};base64,${compact}`, mimeType };
+}
+
+function generatedImageMimeType(bytes: Uint8Array): string | null {
+  if (startsWithBytes(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
+  if (startsWithBytes(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg';
+  const header = Buffer.from(bytes.subarray(0, 12)).toString('ascii');
+  if (header.startsWith('GIF87a') || header.startsWith('GIF89a')) return 'image/gif';
+  if (header.startsWith('RIFF') && header.slice(8, 12) === 'WEBP') return 'image/webp';
+  if (bytes.byteLength >= 12 && header.slice(4, 12) === 'ftypavif') return 'image/avif';
+  return null;
+}
+
+function startsWithBytes(bytes: Uint8Array, prefix: readonly number[]): boolean {
+  return prefix.every((value, index) => bytes[index] === value);
 }
 
 function surfaceMessageStatus(status: Turn['status']): SurfaceMessage['status'] {

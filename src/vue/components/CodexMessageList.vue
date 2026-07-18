@@ -21,6 +21,7 @@
             :index="index"
             :message="message"
             :plugins="plugins"
+            :presentation="presentation"
             :skills="skills"
             @cancel="emit('cancel')"
             @client-response="emit('client-response', $event)"
@@ -48,7 +49,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
-import type { ClientRequestResponse } from '../chat/contracts'
+import type { ClientRequestResponse, CodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
 import { chatMessagesFromInputs } from '../chat/renderer-message-adapter'
@@ -66,6 +67,7 @@ const props = withDefaults(defineProps<{
   followUpsDisabled?: boolean
   messages: readonly (Message | SurfaceMessage)[]
   plugins?: readonly CodexSurfacePlugin[]
+  presentation?: CodexConversationPresentation
   resetKey?: string | number | null
   skills?: readonly CodexSurfaceSkill[]
 }>(), {

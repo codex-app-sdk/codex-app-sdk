@@ -32,6 +32,23 @@ const disposeSdk = registerCodexElectronMain({
 });
 ```
 
+Host-owned app-server identity and conversation defaults stay in the main
+process. `codexHome` creates an isolated app-server child without mutating the
+parent environment; it is never exposed through snapshots or renderer IPC:
+
+```ts
+const surface = createCodexSurface({
+  codexHome: appSpecificCodexHome,
+  conversationDefaults: {
+    model: 'gpt-5.6-terra',
+    reasoningEffort: 'medium',
+  },
+});
+```
+
+Conversation defaults apply to explicit creation when a field is omitted and
+to every implicit creation path, including first send, goals, and reviews.
+
 Preload exposes the narrow SDK bridge; no Node or Electron primitive crosses
 into the renderer:
 
@@ -77,7 +94,7 @@ select/read/rename, archive/unarchive/permanently delete conversations,
 send/queue/steer, interrupt, compact, start a review, update settings, set/clear
 goals, approve/deny/respond, delete/edit/retry messages, subscribe, and close.
 Its snapshots include per-thread live state, thread status, context
-usage, rate limits, goals, approvals, pending app-server questions, queued
+usage, rate limits, authoritative account/login state, goals, approvals, pending app-server questions, queued
 prompts, and turn git diffs. `connect()` paginates the global, non-archived app-server thread list
 without applying a cwd filter, then resumes the newest thread so the first
 snapshot already contains the real conversation history. By default the SDK does
@@ -92,6 +109,22 @@ history and live user, assistant, command, file-change, MCP, plan, search,
 image, compaction, raw response, and agent items into the SDK's serializable
 surface model. Reasoning remains internal while the empty streaming assistant
 placeholder drives the standard Thinking shimmer.
+
+Authentication is projected from app-server `account/read` without filesystem
+or error-string inference. A signed-out surface is still `ready`, with
+`state.authentication` preserving `account`, `requiresOpenaiAuth`, load status,
+and managed-login state. Call `startChatGptLogin()` to receive the app-server
+`loginId` and `authUrl`, open that URL through the SDK native external-link
+bridge, and let `account/login/completed` update the same controller. The SDK
+then refreshes account-dependent catalogs and conversations so the app can
+create and send immediately without restarting. `cancelLogin()`, `logout()`,
+and `refreshAccount()` cross the same typed IPC boundary.
+
+Account-scoped conversation state is invalidated when `account/read` exposes a
+distinct identity. The current protocol has no stable account id for API-key
+accounts, Bedrock accounts with the same credential source, or ChatGPT accounts
+whose email is null; a host replacing those indistinguishable credentials must
+restart the surface so app-server and SDK state begin from the same session.
 
 ### Concurrent conversations and host extensions
 
@@ -180,6 +213,38 @@ const conversation = surface.conversation(created.activeConversationId!);
 `extensionContext` is opaque host-only data. It is retained per conversation,
 passed to start/resume configuration and dynamic tools, and is never exposed by
 the renderer IPC API.
+
+App-owned MCP servers use the same trusted main-process boundary without raw
+Codex configuration keys. Definitions are applied on thread start and resume;
+MCP calls then use the standard tool rendering, progress, confirmation, and
+`tool.started` / `tool.updated` / `tool.completed` events:
+
+```ts
+const surface = createCodexSurface({
+  mcpServers: [{
+    name: 'relay',
+    transport: { type: 'http', url: relayMcpUrl },
+    toolApprovalMode: 'approve',
+    required: true,
+    enabledTools: ['get_shipments', 'update_shipment'],
+  }],
+});
+
+surface.onEvent((event) => {
+  if (event.type === 'tool.completed' && event.payload.toolPart.kind === 'mcp') {
+    refreshBusinessState();
+  }
+});
+```
+
+Stdio definitions accept `command`, `args`, absolute `cwd`, explicit `env`, and
+`envVars` names to inherit without copying secret values. Pass `mcpServers` in
+the Node-only conversation host options to replace the surface definitions for
+one explicitly created or loaded conversation; `[]` disables SDK-provided MCP
+servers for that conversation. These definitions never enter snapshots or
+renderer IPC. They are initial thread configuration, not a hot-swap API: use
+surface defaults for automatically restored conversations, or disable automatic
+selection and call `conversation(id).load({ mcpServers })` explicitly.
 
 The [basic Electron + Vue sample](./samples/basic) proves the complete boundary:
 its custom left pane renders the app-server conversation list from the SDK's
@@ -330,6 +395,20 @@ message-list slots let products replace text, tool, status, and full-message
 rendering while retaining tested layout and auto-scroll behavior. Components
 use `--codex-*` semantic CSS variables with neutral fallbacks and do not depend
 on Element Plus, Electron, application stores, or raw app-server types.
+Completed image-generation items are projected as first-class media alongside
+their technical tool part, including for restored history, so generated images
+remain visible when an app hides technical tool blocks.
+
+For a simpler default surface without CSS hacks, pass the typed `presentation`
+prop. It independently controls composer actions, voice, context usage, shelf
+goal/queue/diff sections, individual message actions, and technical tool
+blocks. Disabled attachment support produces no dead plus-menu entry, and a
+missing transcription capability produces no disabled voice button. Public
+size hooks include `--codex-message-font-size`,
+`--codex-message-line-height`, `--codex-composer-font-size`,
+`--codex-composer-line-height`, `--codex-composer-control-size`,
+`--codex-menu-font-size`, `--codex-menu-control-min-height`, and
+`--codex-message-action-control-size`.
 
 Every top-level Vue component has one same-named isolated spec. Public leaf
 components copied from the conversation kit are also mounted directly by the

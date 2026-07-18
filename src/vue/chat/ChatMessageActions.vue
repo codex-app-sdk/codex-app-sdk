@@ -12,6 +12,7 @@
       {{ sentAtLabel }}
     </span>
     <ChatIconButton
+      v-if="showCopy"
       :label="copied ? t('chat.actions.copied') : t('chat.actions.copy')"
       @click="emit('copy')"
     >
@@ -19,28 +20,28 @@
       <CopyIcon v-else />
     </ChatIconButton>
     <ChatIconButton
-      v-if="message.role === 'user' && canEdit"
+      v-if="message.role === 'user' && canEdit && showEdit"
       :label="t('chat.actions.edit')"
       @click="emit('edit')"
     >
       <PencilIcon />
     </ChatIconButton>
     <ChatIconButton
-      v-if="message.role === 'user'"
+      v-if="message.role === 'user' && showQuote"
       :label="t('chat.actions.quote')"
       @click="emit('quote')"
     >
       <QuoteIcon />
     </ChatIconButton>
     <ChatIconButton
-      v-if="message.role === 'assistant' && canRetry"
+      v-if="message.role === 'assistant' && canRetry && showRetry"
       :label="t('chat.actions.retry')"
       @click="emit('retry')"
     >
       <RotateClockwiseIcon />
     </ChatIconButton>
     <ChatIconButton
-      v-if="canDelete"
+      v-if="canDelete && showDelete"
       danger
       :label="t('chat.actions.delete')"
       @click="emit('delete')"
@@ -63,6 +64,7 @@ import { computed } from 'vue'
 import { useCodexChatI18n } from './chat-i18n'
 import ChatIconButton from './ChatIconButton.vue'
 import { formatMessageSentAt, fullMessageSentAt } from './message-time'
+import type { CodexMessageActionsPresentation } from './contracts'
 import type { Message } from './types'
 
 const props = withDefaults(defineProps<{
@@ -71,6 +73,7 @@ const props = withDefaults(defineProps<{
   canRetry?: boolean
   copied?: boolean
   message: Message
+  presentation?: CodexMessageActionsPresentation
 }>(), {
   canDelete: true,
   canEdit: true,
@@ -85,6 +88,11 @@ const emit = defineEmits<{
   retry: []
 }>()
 const { t } = useCodexChatI18n()
+const showCopy = computed(() => props.presentation?.copy !== false)
+const showDelete = computed(() => props.presentation?.delete !== false)
+const showEdit = computed(() => props.presentation?.edit !== false)
+const showQuote = computed(() => props.presentation?.quote !== false)
+const showRetry = computed(() => props.presentation?.retry !== false)
 const sentAtLabel = computed(() => props.message.createdAt ? formatMessageSentAt(props.message.createdAt) : '')
 const sentAtTitle = computed(() => props.message.createdAt ? fullMessageSentAt(props.message.createdAt) : undefined)
 </script>

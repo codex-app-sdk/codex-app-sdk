@@ -17,6 +17,8 @@ import type {
   CodexSurfaceApprovalPreset,
   CodexSurfaceApprovalScope,
   CodexSurfaceAttachment,
+  CodexSurfaceAuthentication,
+  CodexSurfaceChatGptLogin,
   CodexSurfaceClientRequest,
   CodexSurfaceClientRequestResponse,
   CodexSurfaceContextUsage,
@@ -41,11 +43,13 @@ import type {
   StartCodexReviewOptions,
   SurfaceMessage,
   SurfaceMessageAttachmentPart,
+  SurfaceMessageMediaPart,
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
   UpdateCodexConversationSettings,
 } from '../surface/types';
 import {
+  codexItemToMediaPart,
   codexItemToSurfaceMessage,
   codexItemToToolPart,
   codexThreadToSurfaceMessages,
@@ -109,9 +113,44 @@ export type CodexThreadStartExtension = {
   developerInstructions?: string;
 };
 
+export type CodexMcpServerToolApprovalMode = 'auto' | 'prompt' | 'writes' | 'approve';
+
+export type CodexMcpServerTransport =
+  | {
+    type: 'stdio';
+    command: string;
+    args?: readonly string[];
+    cwd?: string;
+    env?: Readonly<Record<string, string>>;
+    /** Environment variable names inherited by the app-server-launched process. */
+    envVars?: readonly string[];
+  }
+  | {
+    type: 'http';
+    url: string;
+  };
+
+/** Trusted main-process configuration for an app-owned MCP server. */
+export type CodexMcpServerDefinition = {
+  name: string;
+  transport: CodexMcpServerTransport;
+  toolApprovalMode?: CodexMcpServerToolApprovalMode;
+  required?: boolean;
+  enabledTools?: readonly string[];
+  startupTimeoutMs?: number;
+  toolTimeoutMs?: number;
+};
+
 export type CodexConversationHostOptions = {
   extensionContext?: unknown;
+  /** Replaces the surface MCP definitions for this conversation. Main-process only. */
+  mcpServers?: readonly CodexMcpServerDefinition[];
 };
+
+export type CodexConversationDefaults = Pick<
+  CreateCodexConversationOptions,
+  'model' | 'reasoningEffort'
+>;
 
 export type CodexConversationLoadOptions = CodexConversationHostOptions & {
   cwd?: string;
@@ -230,10 +269,16 @@ export type CodexSurfaceOptions = {
     title?: string;
     version: string;
   };
+  /** Host-owned defaults used by explicit and implicit conversation creation. */
+  conversationDefaults?: Readonly<CodexConversationDefaults>;
   conversationLimit?: number;
+  /** Trusted main-process CODEX_HOME for this app-server child. Never expose this through renderer IPC. */
+  codexHome?: string;
   cwd?: string;
   autoSelectFirstConversation?: boolean;
   extensions?: readonly CodexSurfaceExtension[];
+  /** App-owned MCP servers applied to every started or resumed conversation. Main-process only. */
+  mcpServers?: readonly CodexMcpServerDefinition[];
   /** Receives notifications added by a newer app-server than this SDK schema. */
   onUnknownNotification?: (notification: { method: string; params?: unknown }) => void;
   permissionMode?: CodexSurfacePermissionMode;
@@ -249,6 +294,7 @@ export class CodexSurface {
   private readonly conversationListeners = new Map<string, Set<ConversationStateListener>>();
   private readonly conversationHandles = new Map<string, CodexConversation>();
   private readonly dynamicTools = new Map<string, CodexDynamicTool>();
+  private readonly defaultMcpServers: readonly CodexMcpServerDefinition[];
   private readonly hydrationPromises = new Map<string, Promise<void>>();
   private readonly historyHydrationPromises = new Map<string, Promise<void>>();
   private readonly catalogIconDataUrls = new Map<string, Promise<string | undefined>>();
@@ -268,10 +314,19 @@ export class CodexSurface {
   private pluginCatalogPromise: Promise<void> | null = null;
   private pluginCatalogLastAttemptedCwdsKey: string | null = null;
   private pluginCatalogRefreshRequested = false;
+  private accountRefreshPromise: Promise<CodexSurfaceSnapshot> | null = null;
+  private accountRefreshRequested = false;
+  private accountRefreshForceBootstrap = false;
+  private accountRefreshOrigin: CodexSurfaceEventOrigin = 'action';
+  private chatGptLoginPromise: Promise<CodexSurfaceChatGptLogin> | null = null;
+  private surfaceBootstrapPromise: Promise<void> | null = null;
+  private bootstrappedAuthenticationKey: string | null = null;
+  private lastLoadedAuthenticationIdentityKey: string | null = null;
   private eventSequence = 0;
   private closed = false;
   private state: CodexSurfaceSnapshot = {
     status: 'idle',
+    authentication: initialAuthentication(),
     conversations: [],
     activeConversationId: null,
     messages: [],
@@ -302,6 +357,7 @@ export class CodexSurface {
   };
 
   constructor(private readonly options: CodexSurfaceOptions = {}) {
+    this.defaultMcpServers = normalizeMcpServers(options.mcpServers ?? []);
     for (const extension of options.extensions ?? []) {
       for (const tool of extension.dynamicTools ?? []) {
         const name = tool.name.trim();
@@ -310,9 +366,10 @@ export class CodexSurface {
         this.dynamicTools.set(name, { ...tool, name });
       }
     }
-    this.client = options.client ?? new CodexAppServerClient(new CodexAppServerStdioTransport({
-      ...options.transport,
-    }));
+    const transportOptions = surfaceTransportOptions(options);
+    this.client = options.client ?? new CodexAppServerClient(new CodexAppServerStdioTransport(
+      transportOptions,
+    ));
     this.unsubscribeNotification = this.client.onNotification((notification) => this.handleNotification(notification));
     this.unsubscribeDisconnect = this.client.onDisconnect((error) => this.handleDisconnect(error));
     this.unsubscribeApprovals = registerCodexApprovalHandlers(this.client, (pending) => {
@@ -376,6 +433,13 @@ export class CodexSurface {
     this.emitSurfaceStatus('lifecycle');
     this.connectPromise = (async () => {
       try {
+        // A restarted app-server must repopulate global state even when the
+        // authenticated account is unchanged from the previous process.
+        this.bootstrappedAuthenticationKey = null;
+        this.pluginCatalogLastAttemptedCwdsKey = null;
+        this.pluginCatalogRefreshRequested = true;
+        this.catalogIconDataUrls.clear();
+        this.resetAppServerSessionState();
         await this.client.start();
         const clientInfo = this.options.clientInfo ?? {
           name: 'codex_app_sdk',
@@ -390,20 +454,14 @@ export class CodexSurface {
           },
           capabilities: { experimentalApi: true, requestAttestation: false },
         });
-        await Promise.all([
-          this.loadModels(),
-          this.loadSkills(),
-          this.loadPermissionProfiles(),
-          this.loadRateLimits(),
-          this.loadConversations(),
-        ]);
-        const firstConversation = this.state.conversations[0];
-        if (firstConversation && this.options.autoSelectFirstConversation !== false) {
-          await this.resumeConversation(firstConversation.id);
+        const authenticationChanged = await this.loadAuthentication('lifecycle');
+        if (authenticationChanged || this.authenticationBlocksBootstrap()) {
+          await this.clearAuthenticatedSurfaceData();
         }
+        if (!this.authenticationBlocksBootstrap()) await this.bootstrapSurfaceData();
         this.patch({ status: 'ready', error: null });
         this.emitSurfaceStatus('lifecycle');
-        this.schedulePluginCatalogRefresh();
+        if (!this.authenticationBlocksBootstrap()) this.schedulePluginCatalogRefresh();
         return this.getSnapshot();
       } catch (error) {
         this.patch({ status: 'error', error: errorMessage(error) });
@@ -414,6 +472,259 @@ export class CodexSurface {
       }
     })();
     return this.connectPromise;
+  }
+
+  async refreshAccount(): Promise<CodexSurfaceSnapshot> {
+    await this.ensureConnected();
+    return this.refreshAuthentication('action', true);
+  }
+
+  async startChatGptLogin(): Promise<CodexSurfaceChatGptLogin> {
+    await this.ensureConnected();
+    const current = this.state.authentication.login;
+    if (current.status === 'pending' && current.loginId && current.authUrl) {
+      return { loginId: current.loginId, authUrl: current.authUrl };
+    }
+    if (this.chatGptLoginPromise) return this.chatGptLoginPromise;
+    const start = (async () => {
+      this.patchAuthentication({
+        login: { status: 'starting', loginId: null, authUrl: null, error: null },
+      }, 'action');
+      try {
+        const response = await this.client.request('account/login/start', { type: 'chatgpt' });
+        if (response.type !== 'chatgpt') {
+          throw new Error(`Codex account/login/start returned unexpected login type '${response.type}'`);
+        }
+        const loginId = normalizedLoginId(response.loginId);
+        const authUrl = safeLoginUrl(response.authUrl);
+        this.patchAuthentication({
+          login: { status: 'pending', loginId, authUrl, error: null },
+        }, 'action');
+        return { loginId, authUrl };
+      } catch (error) {
+        this.patchAuthentication({
+          login: {
+            status: 'error',
+            loginId: null,
+            authUrl: null,
+            error: errorMessage(error),
+          },
+        }, 'action');
+        throw error;
+      }
+    })();
+    this.chatGptLoginPromise = start;
+    void start.finally(() => {
+      if (this.chatGptLoginPromise === start) this.chatGptLoginPromise = null;
+    }).catch(() => undefined);
+    return start;
+  }
+
+  async cancelLogin(loginId = this.state.authentication.login.loginId ?? ''): Promise<CodexSurfaceSnapshot> {
+    await this.ensureConnected();
+    const normalized = normalizedLoginId(loginId);
+    const response = await this.client.request('account/login/cancel', { loginId: normalized });
+    this.patchAuthentication({
+      login: {
+        status: response.status === 'canceled' ? 'cancelled' : 'idle',
+        loginId: null,
+        authUrl: null,
+        error: null,
+      },
+    }, 'action');
+    return this.getSnapshot();
+  }
+
+  async logout(): Promise<CodexSurfaceSnapshot> {
+    await this.ensureConnected();
+    await this.client.request('account/logout', undefined);
+    this.patchAuthentication({
+      login: { status: 'idle', loginId: null, authUrl: null, error: null },
+    }, 'action');
+    const authenticationChanged = await this.loadAuthentication('action');
+    if (authenticationChanged || this.authenticationBlocksBootstrap()) {
+      await this.clearAuthenticatedSurfaceData();
+    }
+    if (!this.authenticationBlocksBootstrap()) await this.bootstrapSurfaceData(true);
+    return this.getSnapshot();
+  }
+
+  private refreshAuthentication(
+    origin: CodexSurfaceEventOrigin,
+    forceBootstrap = false,
+  ): Promise<CodexSurfaceSnapshot> {
+    this.accountRefreshRequested = true;
+    this.accountRefreshForceBootstrap ||= forceBootstrap;
+    this.accountRefreshOrigin = origin;
+    if (this.accountRefreshPromise) return this.accountRefreshPromise;
+    const refresh = (async () => {
+      while (this.accountRefreshRequested) {
+        const refreshOrigin = this.accountRefreshOrigin;
+        const refreshForceBootstrap = this.accountRefreshForceBootstrap;
+        this.accountRefreshRequested = false;
+        this.accountRefreshForceBootstrap = false;
+        try {
+          const authenticationChanged = await this.loadAuthentication(refreshOrigin);
+          if (authenticationChanged || this.authenticationBlocksBootstrap()) {
+            await this.clearAuthenticatedSurfaceData();
+          }
+          if (!this.authenticationBlocksBootstrap()) {
+            await this.bootstrapSurfaceData(refreshForceBootstrap);
+          }
+        } catch (error) {
+          if (!this.accountRefreshRequested) throw error;
+          this.accountRefreshForceBootstrap ||= refreshForceBootstrap;
+        }
+      }
+      return this.getSnapshot();
+    })();
+    this.accountRefreshPromise = refresh;
+    void refresh.finally(() => {
+      if (this.accountRefreshPromise === refresh) this.accountRefreshPromise = null;
+    }).catch(() => undefined);
+    return refresh;
+  }
+
+  private async loadAuthentication(origin: CodexSurfaceEventOrigin): Promise<boolean> {
+    const previousAuthenticationIdentityKey = this.lastLoadedAuthenticationIdentityKey;
+    this.patchAuthentication({ status: 'loading', error: null }, origin);
+    try {
+      const response = await this.client.request('account/read', { refreshToken: false });
+      const account = response.account ? surfaceAccount(response.account) : null;
+      const authentication = {
+        ...this.state.authentication,
+        account,
+        requiresOpenaiAuth: response.requiresOpenaiAuth,
+      };
+      const authenticationIdentityKey = surfaceAuthenticationIdentityKey(authentication);
+      this.patchAuthentication({
+        status: 'loaded',
+        account,
+        requiresOpenaiAuth: response.requiresOpenaiAuth,
+        error: null,
+      }, origin);
+      this.lastLoadedAuthenticationIdentityKey = authenticationIdentityKey;
+      return previousAuthenticationIdentityKey !== null
+        && previousAuthenticationIdentityKey !== authenticationIdentityKey;
+    } catch (error) {
+      this.patchAuthentication({
+        status: 'error',
+        error: errorMessage(error),
+      }, origin);
+      throw error;
+    }
+  }
+
+  private authenticationBlocksBootstrap(): boolean {
+    const authentication = this.state.authentication;
+    return authentication.status === 'loaded'
+      && authentication.account === null
+      && authentication.requiresOpenaiAuth === true;
+  }
+
+  private bootstrapSurfaceData(force = false): Promise<void> {
+    const authenticationKey = surfaceAuthenticationKey(this.state.authentication);
+    if (!force && this.bootstrappedAuthenticationKey === authenticationKey) return Promise.resolve();
+    if (this.surfaceBootstrapPromise) {
+      const pending = this.surfaceBootstrapPromise;
+      return pending.then(() => {
+        if (this.surfaceBootstrapPromise === pending) this.surfaceBootstrapPromise = null;
+        return this.bootstrapSurfaceData(force);
+      });
+    }
+    const bootstrap = (async () => {
+      await Promise.all([
+        this.loadModels(),
+        this.loadSkills(force),
+        this.loadPermissionProfiles(),
+        this.loadRateLimits(),
+        this.loadConversations(),
+      ]);
+      const activeConversation = this.state.activeConversationId
+        ? this.state.conversations.find((conversation) => conversation.id === this.state.activeConversationId)
+        : undefined;
+      const conversationToResume = activeConversation
+        ?? (this.options.autoSelectFirstConversation === false ? undefined : this.state.conversations[0]);
+      if (conversationToResume && !this.runtimes.get(conversationToResume.id)?.hydrated) {
+        await this.resumeConversation(conversationToResume.id);
+      }
+      this.bootstrappedAuthenticationKey = authenticationKey;
+      this.schedulePluginCatalogRefresh(force);
+    })();
+    this.surfaceBootstrapPromise = bootstrap;
+    void bootstrap.finally(() => {
+      if (this.surfaceBootstrapPromise === bootstrap) this.surfaceBootstrapPromise = null;
+    }).catch(() => undefined);
+    return bootstrap;
+  }
+
+  private resetAppServerSessionState(): void {
+    this.runtimes.clear();
+    this.hydrationPromises.clear();
+    this.historyHydrationPromises.clear();
+    this.commandOutputForwardItemIds.clear();
+    this.semanticEventValues.clear();
+  }
+
+  private async clearAuthenticatedSurfaceData(): Promise<void> {
+    const pendingBootstrap = this.surfaceBootstrapPromise;
+    if (pendingBootstrap) await pendingBootstrap.catch(() => undefined);
+    for (const pending of this.pendingApprovals.values()) pending.resolve('deny', 'once');
+    for (const pending of this.pendingClientRequests.values()) pending.responder.reject('Codex account signed out');
+    this.pendingApprovals.clear();
+    this.pendingClientRequests.clear();
+    this.runtimes.clear();
+    this.hydrationPromises.clear();
+    this.historyHydrationPromises.clear();
+    this.conversationHandles.clear();
+    this.hostOptionsByThread.clear();
+    this.commandOutputForwardItemIds.clear();
+    this.catalogIconDataUrls.clear();
+    this.semanticEventValues.clear();
+    this.bootstrappedAuthenticationKey = null;
+    this.pluginCatalogLastAttemptedCwdsKey = null;
+    this.pluginCatalogRefreshRequested = true;
+    this.patch({
+      conversations: [],
+      activeConversationId: null,
+      messages: [],
+      clientRequests: [],
+      answeredClientRequestIds: [],
+      approvals: [],
+      models: [],
+      modelCatalogStatus: 'notLoaded',
+      skills: [],
+      skillCatalogStatus: 'notLoaded',
+      plugins: [],
+      pluginCatalogStatus: 'notLoaded',
+      permissionProfiles: [],
+      approvalPresets: [],
+      approvalPreset: null,
+      selectedModelId: null,
+      selectedReasoningEffort: null,
+      planMode: false,
+      contextUsage: null,
+      goal: null,
+      turnGitDiff: null,
+      threadStatus: null,
+      rateLimits: null,
+      queuedPrompts: [],
+      busy: false,
+      historyLoading: false,
+      error: null,
+    });
+  }
+
+  private patchAuthentication(
+    patch: Partial<CodexSurfaceAuthentication>,
+    origin: CodexSurfaceEventOrigin,
+  ): void {
+    const authentication = { ...this.state.authentication, ...patch };
+    this.patch({ authentication });
+    this.emitEvent(origin, {
+      type: 'authentication.changed',
+      payload: { authentication: structuredClone(authentication) },
+    });
   }
 
   async refreshConversations(): Promise<CodexSurfaceSnapshot> {
@@ -676,7 +987,7 @@ export class CodexSurface {
   }
 
   private schedulePluginCatalogRefresh(force = false): void {
-    if (this.closed || this.state.status !== 'ready') return;
+    if (this.closed || this.state.status !== 'ready' || this.authenticationBlocksBootstrap()) return;
     const scope = this.pluginCatalogScope();
     if (force) {
       this.pluginCatalogLastAttemptedCwdsKey = null;
@@ -724,14 +1035,14 @@ export class CodexSurface {
       const plugins = await Promise.all(
         [...summaries.values()].map((plugin) => surfacePlugin(plugin, (path) => this.catalogIconDataUrl(path))),
       );
-      if (this.closed) return;
+      if (this.closed || this.authenticationBlocksBootstrap()) return;
       this.patch({ plugins, pluginCatalogStatus: 'loaded' });
       this.emitEvent('action', {
         type: 'catalog.pluginsChanged',
         payload: { plugins: structuredClone(plugins), status: 'loaded' },
       });
     } catch {
-      if (this.closed) return;
+      if (this.closed || this.authenticationBlocksBootstrap()) return;
       this.pluginCatalogLastAttemptedCwdsKey = null;
       this.patch({ pluginCatalogStatus: 'error' });
       this.emitEvent('action', {
@@ -895,6 +1206,7 @@ export class CodexSurface {
     hostOptions: CodexConversationHostOptions = {},
   ): Promise<CodexSurfaceSnapshot> {
     await this.ensureConnected();
+    options = { ...this.options.conversationDefaults, ...options };
     const cwd = options.cwd ?? this.options.cwd;
     const catalogs = await this.loadConversationCatalogs(cwd);
     if (options.approvalPreset && !catalogs.approvalPresets.includes(options.approvalPreset)) {
@@ -922,13 +1234,16 @@ export class CodexSurface {
         : requestedModel ? defaultReasoningEffort(requestedModel) : null)
       ?? undefined;
     validateReasoningEffort(requestedModel, requestedReasoningEffort);
+    const mcpServers = hostOptions.mcpServers === undefined
+      ? this.defaultMcpServers
+      : normalizeMcpServers(hostOptions.mcpServers);
     const extension = await this.conversationExtension({
       operation: 'start',
       conversationId: null,
       cwd,
       createOptions: options,
       extensionContext: hostOptions.extensionContext,
-    }, options);
+    }, options, mcpServers);
     const response = await this.client.request('thread/start', {
       ...(cwd ? { cwd } : {}),
       ...(model ? { model } : {}),
@@ -972,6 +1287,7 @@ export class CodexSurface {
     this.hostOptionsByThread.set(response.thread.id, {
       ...(cwd ? { cwd } : {}),
       ...hostOptions,
+      mcpServers,
     });
     const summary = threadToSummary(response.thread);
     this.patch({
@@ -1007,14 +1323,20 @@ export class CodexSurface {
     loadOptions: CodexConversationLoadOptions = {},
     historyReason: 'load' | 'resume' = 'resume',
   ): Promise<CodexSurfaceSnapshot> {
-    const hostOptions = { ...this.hostOptionsByThread.get(conversationId), ...loadOptions };
+    const requestedHostOptions = { ...this.hostOptionsByThread.get(conversationId), ...loadOptions };
+    const hostOptions = {
+      ...requestedHostOptions,
+      mcpServers: requestedHostOptions.mcpServers === undefined
+        ? this.defaultMcpServers
+        : normalizeMcpServers(requestedHostOptions.mcpServers),
+    };
     this.hostOptionsByThread.set(conversationId, hostOptions);
     const extension = await this.conversationExtension({
       operation: 'resume',
       conversationId,
       cwd: hostOptions.cwd,
       extensionContext: hostOptions.extensionContext,
-    });
+    }, {}, hostOptions.mcpServers);
     const loadingRuntime = this.createRuntime(conversationId, { historyLoading: true, error: null });
     if (activate) this.activateRuntime(loadingRuntime);
     try {
@@ -1990,6 +2312,11 @@ export class CodexSurface {
     if (this.state.status !== 'ready') {
       await this.connect();
     }
+    while (true) {
+      const pending = this.accountRefreshPromise ?? this.surfaceBootstrapPromise;
+      if (!pending) return;
+      await pending;
+    }
   }
 
   private async ensureThreadReady(
@@ -2437,20 +2764,27 @@ export class CodexSurface {
   private async conversationExtension(
     context: Parameters<NonNullable<CodexSurfaceExtension['configureConversation']>>[0],
     createOptions: CreateCodexConversationOptions = {},
+    mcpServers: readonly CodexMcpServerDefinition[] = this.defaultMcpServers,
   ): Promise<CodexThreadStartExtension> {
-    const config: Record<string, CodexSurfaceJsonValue> = {};
+    const config: Record<string, CodexSurfaceJsonValue> = mcpServerConfig(mcpServers);
     const developerInstructions: string[] = [];
     let baseInstructions: string | undefined;
     for (const extension of this.options.extensions ?? []) {
       if (!extension.configureConversation) continue;
       const contribution = await extension.configureConversation(context);
-      if (contribution.config) Object.assign(config, contribution.config);
+      if (contribution.config) {
+        assertNoMcpConfigCollision(contribution.config, mcpServers);
+        Object.assign(config, contribution.config);
+      }
       if (contribution.baseInstructions !== undefined) baseInstructions = contribution.baseInstructions;
       if (contribution.developerInstructions?.trim()) {
         developerInstructions.push(contribution.developerInstructions.trim());
       }
     }
-    if (createOptions.config) Object.assign(config, createOptions.config);
+    if (createOptions.config) {
+      assertNoMcpConfigCollision(createOptions.config, mcpServers);
+      Object.assign(config, createOptions.config);
+    }
     if (createOptions.baseInstructions !== undefined) baseInstructions = createOptions.baseInstructions;
     if (createOptions.developerInstructions?.trim()) {
       developerInstructions.push(createOptions.developerInstructions.trim());
@@ -2548,6 +2882,37 @@ export class CodexSurface {
       return null;
     }
     return 'ask-for-approval';
+  }
+
+  private refreshAuthenticationFromNotification(forceBootstrap = false): void {
+    void this.refreshAuthentication('notification', forceBootstrap).catch((error) => {
+      this.patch({ error: errorMessage(error) });
+    });
+  }
+
+  private handleAccountLoginCompleted(params: v2.AccountLoginCompletedNotification): void {
+    const current = this.state.authentication.login;
+    const loginId = params.loginId ?? current.loginId;
+    if (!params.success) {
+      this.patchAuthentication({
+        login: {
+          status: 'error',
+          loginId,
+          authUrl: current.authUrl,
+          error: params.error ?? 'Codex sign-in failed',
+        },
+      }, 'notification');
+      return;
+    }
+    this.patchAuthentication({
+      login: {
+        status: 'completed',
+        loginId,
+        authUrl: current.authUrl,
+        error: null,
+      },
+    }, 'notification');
+    this.refreshAuthenticationFromNotification();
   }
 
   private handleNotification(notification: ServerNotification): void {
@@ -2870,6 +3235,12 @@ export class CodexSurface {
           payload: { rateLimits: structuredClone(this.state.rateLimits) },
         });
         return;
+      case 'account/updated':
+        this.refreshAuthenticationFromNotification();
+        return;
+      case 'account/login/completed':
+        this.handleAccountLoginCompleted(notification.params);
+        return;
       case 'hook/started':
       case 'hook/completed':
       case 'item/autoApprovalReview/started':
@@ -2881,7 +3252,6 @@ export class CodexSurface {
       case 'item/fileChange/outputDelta':
       case 'mcpServer/oauthLogin/completed':
       case 'mcpServer/startupStatus/updated':
-      case 'account/updated':
       case 'app/list/updated':
       case 'remoteControl/status/changed':
       case 'externalAgentConfig/import/progress':
@@ -2910,7 +3280,6 @@ export class CodexSurface {
       case 'thread/realtime/closed':
       case 'windows/worldWritableWarning':
       case 'windowsSandbox/setupCompleted':
-      case 'account/login/completed':
         return;
       default:
         return this.handleUnknownNotification(notification);
@@ -3373,17 +3742,37 @@ export class CodexSurface {
 
     const includeCommandOutput = this.shouldForwardCommandOutput(params.threadId, completed, params.item);
     const toolPart = codexItemToToolPart(params.item, { includeCommandOutput });
-    if (!toolPart) return;
+    const mediaPart = codexItemToMediaPart(params.item);
+    if (!toolPart && !mediaPart) return;
+    const mediaChanged = mediaPart ? !runtime.messages.some((message) => (
+      message.parts.some((part) => part.type === 'media' && surfaceMediaPartsEqual(part, mediaPart))
+    )) : false;
+    let messages = toolPart
+      ? upsertAssistantToolPart(runtime.messages, params.threadId, params.turnId, toolPart)
+      : [...runtime.messages];
+    if (mediaPart) {
+      messages = upsertAssistantMediaPart(messages, params.threadId, params.turnId, mediaPart);
+    }
     this.patchRuntime(params.threadId, {
-      messages: upsertAssistantToolPart(runtime.messages, params.threadId, params.turnId, toolPart),
+      messages,
     });
-    const message = this.messageContainingTool(params.threadId, params.turnId, toolPart.id);
-    if (message) {
+    const message = toolPart
+      ? this.messageContainingTool(params.threadId, params.turnId, toolPart.id)
+      : this.assistantMessageForTurn(params.threadId, params.turnId);
+    if (message && toolPart) {
       this.emitEvent('notification', {
         type: completed ? 'tool.completed' : 'tool.started',
         conversationId: params.threadId,
         turnId: params.turnId,
         payload: { messageId: message.id, toolPart: structuredClone(toolPart) },
+      });
+    }
+    if (message && mediaPart && mediaChanged) {
+      this.emitEvent('notification', {
+        type: 'message.updated',
+        conversationId: params.threadId,
+        turnId: params.turnId,
+        payload: { message: structuredClone(message) },
       });
     }
   }
@@ -3508,6 +3897,276 @@ export class CodexSurface {
 
 export function createCodexSurface(options: CodexSurfaceOptions = {}): CodexSurface {
   return new CodexSurface(options);
+}
+
+function normalizeMcpServers(
+  definitions: readonly CodexMcpServerDefinition[],
+): readonly CodexMcpServerDefinition[] {
+  if (!Array.isArray(definitions)) throw new TypeError('Codex MCP servers must be an array');
+  const names = new Set<string>();
+  return definitions.map((definition, index) => {
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+      throw new TypeError(`Codex MCP server ${index + 1} must be an object`);
+    }
+    const name = definition.name?.trim();
+    if (!name || !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
+      throw new TypeError(`Codex MCP server ${index + 1} name must match ^[A-Za-z0-9][A-Za-z0-9_-]*$`);
+    }
+    if (names.has(name)) throw new Error(`Duplicate Codex MCP server '${name}'`);
+    names.add(name);
+    const transport = normalizeMcpTransport(definition.transport, name);
+    const toolApprovalMode = definition.toolApprovalMode;
+    if (
+      toolApprovalMode !== undefined
+      && toolApprovalMode !== 'auto'
+      && toolApprovalMode !== 'prompt'
+      && toolApprovalMode !== 'writes'
+      && toolApprovalMode !== 'approve'
+    ) {
+      throw new TypeError(`Codex MCP server '${name}' tool approval mode is invalid`);
+    }
+    if (definition.required !== undefined && typeof definition.required !== 'boolean') {
+      throw new TypeError(`Codex MCP server '${name}' required flag must be a boolean`);
+    }
+    const enabledTools = definition.enabledTools === undefined
+      ? undefined
+      : normalizedNonEmptyStrings(definition.enabledTools, `Codex MCP server '${name}' enabled tool`);
+    const startupTimeoutMs = optionalPositiveMilliseconds(
+      definition.startupTimeoutMs,
+      `Codex MCP server '${name}' startup timeout`,
+    );
+    const toolTimeoutMs = optionalPositiveMilliseconds(
+      definition.toolTimeoutMs,
+      `Codex MCP server '${name}' tool timeout`,
+    );
+    return {
+      name,
+      transport,
+      ...(toolApprovalMode === undefined ? {} : { toolApprovalMode }),
+      ...(definition.required === undefined ? {} : { required: definition.required }),
+      ...(enabledTools === undefined ? {} : { enabledTools }),
+      ...(startupTimeoutMs === undefined ? {} : { startupTimeoutMs }),
+      ...(toolTimeoutMs === undefined ? {} : { toolTimeoutMs }),
+    };
+  });
+}
+
+function normalizeMcpTransport(
+  transport: CodexMcpServerTransport,
+  serverName: string,
+): CodexMcpServerTransport {
+  if (!transport || typeof transport !== 'object' || Array.isArray(transport)) {
+    throw new TypeError(`Codex MCP server '${serverName}' transport must be an object`);
+  }
+  if (transport.type === 'http') {
+    const url = transport.url?.trim();
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new TypeError(`Codex MCP server '${serverName}' URL must be valid`);
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new TypeError(`Codex MCP server '${serverName}' URL must use HTTP or HTTPS`);
+    }
+    return { type: 'http', url };
+  }
+  if (transport.type !== 'stdio') {
+    throw new TypeError(`Codex MCP server '${serverName}' transport type is invalid`);
+  }
+  const command = transport.command?.trim();
+  if (!command) throw new TypeError(`Codex MCP server '${serverName}' command cannot be empty`);
+  const args = transport.args === undefined
+    ? undefined
+    : normalizedNonEmptyStrings(transport.args, `Codex MCP server '${serverName}' argument`);
+  const cwd = transport.cwd?.trim();
+  if (cwd !== undefined && (!cwd || !isAbsolute(cwd))) {
+    throw new TypeError(`Codex MCP server '${serverName}' cwd must be an absolute path`);
+  }
+  let env: Record<string, string> | undefined;
+  if (transport.env !== undefined) {
+    if (!transport.env || typeof transport.env !== 'object' || Array.isArray(transport.env)) {
+      throw new TypeError(`Codex MCP server '${serverName}' env must be an object`);
+    }
+    env = {};
+    for (const [key, value] of Object.entries(transport.env)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== 'string') {
+        throw new TypeError(`Codex MCP server '${serverName}' env entries must be string environment variables`);
+      }
+      env[key] = value;
+    }
+  }
+  const envVars = transport.envVars === undefined
+    ? undefined
+    : normalizedEnvironmentVariableNames(transport.envVars, serverName);
+  return {
+    type: 'stdio',
+    command,
+    ...(args === undefined ? {} : { args }),
+    ...(cwd === undefined ? {} : { cwd }),
+    ...(env === undefined ? {} : { env }),
+    ...(envVars === undefined ? {} : { envVars }),
+  };
+}
+
+function normalizedNonEmptyStrings(values: readonly string[], label: string): string[] {
+  if (!Array.isArray(values)) throw new TypeError(`${label}s must be an array`);
+  const normalized = values.map((value) => {
+    if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${label} cannot be empty`);
+    return value.trim();
+  });
+  return [...new Set(normalized)];
+}
+
+function normalizedEnvironmentVariableNames(values: readonly string[], serverName: string): string[] {
+  const names = normalizedNonEmptyStrings(values, `Codex MCP server '${serverName}' environment variable`);
+  for (const name of names) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      throw new TypeError(`Codex MCP server '${serverName}' environment variable '${name}' is invalid`);
+    }
+  }
+  return names;
+}
+
+function optionalPositiveMilliseconds(value: number | undefined, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isFinite(value) || value <= 0) throw new TypeError(`${label} must be a positive finite number`);
+  return value;
+}
+
+function mcpServerConfig(
+  definitions: readonly CodexMcpServerDefinition[],
+): Record<string, CodexSurfaceJsonValue> {
+  const config: Record<string, CodexSurfaceJsonValue> = {};
+  for (const definition of definitions) {
+    const server: Record<string, CodexSurfaceJsonValue> = definition.transport.type === 'http'
+      ? { url: definition.transport.url }
+      : {
+        command: definition.transport.command,
+        ...(definition.transport.args === undefined ? {} : { args: [...definition.transport.args] }),
+        ...(definition.transport.cwd === undefined ? {} : { cwd: definition.transport.cwd }),
+        ...(definition.transport.env === undefined ? {} : { env: { ...definition.transport.env } }),
+        ...(definition.transport.envVars === undefined ? {} : { env_vars: [...definition.transport.envVars] }),
+      };
+    if (definition.toolApprovalMode !== undefined) {
+      server.default_tools_approval_mode = definition.toolApprovalMode;
+    }
+    if (definition.required !== undefined) server.required = definition.required;
+    if (definition.enabledTools !== undefined) server.enabled_tools = [...definition.enabledTools];
+    if (definition.startupTimeoutMs !== undefined) server.startup_timeout_sec = definition.startupTimeoutMs / 1000;
+    if (definition.toolTimeoutMs !== undefined) server.tool_timeout_sec = definition.toolTimeoutMs / 1000;
+    config[`mcp_servers.${definition.name}`] = server;
+  }
+  return config;
+}
+
+function assertNoMcpConfigCollision(
+  config: Readonly<Record<string, CodexSurfaceJsonValue>>,
+  definitions: readonly CodexMcpServerDefinition[],
+): void {
+  if (definitions.length === 0) return;
+  for (const key of Object.keys(config)) {
+    if (key === 'mcp_servers') {
+      throw new Error('Raw mcp_servers config cannot be combined with typed Codex MCP servers');
+    }
+    for (const definition of definitions) {
+      const path = `mcp_servers.${definition.name}`;
+      if (key === path || key.startsWith(`${path}.`)) {
+        throw new Error(`Raw config for Codex MCP server '${definition.name}' conflicts with its typed definition`);
+      }
+    }
+  }
+}
+
+function initialAuthentication(): CodexSurfaceAuthentication {
+  return {
+    status: 'notLoaded',
+    account: null,
+    requiresOpenaiAuth: null,
+    error: null,
+    login: {
+      status: 'idle',
+      loginId: null,
+      authUrl: null,
+      error: null,
+    },
+  };
+}
+
+function surfaceAccount(account: v2.Account): NonNullable<CodexSurfaceAuthentication['account']> {
+  if (account.type === 'chatgpt') {
+    return {
+      type: 'chatgpt',
+      email: account.email,
+      planType: account.planType,
+    };
+  }
+  if (account.type === 'amazonBedrock') {
+    return {
+      type: 'amazonBedrock',
+      credentialSource: account.credentialSource,
+    };
+  }
+  return { type: 'apiKey' };
+}
+
+function surfaceAuthenticationKey(authentication: CodexSurfaceAuthentication): string {
+  return JSON.stringify({
+    account: authentication.account,
+    requiresOpenaiAuth: authentication.requiresOpenaiAuth,
+  });
+}
+
+function surfaceAuthenticationIdentityKey(authentication: CodexSurfaceAuthentication): string {
+  const account = authentication.account;
+  if (!account) {
+    return JSON.stringify({ type: null, requiresOpenaiAuth: authentication.requiresOpenaiAuth });
+  }
+  if (account.type === 'chatgpt') return JSON.stringify({ type: account.type, email: account.email });
+  if (account.type === 'amazonBedrock') {
+    return JSON.stringify({ type: account.type, credentialSource: account.credentialSource });
+  }
+  return JSON.stringify({ type: account.type });
+}
+
+function normalizedLoginId(value: string): string {
+  const loginId = value.trim();
+  if (!loginId) throw new Error('Codex login id cannot be empty');
+  return loginId;
+}
+
+function safeLoginUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('Codex account/login/start returned an invalid authentication URL');
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error(`Codex account/login/start returned unsupported authentication URL scheme '${url.protocol}'`);
+  }
+  return url.href;
+}
+
+function surfaceTransportOptions(options: CodexSurfaceOptions): CodexAppServerStdioTransportOptions {
+  const topLevelHome = options.codexHome === undefined
+    ? undefined
+    : absoluteCodexHome(options.codexHome);
+  const transportHome = options.transport?.codexHome;
+  if (topLevelHome !== undefined && transportHome !== undefined && topLevelHome !== transportHome) {
+    throw new Error('Codex surface codexHome conflicts with transport.codexHome');
+  }
+  return {
+    ...options.transport,
+    ...(topLevelHome === undefined ? {} : { codexHome: topLevelHome }),
+  };
+}
+
+function absoluteCodexHome(value: string): string {
+  const codexHome = value.trim();
+  if (!codexHome) throw new Error('Codex surface codexHome cannot be empty');
+  if (!isAbsolute(codexHome)) throw new Error('Codex surface codexHome must be an absolute path');
+  return codexHome;
 }
 
 function threadToSummary(thread: v2.Thread): CodexConversationSummary {
@@ -4225,6 +4884,57 @@ function upsertAssistantToolPart(
   }
   next.splice(messageIndex, 1, { ...message, status: 'streaming', parts });
   return pruneEmptyAssistantPlaceholders(next, threadId);
+}
+
+function upsertAssistantMediaPart(
+  messages: readonly SurfaceMessage[],
+  threadId: string,
+  turnId: string,
+  mediaPart: SurfaceMessageMediaPart,
+): SurfaceMessage[] {
+  let next = [...messages];
+  let messageIndex = next.findIndex((message) => (
+    message.role === 'assistant'
+    && message.metadata?.turnId === turnId
+    && message.parts.some((part) => part.type === 'media' && part.itemId === mediaPart.itemId)
+  ));
+  if (messageIndex < 0 && mediaPart.itemId) {
+    messageIndex = next.findIndex((message) => (
+      message.role === 'assistant'
+      && message.metadata?.turnId === turnId
+      && message.parts.some((part) => part.type === 'tool' && part.id === mediaPart.itemId)
+    ));
+  }
+  if (messageIndex < 0) {
+    next = ensureAssistantTurnMessage(next, threadId, turnId);
+    messageIndex = findLastIndex(next, (message) => (
+      message.role === 'assistant'
+      && message.kind === undefined
+      && message.metadata?.turnId === turnId
+    ));
+  }
+  const message = messageIndex >= 0 ? next[messageIndex] : undefined;
+  if (!message) return next;
+  const parts = [...message.parts];
+  const partIndex = parts.findIndex((part) => (
+    part.type === 'media' && part.itemId === mediaPart.itemId
+  ));
+  if (partIndex >= 0) parts.splice(partIndex, 1, mediaPart);
+  else parts.push(mediaPart);
+  next.splice(messageIndex, 1, { ...message, status: 'streaming', parts });
+  return pruneEmptyAssistantPlaceholders(next, threadId);
+}
+
+function surfaceMediaPartsEqual(
+  left: SurfaceMessageMediaPart,
+  right: SurfaceMessageMediaPart,
+): boolean {
+  return left.itemId === right.itemId
+    && left.media.url === right.media.url
+    && left.media.alt === right.media.alt
+    && left.media.mimeType === right.media.mimeType
+    && left.media.prompt === right.media.prompt
+    && left.media.title === right.media.title;
 }
 
 function updateAssistantToolPart(
