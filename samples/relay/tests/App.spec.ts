@@ -11,7 +11,7 @@ describe('Relay App', () => {
     Reflect.deleteProperty(window, 'relayOperations');
   });
 
-  it('composes the full business board above one uncustomized SDK conversation pane', async () => {
+  it('composes the KPI header and operations rail beside one uncustomized conversation pane', async () => {
     const api = fakeSurfaceApi();
     window.codexSurface = api;
     window.codexAppSdkNative = fakeNativeApi();
@@ -23,6 +23,12 @@ describe('Relay App', () => {
     expect(api.connect).toHaveBeenCalledOnce();
     expect(wrapper.text()).toContain('Relay');
     expect(wrapper.text()).toContain('SHP-4827');
+    const shellChildren = Array.from(wrapper.get('.relay-shell').element.children);
+    expect(shellChildren).toStrictEqual([
+      wrapper.get('.operations-board__header').element,
+      wrapper.get('.operations-board__workspace').element,
+      wrapper.get('.relay-conversation').element,
+    ]);
     const pane = wrapper.getComponent({ name: 'CodexConversationPane' });
     expect(pane.classes()).toContain('relay-chat');
     expect(pane.props('presentation')).toBeUndefined();

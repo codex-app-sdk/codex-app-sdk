@@ -27,4 +27,13 @@ describe('Relay sample product boundary', () => {
     expect(app).not.toContain(':capabilities=');
     expect(app).not.toMatch(/thread\/(start|resume)|turn\/start|JSON-RPC/);
   });
+
+  it('keeps the business workspace vertical beside the conversation', () => {
+    const styles = readFileSync(path.join(sampleRoot, 'src/renderer/styles.css'), 'utf8');
+
+    expect(styles).toContain('"header header"');
+    expect(styles).toContain('"operations conversation"');
+    expect(styles).toMatch(/\.operations-board__workspace\s*{[^}]*grid-area: operations;/s);
+    expect(styles).toMatch(/\.relay-conversation\s*{[^}]*grid-area: conversation;/s);
+  });
 });

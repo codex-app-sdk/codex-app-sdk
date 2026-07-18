@@ -40,7 +40,7 @@
         :surface="surface"
         aria-label="Chat with Relay"
         empty-title="Your operations room is ready"
-        empty-description="Select an exception action above, or ask about any shipment in the composer."
+        empty-description="Select an exception action on the left, or ask about any shipment in the composer."
         placeholder="Ask about operations…"
         autofocus
       />

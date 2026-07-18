@@ -1,8 +1,10 @@
 # Relay logistics exception desk
 
 Relay is a business-oriented Electron + Vue sample built around one persistent
-Codex conversation. The upper business view is sample-owned; the lower view is
-the stock SDK `CodexConversationPane` with only light semantic theming.
+Codex conversation. A shared KPI header sits above a vertical workspace: the
+sample-owned exception queue and issue detail are stacked in the left rail,
+while the right side remains the stock SDK `CodexConversationPane` with only
+light semantic theming.
 
 The sample demonstrates a complete bidirectional product loop:
 
