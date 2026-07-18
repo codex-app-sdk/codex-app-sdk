@@ -4,7 +4,7 @@ import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatComposerSkillMenu from '../../../src/vue/chat/ChatComposerSkillMenu.vue';
-import type { BackendSkillSummary } from '../../../src/vue/chat/contracts';
+import type { CodexSkillSummary } from '../../../src/vue/chat/contracts';
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 
@@ -46,7 +46,7 @@ describe('ChatComposerSkillMenu', () => {
   });
 });
 
-function createSkills(count: number): BackendSkillSummary[] {
+function createSkills(count: number): CodexSkillSummary[] {
   return Array.from({ length: count }, (_, index) => ({
     name: `skill-${index + 1}`,
     displayName: `Skill ${index + 1}`,

@@ -21,6 +21,11 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
       const toolCall = rendererToolPartToToolCall(message, part, toolCalls.length);
       toolCalls.push(toolCall);
       parts.push({ type: 'tool', toolCall });
+    } else if (part.type === 'attachment') {
+      parts.push({
+        type: 'attachment',
+        attachment: { ...part.attachment },
+      });
     } else {
       contentParts.push(part.text);
       parts.push({ type: 'text', content: part.text });

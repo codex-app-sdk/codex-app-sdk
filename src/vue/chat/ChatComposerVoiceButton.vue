@@ -1,6 +1,6 @@
 <template>
   <button
-    class="chat-composer__voice"
+    class="codex-chat-theme chat-composer__voice"
     :class="{ 'chat-composer__voice--recording': recording }"
     type="button"
     :disabled="disabled"

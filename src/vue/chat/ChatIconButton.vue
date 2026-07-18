@@ -1,7 +1,7 @@
 <template>
   <component
     :is="href ? 'a' : 'button'"
-    class="chat-icon-button"
+    class="codex-chat-theme chat-icon-button"
     :class="{
       'chat-icon-button--bordered': bordered,
       'chat-icon-button--danger': danger,

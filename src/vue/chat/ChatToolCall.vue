@@ -1,17 +1,19 @@
 <template>
   <ChatToolConfirmation
     v-if="isToolConfirmation"
+    class="codex-chat-theme"
     :answered-client-request-ids="answeredClientRequestIds"
     :tool-call="toolCall"
     @client-response="emit('client-response', $event)"
   />
   <ChatToolUserInputRequest
     v-else-if="isUserInputRequest"
+    class="codex-chat-theme"
     :answered-client-request-ids="answeredClientRequestIds"
     :tool-call="toolCall"
     @client-response="emit('client-response', $event)"
   />
-  <section v-else class="chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
+  <section v-else class="codex-chat-theme chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
     <div v-if="summaryOnly" class="chat-tool-call__summary">
       <ChatToolCallTitle
         :icon="titleIcon"
@@ -91,7 +93,7 @@ import { getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } 
 import { getMessageToolCallArgs, type MessageToolCall } from './types'
 
 const props = defineProps<{
-  answeredClientRequestIds?: Set<string>
+  answeredClientRequestIds?: ReadonlySet<string>
   headerless?: boolean
   summaryOnly?: boolean
   toolCall: MessageToolCall

@@ -1,5 +1,5 @@
 <template>
-  <div v-if="goal" class="chat-goal" aria-label="Current goal">
+  <div v-if="goal" class="codex-chat-theme chat-goal" aria-label="Current goal">
     <TargetArrowIcon class="chat-goal__icon" aria-hidden="true" />
     <div class="chat-goal__copy">
       <span class="chat-goal__label">Goal</span>

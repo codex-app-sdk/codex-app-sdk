@@ -1,11 +1,12 @@
 import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
-import type { AppleSpeechTranscriptionResult, CodexChatTranscription } from './contracts'
+import type { CodexSpeechTranscriptionResult, CodexChatTranscription } from './contracts'
 import {
   BrowserAudioRecorder,
   isBrowserAudioRecordingSupported,
   type RecordedAudio,
 } from '../audio/browser-audio-recorder'
 import { transcribeRecordedAudio } from '../audio/apple-speech-transcription'
+import { getCodexNativeRendererApi } from '../native-capabilities'
 
 type ChatComposerVoiceOptions = {
   isDisabled: () => boolean
@@ -18,14 +19,20 @@ type ChatComposerVoiceDependencies = {
   canTranscribe: () => boolean
   createRecorder: () => BrowserAudioRecorder
   isRecordingSupported: () => boolean
-  transcribe: (recording: RecordedAudio) => Promise<AppleSpeechTranscriptionResult>
+  transcribe: (recording: RecordedAudio) => Promise<CodexSpeechTranscriptionResult>
 }
 
 const defaultDependencies: ChatComposerVoiceDependencies = {
-  canTranscribe: () => false,
+  canTranscribe: () => getCodexNativeRendererApi()?.capabilities.transcription === true,
   createRecorder: () => new BrowserAudioRecorder(),
   isRecordingSupported: isBrowserAudioRecordingSupported,
-  transcribe: async () => ({ error: 'Speech transcription is not available.', text: '' }),
+  transcribe: (recording) => transcribeRecordedAudio(recording, {
+    transcribeAppleSpeech: async (audioData, options) => {
+      const nativeApi = getCodexNativeRendererApi()
+      if (!nativeApi) return { error: 'Speech transcription is not available.', text: '' }
+      return nativeApi.transcribeAudio(audioData, options)
+    },
+  }),
 }
 
 export function useChatComposerVoice(

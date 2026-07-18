@@ -2,7 +2,7 @@
   <aside class="conversation-sidebar" aria-label="Conversations">
     <div class="conversation-sidebar__header">
       <span class="conversation-sidebar__brand">Codex</span>
-      <button class="conversation-sidebar__new" type="button" :disabled="disabled" @click="emit('create')">
+      <button class="conversation-sidebar__new" type="button" :disabled="createDisabled" @click="emit('create')">
         <span aria-hidden="true">＋</span>
         New thread
       </button>
@@ -18,9 +18,14 @@
         :class="{ 'conversation-sidebar__item--active': conversation.id === activeConversationId }"
         type="button"
         :aria-current="conversation.id === activeConversationId ? 'page' : undefined"
-        :disabled="disabled"
         @click="emit('select', conversation.id)"
       >
+        <span
+          class="conversation-sidebar__status"
+          :class="`conversation-sidebar__status--${conversation.status}`"
+          :aria-label="`Status: ${conversation.status}`"
+          :title="conversation.status"
+        />
         <span class="conversation-sidebar__title">{{ conversation.title }}</span>
         <span class="conversation-sidebar__time">{{ relativeTime(conversation.updatedAt) }}</span>
       </button>
@@ -34,11 +39,11 @@ import type { CodexConversationSummary } from 'codex-app-sdk/surface';
 withDefaults(defineProps<{
   activeConversationId?: string | null;
   conversations: readonly CodexConversationSummary[];
-  disabled?: boolean;
+  createDisabled?: boolean;
   loading?: boolean;
 }>(), {
   activeConversationId: null,
-  disabled: false,
+  createDisabled: false,
   loading: false,
 });
 
@@ -115,9 +120,26 @@ function relativeTime(value: string): string {
 
 .conversation-sidebar__item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
   gap: 8px;
+  align-items: center;
   padding: 9px 10px;
+}
+
+.conversation-sidebar__status {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a0a099;
+}
+
+.conversation-sidebar__status--active {
+  background: #3b82f6;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 14%);
+}
+
+.conversation-sidebar__status--error {
+  background: #c2413b;
 }
 
 .conversation-sidebar__title {

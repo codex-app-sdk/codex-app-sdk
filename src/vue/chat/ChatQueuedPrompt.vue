@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-queued-prompt" aria-label="Queued prompt">
+  <div class="codex-chat-theme chat-queued-prompt" aria-label="Queued prompt">
     <TerminalIcon class="chat-queued-prompt__icon" aria-hidden="true" />
     <span class="chat-queued-prompt__text">{{ prompt.text }}</span>
     <div class="chat-queued-prompt__actions">

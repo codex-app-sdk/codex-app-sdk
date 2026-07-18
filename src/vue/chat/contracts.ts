@@ -1,17 +1,12 @@
-export type AgentBackend = 'codex' | 'claude';
-
 export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
 
 export type ReasoningEffort = string;
 
-export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
-
-export type BackendCapabilities = {
+export type CodexCapabilities = {
   models: boolean;
   skills: boolean;
   reasoningEffort: boolean;
-  thinkingBudget: boolean;
-  planMode: BackendPlanModeSupport;
+  planMode: boolean;
   goals: boolean;
   steerPrompt: boolean;
   interrupt: boolean;
@@ -20,28 +15,27 @@ export type BackendCapabilities = {
   editMessage: boolean;
   retryMessage: boolean;
   approvals: boolean;
-  approvalPresets?: ApprovalPreset[];
+  approvalPresets?: readonly ApprovalPreset[];
 };
 
-export type BackendReasoningEffortOption = {
+export type CodexReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;
 };
 
-export type BackendModelOption = {
+export type CodexModelOption = {
   id: string;
   model: string;
   displayName: string;
   description?: string;
   hidden?: boolean;
-  supportedReasoningEfforts?: BackendReasoningEffortOption[];
+  supportedReasoningEfforts?: readonly CodexReasoningEffortOption[];
   defaultReasoningEffort?: ReasoningEffort | null;
   isDefault?: boolean;
-  capabilities?: Partial<BackendCapabilities>;
   providerMetadata?: Record<string, unknown>;
 };
 
-export type BackendSkillSummary = {
+export type CodexSkillSummary = {
   id?: string;
   name: string;
   description?: string;
@@ -57,9 +51,8 @@ export type BackendSkillSummary = {
   providerMetadata?: Record<string, unknown>;
 };
 
-export type BackendCommandSummary = {
+export type CodexCommandSummary = {
   id: string;
-  backend: AgentBackend;
   name: string;
   displayName?: string;
   description?: string;
@@ -68,17 +61,21 @@ export type BackendCommandSummary = {
   providerMetadata?: Record<string, unknown>;
 };
 
-export type AgentFileSearchItem = {
+export type CodexFileSearchItem = {
   name: string;
   path: string;
 };
+
+export type CodexConversationLink =
+  | { href: string; kind: 'external' }
+  | { href: string; kind: 'file'; path: string; line?: number; column?: number };
 
 export type PromptSkillInput = {
   name: string;
   path: string;
 };
 
-export type AgentContextUsage = {
+export type CodexContextUsage = {
   totalTokens: number;
   inputTokens: number;
   cachedInputTokens: number;
@@ -148,12 +145,10 @@ export type TurnGitDiff = {
   updatedAt: string;
 };
 
-export type AppleSpeechTranscriptionResult = {
-  text: string;
-  error?: string;
-};
+export type CodexSpeechTranscriptionResult = NativeSpeechTranscriptionResult;
 
 export type CodexChatTranscription = (
   audioData: ArrayBuffer,
   options?: { locale?: string },
-) => Promise<AppleSpeechTranscriptionResult>;
+) => Promise<CodexSpeechTranscriptionResult>;
+import type { CodexSpeechTranscriptionResult as NativeSpeechTranscriptionResult } from '../../native/types';

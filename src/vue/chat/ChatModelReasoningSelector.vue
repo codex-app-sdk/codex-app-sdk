@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-model-selector">
+  <div class="codex-chat-theme chat-model-selector">
     <button
       v-if="models.length === 0"
       class="chat-model-selector__button"
@@ -40,7 +40,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { BackendModelOption, ReasoningEffort } from './contracts';
+import type { CodexModelOption, ReasoningEffort } from './contracts';
 import { BoltIcon, ChevronDown } from '../icons/app-icons';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposerMenu from '../components/CodexComposerMenu.vue';
@@ -54,7 +54,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   modelId?: string | null;
-  models?: readonly BackendModelOption[];
+  models?: readonly CodexModelOption[];
   reasoningEffort?: ReasoningEffort | null;
   showReasoning?: boolean;
 }>(), {

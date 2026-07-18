@@ -1,7 +1,7 @@
 <template>
   <div
     ref="menuEl"
-    class="chat-composer-skill-menu"
+    class="codex-chat-theme chat-composer-skill-menu"
     role="listbox"
     aria-label="Skills"
   >
@@ -40,17 +40,17 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { useCodexChatI18n } from './chat-i18n';
-import type { BackendSkillSummary } from './contracts';
+import type { CodexSkillSummary } from './contracts';
 import { skillDescription, skillDisplayName } from './composer-skills';
 import { SparklesIcon } from '../icons/app-icons';
 
 const props = defineProps<{
   activeIndex: number;
-  visibleSkills: BackendSkillSummary[];
+  visibleSkills: CodexSkillSummary[];
 }>();
 
 defineEmits<{
-  select: [skill: BackendSkillSummary];
+  select: [skill: CodexSkillSummary];
 }>();
 
 const { t } = useCodexChatI18n();

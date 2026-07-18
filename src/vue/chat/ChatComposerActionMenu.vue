@@ -47,7 +47,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean;
   items?: readonly CodexComposerMenuItem<Payload>[];
   approvalPreset?: ApprovalPreset | null;
-  approvalPresets?: ApprovalPreset[];
+  approvalPresets?: readonly ApprovalPreset[];
   planMode: boolean;
   showApprovalMenu?: boolean;
   showPlanMode?: boolean;
@@ -96,6 +96,7 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
       id: 'plan-mode',
       type: 'checkbox',
       label: 'Plan mode',
+      accessory: 'switch',
       checked: props.planMode,
       icon: ListDetailsIcon,
       payload: { kind: 'plan-mode' },

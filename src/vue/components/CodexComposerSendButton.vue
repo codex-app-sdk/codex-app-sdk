@@ -1,6 +1,6 @@
 <template>
   <button
-    class="codex-composer-send-button"
+    class="codex-chat-theme codex-composer-send-button"
     :class="{ 'codex-composer-send-button--busy': busy }"
     type="button"
     :disabled="disabled"
@@ -63,14 +63,14 @@ const emit = defineEmits<{
   padding: 0;
   border: 0;
   border-radius: 999px;
-  color: var(--codex-composer-button-foreground, #fff);
-  background: var(--codex-composer-button-background, #202124);
+  color: var(--codex-composer-button-foreground, var(--color-surface-lowest, #fff));
+  background: var(--codex-composer-button-background, var(--color-text, #202124));
   cursor: pointer;
   transition: opacity 120ms ease, transform 120ms ease, background 120ms ease;
 }
 
 .codex-composer-send-button:hover:not(:disabled) {
-  background: var(--codex-composer-button-hover-background, #000);
+  background: var(--codex-composer-button-hover-background, color-mix(in srgb, var(--color-text, #202124) 86%, var(--color-background, #fff)));
 }
 
 .codex-composer-send-button:active:not(:disabled) {
@@ -107,4 +107,3 @@ const emit = defineEmits<{
   to { transform: rotate(360deg); }
 }
 </style>
-

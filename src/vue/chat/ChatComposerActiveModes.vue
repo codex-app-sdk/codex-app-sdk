@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="planMode"
-    class="chat-composer__modes"
+    class="codex-chat-theme chat-composer__modes"
     aria-label="Active composer modes"
   >
     <span class="chat-composer__mode chat-composer__mode__info">

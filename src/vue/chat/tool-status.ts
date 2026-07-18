@@ -1,4 +1,4 @@
-import { getMessageToolCallArgs, getMessageToolCallName, type MessageToolCall, type ToolStatusDescriptor } from './types';
+import { getMessageToolCallName, type MessageToolCall, type ToolStatusDescriptor } from './types';
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
 
@@ -6,6 +6,23 @@ export type ToolLineDiff = {
   addedLines: number;
   removedLines: number;
 };
+
+export type CodexToolTitlePresenterContext = {
+  descriptor: ToolStatusDescriptor | undefined;
+  toolCall: MessageToolCall;
+  translate: Translate;
+};
+
+export type CodexToolTitlePresenter = (
+  context: CodexToolTitlePresenterContext,
+) => string | undefined;
+
+const toolTitlePresenters = new Set<CodexToolTitlePresenter>();
+
+export function registerCodexToolTitlePresenter(presenter: CodexToolTitlePresenter): () => void {
+  toolTitlePresenters.add(presenter);
+  return () => toolTitlePresenters.delete(presenter);
+}
 
 export function parseToolStatusDescriptor(value: unknown): ToolStatusDescriptor | undefined {
   if (typeof value !== 'string' || !value.trim().startsWith('{')) {
@@ -44,9 +61,9 @@ export function getToolDisplayTitle(
   descriptor: ToolStatusDescriptor | undefined,
   t: Translate = defaultToolTranslate,
 ) {
-  const collaborationTitle = getCollaborationMcpTitle(toolCall, descriptor, t);
-  if (collaborationTitle) {
-    return collaborationTitle;
+  for (const presenter of toolTitlePresenters) {
+    const title = presenter({ descriptor, toolCall, translate: t });
+    if (title) return title;
   }
 
   if (descriptor?.source === 'codex' && isCodexToolAction(descriptor.action)) {
@@ -89,109 +106,6 @@ export function getToolFallbackTitle(toolCall: MessageToolCall, t: Translate = d
   });
 }
 
-function getCollaborationMcpTitle(
-  toolCall: MessageToolCall,
-  descriptor: ToolStatusDescriptor | undefined,
-  t: Translate,
-): string | undefined {
-  const toolName = collaborationToolName(toolCall);
-  if (!toolName) {
-    return undefined;
-  }
-
-  const phase = toolPhase(toolCall, descriptor);
-  const args = getRecord(getMessageToolCallArgs(toolCall));
-  if (toolName === 'set-status' && phase === 'completed' && hasStringParam(args, 'status') && !stringParam(args, 'status')) {
-    return t('chat.tool.mcp.collaboration.setStatus.cleared');
-  }
-
-  const params = collaborationToolParams(toolName, args);
-  return t(`chat.tool.mcp.collaboration.${collaborationToolKey(toolName)}.${phase}`, params);
-}
-
-function collaborationToolName(toolCall: MessageToolCall): CollaborationToolName | undefined {
-  const name = getMessageToolCallName(toolCall);
-  const toolName = collaborationToolNameFromBackendName(name);
-  return isCollaborationTool(toolName) ? toolName : undefined;
-}
-
-function collaborationToolNameFromBackendName(name: string): string {
-  const normalized = name.toLowerCase().replace(/[._]+/g, '-');
-  return [...collaborationTools].find((toolName) => (
-    normalized === toolName || normalized.endsWith(`-${toolName}`)
-  )) ?? '';
-}
-
-function collaborationToolParams(toolName: CollaborationToolName, args: Record<string, unknown> | undefined) {
-  if (toolName === 'send-message') {
-    const target = stringParam(args, 'to');
-    return target ? { target } : undefined;
-  }
-
-  if (toolName === 'display-markdown') {
-    return { target: displayMarkdownTarget(args) };
-  }
-
-  return undefined;
-}
-
-function collaborationToolKey(toolName: CollaborationToolName) {
-  const keys: Record<CollaborationToolName, string> = {
-    'broadcast-message': 'broadcastMessage',
-    'check-messages': 'checkMessages',
-    'display-markdown': 'displayMarkdown',
-    'list-agents': 'listAgents',
-    'mark-work-item-completed': 'markWorkItemCompleted',
-    'register-agent': 'registerAgent',
-    'send-message': 'sendMessage',
-    'set-status': 'setStatus',
-  };
-  return keys[toolName];
-}
-
-function toolPhase(toolCall: MessageToolCall, descriptor: ToolStatusDescriptor | undefined): 'completed' | 'failed' | 'running' {
-  if (descriptor?.phase === 'completed' || descriptor?.phase === 'failed' || descriptor?.phase === 'running') {
-    return descriptor.phase;
-  }
-
-  if (toolCall.state === 'error' || toolCall.status === 'failed') {
-    return 'failed';
-  }
-
-  if (!toolCall.done && toolCall.state !== 'completed') {
-    return 'running';
-  }
-
-  return 'completed';
-}
-
-function getRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
-}
-
-function stringParam(value: Record<string, unknown> | undefined, key: string): string | undefined {
-  const param = value?.[key];
-  return typeof param === 'string' && param.trim() ? param.trim() : undefined;
-}
-
-function displayMarkdownTarget(args: Record<string, unknown> | undefined): string {
-  const title = stringParam(args, 'title');
-  if (title) {
-    return title;
-  }
-
-  const path = stringParam(args, 'path');
-  if (!path) {
-    return 'Markdown';
-  }
-
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-}
-
-function hasStringParam(value: Record<string, unknown> | undefined, key: string): boolean {
-  return typeof value?.[key] === 'string';
-}
-
 function commandTarget(descriptor: ToolStatusDescriptor, fallback: string) {
   const target = descriptor.params?.target;
   return typeof target === 'string' && target.trim() ? target : fallback;
@@ -207,31 +121,6 @@ function commandPhase(phase: string) {
 
 function isCodexToolAction(action: string): action is 'create' | 'delete' | 'edit' | 'explore' | 'list' | 'plan' | 'read' | 'run' | 'search' {
   return action === 'create' || action === 'delete' || action === 'edit' || action === 'explore' || action === 'list' || action === 'plan' || action === 'read' || action === 'run' || action === 'search';
-}
-
-const collaborationTools = new Set([
-  'broadcast-message',
-  'check-messages',
-  'display-markdown',
-  'list-agents',
-  'mark-work-item-completed',
-  'register-agent',
-  'send-message',
-  'set-status',
-]);
-
-type CollaborationToolName =
-  | 'broadcast-message'
-  | 'check-messages'
-  | 'display-markdown'
-  | 'list-agents'
-  | 'mark-work-item-completed'
-  | 'register-agent'
-  | 'send-message'
-  | 'set-status';
-
-function isCollaborationTool(value: string): value is CollaborationToolName {
-  return collaborationTools.has(value);
 }
 
 export function defaultToolTranslate(key: string, params?: Record<string, unknown>) {
@@ -269,31 +158,6 @@ export function defaultToolTranslate(key: string, params?: Record<string, unknow
     'chat.tool.command.search.running': 'Searching {target}',
     'chat.tool.fallback.completed': 'Ran {name}',
     'chat.tool.fallback.running': 'Running {name}',
-    'chat.tool.mcp.collaboration.broadcastMessage.completed': 'Broadcast message',
-    'chat.tool.mcp.collaboration.broadcastMessage.failed': 'Failed broadcasting message',
-    'chat.tool.mcp.collaboration.broadcastMessage.running': 'Broadcasting message',
-    'chat.tool.mcp.collaboration.checkMessages.completed': 'Checked messages',
-    'chat.tool.mcp.collaboration.checkMessages.failed': 'Failed checking messages',
-    'chat.tool.mcp.collaboration.checkMessages.running': 'Checking messages',
-    'chat.tool.mcp.collaboration.displayMarkdown.completed': 'Displayed {target}',
-    'chat.tool.mcp.collaboration.displayMarkdown.failed': 'Failed displaying {target}',
-    'chat.tool.mcp.collaboration.displayMarkdown.running': 'Displaying {target}',
-    'chat.tool.mcp.collaboration.listAgents.completed': 'Listed agents',
-    'chat.tool.mcp.collaboration.listAgents.failed': 'Failed listing agents',
-    'chat.tool.mcp.collaboration.listAgents.running': 'Listing agents',
-    'chat.tool.mcp.collaboration.markWorkItemCompleted.completed': 'Marked work item complete',
-    'chat.tool.mcp.collaboration.markWorkItemCompleted.failed': 'Failed marking work item complete',
-    'chat.tool.mcp.collaboration.markWorkItemCompleted.running': 'Marking work item complete',
-    'chat.tool.mcp.collaboration.registerAgent.completed': 'Registered agent',
-    'chat.tool.mcp.collaboration.registerAgent.failed': 'Failed registering agent',
-    'chat.tool.mcp.collaboration.registerAgent.running': 'Registering agent',
-    'chat.tool.mcp.collaboration.sendMessage.completed': 'Sent message to {target}',
-    'chat.tool.mcp.collaboration.sendMessage.failed': 'Failed sending message to {target}',
-    'chat.tool.mcp.collaboration.sendMessage.running': 'Sending message to {target}',
-    'chat.tool.mcp.collaboration.setStatus.cleared': 'Cleared status',
-    'chat.tool.mcp.collaboration.setStatus.completed': 'Updated status',
-    'chat.tool.mcp.collaboration.setStatus.failed': 'Failed updating status',
-    'chat.tool.mcp.collaboration.setStatus.running': 'Updating status',
   };
 
   return (templates[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));

@@ -2,12 +2,11 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  absoluteHttpOrigin,
-  faviconUrl,
   renderInlineToken,
   renderMarkdown,
   renderTaskItem,
   renderUserText,
+  safeMarkdownHref,
 } from '../../../src/vue/chat/message-markdown';
 
 describe('message markdown rendering', () => {
@@ -60,10 +59,10 @@ describe('message markdown rendering', () => {
       '[file](README.md)',
     ].join('\n'));
 
-    expect(html).toContain('chat-message-link__icon--favicon');
+    expect(html).toContain('chat-message-link__icon--external');
     expect(html).toContain('chat-message-link__icon--mail');
     expect(html).toContain('chat-message-link__icon--file');
-    expect(html).toContain('target="_blank" rel="noreferrer"');
+    expect(html).toContain('target="_blank" rel="noopener noreferrer"');
   });
 
   it('adds safe link attributes to markdown links', () => {
@@ -72,26 +71,17 @@ describe('message markdown rendering', () => {
     expect(html).toContain('class="chat-message-link"');
     expect(html).toContain('href="https://openai.com"');
     expect(html).toContain('target="_blank"');
-    expect(html).toContain('rel="noreferrer"');
-    expect(html).toContain('chat-message-link__icon--favicon');
-    expect(html).toContain("--favicon-url: url('https://s2.googleusercontent.com/s2/favicons?sz=32&amp;domain_url=https%3A%2F%2Fopenai.com')");
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('chat-message-link__icon--external');
+    expect(html).not.toContain('googleusercontent.com');
     expect(html).toContain('<span class="chat-message-link__label">OpenAI</span>');
   });
 
-  it('normalizes external favicon URLs to the link origin', () => {
+  it('renders external links without disclosing their origin to an icon service', () => {
     const html = renderMarkdown('[Vue docs](https://vuejs.org/guide/introduction.html?from=id8)');
 
-    expect(html).toContain('domain_url=https%3A%2F%2Fvuejs.org');
-    expect(html).not.toContain('domain_url=https%3A%2F%2Fvuejs.org%2Fguide');
-  });
-
-  it('reuses cached favicon URLs for links from the same origin', () => {
-    renderMarkdown('[First](https://cached.example/one)');
-
-    const html = renderMarkdown('[Second](https://cached.example/two)');
-
-    expect(html).toContain('domain_url=https%3A%2F%2Fcached.example');
-    expect(html).toContain('<span class="chat-message-link__label">Second</span>');
+    expect(html).toContain('chat-message-link__icon--external');
+    expect(html).not.toContain('googleusercontent.com');
   });
 
   it('renders relative links with a file icon', () => {
@@ -100,7 +90,7 @@ describe('message markdown rendering', () => {
     expect(html).toContain('href="src/index.html"');
     expect(html).toContain('chat-message-link__icon--file');
     expect(html).not.toContain('target="_blank"');
-    expect(html).not.toContain('s2.googleusercontent.com');
+    expect(html).not.toContain('googleusercontent.com');
   });
 
   it('renders titled links, nested strong tokens, and task lists', () => {
@@ -143,12 +133,11 @@ describe('message markdown rendering', () => {
     expect(html).not.toContain('target="_blank"');
   });
 
-  it('falls back to a file icon for malformed absolute-looking links', () => {
+  it('removes hrefs from malformed absolute-looking links', () => {
     const html = renderMarkdown('[Broken](https://%)');
 
-    expect(html).toContain('href="https://%"');
-    expect(html).toContain('chat-message-link__icon--file');
-    expect(html).not.toContain('target="_blank"');
+    expect(html).toContain('chat-message-link--blocked');
+    expect(html).not.toContain('href=');
   });
 
   it('renders plain autolinks with escaped labels', () => {
@@ -156,6 +145,20 @@ describe('message markdown rendering', () => {
 
     expect(html).toContain('href="https://example.com/search?q=a&amp;b=c"');
     expect(html).toContain('q=a&amp;b=c');
+  });
+
+  it('sanitizes Markdown image sources and protects external image requests', () => {
+    const safe = renderMarkdown('![diagram](https://example.com/diagram.png "Architecture")');
+    const unsafe = renderMarkdown('![payload](data:text/html,<script>alert(1)</script>)');
+
+    expect(safe).toContain('src="https://example.com/diagram.png"');
+    expect(safe).toContain('alt="diagram"');
+    expect(safe).toContain('title="Architecture"');
+    expect(safe).toContain('loading="lazy"');
+    expect(safe).toContain('referrerpolicy="no-referrer"');
+    expect(unsafe).not.toContain('<img');
+    expect(unsafe).not.toContain('src=');
+    expect(unsafe).not.toContain('<script>');
   });
 
   it('escapes backticks in relative link hrefs', () => {
@@ -204,11 +207,34 @@ describe('message markdown rendering', () => {
     expect(renderTaskItem({ mainContent: 'main' })).toContain('main');
   });
 
-  it('covers favicon origin caching and invalid URL paths', () => {
-    expect(absoluteHttpOrigin('https://example.com/a')).toBe('https://example.com');
-    expect(absoluteHttpOrigin('mailto:test@example.com')).toBeNull();
-    expect(absoluteHttpOrigin('not a url')).toBeNull();
-    expect(faviconUrl('not a url')).toBe('');
-    expect(faviconUrl('https://example.com/a')).toBe(faviconUrl('https://example.com/b'));
+  it('allows only non-executable absolute schemes and safe relative links', () => {
+    expect(safeMarkdownHref('https://example.com/path')).toBe('https://example.com/path');
+    expect(safeMarkdownHref('HTTP://example.com')).toBe('HTTP://example.com');
+    expect(safeMarkdownHref('mailto:test@example.com')).toBe('mailto:test@example.com');
+    expect(safeMarkdownHref('tel:+15551234567')).toBe('tel:+15551234567');
+    expect(safeMarkdownHref('file:///tmp/readme.md#L1')).toBe('file:///tmp/readme.md#L1');
+    expect(safeMarkdownHref('../README.md#usage')).toBe('../README.md#usage');
+    expect(safeMarkdownHref('/tmp/README.md')).toBe('/tmp/README.md');
+    expect(safeMarkdownHref('C:\\work\\README.md')).toBe('C:\\work\\README.md');
+    expect(safeMarkdownHref('D:/work/README.md')).toBe('D:/work/README.md');
+    expect(safeMarkdownHref('#section')).toBe('#section');
+    expect(safeMarkdownHref('?line=12')).toBe('?line=12');
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'JaVaScRiPt:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)',
+    'blob:https://example.com/unsafe',
+    '//example.com/inherited-scheme',
+    '\\\\example.com\\share',
+    'java\nscript:alert(1)',
+    'https://%',
+  ])('blocks unsafe Markdown href %s', (href) => {
+    expect(safeMarkdownHref(href)).toBeNull();
+    const html = renderMarkdown(`[unsafe](${href})`);
+    expect(html).not.toContain('href=');
+    expect(html).not.toContain('<script>');
   });
 });

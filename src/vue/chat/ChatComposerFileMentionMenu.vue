@@ -1,7 +1,7 @@
 <template>
   <div
     ref="menuEl"
-    class="chat-composer-file-menu"
+    class="codex-chat-theme chat-composer-file-menu"
     role="listbox"
     aria-label="Files"
   >
@@ -42,17 +42,17 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { useCodexChatI18n } from './chat-i18n';
-import type { AgentFileSearchItem } from './contracts';
+import type { CodexFileSearchItem } from './contracts';
 import { FileTextIcon } from '../icons/app-icons';
 
 const props = defineProps<{
   activeIndex: number;
   showHint?: boolean;
-  visibleFiles: AgentFileSearchItem[];
+  visibleFiles: CodexFileSearchItem[];
 }>();
 
 defineEmits<{
-  select: [file: AgentFileSearchItem];
+  select: [file: CodexFileSearchItem];
 }>();
 
 const { t } = useCodexChatI18n();

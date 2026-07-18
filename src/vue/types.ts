@@ -1,5 +1,7 @@
 export type {
   SurfaceMessage,
+  SurfaceMessageAttachment,
+  SurfaceMessageAttachmentPart,
   SurfaceMessagePart,
   SurfaceMessageStatusPart,
   SurfaceMessageTextPart,

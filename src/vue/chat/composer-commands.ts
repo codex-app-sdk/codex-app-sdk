@@ -1,4 +1,4 @@
-import type { BackendCommandSummary } from './contracts';
+import type { CodexCommandSummary } from './contracts';
 import { filterComposerSearchItems } from './composer-search';
 
 export type ActiveCommandSlash = {
@@ -32,7 +32,7 @@ export function findActiveCommandSlash(value: string, caretPosition: number): Ac
   };
 }
 
-export function filterComposerCommands(commands: BackendCommandSummary[], query: string, maxResults = -1): BackendCommandSummary[] {
+export function filterComposerCommands(commands: CodexCommandSummary[], query: string, maxResults = -1): CodexCommandSummary[] {
   return filterComposerSearchItems(commands, query, [
     { values: (command) => [command.id] },
     { values: (command) => [command.name, command.displayName, command.slashName] },
@@ -40,10 +40,10 @@ export function filterComposerCommands(commands: BackendCommandSummary[], query:
   ], maxResults);
 }
 
-export function commandDisplayName(command: BackendCommandSummary): string {
+export function commandDisplayName(command: CodexCommandSummary): string {
   return command.displayName || command.name;
 }
 
-export function commandDescription(command: BackendCommandSummary): string {
+export function commandDescription(command: CodexCommandSummary): string {
   return command.description || '';
 }

@@ -1,4 +1,4 @@
-import type { BackendSkillSummary, PromptSkillInput } from './contracts';
+import type { CodexSkillSummary, PromptSkillInput } from './contracts';
 import { filterComposerSearchItems } from './composer-search';
 
 export type ActiveSkillSlash = {
@@ -38,7 +38,7 @@ export function findActiveSkillSlash(value: string, caretPosition: number): Acti
   return findActiveSkillTrigger(value, caretPosition, '/');
 }
 
-export function filterComposerSkills(skills: BackendSkillSummary[], query: string, maxResults = -1): BackendSkillSummary[] {
+export function filterComposerSkills(skills: CodexSkillSummary[], query: string, maxResults = -1): CodexSkillSummary[] {
   return filterComposerSearchItems(skills, query, [
     { values: (skill) => [skill.id] },
     { values: (skill) => [skill.name, skill.displayName] },
@@ -46,15 +46,15 @@ export function filterComposerSkills(skills: BackendSkillSummary[], query: strin
   ], maxResults);
 }
 
-export function skillDisplayName(skill: BackendSkillSummary): string {
+export function skillDisplayName(skill: CodexSkillSummary): string {
   return skill.displayName || skill.name;
 }
 
-export function skillDescription(skill: BackendSkillSummary): string {
+export function skillDescription(skill: CodexSkillSummary): string {
   return skill.shortDescription || skill.description || '';
 }
 
-export function promptSkillInputsFromText(text: string, skills: BackendSkillSummary[]): PromptSkillInput[] {
+export function promptSkillInputsFromText(text: string, skills: CodexSkillSummary[]): PromptSkillInput[] {
   const names = new Set<string>();
   const pattern = /(?:^|[^\w.%+-])[$/]([A-Za-z0-9_.-]+)/g;
   let match: RegExpExecArray | null;

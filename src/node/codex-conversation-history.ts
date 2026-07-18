@@ -1,7 +1,13 @@
 import type { Thread } from '../codex/generated/v2/Thread';
 import type { ThreadItem } from '../codex/generated/v2/ThreadItem';
 import type { Turn } from '../codex/generated/v2/Turn';
-import type { SurfaceMessage, SurfaceMessagePart } from '../surface/types';
+import { basename, extname, isAbsolute } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import type {
+  SurfaceMessage,
+  SurfaceMessageAttachment,
+  SurfaceMessagePart,
+} from '../surface/types';
 import { codexThreadItemToToolPart } from './codex-tool-part-adapter';
 
 export { codexThreadItemToToolPart as codexItemToToolPart } from './codex-tool-part-adapter';
@@ -31,6 +37,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       turnId: turn.id,
       parts: [...assistantParts],
       createdAt,
+      metadata: { conversationId: threadId, turnId: turn.id },
     });
     assistantParts.length = 0;
     assistantSegmentIndex += 1;
@@ -38,8 +45,8 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
 
   for (const item of Array.isArray(turn.items) ? turn.items : []) {
     if (item.type === 'userMessage') {
-      const text = userMessageText(item);
-      if (text) {
+      const parts = userMessageParts(item);
+      if (parts.length > 0) {
         const isSteerMessage = sawAssistantActivity;
         flushAssistantMessage();
         messages.push({
@@ -48,8 +55,9 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
           role: 'user',
           status: 'complete',
           turnId: turn.id,
-          parts: [{ type: 'text', text }],
+          parts,
           createdAt,
+          metadata: { conversationId: threadId, turnId: turn.id },
         });
       }
       continue;
@@ -91,13 +99,13 @@ export function codexItemToSurfaceMessage(
 ): SurfaceMessage | null {
   const createdAt = timestampToIso(turn.startedAt);
   if (item.type === 'userMessage') {
-    const text = userMessageText(item);
-    return text ? {
+    const parts = userMessageParts(item);
+    return parts.length > 0 ? {
       id: item.clientId ?? `user-${threadId}-${turn.id}-${item.id}`,
       role: 'user',
       status: 'complete',
       turnId: turn.id,
-      parts: [{ type: 'text', text }],
+      parts,
       createdAt,
       metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
     } : null;
@@ -128,9 +136,28 @@ export function codexItemToSurfaceMessage(
   } : null;
 }
 
-function userMessageText(item: Extract<ThreadItem, { type: 'userMessage' }>): string {
+function userMessageParts(item: Extract<ThreadItem, { type: 'userMessage' }>): SurfaceMessagePart[] {
   const content = Array.isArray(item.content) ? item.content : [];
-  return content.map(userInputText).filter(Boolean).join('\n');
+  const parts: SurfaceMessagePart[] = [];
+  let text: string[] = [];
+  const flushText = () => {
+    if (text.length > 0) parts.push({ type: 'text', text: text.join('\n') });
+    text = [];
+  };
+
+  for (const input of content) {
+    const inputText = userInputText(input);
+    if (inputText) {
+      text.push(inputText);
+      continue;
+    }
+    const attachment = userInputAttachment(input);
+    if (!attachment) continue;
+    flushText();
+    parts.push({ type: 'attachment', attachment });
+  }
+  flushText();
+  return parts;
 }
 
 function userInputText(input: unknown): string {
@@ -139,10 +166,77 @@ function userInputText(input: unknown): string {
   }
   if (input.type === 'text' && typeof input.text === 'string') return input.text;
   if (input.type === 'skill' && typeof input.name === 'string') return `$${input.name}`;
-  if (input.type === 'mention' && typeof input.name === 'string') return `@${input.name}`;
-  if (input.type === 'image' && typeof input.url === 'string') return `![image](${input.url})`;
-  if (input.type === 'localImage' && typeof input.path === 'string') return `![image](${input.path})`;
   return '';
+}
+
+function userInputAttachment(input: unknown): SurfaceMessageAttachment | null {
+  if (!isRecord(input) || typeof input.type !== 'string') return null;
+  if (input.type === 'mention' && typeof input.path === 'string') {
+    const name = typeof input.name === 'string' && input.name.trim()
+      ? input.name.trim()
+      : attachmentName(input.path, 'File');
+    const mimeType = mimeTypeForSource(input.path);
+    return {
+      kind: 'file',
+      name,
+      path: input.path,
+      ...(mimeType ? { mimeType } : {}),
+    };
+  }
+  if (input.type === 'image' && typeof input.url === 'string') {
+    const mimeType = mimeTypeForSource(input.url);
+    return {
+      kind: 'image',
+      name: attachmentName(input.url, 'Image'),
+      url: input.url,
+      ...(mimeType ? { mimeType } : {}),
+    };
+  }
+  if (input.type === 'localImage' && typeof input.path === 'string') {
+    const mimeType = mimeTypeForSource(input.path);
+    return {
+      kind: 'image',
+      name: attachmentName(input.path, 'Image'),
+      path: input.path,
+      ...(isAbsolute(input.path) ? { url: pathToFileURL(input.path).href } : {}),
+      ...(mimeType ? { mimeType } : {}),
+    };
+  }
+  return null;
+}
+
+function attachmentName(source: string, fallback: string): string {
+  try {
+    const path = /^[a-z][a-z\d+.-]*:/i.test(source) ? new URL(source).pathname : source;
+    const name = basename(decodeURIComponent(path)).trim();
+    return name || fallback;
+  } catch {
+    return basename(source).trim() || fallback;
+  }
+}
+
+function mimeTypeForSource(source: string): string | undefined {
+  const dataMimeType = /^data:([^;,]+)/i.exec(source)?.[1]?.toLowerCase();
+  if (dataMimeType) return dataMimeType;
+  let extension = '';
+  try {
+    const path = /^[a-z][a-z\d+.-]*:/i.test(source) ? new URL(source).pathname : source;
+    extension = extname(path).slice(1).toLowerCase();
+  } catch {
+    extension = extname(source).slice(1).toLowerCase();
+  }
+  return ({
+    avif: 'image/avif',
+    gif: 'image/gif',
+    heic: 'image/heic',
+    heif: 'image/heif',
+    jpeg: 'image/jpeg',
+    jpg: 'image/jpeg',
+    pdf: 'application/pdf',
+    png: 'image/png',
+    svg: 'image/svg+xml',
+    webp: 'image/webp',
+  } as Record<string, string>)[extension];
 }
 
 function surfaceMessageStatus(status: Turn['status']): SurfaceMessage['status'] {

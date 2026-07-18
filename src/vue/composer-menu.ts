@@ -1,9 +1,11 @@
+import type { Component } from 'vue';
+
 export type CodexComposerMenuItemBase<Payload = unknown> = {
   id: string;
   label: string;
   description?: string;
   disabled?: boolean;
-  icon?: unknown;
+  icon?: Component;
   payload?: Payload;
   value?: string;
 };
@@ -12,10 +14,12 @@ export type CodexComposerMenuActionItem<Payload = unknown> = CodexComposerMenuIt
   type: 'action' | 'custom';
   closeOnSelect?: boolean;
   danger?: boolean;
+  leadingColor?: string;
 };
 
 export type CodexComposerMenuCheckboxItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
   type: 'checkbox';
+  accessory?: 'check' | 'switch';
   checked: boolean;
   closeOnSelect?: boolean;
 };
@@ -40,6 +44,7 @@ export type CodexComposerMenuHeadingItem = {
 export type CodexComposerMenuSubmenuItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
   type: 'submenu';
   items: readonly CodexComposerMenuItem<Payload>[];
+  submenuWidth?: 'default' | 'wide';
 };
 
 export type CodexComposerMenuItem<Payload = unknown> =

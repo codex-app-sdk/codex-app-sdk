@@ -6,7 +6,7 @@
     @cancel="emit('cancel')"
     @client-response="emit('client-response', $event)"
   />
-  <section v-else class="chat-tool-group">
+  <section v-else class="codex-chat-theme chat-tool-group">
     <button class="chat-tool-group__header" type="button" @click="toggleExpanded">
       <ChatToolCall
         v-if="headerToolCall"
@@ -54,7 +54,7 @@ import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
 
 const props = defineProps<{
-  answeredClientRequestIds?: Set<string>
+  answeredClientRequestIds?: ReadonlySet<string>
   toolCalls: MessageToolCall[]
 }>()
 const emit = defineEmits<{

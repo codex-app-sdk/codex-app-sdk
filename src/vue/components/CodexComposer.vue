@@ -1,6 +1,6 @@
 <template>
   <form
-    class="chat-composer"
+    class="codex-chat-theme chat-composer"
     :class="{ 'chat-composer--disabled': disabled && !isSending }"
     aria-label="Prompt composer"
     @submit.prevent="submitPrompt"
@@ -35,10 +35,10 @@
       :disabled="disabled"
       :items="menuItems"
       :approval-preset="approvalPreset"
-      :approval-presets="effectiveBackendCapabilities.approvalPresets ?? []"
+      :approval-presets="effectiveCodexCapabilities.approvalPresets ?? []"
       :plan-mode="planMode"
-      :show-approval-menu="effectiveBackendCapabilities.approvals && Boolean(approvalPreset) && (effectiveBackendCapabilities.approvalPresets?.length ?? 0) > 0"
-      :show-plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported'"
+      :show-approval-menu="effectiveCodexCapabilities.approvals && Boolean(approvalPreset) && (effectiveCodexCapabilities.approvalPresets?.length ?? 0) > 0"
+      :show-plan-mode="effectiveCodexCapabilities.planMode"
       @attach="$emit('attach')"
       @select="$emit('menuSelect', $event)"
       @select-approval-preset="$emit('selectApprovalPreset', $event)"
@@ -74,18 +74,18 @@
     <div class="chat-composer__meta">
       <slot name="before-meta" />
       <ChatComposerActiveModes
-        :plan-mode="effectiveBackendCapabilities.planMode !== 'unsupported' && Boolean(planMode)"
+        :plan-mode="effectiveCodexCapabilities.planMode && Boolean(planMode)"
         @disable-plan-mode="$emit('update:planMode', false)"
       />
       <ChatContextUsageIndicator :context-usage="contextUsage" />
       <ChatModelReasoningSelector
-        v-if="effectiveBackendCapabilities.models"
+        v-if="effectiveCodexCapabilities.models"
         :disabled="disabled || isSending"
         :models="models"
         :model-catalog-status="modelCatalogStatus"
         :model-id="selectedModelId"
         :reasoning-effort="selectedReasoningEffort"
-        :show-reasoning="effectiveBackendCapabilities.reasoningEffort"
+        :show-reasoning="effectiveCodexCapabilities.reasoningEffort"
         @update:model-id="$emit('update:modelId', $event)"
         @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
       />
@@ -111,8 +111,9 @@
 
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import type { AgentContextUsage, AgentFileSearchItem, ApprovalPreset, BackendCapabilities, BackendCommandSummary, BackendModelOption, BackendSkillSummary, CodexChatTranscription, ReasoningEffort } from '../chat/contracts';
-import { defaultBackendCapabilities } from '../chat/backend-capabilities';
+import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapabilities, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription, ReasoningEffort } from '../chat/contracts';
+import { codexCapabilities } from '../chat/codex-capabilities';
+import { codexCommands } from '../chat/codex-commands';
 import CodexComposerSendButton from './CodexComposerSendButton.vue';
 import ChatComposerActiveModes from '../chat/ChatComposerActiveModes.vue';
 import ChatComposerActionMenu from '../chat/ChatComposerActionMenu.vue';
@@ -130,24 +131,24 @@ import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../
 const props = defineProps<{
   autofocus?: boolean;
   attachEnabled?: boolean;
-  contextUsage?: AgentContextUsage | null;
+  contextUsage?: CodexContextUsage | null;
   disabled: boolean;
   draft?: string;
   draftRevision?: number;
-  files?: readonly AgentFileSearchItem[];
-  backendCapabilities?: BackendCapabilities;
-  commands?: readonly BackendCommandSummary[];
+  files?: readonly CodexFileSearchItem[];
+  capabilities?: CodexCapabilities;
+  commands?: readonly CodexCommandSummary[];
   isSending: boolean;
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  models?: readonly BackendModelOption[];
+  models?: readonly CodexModelOption[];
   placeholder: string;
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  skills?: readonly BackendSkillSummary[];
+  skills?: readonly CodexSkillSummary[];
   transcribeAudio?: CodexChatTranscription;
 }>();
 
@@ -168,7 +169,7 @@ const CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX = 88;
 const prompt = ref('');
 const textareaEl = ref<HTMLTextAreaElement | null>(null);
 const caretPosition = ref(0);
-const effectiveBackendCapabilities = computed(() => props.backendCapabilities ?? defaultBackendCapabilities('codex'));
+const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCapabilities);
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
@@ -213,7 +214,7 @@ const {
   visibleSlashSkills,
 } = useChatComposerSuggestions({
   caretPosition,
-  commands: () => props.commands ?? [],
+  commands: () => props.commands ?? codexCommands,
   disabled: () => props.disabled,
   files: () => props.files ?? [],
   isSending: () => props.isSending,
@@ -224,7 +225,7 @@ const {
   onTextInserted: focusAt,
   prompt,
   skills: () => props.skills ?? [],
-  skillsEnabled: () => effectiveBackendCapabilities.value.skills,
+  skillsEnabled: () => effectiveCodexCapabilities.value.skills,
   textarea: textareaEl,
 });
 
@@ -315,7 +316,7 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
 
   if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
-    if (effectiveBackendCapabilities.value.planMode !== 'unsupported') {
+    if (effectiveCodexCapabilities.value.planMode) {
       emit('update:planMode', !props.planMode);
     }
     return;

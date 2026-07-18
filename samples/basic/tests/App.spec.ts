@@ -1,40 +1,44 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceApi, CodexSurfaceSnapshot } from 'codex-app-sdk/surface';
+import type { CodexNativeAttachmentInput, CodexNativeRendererApi } from 'codex-app-sdk/electron';
+import type { CodexSurfaceRendererApi, CodexSurfaceSnapshot } from 'codex-app-sdk/surface';
 import App from '../src/App.vue';
 
 describe('basic sample App', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(window, 'codexAppSdkNative');
+  });
 
-  it('renders a custom conversation list and sends through the SDK pane', async () => {
+  it('renders its custom conversation list and sends through one bound SDK pane', async () => {
     const api = fakeSurfaceApi();
     window.codexSurface = api;
     const wrapper = mount(App);
     await flushPromises();
 
     expect(api.connect).toHaveBeenCalledOnce();
+    expect(wrapper.findComponent({ name: 'CodexConversationPane' }).props('surface')).toBeDefined();
     expect(wrapper.get('[aria-label="Conversations"]').text()).toContain('First thread');
-    await wrapper.get('.conversation-sidebar__item').trigger('click');
+    expect(wrapper.findAll('[aria-label="Status: active"]')).toHaveLength(2);
+
+    const conversationItems = wrapper.findAll('.conversation-sidebar__item');
+    expect(conversationItems.every((item) => item.attributes('disabled') === undefined)).toBe(true);
+    await conversationItems[1]!.trigger('click');
     await flushPromises();
-    expect(api.selectConversation).toHaveBeenCalledWith('thread-1');
+    expect(api.selectConversation).toHaveBeenCalledWith('thread-2');
+
     await wrapper.get('textarea').setValue('Build a new surface');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(api.sendMessage).toHaveBeenCalledWith('Build a new surface', undefined);
+
+    await wrapper.get('textarea').setValue('/goal Ship the sample');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(api.sendMessage).toHaveBeenLastCalledWith('/goal Ship the sample', undefined);
   });
 
-  it('demonstrates menu extensibility with a sample-provided refresh action', async () => {
-    const api = fakeSurfaceApi();
-    window.codexSurface = api;
-    const wrapper = mount(App);
-    await flushPromises();
-    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
-    await wrapper.findAll('button').find((button) => button.text().includes('Refresh conversations'))!.trigger('click');
-    await flushPromises();
-    expect(api.refreshConversations).toHaveBeenCalledOnce();
-  });
-
-  it('wires app-server model and permission state into the SDK pane', async () => {
+  it('gets app-server models, permission presets, and plan mode through the bound SDK pane', async () => {
     const api = fakeSurfaceApi();
     window.codexSurface = api;
     const wrapper = mount(App);
@@ -49,17 +53,128 @@ describe('basic sample App', () => {
     await wrapper.findAll('[role="menuitemradio"]')[2]!.trigger('click');
     await flushPromises();
     expect(api.updateConversationSettings).toHaveBeenCalledWith({ approvalPreset: 'full-access' });
+
+    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+    await wrapper.get('[role="menuitemcheckbox"]').trigger('click');
+    await flushPromises();
+    expect(api.updateConversationSettings).toHaveBeenCalledWith({ planMode: true });
+  });
+
+  it('gets native attachment picking through the SDK without sample callbacks', async () => {
+    const api = fakeSurfaceApi();
+    window.codexSurface = api;
+    const attachment = {
+      id: 'diagram',
+      type: 'image' as const,
+      path: '/tmp/diagram.png',
+      name: 'diagram.png',
+      mimeType: 'image/png',
+      size: 3,
+      previewUrl: 'data:image/png;base64,cG5n',
+    };
+    window.codexAppSdkNative = fakeNativeApi({
+      pickAttachments: vi.fn(async () => [attachment]),
+    });
+    const wrapper = mount(App);
+    await flushPromises();
+
+    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text().includes('Add Files & Photos'))!.trigger('click');
+    await flushPromises();
+    expect(window.codexAppSdkNative.pickAttachments).toHaveBeenCalledOnce();
+    expect(wrapper.get('.codex-conversation-pane__attachment-preview').attributes('src')).toBe(attachment.previewUrl);
+
+    await wrapper.get('textarea').setValue('Review this image');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(api.sendMessage).toHaveBeenCalledWith('Review this image', {
+      attachments: [{
+        type: 'image',
+        path: '/tmp/diagram.png',
+        name: 'diagram.png',
+        mimeType: 'image/png',
+        previewUrl: 'data:image/png;base64,cG5n',
+      }],
+    });
+  });
+
+  it('uses the SDK native bridge for text and image paste plus image drop without sample callbacks', async () => {
+    const api = fakeSurfaceApi();
+    window.codexSurface = api;
+    const ingestAttachments = vi.fn(async (files: readonly CodexNativeAttachmentInput[]) => files.map((file) => ({
+      id: file.name,
+      type: 'image' as const,
+      path: `/tmp/${file.name}`,
+      name: file.name,
+      mimeType: file.mimeType ?? 'image/png',
+      size: file.data.byteLength,
+      previewUrl: 'data:image/png;base64,cG5n',
+    })));
+    window.codexAppSdkNative = fakeNativeApi({ ingestAttachments });
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const pastedImage = imageFile('clipboard.png');
+    await wrapper.get('textarea').setValue('Keep the pasted text');
+    const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { files: [pastedImage], getData: () => 'Keep the pasted text' },
+    });
+    wrapper.get('textarea').element.dispatchEvent(paste);
+
+    expect(paste.defaultPrevented).toBe(false);
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Keep the pasted text');
+    await vi.waitFor(() => expect(ingestAttachments).toHaveBeenCalledOnce());
+    expect(ingestAttachments).toHaveBeenLastCalledWith([{
+      name: 'clipboard.png',
+      mimeType: 'image/png',
+      data: expect.any(ArrayBuffer),
+    }]);
+    expect(wrapper.text()).toContain('clipboard.png');
+
+    const droppedImage = imageFile('dropped.png');
+    const drop = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { files: [droppedImage], types: ['Files'] },
+    });
+    wrapper.get('.codex-conversation-pane').element.dispatchEvent(drop);
+
+    expect(drop.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(ingestAttachments).toHaveBeenCalledTimes(2));
+    expect(ingestAttachments).toHaveBeenLastCalledWith([{
+      name: 'dropped.png',
+      mimeType: 'image/png',
+      data: expect.any(ArrayBuffer),
+    }]);
+    expect(wrapper.text()).toContain('dropped.png');
   });
 });
 
 const snapshot: CodexSurfaceSnapshot = {
   status: 'ready',
   conversations: [{
-    id: 'thread-1', title: 'First thread', preview: 'First thread', cwd: '/tmp/project', status: 'idle',
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    id: 'thread-1',
+    title: 'First thread',
+    preview: 'First thread',
+    cwd: '/tmp/project',
+    status: 'active',
+    turnCount: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }, {
+    id: 'thread-2',
+    title: 'Second active thread',
+    preview: 'Still working',
+    cwd: '/tmp/project',
+    status: 'active',
+    turnCount: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }],
   activeConversationId: 'thread-1',
   messages: [],
+  clientRequests: [],
+  answeredClientRequestIds: [],
   approvals: [],
   models: [
     {
@@ -88,14 +203,18 @@ const snapshot: CodexSurfaceSnapshot = {
   contextUsage: null,
   goal: null,
   turnGitDiff: null,
+  threadStatus: null,
+  rateLimits: null,
   queuedPrompts: [],
   busy: false,
+  historyLoading: false,
   error: null,
 };
 
-function fakeSurfaceApi(): CodexSurfaceApi & Record<string, ReturnType<typeof vi.fn>> {
+function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<typeof vi.fn>> {
   return {
     clearGoal: vi.fn(async () => snapshot),
+    compactConversation: vi.fn(async () => snapshot),
     connect: vi.fn(async () => snapshot),
     createConversation: vi.fn(async () => snapshot),
     deleteMessage: vi.fn(async () => snapshot),
@@ -103,16 +222,47 @@ function fakeSurfaceApi(): CodexSurfaceApi & Record<string, ReturnType<typeof vi
     editMessage: vi.fn(async () => snapshot),
     getSnapshot: vi.fn(async () => snapshot),
     interrupt: vi.fn(async () => snapshot),
+    listConversations: vi.fn(async () => snapshot.conversations),
+    listModels: vi.fn(async () => snapshot.models),
+    onEvent: vi.fn(() => vi.fn()),
     onStateChange: vi.fn(() => vi.fn()),
+    readConversationHistory: vi.fn(async (conversationId = 'thread-1') => ({
+      conversationId,
+      messages: [],
+      threadStatus: null,
+    })),
     refreshConversations: vi.fn(async () => snapshot),
+    renameConversation: vi.fn(async () => snapshot),
     respondToClientRequest: vi.fn(async () => snapshot),
     resolveApproval: vi.fn(async () => snapshot),
     retryMessage: vi.fn(async () => snapshot),
     setGoal: vi.fn(async () => snapshot),
     selectConversation: vi.fn(async () => ({ ...snapshot, activeConversationId: 'thread-1' })),
     sendMessage: vi.fn(async () => snapshot),
+    startReview: vi.fn(async () => snapshot),
     steerMessage: vi.fn(async () => snapshot),
     steerQueuedPrompt: vi.fn(async () => snapshot),
     updateConversationSettings: vi.fn(async () => snapshot),
   };
+}
+
+function fakeNativeApi(overrides: Partial<CodexNativeRendererApi> = {}): CodexNativeRendererApi {
+  return {
+    capabilities: { attachments: true, clipboard: true, externalLinks: true, transcription: true },
+    copyToClipboard: vi.fn(async () => undefined),
+    ingestAttachments: vi.fn(async () => []),
+    openExternal: vi.fn(async () => undefined),
+    pickAttachments: vi.fn(async () => []),
+    transcribeAudio: vi.fn(async () => ({ text: '' })),
+    ...overrides,
+  };
+}
+
+function imageFile(name: string): File {
+  const file = new File(['png'], name, { type: 'image/png' });
+  Object.defineProperty(file, 'arrayBuffer', {
+    configurable: true,
+    value: vi.fn(async () => new Uint8Array([1, 2, 3]).buffer),
+  });
+  return file;
 }

@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { h, reactive } from 'vue';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CodexConversationPane,
   type CodexComposerMenuItem,
+  type CodexNativeAttachment,
+  type CodexSurfaceController,
   type SurfaceMessage,
 } from '../../src/vue';
+import type { CodexSurfaceSnapshot } from '../../src/surface';
 
 const messages: SurfaceMessage[] = [{
   id: 'assistant-1',
@@ -16,11 +20,11 @@ const messages: SurfaceMessage[] = [{
 }];
 
 describe('CodexConversationPane', () => {
-  it('renders its header, messages, empty state, and errors in isolation', async () => {
+  it('renders messages, empty state, and errors without owning an application header', async () => {
     const wrapper = mount(CodexConversationPane, {
-      props: { error: 'Connection lost', messages, modelValue: '', title: 'SDK conversation' },
+      props: { error: 'Connection lost', messages, modelValue: '' },
     });
-    expect(wrapper.text()).toContain('SDK conversation');
+    expect(wrapper.find('header').exists()).toBe(false);
     expect(wrapper.text()).toContain('Ready to build');
     expect(wrapper.get('[role="alert"]').text()).toBe('Connection lost');
 
@@ -41,6 +45,171 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('interrupt')).toHaveLength(1);
   });
 
+  it('owns native attachment picking, previews, removal, and typed submit options', async () => {
+    const attachment: CodexNativeAttachment = {
+      id: 'attachment-1',
+      type: 'image',
+      path: '/tmp/diagram.png',
+      name: 'diagram.png',
+      mimeType: 'image/png',
+      size: 3,
+      previewUrl: 'data:image/png;base64,cG5n',
+    };
+    const pickAttachments = vi.fn(async () => [attachment]);
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages, modelValue: '', pickAttachments },
+    });
+
+    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text().includes('Add Files & Photos'))!.trigger('click');
+    await vi.waitFor(() => expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(true));
+    expect(wrapper.get('.codex-conversation-pane__attachment-preview').attributes('src')).toBe(
+      attachment.previewUrl,
+    );
+
+    await wrapper.get('textarea').setValue('review this image');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')).toStrictEqual([[
+      'review this image',
+      {
+        attachments: [{
+          type: 'image',
+          path: '/tmp/diagram.png',
+          name: 'diagram.png',
+          mimeType: 'image/png',
+          previewUrl: 'data:image/png;base64,cG5n',
+        }],
+      },
+    ]]);
+    expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
+  });
+
+  it('ingests pasted images without suppressing accompanying text paste behavior', async () => {
+    const file = new File(['png'], 'clipboard.png', { type: 'image/png' });
+    const ingestAttachments = vi.fn(async () => [{
+      id: 'clipboard-image',
+      type: 'image' as const,
+      path: '/tmp/clipboard.png',
+      name: 'clipboard.png',
+      mimeType: 'image/png',
+      size: 3,
+    }]);
+    const wrapper = mount(CodexConversationPane, {
+      props: { ingestAttachments, messages, modelValue: '' },
+    });
+    await wrapper.get('textarea').setValue('pasted text');
+    const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { files: [file], getData: () => 'pasted text' },
+    });
+    wrapper.get('textarea').element.dispatchEvent(paste);
+
+    expect(paste.defaultPrevented).toBe(false);
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('pasted text');
+    await vi.waitFor(() => expect(ingestAttachments).toHaveBeenCalledWith([
+      expect.objectContaining({ name: 'clipboard.png', mimeType: 'image/png' }),
+    ]));
+    expect(wrapper.text()).toContain('clipboard.png');
+  });
+
+  it('exposes attachment rendering as a pane-level customization slot', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages: [{
+          id: 'user-file',
+          role: 'user',
+          status: 'complete',
+          parts: [{
+            type: 'attachment',
+            attachment: { kind: 'file', name: 'report.pdf', path: '/tmp/report.pdf' },
+          }],
+        }],
+        modelValue: '',
+      },
+      slots: {
+        'message-attachment': ({ attachment }: { attachment: { name: string } }) => (
+          h('strong', { class: 'custom-attachment' }, attachment.name)
+        ),
+      },
+    });
+
+    expect(wrapper.get('.custom-attachment').text()).toBe('report.pdf');
+    expect(wrapper.find('.chat-attachment-block').exists()).toBe(false);
+  });
+
+  it('blocks pasted and dropped files when attachments are disabled', async () => {
+    const file = new File(['png'], 'blocked.png', { type: 'image/png' });
+    const ingestAttachments = vi.fn(async () => []);
+    const wrapper = mount(CodexConversationPane, {
+      props: { attachEnabled: false, ingestAttachments, messages, modelValue: '' },
+    });
+    const pane = wrapper.get('.codex-conversation-pane');
+    const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(paste, 'clipboardData', { value: { files: [file] } });
+    const drop = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
+    Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } });
+
+    pane.element.dispatchEvent(paste);
+    pane.element.dispatchEvent(drop);
+    await wrapper.vm.$nextTick();
+
+    expect(paste.defaultPrevented).toBe(false);
+    expect(drop.defaultPrevented).toBe(false);
+    expect(ingestAttachments).not.toHaveBeenCalled();
+    expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
+  });
+
+  it('clears an existing attachment queue when attachments become disabled', async () => {
+    const pickAttachments = vi.fn(async () => [{
+      id: 'queued-image',
+      type: 'image' as const,
+      path: '/tmp/queued.png',
+      name: 'queued.png',
+      mimeType: 'image/png',
+      size: 3,
+    }]);
+    const wrapper = mount(CodexConversationPane, {
+      props: { attachEnabled: true, messages, modelValue: '', pickAttachments },
+    });
+    await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text().includes('Add Files & Photos'))!.trigger('click');
+    await vi.waitFor(() => expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(true));
+
+    await wrapper.setProps({ attachEnabled: false });
+
+    expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
+    expect(wrapper.emitted('attachmentsChange')).toContainEqual([[]]);
+  });
+
+  it('resets the composer draft and attachment queue when conversations change', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { conversationKey: 'thread-1', messages, modelValue: '' },
+    });
+    await wrapper.get('textarea').setValue('thread one draft');
+    await wrapper.setProps({ conversationKey: 'thread-2' });
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(wrapper.emitted('update:modelValue')).toContainEqual(['']);
+  });
+
+  it('binds directly to a surface controller while preserving controlled mode overrides', async () => {
+    const controller = fakeSurfaceController();
+    const wrapper = mount(CodexConversationPane, { props: { surface: controller } });
+
+    await vi.waitFor(() => expect(controller.connect).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Bound controller message'));
+    await wrapper.get('textarea').setValue('/goal ship the SDK');
+    await wrapper.get('form').trigger('submit');
+    expect(controller.sendMessage).toHaveBeenCalledWith('/goal ship the SDK', undefined);
+
+    await wrapper.setProps({
+      messages: [{ id: 'controlled', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Controlled override' }] }],
+    });
+    expect(wrapper.text()).toContain('Controlled override');
+    expect(wrapper.text()).not.toContain('Bound controller message');
+  });
+
   it('exposes slots and extensible composer menu entries', async () => {
     const menuItems: CodexComposerMenuItem<{ source: string }>[] = [{
       id: 'custom-action',
@@ -49,14 +218,12 @@ describe('CodexConversationPane', () => {
       payload: { source: 'sample' },
     }];
     const wrapper = mount(CodexConversationPane, {
-      props: { menuItems, messages: [], modelValue: '', title: 'Fallback' },
+      props: { menuItems, messages: [], modelValue: '' },
       slots: {
-        header: '<strong class="custom-header">Custom header</strong>',
         empty: '<p class="custom-empty">Pick a prompt</p>',
         'before-composer': '<div class="custom-toolbar">Toolbar</div>',
       },
     });
-    expect(wrapper.get('.custom-header').text()).toBe('Custom header');
     expect(wrapper.get('.custom-empty').text()).toBe('Pick a prompt');
     expect(wrapper.get('.custom-toolbar').text()).toBe('Toolbar');
 
@@ -105,4 +272,158 @@ describe('CodexConversationPane', () => {
     expect(wrapper.get('.after-slot').text()).toBe('After slot');
     expect(wrapper.get('.footer-slot').text()).toBe('Footer slot');
   });
+
+  it('makes history loading authoritative over a previously rendered transcript', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { historyLoading: true, messages, modelValue: '' },
+    });
+
+    expect(wrapper.find('[aria-label="Loading conversation"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('Ready to build');
+
+    await wrapper.setProps({ historyLoading: false });
+    expect(wrapper.text()).toContain('Ready to build');
+  });
+
+  it('disables message actions by default while Codex is busy', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        busy: true,
+        messages: [{ id: 'user-1', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Ship it' }] }],
+        modelValue: '',
+      },
+    });
+
+    expect(wrapper.get('.chat-message__actions').attributes('aria-hidden')).toBe('true');
+    expect(wrapper.get('.chat-message__actions').attributes()).toHaveProperty('inert');
+  });
+
+  it.each([
+    ['docs/design%20notes.md?raw=1#overview', { href: 'docs/design%20notes.md?raw=1#overview', kind: 'file', path: 'docs/design notes.md' }],
+    ['README.md:40', { href: 'README.md:40', kind: 'file', path: 'README.md', line: 40 }],
+    ['file:///tmp/README.md:40:2', { href: 'file:///tmp/README.md:40:2', kind: 'file', path: '/tmp/README.md', line: 40, column: 2 }],
+    ['file:///tmp/design%20notes.md#L4', { href: 'file:///tmp/design%20notes.md#L4', kind: 'file', path: '/tmp/design notes.md' }],
+    ['C:/repo/src/App.vue#L9', { href: 'C:/repo/src/App.vue#L9', kind: 'file', path: 'C:/repo/src/App.vue' }],
+    ['C:\\repo\\src\\App.vue#L9', { href: 'C:\\repo\\src\\App.vue#L9', kind: 'file', path: 'C:\\repo\\src\\App.vue' }],
+    ['https://example.com/docs', { href: 'https://example.com/docs', kind: 'external' }],
+  ])('intercepts %s and delegates opening to the host', async (href, expected) => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages, modelValue: '' },
+      slots: { message: () => h('a', { class: 'test-link', href }, 'Open') },
+    });
+
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    wrapper.get('.test-link').element.dispatchEvent(event);
+    await wrapper.vm.$nextTick();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(wrapper.emitted('openLink')).toStrictEqual([[expected]]);
+  });
+
+  it.each(['javascript:alert(1)', 'data:text/html,boom', '\\\\server\\share\\file.ts'])('blocks unsupported link %s without delegating it', async (href) => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages, modelValue: '' },
+      slots: { message: () => h('a', { class: 'test-link', href }, 'Open') },
+    });
+
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    wrapper.get('.test-link').element.dispatchEvent(event);
+    await wrapper.vm.$nextTick();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(wrapper.emitted('openLink')).toBeUndefined();
+  });
+
+  it('passes typed message tool and action slots through the whole pane', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages: [{
+          role: 'assistant',
+          content: '<tool id="tool-1"></tool>',
+          toolCalls: [{ args: {}, done: true, function: 'shell', id: 'tool-1', result: 'ok', state: 'completed' }],
+        }],
+        modelValue: '',
+      },
+      slots: {
+        'message-actions': ({ index }: { index: number }) => h('button', { class: 'custom-message-action' }, `Action ${index}`),
+        'message-tool': ({ toolCall, toolCalls }: { toolCall?: { function: string }; toolCalls?: Array<{ function: string }> }) => h('div', { class: 'custom-tool' }, toolCall?.function ?? toolCalls?.[0]?.function),
+      },
+    });
+
+    expect(wrapper.get('.custom-tool').text()).toBe('shell');
+    expect(wrapper.get('.custom-message-action').text()).toBe('Action 0');
+  });
 });
+
+function fakeSurfaceController(): CodexSurfaceController {
+  const state = reactive<CodexSurfaceSnapshot>({
+    status: 'idle',
+    conversations: [],
+    activeConversationId: null,
+    messages: [],
+    clientRequests: [],
+    answeredClientRequestIds: [],
+    approvals: [],
+    models: [],
+    modelCatalogStatus: 'loaded',
+    skills: [],
+    skillCatalogStatus: 'loaded',
+    permissionProfiles: [],
+    approvalPresets: [],
+    approvalPreset: null,
+    selectedModelId: null,
+    selectedReasoningEffort: null,
+    planMode: false,
+    contextUsage: null,
+    goal: null,
+    turnGitDiff: null,
+    threadStatus: null,
+    rateLimits: null,
+    queuedPrompts: [],
+    busy: false,
+    historyLoading: false,
+    error: null,
+  });
+  const snapshot = () => structuredClone(state);
+  const connect = vi.fn(async () => {
+    state.status = 'ready';
+    state.activeConversationId = 'thread-bound';
+    state.messages = [{
+      id: 'bound-message',
+      role: 'assistant',
+      status: 'complete',
+      parts: [{ type: 'text', text: 'Bound controller message' }],
+    }];
+    return snapshot();
+  });
+  const sendMessage = vi.fn(async () => snapshot());
+  const action = vi.fn(async () => snapshot());
+  return {
+    state,
+    answeredClientRequestIds: new Set<string>(),
+    clearGoal: action,
+    compactConversation: action,
+    connect,
+    createConversation: action,
+    deleteMessage: action,
+    deleteQueuedPrompt: action,
+    editMessage: action,
+    interrupt: action,
+    listConversations: vi.fn(async () => []),
+    readConversationHistory: vi.fn(async () => ({
+      conversationId: 'thread-bound', messages: [], threadStatus: null,
+    })),
+    refreshConversations: action,
+    renameConversation: action,
+    respondToClientRequest: action,
+    resolveApproval: action,
+    retryMessage: action,
+    selectConversation: action,
+    sendMessage,
+    setGoal: action,
+    startReview: action,
+    steerMessage: action,
+    steerQueuedPrompt: action,
+    updateConversationSettings: action,
+  } as unknown as CodexSurfaceController;
+}

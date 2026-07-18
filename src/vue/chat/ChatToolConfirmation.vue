@@ -1,6 +1,6 @@
 <template>
   <section
-    class="chat-tool-confirmation"
+    class="codex-chat-theme chat-tool-confirmation"
     :class="{ 'chat-tool-confirmation--resolved': resolved }"
   >
     <div v-if="resolved" class="chat-tool-confirmation__summary">
@@ -64,7 +64,7 @@ import { parseToolStatusDescriptor } from './tool-status'
 import { getMessageToolCallArgs, getMessageToolCallName, type MessageToolCall } from './types'
 
 const props = defineProps<{
-  answeredClientRequestIds?: Set<string>
+  answeredClientRequestIds?: ReadonlySet<string>
   toolCall: MessageToolCall
 }>()
 

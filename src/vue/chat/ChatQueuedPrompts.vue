@@ -1,5 +1,5 @@
 <template>
-  <div v-if="prompts.length" class="chat-queued-prompts">
+  <div v-if="prompts.length" class="codex-chat-theme chat-queued-prompts">
     <ChatQueuedPrompt
       v-for="prompt in prompts"
       :key="prompt.id"

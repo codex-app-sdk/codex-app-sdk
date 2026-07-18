@@ -1,4 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { createCodexSurfaceRendererApi } from 'codex-app-sdk/electron';
+import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
 
-contextBridge.exposeInMainWorld('codexSurface', createCodexSurfaceRendererApi(ipcRenderer));
+exposeCodexElectronPreload(contextBridge, ipcRenderer);

@@ -1,29 +1,46 @@
-import './styles.css';
-
 export { default as CodexComposer } from './components/CodexComposer.vue';
 export { default as CodexApprovalPrompt } from './components/CodexApprovalPrompt.vue';
 export { default as CodexConversationPane } from './components/CodexConversationPane.vue';
+export { default as CodexConversationHistoryLoader } from './components/CodexConversationHistoryLoader.vue';
 export { default as CodexComposerMenu } from './components/CodexComposerMenu.vue';
 export { default as CodexComposerMenuList } from './components/CodexComposerMenuList.vue';
 export { default as CodexComposerSendButton } from './components/CodexComposerSendButton.vue';
 export { default as CodexMessage } from './components/CodexMessage.vue';
 export { default as CodexMessageList } from './components/CodexMessageList.vue';
+export { default as CodexWorkbenchLayout } from './components/CodexWorkbenchLayout.vue';
+export { default as CodexAttachmentBlock } from './chat/ChatAttachmentBlock.vue';
 export { default as CodexAnimatedDiffStat } from './chat/ChatAnimatedDiffStat.vue';
 export { default as CodexCompactionMessage } from './chat/ChatCompactionMessage.vue';
+export { default as CodexComposerActionMenu } from './chat/ChatComposerActionMenu.vue';
+export { default as CodexComposerActiveModes } from './chat/ChatComposerActiveModes.vue';
+export { default as CodexComposerFileMentionMenu } from './chat/ChatComposerFileMentionMenu.vue';
 export { default as CodexComposerShelf } from './chat/ChatComposerShelf.vue';
+export { default as CodexComposerSkillMenu } from './chat/ChatComposerSkillMenu.vue';
+export { default as CodexComposerSlashMenu } from './chat/ChatComposerSlashMenu.vue';
+export { default as CodexComposerVoiceButton } from './chat/ChatComposerVoiceButton.vue';
+export { default as CodexComposerVoiceField } from './chat/ChatComposerVoiceField.vue';
+export { default as CodexComposerWaveform } from './chat/ChatComposerWaveform.vue';
 export { default as CodexContextUsageIndicator } from './chat/ChatContextUsageIndicator.vue';
+export { default as CodexFoldTransition } from './chat/ChatFoldTransition.vue';
 export { default as CodexFollowUps } from './chat/ChatFollowUps.vue';
 export { default as CodexGoal } from './chat/ChatGoal.vue';
+export { default as CodexIconButton } from './chat/ChatIconButton.vue';
 export { default as CodexMediaBlock } from './chat/ChatMediaBlock.vue';
 export { default as CodexMermaidBlock } from './chat/ChatMermaidBlock.vue';
+export { default as CodexMessageActions } from './chat/ChatMessageActions.vue';
+export { default as CodexMessageBlock } from './chat/ChatMessageBlock.vue';
+export { default as CodexMessageEditor } from './chat/ChatMessageEditor.vue';
 export { default as CodexModelReasoningSelector } from './chat/ChatModelReasoningSelector.vue';
+export { default as CodexQueuedPrompt } from './chat/ChatQueuedPrompt.vue';
 export { default as CodexQueuedPrompts } from './chat/ChatQueuedPrompts.vue';
 export { default as CodexToolCall } from './chat/ChatToolCall.vue';
+export { default as CodexToolCallTitle } from './chat/ChatToolCallTitle.vue';
 export { default as CodexToolConfirmation } from './chat/ChatToolConfirmation.vue';
+export { default as CodexToolGroup } from './chat/ChatToolGroup.vue';
 export { default as CodexToolUserInputRequest } from './chat/ChatToolUserInputRequest.vue';
 export { default as CodexTurnGitInfo } from './chat/ChatTurnGitInfo.vue';
-export { defaultBackendCapabilities } from './chat/backend-capabilities';
-export { claudeBackendCommands, codexBackendCommands, defaultBackendCommands } from './chat/backend-commands';
+export { codexCapabilities } from './chat/codex-capabilities';
+export { codexCommands } from './chat/codex-commands';
 export { approvalPresetOptions, defaultApprovalPreset, isApprovalPreset } from './chat/approval-presets';
 export { defaultCodexChatTranslate, provideCodexChatTranslate } from './chat/chat-i18n';
 export {
@@ -41,6 +58,8 @@ export {
 } from './chat/composer-skills';
 export { renderMarkdown } from './chat/message-markdown';
 export { languageForFilePath, renderCodeBlock } from './chat/syntax-highlighting';
+export { registerCodexToolTitlePresenter } from './chat/tool-status';
+export type { CodexToolTitlePresenter, CodexToolTitlePresenterContext } from './chat/tool-status';
 export type {
   CodexComposerMenuActionItem,
   CodexComposerMenuCheckboxItem,
@@ -53,20 +72,19 @@ export type {
   CodexComposerMenuSubmenuItem,
 } from './composer-menu';
 export type {
-  AgentBackend,
-  AgentContextUsage,
-  AgentFileSearchItem,
-  AppleSpeechTranscriptionResult,
+  CodexContextUsage,
+  CodexConversationLink,
+  CodexFileSearchItem,
+  CodexSpeechTranscriptionResult,
   ApprovalPreset,
   AskUserAnswers,
   AskUserQuestion,
   AskUserQuestionOption,
-  BackendCapabilities,
-  BackendCommandSummary,
-  BackendModelOption,
-  BackendPlanModeSupport,
-  BackendReasoningEffortOption,
-  BackendSkillSummary,
+  CodexCapabilities,
+  CodexCommandSummary,
+  CodexModelOption,
+  CodexReasoningEffortOption,
+  CodexSkillSummary,
   ClientRequestResponse,
   CodexChatTranscription,
   PromptSkillInput,
@@ -77,6 +95,7 @@ export type {
   TurnGitDiff,
 } from './chat/contracts';
 export type {
+  MessageAttachment as CodexMessageAttachment,
   Message as CodexChatMessage,
   MessageMedia as CodexMessageMedia,
   MessagePart as CodexChatMessagePart,
@@ -87,12 +106,34 @@ export type {
 } from './chat/types';
 export type { ChatMessageInput as CodexMessageInput } from './chat/renderer-message-adapter';
 export type { CodexChatTranslate } from './chat/chat-i18n';
-export type { QueuedChatPrompt as CodexQueuedPrompt } from './chat/queued-prompts';
+export type { QueuedChatPrompt as CodexQueuedPromptData } from './chat/queued-prompts';
 export type {
   SurfaceMessage,
+  SurfaceMessageAttachment,
+  SurfaceMessageAttachmentPart,
   SurfaceMessagePart,
   SurfaceMessageStatusPart,
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,
 } from './types';
-export { useCodexSurface } from './use-codex-surface';
+export { useCodexSurface, type CodexSurfaceController } from './use-codex-surface';
+export { applyCodexTheme, type CodexThemeMode, type CodexThemeOptions } from './codex-theme';
+export {
+  codexConversationLinkFromHref,
+  parseCodexEditorFileReference,
+  type CodexEditorFileReference,
+} from './chat/conversation-links';
+export {
+  getCodexNativeRendererApi,
+  ingestCodexAttachments,
+  pickCodexAttachments,
+  type CodexAttachmentIngester,
+  type CodexAttachmentPicker,
+} from './native-capabilities';
+export type {
+  CodexNativeAttachment,
+  CodexNativeAttachmentInput,
+  CodexNativeClipboardContent,
+  CodexNativeRendererApi,
+} from '../native/types';
+export type { CodexSurfaceAttachment, SendCodexMessageOptions } from '../surface/types';

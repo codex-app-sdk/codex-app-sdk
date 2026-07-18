@@ -48,7 +48,7 @@ describe('CodexMessage', () => {
     });
 
     expect(wrapper.text()).toContain('Thinking');
-    expect(wrapper.get('.chat-message__thinking').classes()).toContain('text-shimmer');
+    expect(wrapper.get('.chat-message__thinking').classes()).toContain('codex-text-shimmer');
   });
 
   it('renders the thinking shimmer directly from an app-server surface placeholder', () => {
@@ -63,7 +63,7 @@ describe('CodexMessage', () => {
     });
 
     expect(wrapper.get('.chat-message__thinking').text()).toBe('Thinking');
-    expect(wrapper.get('.chat-message__thinking').classes()).toContain('text-shimmer');
+    expect(wrapper.get('.chat-message__thinking').classes()).toContain('codex-text-shimmer');
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
   });
 
@@ -73,6 +73,45 @@ describe('CodexMessage', () => {
     });
 
     expect(wrapper.get('.chat-message-block--text').classes()).toContain('codex-markdown');
+  });
+
+  it('renders optimistic image previews and persisted file chips in user messages', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'user-attachments',
+        role: 'user',
+        status: 'complete',
+        parts: [
+          { type: 'text', text: 'Review both' },
+          {
+            type: 'attachment',
+            attachment: {
+              kind: 'image',
+              name: 'preview.png',
+              path: '/tmp/preview.png',
+              url: 'data:image/png;base64,cG5n',
+              mimeType: 'image/png',
+            },
+          },
+          {
+            type: 'attachment',
+            attachment: {
+              kind: 'file',
+              name: 'notes.md',
+              path: '/tmp/notes.md',
+              mimeType: 'text/markdown',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.get('.chat-message-block--text').text()).toBe('Review both');
+    expect(wrapper.get('.chat-attachment-block__preview').attributes('src'))
+      .toBe('data:image/png;base64,cG5n');
+    expect(wrapper.findAll('.chat-attachment-block').map((block) => block.text()))
+      .toStrictEqual(['preview.png', 'notes.mdtext/markdown']);
+    expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/notes.md');
   });
 
   it('hides unsupported user mutation actions while keeping copy and quote', () => {

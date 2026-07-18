@@ -17,3 +17,31 @@ export {
   registerCodexSurfaceIpc,
   type CodexSurfaceRendererApi,
 } from './codex-surface-ipc';
+export {
+  createCodexNativeRendererApi,
+  exposeCodexNativeRendererApi,
+  type CodexContextBridge,
+} from './codex-native-renderer';
+export {
+  registerCodexNativeIpc,
+  type CodexNativeClipboard,
+  type CodexNativeDialog,
+  type CodexNativeMainDependencies,
+  type CodexNativeMainOptions,
+  type CodexNativeShell,
+} from './codex-native-ipc';
+export type {
+  CodexNativeAttachment,
+  CodexNativeAttachmentInput,
+  CodexNativeClipboardContent,
+  CodexNativeRendererApi,
+  CodexSpeechTranscriptionResult,
+} from '../native/types';
+export {
+  exposeCodexElectronPreload,
+  type CodexElectronRendererApis,
+} from './codex-electron-preload';
+export {
+  registerCodexElectronMain,
+  type CodexElectronMainOptions,
+} from './codex-electron-integration';

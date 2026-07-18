@@ -104,10 +104,8 @@ describe('CodexMessageList', () => {
     chatMessage.vm.$emit('delete-message', 0);
     chatMessage.vm.$emit('edit-message', editPayload);
     chatMessage.vm.$emit('quote-message', 0);
-    chatMessage.vm.$emit('review-file', '/tmp/app.ts');
     chatMessage.vm.$emit('retry-message', 1);
     chatMessage.vm.$emit('send-follow-up', 'Open the failing file');
-    chatMessage.vm.$emit('undo-change-set', 'change-set-1');
     await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
@@ -116,10 +114,8 @@ describe('CodexMessageList', () => {
     expect(wrapper.emitted('delete-message')).toStrictEqual([[0]]);
     expect(wrapper.emitted('edit-message')).toStrictEqual([[editPayload]]);
     expect(wrapper.emitted('quote-message')).toStrictEqual([[0]]);
-    expect(wrapper.emitted('review-file')).toStrictEqual([['/tmp/app.ts']]);
     expect(wrapper.emitted('retry-message')).toStrictEqual([[1]]);
     expect(wrapper.emitted('send-follow-up')).toStrictEqual([['Open the failing file']]);
-    expect(wrapper.emitted('undo-change-set')).toStrictEqual([['change-set-1']]);
   });
 
   it('keeps the transcript stuck to the bottom when messages are appended', async () => {
@@ -156,6 +152,24 @@ describe('CodexMessageList', () => {
     await wrapper.get('.message-list').trigger('scroll');
 
     expect(scrollEl.scrollTop).toBe(100);
+    wrapper.unmount();
+  });
+
+  it('resets scroll position when the conversation key changes', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { messages, resetKey: 'thread-a' },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    scrollEl.scrollTop = 100;
+    await wrapper.get('.message-list').trigger('scroll');
+
+    await wrapper.setProps({ resetKey: 'thread-b' });
+    await flushPromises();
+
+    expect(scrollEl.scrollTop).toBe(900);
     wrapper.unmount();
   });
 });

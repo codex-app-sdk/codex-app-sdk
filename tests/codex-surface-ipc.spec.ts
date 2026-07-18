@@ -5,13 +5,15 @@ import {
   type IpcMainPort,
   type IpcRendererPort,
 } from '../src/electron';
-import type { CodexSurfaceSnapshot } from '../src/surface';
+import type { CodexSurfaceEvent, CodexSurfaceSnapshot } from '../src/surface';
 
 const snapshot: CodexSurfaceSnapshot = {
   status: 'ready',
   conversations: [],
   activeConversationId: null,
   messages: [],
+  clientRequests: [],
+  answeredClientRequestIds: [],
   approvals: [],
   models: [],
   modelCatalogStatus: 'loaded',
@@ -26,9 +28,26 @@ const snapshot: CodexSurfaceSnapshot = {
   contextUsage: null,
   goal: null,
   turnGitDiff: null,
+  threadStatus: null,
+  rateLimits: null,
   queuedPrompts: [],
   busy: false,
+  historyLoading: false,
   error: null,
+};
+
+const history = {
+  conversationId: 'thread-1',
+  messages: [],
+  threadStatus: null,
+};
+
+const surfaceEvent: CodexSurfaceEvent = {
+  seq: 1,
+  occurredAt: '2026-07-18T12:00:00.000Z',
+  origin: 'lifecycle',
+  type: 'surface.statusChanged',
+  payload: { status: 'ready', error: null },
 };
 
 describe('Codex surface Electron bridge', () => {
@@ -36,9 +55,12 @@ describe('Codex surface Electron bridge', () => {
     const main = new FakeMainPort();
     const sender = { send: vi.fn() };
     let stateListener: ((value: CodexSurfaceSnapshot) => void) | undefined;
+    let eventListener: ((value: CodexSurfaceEvent) => void) | undefined;
     const unsubscribeState = vi.fn();
+    const unsubscribeEvents = vi.fn();
     const surface = {
       clearGoal: vi.fn(async () => snapshot),
+      compactConversation: vi.fn(async () => snapshot),
       connect: vi.fn(async () => snapshot),
       createConversation: vi.fn(async () => snapshot),
       deleteMessage: vi.fn(async () => snapshot),
@@ -46,13 +68,18 @@ describe('Codex surface Electron bridge', () => {
       editMessage: vi.fn(async () => snapshot),
       getSnapshot: vi.fn(() => snapshot),
       interrupt: vi.fn(async () => snapshot),
+      listConversations: vi.fn(async () => []),
+      listModels: vi.fn(async () => []),
+      readConversationHistory: vi.fn(async () => history),
       refreshConversations: vi.fn(async () => snapshot),
+      renameConversation: vi.fn(async () => snapshot),
       respondToClientRequest: vi.fn(async () => snapshot),
       resolveApproval: vi.fn(async () => snapshot),
       retryMessage: vi.fn(async () => snapshot),
       setGoal: vi.fn(async () => snapshot),
       selectConversation: vi.fn(async () => snapshot),
       sendMessage: vi.fn(async () => snapshot),
+      startReview: vi.fn(async () => snapshot),
       steerMessage: vi.fn(async () => snapshot),
       steerQueuedPrompt: vi.fn(async () => snapshot),
       updateConversationSettings: vi.fn(async () => snapshot),
@@ -60,11 +87,16 @@ describe('Codex surface Electron bridge', () => {
         stateListener = listener;
         return unsubscribeState;
       }),
+      onEvent: vi.fn((listener: (value: CodexSurfaceEvent) => void) => {
+        eventListener = listener;
+        return unsubscribeEvents;
+      }),
     };
 
     const dispose = registerCodexSurfaceIpc(main, sender, surface);
     expect([...main.handlers.keys()].sort()).toStrictEqual([
       'codex-surface:clear-goal',
+      'codex-surface:compact-conversation',
       'codex-surface:connect',
       'codex-surface:create-conversation',
       'codex-surface:delete-message',
@@ -72,26 +104,31 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:edit-message',
       'codex-surface:get-snapshot',
       'codex-surface:interrupt',
+      'codex-surface:list-conversations',
+      'codex-surface:list-models',
+      'codex-surface:read-conversation-history',
       'codex-surface:refresh-conversations',
+      'codex-surface:rename-conversation',
       'codex-surface:resolve-approval',
       'codex-surface:respond-to-client-request',
       'codex-surface:retry-message',
       'codex-surface:select-conversation',
       'codex-surface:send-message',
       'codex-surface:set-goal',
+      'codex-surface:start-review',
       'codex-surface:steer-message',
       'codex-surface:steer-queued-prompt',
       'codex-surface:update-conversation-settings',
     ]);
     await expect(main.call('codex-surface:clear-goal')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:compact-conversation')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', {
       model: 'gpt-5',
-      cwd: '/',
-      approvalMode: 'ask',
-      permissionMode: 'full-access',
     })).resolves.toBe(snapshot);
-    await expect(main.call('codex-surface:create-conversation', { cwd: '/' })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:create-conversation', { cwd: '/' })).rejects.toThrow(
+      'Conversation options contains unsupported property "cwd"',
+    );
     await expect(main.call('codex-surface:create-conversation')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', {
       reasoningEffort: 'high', approvalPreset: 'approve-for-me',
@@ -101,6 +138,9 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:edit-message', 1, 'Replacement')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', 'unsafe')).rejects.toThrow(
       'Conversation options must be an object',
+    );
+    await expect(main.call('codex-surface:create-conversation', new Date())).rejects.toThrow(
+      'Conversation options must be a plain object',
     );
     await expect(main.call('codex-surface:create-conversation', { model: 42 })).rejects.toThrow(
       'Conversation model must be a non-empty string',
@@ -122,7 +162,25 @@ describe('Codex surface Electron bridge', () => {
     );
     await expect(main.call('codex-surface:get-snapshot')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:interrupt')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:list-conversations', {
+      cwd: ['/tmp/a', '/tmp/b'], limit: 20, archived: false, searchTerm: 'SDK',
+    })).resolves.toStrictEqual([]);
+    await expect(main.call('codex-surface:list-models', {
+      includeHidden: true, forceReload: true,
+    })).resolves.toStrictEqual([]);
+    await expect(main.call('codex-surface:list-models', { includeHidden: 'yes' })).rejects.toThrow(
+      'Model list includeHidden must be a boolean',
+    );
+    await expect(main.call('codex-surface:list-conversations', { limit: -1 })).rejects.toThrow(
+      'Conversation list limit must be a non-negative integer',
+    );
+    await expect(main.call('codex-surface:list-conversations', { cwd: [''] })).rejects.toThrow(
+      'Conversation list cwd must be a non-empty string',
+    );
+    await expect(main.call('codex-surface:read-conversation-history', 'thread-1')).resolves.toBe(history);
+    await expect(main.call('codex-surface:read-conversation-history')).resolves.toBe(history);
     await expect(main.call('codex-surface:refresh-conversations')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:rename-conversation', 'SDK parity')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:respond-to-client-request', {
       id: 'question-1', payload: { answers: { target: { answers: ['README.md'] } } },
     })).resolves.toBe(snapshot);
@@ -130,9 +188,27 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:respond-to-client-request', {
       id: 'question-3', payload: { answers: {}, cancelled: true, decision: null },
     })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: { cancelled: false, decision: 'allow' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-5', payload: { decision: 'allow_conversation' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-6', payload: { decision: 'always_allow' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-7', payload: { decision: 'deny' },
+    })).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:respond-to-client-request', null)).rejects.toThrow(
       'Client request response must be an object',
     );
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-symbol', [Symbol('unsafe')]: true,
+    })).rejects.toThrow('Client request response must not contain symbol properties');
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-extra', extra: true,
+    })).rejects.toThrow('Client request response contains unsupported property "extra"');
     await expect(main.call('codex-surface:respond-to-client-request', {
       id: 'question-4', payload: [],
     })).rejects.toThrow('Client request response payload must be an object');
@@ -145,16 +221,157 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:respond-to-client-request', {
       id: 'question-4', payload: { answers: [] },
     })).rejects.toThrow('Client request answers must be an object');
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: { answers: { target: { answers: [42] } } },
+    })).rejects.toThrow('Client request answer values must be an array of strings');
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: { answers: { '': { answers: [] } } },
+    })).rejects.toThrow('Client request question id must be non-empty');
+    await expect(main.call('codex-surface:respond-to-client-request', {
+      id: 'question-4', payload: { answers: { target: { answers: [], extra: true } } },
+    })).rejects.toThrow('Client request answer contains unsupported property "extra"');
     await expect(main.call('codex-surface:resolve-approval', 'approval-1', 'approve', 'session')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:resolve-approval', 'approval-2', 'deny')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:resolve-approval', 'approval-1', 'invalid', 'session')).rejects.toThrow(
+      'Approval decision is invalid',
+    );
+    await expect(main.call('codex-surface:resolve-approval', 'approval-1', 'approve', 'forever')).rejects.toThrow(
+      'Approval scope is invalid',
+    );
+    await expect(main.call('codex-surface:resolve-approval', '', 'approve')).rejects.toThrow(
+      'Approval id must be a non-empty string',
+    );
     await expect(main.call('codex-surface:set-goal', 'Ship the SDK', 1000)).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:set-goal', 'Ship the SDK')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:set-goal', 'Ship the SDK', null)).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:set-goal', 'Ship the SDK', 0)).rejects.toThrow(
       'Goal token budget must be a positive number or null',
     );
+    await expect(main.call('codex-surface:set-goal', 'Ship the SDK', Number.POSITIVE_INFINITY)).rejects.toThrow(
+      'Goal token budget must be a positive number or null',
+    );
+    await expect(main.call('codex-surface:set-goal', 'Ship the SDK', '1000')).rejects.toThrow(
+      'Goal token budget must be a positive number or null',
+    );
     await expect(main.call('codex-surface:retry-message', 3)).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:select-conversation', 'thread-1')).resolves.toBe(snapshot);
-    await expect(main.call('codex-surface:send-message', 'Hello', { model: 'gpt-5' })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      model: 'gpt-5',
+      planMode: true,
+      skills: [{ name: 'review', path: '/skills/review/SKILL.md' }],
+      outputSchema: { type: 'object', required: ['result'] },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:send-message', 'Without options')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:send-message', 'Empty options', {})).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:send-message', 'Reason deeply', {
+      reasoningEffort: 'high',
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:send-message', 'JSON values', {
+      outputSchema: { nullable: null, enabled: true, count: 2, nested: ['value'] },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:send-message', 'Attachments', {
+      attachments: [
+        {
+          type: 'image',
+          path: '/tmp/screenshot.png',
+          detail: 'original',
+          name: 'screenshot.png',
+          mimeType: 'image/png',
+          previewUrl: 'data:image/png;base64,cG5n',
+        },
+        { type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' },
+      ],
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:send-message', 'Attachments', {
+      attachments: [{ type: 'image', path: '/tmp/screenshot.png', detail: 'huge' }],
+    })).rejects.toThrow('Message image detail is invalid');
+    await expect(main.call('codex-surface:send-message', 'Attachments', {
+      attachments: [{ type: 'unknown', path: '/tmp/file' }],
+    })).rejects.toThrow('Message attachment type is invalid');
+    await expect(main.call('codex-surface:send-message', 'Attachments', {
+      attachments: [{
+        type: 'image', path: '/tmp/screenshot.png', previewUrl: 'https://example.com/screenshot.png',
+      }],
+    })).rejects.toThrow('Message attachment preview URL must be a base64 image data URL');
+    await expect(main.call('codex-surface:send-message', 'Attachments', {
+      attachments: [{
+        type: 'image', path: '/tmp/screenshot.svg', previewUrl: 'data:image/svg+xml;base64,PHN2Zy8+',
+      }],
+    })).rejects.toThrow('Message attachment preview URL must be a base64 image data URL');
+    await expect(main.call('codex-surface:send-message', 'Hello', { cwd: '/' })).rejects.toThrow(
+      'Message options contains unsupported property "cwd"',
+    );
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      skills: [{ name: 'review', path: 1 }],
+    })).rejects.toThrow('Message skill path must be a non-empty string');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      skills: 'review',
+    })).rejects.toThrow('Message skills must be an array');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      planMode: 'yes',
+    })).rejects.toThrow('Message plan mode must be a boolean');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: { invalid: BigInt(1) },
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: new Date(),
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: new Map([['type', 'object']]),
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: { [Symbol('unsafe')]: true },
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: Array(1),
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    const cyclicOutputSchema: Record<string, unknown> = {};
+    cyclicOutputSchema.self = cyclicOutputSchema;
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: cyclicOutputSchema,
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    const hiddenOutputSchema = Object.defineProperty({}, 'hidden', { value: true });
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: hiddenOutputSchema,
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: Object.assign([true], { extra: false }),
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    await expect(main.call('codex-surface:send-message', 'Hello', {
+      outputSchema: Number.NaN,
+    })).rejects.toThrow('Message output schema must be JSON-serializable');
+    await expect(main.call('codex-surface:send-message', '   ')).rejects.toThrow(
+      'Message prompt must be a non-empty string',
+    );
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'baseBranch', branch: 'main' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review', {})).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'uncommittedChanges' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'commit', sha: 'abc123' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'commit', sha: 'abc123', title: null },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'commit', sha: 'abc123', title: 'Parity review' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'custom', instructions: 'Review IPC boundaries' },
+    })).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'commit', sha: 'abc123', title: 42 },
+    })).rejects.toThrow('Review commit title must be a string or null');
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'unknown' },
+    })).rejects.toThrow('Review target type is invalid');
+    await expect(main.call('codex-surface:start-review', {
+      target: { type: 'custom', instructions: '' },
+    })).rejects.toThrow('Review instructions must be a non-empty string');
     await expect(main.call('codex-surface:steer-message', 'More detail')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:steer-queued-prompt', 'queued-2')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:update-conversation-settings', {
@@ -170,34 +387,70 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:update-conversation-settings', { planMode: 'yes' })).rejects.toThrow(
       'Conversation plan mode must be a boolean',
     );
+    await expect(main.call('codex-surface:connect', 'unexpected')).rejects.toThrow(
+      'codex-surface:connect received an invalid number of arguments',
+    );
+    await expect(main.call('codex-surface:send-message')).rejects.toThrow(
+      'codex-surface:send-message received an invalid number of arguments',
+    );
     stateListener?.(snapshot);
     expect(surface.connect).toHaveBeenCalledOnce();
     expect(surface.clearGoal).toHaveBeenCalledOnce();
     expect(surface.createConversation).toHaveBeenNthCalledWith(1, {
       model: 'gpt-5',
     });
-    expect(surface.createConversation).toHaveBeenNthCalledWith(2, {});
+    expect(surface.createConversation).toHaveBeenNthCalledWith(2, undefined);
     expect(surface.deleteMessage).toHaveBeenCalledWith(2);
     expect(surface.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
     expect(surface.editMessage).toHaveBeenCalledWith(1, 'Replacement');
     expect(surface.getSnapshot).toHaveBeenCalledOnce();
     expect(surface.interrupt).toHaveBeenCalledOnce();
+    expect(surface.listConversations).toHaveBeenCalledWith({
+      cwd: ['/tmp/a', '/tmp/b'], limit: 20, archived: false, searchTerm: 'SDK',
+    });
+    expect(surface.readConversationHistory).toHaveBeenNthCalledWith(1, 'thread-1');
+    expect(surface.readConversationHistory).toHaveBeenNthCalledWith(2, undefined);
     expect(surface.refreshConversations).toHaveBeenCalledOnce();
+    expect(surface.renameConversation).toHaveBeenCalledWith('SDK parity');
     expect(surface.respondToClientRequest).toHaveBeenCalledWith({
       id: 'question-1', payload: { answers: { target: { answers: ['README.md'] } } },
     });
     expect(surface.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
+    expect(surface.resolveApproval).toHaveBeenCalledTimes(2);
     expect(surface.setGoal).toHaveBeenCalledWith('Ship the SDK', 1000);
     expect(surface.retryMessage).toHaveBeenCalledWith(3);
     expect(surface.selectConversation).toHaveBeenCalledWith('thread-1');
-    expect(surface.sendMessage).toHaveBeenCalledWith('Hello', { model: 'gpt-5' });
+    expect(surface.sendMessage).toHaveBeenCalledWith('Hello', {
+      model: 'gpt-5',
+      planMode: true,
+      skills: [{ name: 'review', path: '/skills/review/SKILL.md' }],
+      outputSchema: { type: 'object', required: ['result'] },
+    });
+    expect(surface.sendMessage).toHaveBeenCalledWith('Attachments', {
+      attachments: [
+        {
+          type: 'image',
+          path: '/tmp/screenshot.png',
+          detail: 'original',
+          name: 'screenshot.png',
+          mimeType: 'image/png',
+          previewUrl: 'data:image/png;base64,cG5n',
+        },
+        { type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' },
+      ],
+    });
+    expect(surface.startReview).toHaveBeenCalledWith({ target: { type: 'baseBranch', branch: 'main' } });
     expect(surface.steerMessage).toHaveBeenCalledWith('More detail');
     expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2');
     expect(surface.updateConversationSettings).toHaveBeenCalledWith({
       modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
     });
+    stateListener?.(snapshot);
+    eventListener?.(surfaceEvent);
     expect(sender.send).toHaveBeenCalledWith('codex-surface:state-changed', snapshot);
+    expect(sender.send).toHaveBeenCalledWith('codex-surface:event', surfaceEvent);
     dispose();
+    expect(unsubscribeEvents).toHaveBeenCalledOnce();
     expect(unsubscribeState).toHaveBeenCalledOnce();
     expect(main.handlers.size).toBe(0);
   });
@@ -206,44 +459,60 @@ describe('Codex surface Electron bridge', () => {
     const renderer = new FakeRendererPort();
     const api = createCodexSurfaceRendererApi(renderer);
     const listener = vi.fn();
+    const eventListener = vi.fn();
     const unsubscribe = api.onStateChange(listener);
+    const unsubscribeEvent = api.onEvent(eventListener);
 
     await api.connect();
     await api.clearGoal();
+    await api.compactConversation();
     await api.createConversation({ model: 'gpt-5' });
     await api.deleteMessage(2);
     await api.deleteQueuedPrompt('queued-1');
     await api.editMessage(1, 'Replacement');
+    await api.readConversationHistory('thread-2');
+    await api.listConversations({ cwd: '/tmp/project', limit: 10 });
+    await api.listModels({ includeHidden: true, forceReload: true });
     await api.refreshConversations();
+    await api.renameConversation('Renamed');
     await api.respondToClientRequest({ id: 'question-1', payload: { answers: {} } });
     await api.resolveApproval('approval-1', 'approve', 'once');
     await api.setGoal('Ship it', 2000);
     await api.retryMessage(3);
     await api.selectConversation('thread-2');
     await api.sendMessage('Build it', { model: 'gpt-5' });
+    await api.startReview({ target: { type: 'uncommittedChanges' } });
     await api.steerMessage('Keep going');
     await api.steerQueuedPrompt('queued-2');
     await api.updateConversationSettings({ modelId: 'gpt-5', approvalPreset: 'ask-for-approval' });
     await api.interrupt();
     await api.getSnapshot();
     renderer.emit('codex-surface:state-changed', snapshot);
+    renderer.emit('codex-surface:event', surfaceEvent);
     unsubscribe();
+    unsubscribeEvent();
     renderer.emit('codex-surface:state-changed', { ...snapshot, busy: true });
 
     expect(renderer.invoke.mock.calls).toStrictEqual([
       ['codex-surface:connect'],
       ['codex-surface:clear-goal'],
+      ['codex-surface:compact-conversation'],
       ['codex-surface:create-conversation', { model: 'gpt-5' }],
       ['codex-surface:delete-message', 2],
       ['codex-surface:delete-queued-prompt', 'queued-1'],
       ['codex-surface:edit-message', 1, 'Replacement'],
+      ['codex-surface:read-conversation-history', 'thread-2'],
+      ['codex-surface:list-conversations', { cwd: '/tmp/project', limit: 10 }],
+      ['codex-surface:list-models', { includeHidden: true, forceReload: true }],
       ['codex-surface:refresh-conversations'],
+      ['codex-surface:rename-conversation', 'Renamed'],
       ['codex-surface:respond-to-client-request', { id: 'question-1', payload: { answers: {} } }],
       ['codex-surface:resolve-approval', 'approval-1', 'approve', 'once'],
       ['codex-surface:set-goal', 'Ship it', 2000],
       ['codex-surface:retry-message', 3],
       ['codex-surface:select-conversation', 'thread-2'],
       ['codex-surface:send-message', 'Build it', { model: 'gpt-5' }],
+      ['codex-surface:start-review', { target: { type: 'uncommittedChanges' } }],
       ['codex-surface:steer-message', 'Keep going'],
       ['codex-surface:steer-queued-prompt', 'queued-2'],
       ['codex-surface:update-conversation-settings', { modelId: 'gpt-5', approvalPreset: 'ask-for-approval' }],
@@ -252,6 +521,7 @@ describe('Codex surface Electron bridge', () => {
     ]);
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(snapshot);
+    expect(eventListener).toHaveBeenCalledWith(surfaceEvent);
   });
 });
 

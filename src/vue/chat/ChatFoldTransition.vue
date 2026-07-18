@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-fold" :class="{ 'chat-fold--open': open }">
+  <div class="codex-chat-theme chat-fold" :class="{ 'chat-fold--open': open }">
     <div class="chat-fold__inner">
       <slot />
     </div>

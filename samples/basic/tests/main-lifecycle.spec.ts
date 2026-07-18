@@ -11,7 +11,17 @@ const electron = vi.hoisted(() => {
       return [...windows];
     }
 
-    readonly webContents = { send: vi.fn() };
+    readonly navigationHandlers = new Map<string, (event: { preventDefault(): void }, url: string) => void>();
+    windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | undefined;
+    readonly webContents = {
+      send: vi.fn(),
+      on: vi.fn((event: string, listener: (event: { preventDefault(): void }, url: string) => void) => {
+        this.navigationHandlers.set(event, listener);
+      }),
+      setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => { action: 'deny' }) => {
+        this.windowOpenHandler = handler;
+      }),
+    };
     readonly loadFile = vi.fn(async () => undefined);
     readonly loadURL = vi.fn(async () => undefined);
     readonly handlers = new Map<string, () => void>();
@@ -38,7 +48,10 @@ const electron = vi.hoisted(() => {
     },
     appHandlers,
     BrowserWindow: MockBrowserWindow,
+    clipboard: { write: vi.fn() },
+    dialog: { showOpenDialog: vi.fn() },
     ipcMain: {},
+    shell: { openExternal: vi.fn(async () => undefined) },
     reset() {
       appHandlers.clear();
       windows.splice(0);
@@ -51,7 +64,7 @@ const sdk = vi.hoisted(() => {
   const surface = { close: vi.fn(async () => undefined) };
   return {
     createCodexSurface: vi.fn(() => surface),
-    registerCodexSurfaceIpc: vi.fn(() => vi.fn()),
+    registerCodexElectronMain: vi.fn(() => vi.fn()),
     surface,
   };
 });
@@ -59,10 +72,13 @@ const sdk = vi.hoisted(() => {
 vi.mock('electron', () => ({
   app: electron.app,
   BrowserWindow: electron.BrowserWindow,
+  clipboard: electron.clipboard,
+  dialog: electron.dialog,
   ipcMain: electron.ipcMain,
+  shell: electron.shell,
 }));
 vi.mock('codex-app-sdk/electron', () => ({
-  registerCodexSurfaceIpc: sdk.registerCodexSurfaceIpc,
+  registerCodexElectronMain: sdk.registerCodexElectronMain,
 }));
 vi.mock('codex-app-sdk/node', () => ({
   createCodexSurface: sdk.createCodexSurface,
@@ -86,14 +102,20 @@ describe('basic sample main lifecycle', () => {
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
 
     expect(sdk.createCodexSurface).toHaveBeenCalledOnce();
-    expect(sdk.createCodexSurface).toHaveBeenCalledWith({
-      clientInfo: { name: 'codex_sdk_basic_sample', title: 'Codex SDK Basic Sample', version: '0.1.0' },
-    });
-    expect(sdk.registerCodexSurfaceIpc).toHaveBeenCalledOnce();
+    expect(sdk.createCodexSurface).toHaveBeenCalledWith();
+    expect(sdk.registerCodexElectronMain).toHaveBeenCalledOnce();
+    expect(sdk.registerCodexElectronMain).toHaveBeenCalledWith(expect.objectContaining({
+      clipboard: electron.clipboard,
+      dialog: electron.dialog,
+      ipcMain: electron.ipcMain,
+      shell: electron.shell,
+      surface: sdk.surface,
+      sender: { send: expect.any(Function) },
+    }));
     expect(electron.windows[0]?.loadFile).toHaveBeenCalledOnce();
 
     electron.appHandlers.get('before-quit')?.();
-    expect(sdk.registerCodexSurfaceIpc.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(sdk.registerCodexElectronMain.mock.results[0]?.value).toHaveBeenCalledOnce();
     expect(sdk.surface.close).toHaveBeenCalledOnce();
   });
 
@@ -104,5 +126,34 @@ describe('basic sample main lifecycle', () => {
 
     expect(electron.windows[0]?.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/');
     expect(electron.windows[0]?.loadFile).not.toHaveBeenCalled();
+  });
+
+  it('denies renderer-created windows and opens only allowlisted external schemes', async () => {
+    await import('../electron/main');
+    await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
+    const handler = electron.windows[0]!.windowOpenHandler!;
+
+    expect(handler({ url: 'https://example.com/docs' })).toStrictEqual({ action: 'deny' });
+    expect(handler({ url: 'mailto:team@example.com' })).toStrictEqual({ action: 'deny' });
+    expect(handler({ url: 'javascript:alert(1)' })).toStrictEqual({ action: 'deny' });
+    expect(handler({ url: 'file:///tmp/secret' })).toStrictEqual({ action: 'deny' });
+
+    expect(electron.shell.openExternal).toHaveBeenCalledTimes(2);
+    expect(electron.shell.openExternal).toHaveBeenNthCalledWith(1, 'https://example.com/docs');
+    expect(electron.shell.openExternal).toHaveBeenNthCalledWith(2, 'mailto:team@example.com');
+  });
+
+  it('blocks in-renderer navigation and routes safe external destinations to the OS', async () => {
+    await import('../electron/main');
+    await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
+    const preventDefault = vi.fn();
+    const handler = electron.windows[0]!.navigationHandlers.get('will-navigate')!;
+
+    handler({ preventDefault }, 'tel:+15551234567');
+    handler({ preventDefault }, 'data:text/html,<script>alert(1)</script>');
+
+    expect(preventDefault).toHaveBeenCalledTimes(2);
+    expect(electron.shell.openExternal).toHaveBeenCalledOnce();
+    expect(electron.shell.openExternal).toHaveBeenCalledWith('tel:+15551234567');
   });
 });

@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-message__edit-card">
+  <div class="codex-chat-theme chat-message__edit-card">
     <textarea
       ref="input"
       v-model="draft"

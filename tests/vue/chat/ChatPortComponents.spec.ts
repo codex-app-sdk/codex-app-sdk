@@ -223,7 +223,7 @@ describe('ported id8 chat components', () => {
     expect(wrapper.emitted('editGoal')).toStrictEqual([[]]);
   });
 
-  it('keeps current turn diff hidden while shelf display is disabled', () => {
+  it('renders current turn diff in the composer shelf', () => {
     const wrapper = mount(ChatComposerShelf, {
       props: {
         turnGitDiff: {
@@ -237,10 +237,10 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    expect(wrapper.find('.chat-turn-git-info').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain('Current turn');
-    expect(wrapper.text()).not.toContain('+45');
-    expect(wrapper.text()).not.toContain('-23');
+    expect(wrapper.find('.chat-turn-git-info').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Current turn');
+    expect(wrapper.text()).toContain('+45');
+    expect(wrapper.text()).toContain('-23');
   });
 
   it('renders collapsible tool calls with params and result', async () => {
@@ -268,8 +268,7 @@ describe('ported id8 chat components', () => {
         },
       },
     });
-    expect(structuredResult.text()).toContain('Updated status');
-    expect(structuredResult.text()).not.toContain('Ran team.set-status');
+    expect(structuredResult.text()).toContain('Ran team.set-status');
     await structuredResult.get('.chat-tool-call__header').trigger('click');
     expect(structuredResult.text()).toContain('"status": "Registered and idle"');
 
@@ -286,11 +285,10 @@ describe('ported id8 chat components', () => {
         },
       },
     });
-    expect(completedWorkItem.text()).toContain('Marked work item complete');
-    expect(completedWorkItem.text()).not.toContain('Ran team.mark-work-item-completed');
+    expect(completedWorkItem.text()).toContain('Ran team.mark-work-item-completed');
   });
 
-  it('renders display-markdown MCP calls with a human title', () => {
+  it('uses a generic fallback for host-specific MCP calls', () => {
     const wrapper = mount(ChatToolCall, {
       props: {
         toolCall: {
@@ -305,8 +303,7 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Displayed mcp.md');
-    expect(wrapper.text()).not.toContain('mcp__team__display-markdown');
+    expect(wrapper.text()).toContain('Ran mcp__team__display-markdown');
   });
 
   it('renders headerless, summary-only, descriptor, and bare tool states', async () => {

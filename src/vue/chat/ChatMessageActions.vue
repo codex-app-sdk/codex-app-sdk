@@ -1,6 +1,6 @@
 <template>
   <div
-    class="chat-message-actions"
+    class="codex-chat-theme chat-message-actions"
     :class="`chat-message-actions--${message.role}`"
     :aria-label="t('chat.actions.label')"
   >

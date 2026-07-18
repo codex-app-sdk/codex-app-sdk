@@ -1,6 +1,7 @@
 import { Marked, Renderer } from 'marked'
 import { escapeAttribute, escapeHtml } from './html-escape'
 import { renderCodeBlock } from './syntax-highlighting'
+import { parseCodexEditorFileReference } from './conversation-links'
 
 const renderer = new Renderer()
 
@@ -10,11 +11,24 @@ renderer.code = ({ text, lang }) => renderCodeBlock(text, lang)
 
 renderer.link = ({ href, title, tokens }) => {
   const text = renderInlineTokens(tokens)
-  const safeHref = escapeAttribute(href)
+  const safeHref = safeMarkdownHref(href)
+  if (!safeHref) {
+    return `<span class="chat-message-link chat-message-link--blocked">${text}</span>`
+  }
   const safeTitle = title ? ` title="${escapeAttribute(title)}"` : ''
-  const icon = renderLinkIcon(href)
-  const target = isAbsoluteHttpUrl(href) ? ' target="_blank" rel="noreferrer"' : ''
-  return `<a class="chat-message-link" href="${safeHref}"${safeTitle}${target}>${icon}<span class="chat-message-link__label">${text}</span></a>`
+  const icon = renderLinkIcon(safeHref)
+  const target = isAbsoluteHttpUrl(safeHref) ? ' target="_blank" rel="noopener noreferrer"' : ''
+  return `<a class="chat-message-link" href="${escapeAttribute(safeHref)}"${safeTitle}${target}>${icon}<span class="chat-message-link__label">${text}</span></a>`
+}
+
+renderer.image = ({ href, title, text }) => {
+  const safeSrc = safeMarkdownImageSrc(href)
+  const alt = escapeAttribute(text)
+  if (!safeSrc) {
+    return `<span class="chat-message-image chat-message-image--blocked">${escapeHtml(text)}</span>`
+  }
+  const safeTitle = title ? ` title="${escapeAttribute(title)}"` : ''
+  return `<img class="chat-message-image" src="${escapeAttribute(safeSrc)}" alt="${alt}"${safeTitle} loading="lazy" decoding="async" referrerpolicy="no-referrer">`
 }
 
 const markdown = new Marked({
@@ -70,41 +84,70 @@ function isMailtoUrl(value: string) {
   }
 }
 
-const faviconUrlCache = new Map<string, string>()
+const allowedAbsoluteProtocols = new Set(['file:', 'http:', 'https:', 'mailto:', 'tel:'])
 
-export function faviconUrl(value: string) {
-  const origin = absoluteHttpOrigin(value)
-  if (!origin) {
-    return ''
-  }
-
-  const cached = faviconUrlCache.get(origin)
-  if (cached) {
-    return cached
-  }
-
-  const url = `https://s2.googleusercontent.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(origin)}`
-  faviconUrlCache.set(origin, url)
-  return url
-}
-
-export function absoluteHttpOrigin(value: string) {
-  try {
-    const url = new URL(value)
-    if (url.protocol === 'http:' || url.protocol === 'https:') {
-      return url.origin
-    }
-  } catch {
+/**
+ * Returns a browser-safe Markdown href or null when the link uses an executable
+ * or otherwise unsupported scheme. Relative paths and in-document fragments
+ * deliberately remain relative so the host can resolve them against its own
+ * workspace policy.
+ */
+export function safeMarkdownHref(value: string): string | null {
+  const href = value.trim()
+  if (!href || /[\u0000-\u001f\u007f]/.test(href)) {
     return null
   }
 
-  return null
+  if (href.startsWith('#') || href.startsWith('?')) {
+    return href
+  }
+
+  if (/^[a-z]:[\\/]/i.test(href)) {
+    return href
+  }
+
+  if (parseCodexEditorFileReference(href)) {
+    return href
+  }
+
+  // Network-path references inherit the renderer scheme and are therefore not
+  // a stable or safe relative-file contract.
+  if (href.startsWith('\\') || href.startsWith('//')) {
+    return null
+  }
+
+  const scheme = /^([a-z][a-z\d+.-]*):/i.exec(href)?.[1]
+  if (!scheme) {
+    return href
+  }
+
+  const protocol = `${scheme.toLowerCase()}:`
+  if (!allowedAbsoluteProtocols.has(protocol)) {
+    return null
+  }
+
+  try {
+    const url = new URL(href)
+    return url.protocol.toLowerCase() === protocol ? href : null
+  } catch {
+    return null
+  }
+}
+
+function safeMarkdownImageSrc(value: string): string | null {
+  const src = safeMarkdownHref(value)
+  if (!src || src.startsWith('#') || src.startsWith('?')) return null
+  try {
+    const protocol = new URL(src).protocol
+    return protocol === 'mailto:' || protocol === 'tel:' ? null : src
+  } catch {
+    return src
+  }
 }
 
 function renderLinkIcon(href: string) {
   if (isAbsoluteHttpUrl(href)) {
-    const iconUrl = faviconUrl(href)
-    return `<span class="chat-message-link__icon chat-message-link__icon--favicon" aria-hidden="true" style="--favicon-url: url('${escapeAttribute(iconUrl)}')"></span>`
+    return '<svg class="chat-message-link__icon chat-message-link__icon--external" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="m10 14 11-11"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>'
   }
 
   if (isMailtoUrl(href)) {

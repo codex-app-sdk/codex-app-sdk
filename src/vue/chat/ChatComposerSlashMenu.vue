@@ -1,7 +1,7 @@
 <template>
   <div
     ref="menuEl"
-    class="chat-composer-slash-menu"
+    class="codex-chat-theme chat-composer-slash-menu"
     role="listbox"
     aria-label="Commands and skills"
   >
@@ -62,20 +62,20 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { useCodexChatI18n } from './chat-i18n';
-import type { BackendCommandSummary, BackendSkillSummary } from './contracts';
+import type { CodexCommandSummary, CodexSkillSummary } from './contracts';
 import { commandDescription } from './composer-commands';
 import { skillDescription } from './composer-skills';
 import { SparklesIcon, TerminalIcon } from '../icons/app-icons';
 
 const props = defineProps<{
   activeIndex: number;
-  visibleCommands: BackendCommandSummary[];
-  visibleSkills: BackendSkillSummary[];
+  visibleCommands: CodexCommandSummary[];
+  visibleSkills: CodexSkillSummary[];
 }>();
 
 defineEmits<{
-  selectCommand: [command: BackendCommandSummary];
-  selectSkill: [skill: BackendSkillSummary];
+  selectCommand: [command: CodexCommandSummary];
+  selectSkill: [skill: CodexSkillSummary];
 }>();
 
 const { t } = useCodexChatI18n();

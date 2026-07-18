@@ -1,7 +1,7 @@
 <template>
   <div
     ref="element"
-    class="codex-message-list message-list"
+    class="codex-chat-theme codex-message-list message-list"
     :aria-label="ariaLabel"
     @scroll="updateStickiness"
   >
@@ -12,25 +12,31 @@
       <template v-for="(message, index) in chatMessages" v-else :key="message.id ?? index">
         <slot name="message" :message="message" :index="index">
           <CodexMessage
-        :actions-disabled="actionsDisabled"
-        :answered-client-request-ids="answeredClientRequestIds"
-        :can-delete-message="canDeleteMessage"
-        :can-edit-message="canEditMessage"
-        :can-retry-message="canRetryMessage"
-        :follow-ups-disabled="followUpsDisabled"
-        :index="index"
+            :actions-disabled="actionsDisabled"
+            :answered-client-request-ids="answeredClientRequestIds"
+            :can-delete-message="canDeleteMessage"
+            :can-edit-message="canEditMessage"
+            :can-retry-message="canRetryMessage"
+            :follow-ups-disabled="followUpsDisabled"
+            :index="index"
             :message="message"
-        @cancel="emit('cancel')"
-        @client-response="emit('client-response', $event)"
-        @copy-message="emit('copy-message', $event)"
-        @delete-message="emit('delete-message', $event)"
-        @edit-message="emit('edit-message', $event)"
-        @quote-message="emit('quote-message', $event)"
-        @review-file="emit('review-file', $event)"
-        @retry-message="emit('retry-message', $event)"
-        @send-follow-up="emit('send-follow-up', $event)"
-        @undo-change-set="emit('undo-change-set', $event)"
-          />
+            @cancel="emit('cancel')"
+            @client-response="emit('client-response', $event)"
+            @copy-message="emit('copy-message', $event)"
+            @delete-message="emit('delete-message', $event)"
+            @edit-message="emit('edit-message', $event)"
+            @quote-message="emit('quote-message', $event)"
+            @retry-message="emit('retry-message', $event)"
+            @send-follow-up="emit('send-follow-up', $event)"
+          >
+            <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
+            <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
+            <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
+            <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
+            <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
+            <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
+            <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
+          </CodexMessage>
         </slot>
       </template>
     </div>
@@ -42,13 +48,14 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { SurfaceMessage } from '../../surface/types'
 import type { ClientRequestResponse } from '../chat/contracts'
 import type { Message } from '../chat/types'
+import type { MessageBlock } from '../chat/message-blocks'
 import { chatMessagesFromInputs } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
 
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
   ariaLabel?: string
-  answeredClientRequestIds?: Set<string>
+  answeredClientRequestIds?: ReadonlySet<string>
   bottomThreshold?: number
   canDeleteMessage?: boolean
   canEditMessage?: boolean
@@ -56,6 +63,7 @@ const props = withDefaults(defineProps<{
   emptyLabel?: string
   followUpsDisabled?: boolean
   messages: readonly (Message | SurfaceMessage)[]
+  resetKey?: string | number | null
 }>(), {
   ariaLabel: 'Conversation',
   bottomThreshold: 24,
@@ -64,6 +72,29 @@ const props = withDefaults(defineProps<{
   canRetryMessage: true,
   emptyLabel: 'No messages yet',
 })
+
+defineSlots<{
+  actions(props: { disabled: boolean; index: number; message: Message }): unknown
+  attachment(props: {
+    attachment: Extract<MessageBlock, { type: 'attachment' }>['attachment']
+    block: Extract<MessageBlock, { type: 'attachment' }>
+    index: number
+    message: Message
+  }): unknown
+  block(props: { block: MessageBlock; blockIndex: number; index: number; message: Message }): unknown
+  empty(): unknown
+  message(props: { index: number; message: Message }): unknown
+  status(props: { index: number; message: Message; status: 'streaming' }): unknown
+  text(props: { block: Extract<MessageBlock, { type: 'text' | 'user-text' }>; content: string; index: number; message: Message; user: boolean }): unknown
+  thinking(props: { index: number; message: Message }): unknown
+  tool(props: {
+    block: Extract<MessageBlock, { type: 'tool' | 'tool-group' }>
+    index: number
+    message: Message
+    toolCall?: Extract<MessageBlock, { type: 'tool' }>['toolCall']
+    toolCalls?: Extract<MessageBlock, { type: 'tool-group' }>['toolCalls']
+  }): unknown
+}>()
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
@@ -71,11 +102,9 @@ const emit = defineEmits<{
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]
   'quote-message': [index: number]
-  'review-file': [path: string]
   'retry-message': [index: number]
   'send-follow-up': [prompt: string]
   'stickiness-change': [stuckToBottom: boolean]
-  'undo-change-set': [changeSetId: string]
 }>()
 
 const chatMessages = computed(() => chatMessagesFromInputs(props.messages))
@@ -94,6 +123,12 @@ watch(() => props.messages, async () => {
     scrollToBottom()
   }
 }, { deep: true })
+
+watch(() => props.resetKey, async () => {
+  stickToBottom.value = true
+  await nextTick()
+  scrollToBottom()
+})
 
 function updateStickiness(): void {
   const target = element.value
@@ -143,7 +178,7 @@ defineExpose({ scrollToBottom })
 
 .codex-message-list__empty {
   margin: auto;
-  color: var(--codex-muted-text-color, #777b82);
+  color: var(--codex-muted-text-color, var(--color-text-muted, #777b82));
   text-align: center;
 }
 

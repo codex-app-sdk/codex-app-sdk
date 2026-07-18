@@ -21,7 +21,7 @@ describe('codexThreadToSurfaceMessages', () => {
             null,
             { type: 'text', text: 'Hello' },
             { type: 'skill', name: 'review' },
-            { type: 'mention', name: 'README.md' },
+            { type: 'mention', name: 'README.md', path: '/tmp/README.md' },
             { type: 'image', url: 'https://example.com/image.png' },
             { type: 'localImage', path: '/tmp/image.png' },
             { type: 'unknown', value: 'ignored' },
@@ -36,10 +36,27 @@ describe('codexThreadToSurfaceMessages', () => {
     expect(messages).toStrictEqual([expect.objectContaining({
       id: 'client-inputs',
       status: 'complete',
-      parts: [{
-        type: 'text',
-        text: 'Hello\n$review\n@README.md\n![image](https://example.com/image.png)\n![image](/tmp/image.png)',
-      }],
+      parts: [
+        { type: 'text', text: 'Hello\n$review' },
+        {
+          type: 'attachment',
+          attachment: {
+            kind: 'file', name: 'README.md', path: '/tmp/README.md',
+          },
+        },
+        {
+          type: 'attachment',
+          attachment: {
+            kind: 'image', name: 'image.png', url: 'https://example.com/image.png', mimeType: 'image/png',
+          },
+        },
+        {
+          type: 'attachment',
+          attachment: {
+            kind: 'image', name: 'image.png', path: '/tmp/image.png', url: 'file:///tmp/image.png', mimeType: 'image/png',
+          },
+        },
+      ],
     })]);
   });
 
@@ -54,6 +71,21 @@ describe('codexThreadToSurfaceMessages', () => {
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'userMessage', id: 'user', clientId: null, content: [],
     })).toBeNull();
+    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+      type: 'userMessage', id: 'image-only', clientId: null,
+      content: [{ type: 'localImage', path: '/tmp/resumed.png' }],
+    })).toMatchObject({
+      parts: [{
+        type: 'attachment',
+        attachment: {
+          kind: 'image',
+          name: 'resumed.png',
+          path: '/tmp/resumed.png',
+          url: 'file:///tmp/resumed.png',
+          mimeType: 'image/png',
+        },
+      }],
+    });
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'webSearch', id: 'search', query: '', action: null,
     })).toMatchObject({
@@ -124,6 +156,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-resumed', turnId: 'turn-1' },
         parts: [{ type: 'text', text: 'read README.md' }],
       },
       {
@@ -132,6 +165,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-resumed', turnId: 'turn-1' },
         parts: [
           { type: 'text', text: 'I will read it.', itemId: 'msg-1' },
           {
@@ -206,6 +240,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-resumed', turnId: 'turn-1' },
         parts: [{ type: 'text', text: 'write a dummy false plan this is a test' }],
       },
     ]);
@@ -266,6 +301,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-steered', turnId: 'turn-1' },
         parts: [{ type: 'text', text: 'read all markdown files' }],
       },
       {
@@ -274,6 +310,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-steered', turnId: 'turn-1' },
         parts: [
           { type: 'text', text: 'I will inventory the Markdown files.', itemId: 'msg-1' },
         ],
@@ -285,6 +322,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-steered', turnId: 'turn-1' },
         parts: [{ type: 'text', text: 'actually read them too' }],
       },
       {
@@ -293,6 +331,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-1',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-steered', turnId: 'turn-1' },
         parts: [
           { type: 'text', text: 'Reading them now.', itemId: 'msg-2' },
         ],
@@ -344,6 +383,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-review',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-review', turnId: 'turn-review' },
         parts: [{ type: 'text', text: 'current changes' }],
       },
       {
@@ -352,6 +392,7 @@ describe('codexThreadToSurfaceMessages', () => {
         status: 'complete',
         turnId: 'turn-review',
         createdAt: '2026-05-28T20:26:40.000Z',
+        metadata: { conversationId: 'thread-review', turnId: 'turn-review' },
         parts: [{ type: 'text', text: 'Found one issue.', itemId: 'review-1' }],
       },
     ]);

@@ -2,19 +2,19 @@
 
 import { nextTick, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentFileSearchItem, BackendCommandSummary, BackendSkillSummary } from '../../../src/vue/chat/contracts';
+import type { CodexFileSearchItem, CodexCommandSummary, CodexSkillSummary } from '../../../src/vue/chat/contracts';
 import { useChatComposerSuggestions } from '../../../src/vue/chat/use-chat-composer-suggestions';
 
-const files: AgentFileSearchItem[] = [
+const files: CodexFileSearchItem[] = [
   { name: 'alpha.ts', path: 'src/alpha.ts' },
   { name: 'beta.ts', path: 'src/beta.ts' },
 ];
-const skills: BackendSkillSummary[] = [
+const skills: CodexSkillSummary[] = [
   { name: 'frontend', path: '/skills/frontend/SKILL.md', scope: 'project', enabled: true },
   { name: 'testing', path: '/skills/testing/SKILL.md', scope: 'user', enabled: true },
 ];
-const commands: BackendCommandSummary[] = [
-  { id: 'codex:compact', backend: 'codex', name: 'compact', slashName: 'compact', submitOnSelect: true },
+const commands: CodexCommandSummary[] = [
+  { id: 'codex:compact', name: 'compact', slashName: 'compact', submitOnSelect: true },
 ];
 
 function setup(initialPrompt: string) {

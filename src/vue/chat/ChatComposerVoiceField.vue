@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-composer__audio-field">
+  <div class="codex-chat-theme chat-composer__audio-field">
     <ChatComposerWaveform
       v-if="recording"
       :active="recording"

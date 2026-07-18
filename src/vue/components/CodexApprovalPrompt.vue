@@ -1,5 +1,5 @@
 <template>
-  <article class="codex-approval-prompt" role="status">
+  <article class="codex-chat-theme codex-approval-prompt" role="status">
     <div class="codex-approval-prompt__copy">
       <strong>{{ approval.title }}</strong>
       <p v-if="approval.description">{{ approval.description }}</p>
@@ -63,9 +63,9 @@ function permissionLabel(permission: CodexSurfaceRequestedPermission): string {
   justify-content: space-between;
   margin-bottom: var(--codex-space-2, 8px);
   padding: 12px;
-  border: 1px solid var(--codex-border-color, #d8dadd);
+  border: 1px solid var(--codex-border-color, var(--color-border, #d8dadd));
   border-radius: 12px;
-  background: var(--codex-subtle-surface-color, #f7f7f5);
+  background: var(--codex-subtle-surface-color, var(--color-surface-low, #f7f7f5));
 }
 
 .codex-approval-prompt__copy {
@@ -79,7 +79,7 @@ function permissionLabel(permission: CodexSurfaceRequestedPermission): string {
 .codex-approval-prompt small,
 .codex-approval-prompt__permissions {
   margin: 0;
-  color: var(--codex-muted-text-color, #777b82);
+  color: var(--codex-muted-text-color, var(--color-text-muted, #777b82));
   font-size: 12px;
 }
 
@@ -92,7 +92,7 @@ function permissionLabel(permission: CodexSurfaceRequestedPermission): string {
 
 .codex-approval-prompt code {
   overflow: hidden;
-  color: var(--codex-text-color, #202124);
+  color: var(--codex-text-color, var(--color-text, #202124));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -105,16 +105,16 @@ function permissionLabel(permission: CodexSurfaceRequestedPermission): string {
 
 .codex-approval-prompt button {
   padding: 6px 9px;
-  border: 1px solid var(--codex-border-color, #d8dadd);
+  border: 1px solid var(--codex-border-color, var(--color-border, #d8dadd));
   border-radius: 8px;
-  color: var(--codex-text-color, #202124);
-  background: var(--codex-surface-color, #fff);
+  color: var(--codex-text-color, var(--color-text, #202124));
+  background: var(--codex-surface-color, var(--color-surface-lowest, #fff));
   cursor: pointer;
 }
 
 .codex-approval-prompt__primary {
-  color: var(--codex-primary-contrast-color, #fff) !important;
-  background: var(--codex-primary-color, #202124) !important;
+  color: var(--codex-primary-contrast-color, var(--color-surface-lowest, #fff)) !important;
+  background: var(--codex-primary-color, var(--color-text, #202124)) !important;
 }
 
 .codex-approval-prompt button:disabled {

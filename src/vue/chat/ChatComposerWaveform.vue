@@ -1,6 +1,6 @@
 <template>
   <div
-    class="chat-composer-waveform"
+    class="codex-chat-theme chat-composer-waveform"
     :aria-label="label"
     role="img"
   >

@@ -1,10 +1,5 @@
-:where(
-  .codex-chat-theme,
-  .codex-conversation-pane,
-  .codex-message-list,
-  .chat-composer,
-  .chat-message
-) {
+:where(.codex-chat-theme) {
+  color-scheme: light;
   --color-background: var(--codex-background-color, #f9f9f9);
   --color-text: var(--codex-text-color, #0d0d0d);
   --color-text-muted: var(--codex-muted-text-color, #666);
@@ -32,6 +27,7 @@
   --color-surface-highest: var(--codex-surface-highest-color, #e0e0e0);
   --color-shell-main: var(--codex-shell-main-color, #fff);
   --color-shell-sidebar: var(--codex-shell-sidebar-color, #f4f4f4);
+  --color-shine: var(--codex-shine-color, rgb(255 255 255 / 95%));
 
   --font-family-base: var(--codex-font-family, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   --font-family-mono: var(--codex-mono-font-family, "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace);
@@ -89,4 +85,80 @@
   --shadow-md: 0 3px 8px rgb(0 0 0 / 8%);
   --shadow-lg: 0 8px 24px rgb(0 0 0 / 10%);
   --shadow-menu: 0 4px 6px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 5%);
+}
+
+:where(.codex-chat-theme--dark, [data-codex-theme="dark"]),
+:where(.codex-chat-theme--dark, [data-codex-theme="dark"]) .codex-chat-theme {
+  color-scheme: dark;
+  --color-background: var(--codex-background-color, #0d0f12);
+  --color-text: var(--codex-text-color, #f1f4f8);
+  --color-text-muted: var(--codex-muted-text-color, #aab3c0);
+  --color-border: var(--codex-border-color, #323946);
+  --color-border-strong: var(--codex-strong-border-color, #566171);
+  --color-error: var(--codex-danger-color, #ff8a78);
+  --color-warning: var(--codex-warning-color, #ffb95c);
+  --color-success: var(--codex-success-color, #5ed9a6);
+  --color-primary: var(--codex-primary-color, #7da6ff);
+  --color-primary-container: var(--codex-primary-container-color, #17356e);
+  --color-secondary: var(--codex-secondary-color, #8ab4f8);
+  --color-secondary-container: var(--codex-secondary-container-color, #17365f);
+  --color-on-primary: var(--codex-on-primary-color, #081b3f);
+  --color-on-primary-container: var(--codex-on-primary-container-color, #dce7ff);
+  --color-on-secondary-container: var(--codex-on-secondary-container-color, #d8e8ff);
+  --color-on-surface: var(--codex-text-color, #f1f4f8);
+  --color-on-surface-variant: var(--codex-muted-text-color, #aab3c0);
+  --color-outline: var(--codex-strong-border-color, #566171);
+  --color-overlay: var(--codex-overlay-color, rgb(13 15 18 / 82%));
+  --color-surface-lowest: var(--codex-surface-color, #15181d);
+  --color-surface: var(--codex-app-surface-color, #0d0f12);
+  --color-surface-base: var(--codex-surface-raised-color, #232832);
+  --color-surface-low: var(--codex-hover-color, #1b1f25);
+  --color-surface-high: var(--codex-surface-high-color, #2b313c);
+  --color-surface-highest: var(--codex-surface-highest-color, #363d49);
+  --color-shell-main: var(--codex-shell-main-color, #15181d);
+  --color-shell-sidebar: var(--codex-shell-sidebar-color, #1b1f25);
+  --color-shine: var(--codex-shine-color, rgb(255 255 255 / 72%));
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 34%);
+  --shadow-md: 0 3px 10px rgb(0 0 0 / 38%);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 42%);
+  --shadow-menu: 0 12px 32px rgb(0 0 0 / 42%), 0 4px 10px rgb(0 0 0 / 32%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :where(.codex-chat-theme--system, [data-codex-theme="system"]),
+  :where(.codex-chat-theme--system, [data-codex-theme="system"]) .codex-chat-theme {
+    color-scheme: dark;
+    --color-background: var(--codex-background-color, #0d0f12);
+    --color-text: var(--codex-text-color, #f1f4f8);
+    --color-text-muted: var(--codex-muted-text-color, #aab3c0);
+    --color-border: var(--codex-border-color, #323946);
+    --color-border-strong: var(--codex-strong-border-color, #566171);
+    --color-error: var(--codex-danger-color, #ff8a78);
+    --color-warning: var(--codex-warning-color, #ffb95c);
+    --color-success: var(--codex-success-color, #5ed9a6);
+    --color-primary: var(--codex-primary-color, #7da6ff);
+    --color-primary-container: var(--codex-primary-container-color, #17356e);
+    --color-secondary: var(--codex-secondary-color, #8ab4f8);
+    --color-secondary-container: var(--codex-secondary-container-color, #17365f);
+    --color-on-primary: var(--codex-on-primary-color, #081b3f);
+    --color-on-primary-container: var(--codex-on-primary-container-color, #dce7ff);
+    --color-on-secondary-container: var(--codex-on-secondary-container-color, #d8e8ff);
+    --color-on-surface: var(--codex-text-color, #f1f4f8);
+    --color-on-surface-variant: var(--codex-muted-text-color, #aab3c0);
+    --color-outline: var(--codex-strong-border-color, #566171);
+    --color-overlay: var(--codex-overlay-color, rgb(13 15 18 / 82%));
+    --color-surface-lowest: var(--codex-surface-color, #15181d);
+    --color-surface: var(--codex-app-surface-color, #0d0f12);
+    --color-surface-base: var(--codex-surface-raised-color, #232832);
+    --color-surface-low: var(--codex-hover-color, #1b1f25);
+    --color-surface-high: var(--codex-surface-high-color, #2b313c);
+    --color-surface-highest: var(--codex-surface-highest-color, #363d49);
+    --color-shell-main: var(--codex-shell-main-color, #15181d);
+    --color-shell-sidebar: var(--codex-shell-sidebar-color, #1b1f25);
+    --color-shine: var(--codex-shine-color, rgb(255 255 255 / 72%));
+    --shadow-sm: 0 1px 3px rgb(0 0 0 / 34%);
+    --shadow-md: 0 3px 10px rgb(0 0 0 / 38%);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 42%);
+    --shadow-menu: 0 12px 32px rgb(0 0 0 / 42%), 0 4px 10px rgb(0 0 0 / 32%);
+  }
 }

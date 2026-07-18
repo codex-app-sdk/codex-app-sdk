@@ -1,9 +1,10 @@
 /// <reference types="vite/client" />
 
-import type { CodexSurfaceRendererApi } from 'codex-app-sdk/electron';
+import type { CodexNativeRendererApi, CodexSurfaceRendererApi } from 'codex-app-sdk/electron';
 
 declare global {
   interface Window {
+    codexAppSdkNative: CodexNativeRendererApi;
     codexSurface: CodexSurfaceRendererApi;
   }
 }

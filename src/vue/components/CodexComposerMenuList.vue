@@ -35,13 +35,13 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   flex-direction: column;
   width: var(--codex-composer-menu-width, 220px);
   padding: var(--codex-composer-menu-padding, 4px);
-  border: 1px solid var(--codex-border-color, #dedede);
+  border: 1px solid var(--codex-border-color, var(--color-border, #dedede));
   border-radius: var(--codex-composer-menu-radius, 12px);
-  color: var(--codex-text-color, #0d0d0d);
-  background: var(--codex-surface-color, #fff);
-  box-shadow: var(--codex-composer-menu-shadow, 0 4px 6px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 5%));
+  color: var(--codex-text-color, var(--color-text, #0d0d0d));
+  background: var(--codex-surface-color, var(--color-surface-lowest, #fff));
+  box-shadow: var(--codex-composer-menu-shadow, var(--shadow-menu, 0 4px 6px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 5%)));
   box-sizing: border-box;
-  font-family: var(--codex-font-family, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-family: var(--codex-font-family, var(--font-family-base, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif));
   font-size: var(--codex-composer-menu-font-size, 13px);
   line-height: 18px;
 }
@@ -65,18 +65,18 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 
 .codex-composer-menu-list__item:hover:not(:disabled),
 .codex-composer-menu-list__item:focus-visible {
-  background: var(--codex-hover-color, #f4f4f4);
+  background: var(--codex-hover-color, var(--color-surface-low, #f4f4f4));
   outline: none;
 }
 
 .codex-composer-menu-list__item:disabled {
-  color: var(--codex-muted-text-color, #666);
+  color: var(--codex-muted-text-color, var(--color-text-muted, #666));
   cursor: not-allowed;
   opacity: 0.58;
 }
 
 .codex-composer-menu-list__item--danger {
-  color: var(--codex-danger-color, #d5351f);
+  color: var(--codex-danger-color, var(--color-error, #d5351f));
 }
 
 .codex-composer-menu-list__icon,
@@ -104,7 +104,7 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 
 .codex-composer-menu-list__description,
 .codex-composer-menu-list__value {
-  color: var(--codex-muted-text-color, #666);
+  color: var(--codex-muted-text-color, var(--color-text-muted, #666));
   font-size: var(--codex-composer-menu-description-font-size, 12px);
 }
 
@@ -118,12 +118,12 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 .codex-composer-menu-list__separator {
   height: 1px;
   margin: 4px 2px;
-  background: var(--codex-border-color, #dedede);
+  background: var(--codex-border-color, var(--color-border, #dedede));
 }
 
 .codex-composer-menu-list__heading {
   padding: 6px 8px 4px;
-  color: var(--codex-muted-text-color, #666);
+  color: var(--codex-muted-text-color, var(--color-text-muted, #666));
   font-size: var(--codex-composer-menu-heading-font-size, 13px);
   line-height: 18px;
 }
@@ -137,6 +137,48 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   z-index: 2;
   top: 0;
   left: 100%;
+}
+
+.codex-composer-menu-list__submenu-list--wide {
+  width: 360px;
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+.codex-composer-menu-list__switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--codex-border-color, var(--color-border-strong, #b0b0b0));
+  transition: background-color 120ms ease;
+}
+
+.codex-composer-menu-list__switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--codex-surface-color, var(--color-surface-lowest, #fff));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%);
+  transition: transform 120ms ease;
+}
+
+.codex-composer-menu-list__switch--checked {
+  background: var(--codex-primary-color, var(--color-primary, #1b4fb2));
+}
+
+.codex-composer-menu-list__switch--checked .codex-composer-menu-list__switch-thumb {
+  transform: translateX(12px);
+}
+
+.codex-composer-menu-list__color-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
 }
 
 .codex-composer-menu-list__submenu:not(.codex-composer-menu-list__submenu--open) > .codex-composer-menu-list__submenu-list {

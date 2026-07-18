@@ -1,6 +1,6 @@
 <template>
   <div
-    class="chat-turn-git-info"
+    class="codex-chat-theme chat-turn-git-info"
     aria-label="Current turn git changes"
   >
     <span class="chat-turn-git-info__label">Current turn</span>

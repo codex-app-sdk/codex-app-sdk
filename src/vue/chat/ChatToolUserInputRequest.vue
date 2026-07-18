@@ -1,7 +1,7 @@
 <template>
   <span
     v-if="questions.length === 0"
-    class="chat-message__thinking text-shimmer"
+    class="codex-chat-theme chat-message__thinking codex-text-shimmer"
     data-label="Thinking"
   >
     <SquareDashed :size="15" />
@@ -10,7 +10,7 @@
 
   <section
     v-else
-    class="chat-tool-user-input"
+    class="codex-chat-theme chat-tool-user-input"
     :class="{ 'chat-tool-user-input--resolved': cancelled || answered }"
   >
     <div v-if="cancelled" class="chat-tool-user-input__summary chat-tool-user-input__summary--muted">
@@ -137,7 +137,7 @@ import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
 
 const props = defineProps<{
-  answeredClientRequestIds?: Set<string>
+  answeredClientRequestIds?: ReadonlySet<string>
   toolCall: MessageToolCall
 }>()
 

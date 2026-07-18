@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import ConversationSidebar from '../src/components/ConversationSidebar.vue';
 
 const conversations = [{
-  id: 'thread-1', title: 'Build a surface', preview: 'Build a surface', cwd: '/tmp/project', status: 'idle' as const,
+  id: 'thread-1', title: 'Build a surface', preview: 'Build a surface', cwd: '/tmp/project', status: 'active' as const,
+  turnCount: 2,
+  createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+}, {
+  id: 'thread-2', title: 'Run the tests', preview: 'Run the tests', cwd: '/tmp/project', status: 'active' as const,
+  turnCount: 1,
   createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
 }];
 
@@ -13,19 +18,35 @@ describe('ConversationSidebar', () => {
       props: { activeConversationId: 'thread-1', conversations },
     });
     expect(wrapper.get('[aria-current="page"]').text()).toContain('Build a surface');
+    expect(wrapper.find('[aria-label="Status: active"]').exists()).toBe(true);
     await wrapper.get('.conversation-sidebar__item').trigger('click');
     await wrapper.get('.conversation-sidebar__new').trigger('click');
     expect(wrapper.emitted('select')).toStrictEqual([['thread-1']]);
     expect(wrapper.emitted('create')).toHaveLength(1);
   });
 
-  it('shows loading and empty states and respects disabled interactions', async () => {
+  it('shows loading and empty states and can disable creation', async () => {
     const wrapper = mount(ConversationSidebar, {
       props: { conversations: [], loading: true },
     });
     expect(wrapper.text()).toContain('Loading threads…');
-    await wrapper.setProps({ disabled: true, loading: false });
+    await wrapper.setProps({ createDisabled: true, loading: false });
     expect(wrapper.text()).toContain('No conversations yet');
     expect(wrapper.get('button').attributes('disabled')).toBeDefined();
+  });
+
+  it('never disables switching conversations when creation is disabled', async () => {
+    const wrapper = mount(ConversationSidebar, {
+      props: { conversations, createDisabled: true },
+    });
+
+    expect(wrapper.get('.conversation-sidebar__new').attributes('disabled')).toBeDefined();
+    const items = wrapper.findAll('.conversation-sidebar__item');
+    expect(items).toHaveLength(2);
+    expect(items.every((item) => item.attributes('disabled') === undefined)).toBe(true);
+    expect(wrapper.findAll('[aria-label="Status: active"]')).toHaveLength(2);
+    await items[0]!.trigger('click');
+    await items[1]!.trigger('click');
+    expect(wrapper.emitted('select')).toStrictEqual([['thread-1'], ['thread-2']]);
   });
 });

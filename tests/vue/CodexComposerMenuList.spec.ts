@@ -21,6 +21,7 @@ describe('CodexComposerMenuList', () => {
       type: 'checkbox',
       label: 'Plan mode',
       checked: true,
+      accessory: 'switch',
       payload: { source: 'built-in' },
     },
     {
@@ -47,6 +48,8 @@ describe('CodexComposerMenuList', () => {
     expect(wrapper.find('[role="separator"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Provided by the host application');
     expect(wrapper.text()).toContain('Ask first');
+    expect(wrapper.get('.codex-composer-menu-list__switch').classes())
+      .toContain('codex-composer-menu-list__switch--checked');
 
     const customAction = wrapper.findAll('button').find((button) => button.text().includes('Run custom tool'))!;
     await customAction.trigger('click');
@@ -60,7 +63,6 @@ describe('CodexComposerMenuList', () => {
       type: 'action',
       label: 'Disabled action',
       disabled: true,
-      icon: 'host-icon',
     }];
     const wrapper = mount(CodexComposerMenuList, {
       props: { items: disabledItems },

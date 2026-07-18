@@ -1,6 +1,7 @@
-import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageMedia, type MessageToolCall, type MessagePart } from './types'
+import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageAttachment, type MessageMedia, type MessageToolCall, type MessagePart } from './types'
 
 export type MessageBlock =
+  | { type: 'attachment'; attachment: MessageAttachment }
   | { type: 'text'; content: string }
   | { type: 'user-text'; content: string }
   | { type: 'mermaid'; code: string }
@@ -24,10 +25,21 @@ const ungroupedToolNames = new Set([
 
 export function computeMessageBlocks(message: Message): MessageBlock[] {
   if (message.role !== 'assistant') {
-    if (!message.content) {
-      return []
+    if ((message.parts?.length ?? 0) > 0) {
+      return message.parts!.flatMap((part): MessageBlock[] => {
+        if (part.type === 'attachment') {
+          return [{ type: 'attachment', attachment: part.attachment }]
+        }
+        if (part.type === 'text') {
+          const content = stripMessageContext(part.content)
+          return content ? [{ type: 'user-text', content }] : []
+        }
+        return []
+      })
     }
-    return [{ type: 'user-text', content: stripMessageContext(message.content) }]
+
+    const content = stripMessageContext(message.content)
+    return content ? [{ type: 'user-text', content }] : []
   }
 
   const toolCalls = message.toolCalls ?? []
@@ -56,6 +68,11 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
     if (part.type === 'tool') {
       anchoredToolCallIds.add(part.toolCall.id)
       blocks.push({ type: 'tool', toolCall: part.toolCall })
+      continue
+    }
+
+    if (part.type === 'attachment') {
+      blocks.push({ type: 'attachment', attachment: part.attachment })
       continue
     }
 

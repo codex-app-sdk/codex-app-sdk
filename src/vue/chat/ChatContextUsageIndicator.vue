@@ -1,7 +1,7 @@
 <template>
   <span
     v-if="usagePercent !== null && usageDetails"
-    class="chat-context-usage"
+    class="codex-chat-theme chat-context-usage"
     :style="{ '--chat-context-usage-percent': `${usagePercent}%` }"
     :aria-label="t('chat.contextUsage.ariaLabel')"
     tabindex="0"
@@ -21,10 +21,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useCodexChatI18n } from './chat-i18n';
-import type { AgentContextUsage } from './contracts';
+import type { CodexContextUsage } from './contracts';
 
 const props = defineProps<{
-  contextUsage?: AgentContextUsage | null;
+  contextUsage?: CodexContextUsage | null;
 }>();
 const { t } = useCodexChatI18n();
 

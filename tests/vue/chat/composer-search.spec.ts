@@ -1,13 +1,25 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import type { BackendCommandSummary, BackendSkillSummary } from '../../../src/vue/chat/contracts';
-import { filterComposerCommands } from '../../../src/vue/chat/composer-commands';
-import { filterComposerSkills } from '../../../src/vue/chat/composer-skills';
+import type { CodexCommandSummary, CodexSkillSummary } from '../../../src/vue/chat/contracts';
+import {
+  commandDescription,
+  commandDisplayName,
+  filterComposerCommands,
+  findActiveCommandSlash,
+} from '../../../src/vue/chat/composer-commands';
+import {
+  filterComposerSkills,
+  findActiveSkillSlash,
+  findActiveSkillTrigger,
+  promptSkillInputsFromText,
+  skillDescription,
+  skillDisplayName,
+} from '../../../src/vue/chat/composer-skills';
 
 describe('composer search ranking', () => {
   it('ranks skill id matches before name matches and description matches', () => {
-    const skills: BackendSkillSummary[] = [
+    const skills: CodexSkillSummary[] = [
       skill({
         name: 'frontend-polish',
         displayName: 'Frontend Polish',
@@ -39,7 +51,7 @@ describe('composer search ranking', () => {
   });
 
   it('ranks command id matches before command name matches and descriptions', () => {
-    const commands: BackendCommandSummary[] = [
+    const commands: CodexCommandSummary[] = [
       command({
         id: 'codex.ship',
         name: 'ship',
@@ -70,16 +82,80 @@ describe('composer search ranking', () => {
   });
 
   it('keeps original ordering for empty queries', () => {
-    const skills: BackendSkillSummary[] = [
+    const skills: CodexSkillSummary[] = [
       skill({ name: 'alpha' }),
       skill({ name: 'beta' }),
     ];
 
     expect(filterComposerSkills(skills, '').map((entry) => entry.name)).toStrictEqual(['alpha', 'beta']);
   });
+
+  it('finds command and skill triggers only at valid prompt boundaries', () => {
+    expect(findActiveCommandSlash('please /review', 14)).toStrictEqual({
+      end: 14,
+      query: 'review',
+      start: 7,
+    });
+    expect(findActiveCommandSlash('email@example/test', 18)).toBeNull();
+    expect(findActiveCommandSlash('plain text', 10)).toBeNull();
+    expect(findActiveCommandSlash('/review later', 13)).toBeNull();
+    expect(findActiveCommandSlash('/review', -10)).toBeNull();
+
+    expect(findActiveSkillTrigger('use $release', 12)).toStrictEqual({
+      end: 12,
+      query: 'release',
+      start: 4,
+      trigger: '$',
+    });
+    expect(findActiveSkillSlash('/frontend', 99)).toStrictEqual({
+      end: 9,
+      query: 'frontend',
+      start: 0,
+      trigger: '/',
+    });
+    expect(findActiveSkillTrigger('price$release', 13)).toBeNull();
+    expect(findActiveSkillTrigger('$release/next', 13)).toBeNull();
+  });
+
+  it('derives unique, enabled catalog skill inputs from both prompt syntaxes', () => {
+    const skills = [
+      skill({ name: 'review', path: '/skills/review/SKILL.md' }),
+      skill({ name: 'tests', path: '/skills/tests/SKILL.md' }),
+      skill({ name: 'missing-path', path: '' }),
+    ];
+
+    expect(promptSkillInputsFromText(
+      'Use $review, then /tests and $review again; ignore user@example.com and /unknown.',
+      skills,
+    )).toStrictEqual([
+      { name: 'review', path: '/skills/review/SKILL.md' },
+      { name: 'tests', path: '/skills/tests/SKILL.md' },
+    ]);
+    expect(promptSkillInputsFromText('Use /missing-path', skills)).toStrictEqual([]);
+  });
+
+  it('uses display metadata with stable name and empty-description fallbacks', () => {
+    const namedSkill = skill({
+      name: 'review',
+      displayName: 'Review changes',
+      shortDescription: 'Inspect the diff.',
+      description: 'Long description.',
+    });
+    expect(skillDisplayName(namedSkill)).toBe('Review changes');
+    expect(skillDescription(namedSkill)).toBe('Inspect the diff.');
+    expect(skillDisplayName(skill({ name: 'tests', displayName: undefined }))).toBe('tests');
+    expect(skillDescription(skill({ shortDescription: undefined, description: 'Run checks.' }))).toBe('Run checks.');
+    expect(skillDescription(skill({ shortDescription: undefined, description: undefined }))).toBe('');
+
+    const namedCommand = command({ name: 'review', displayName: 'Review changes', description: 'Inspect the diff.' });
+    expect(commandDisplayName(namedCommand)).toBe('Review changes');
+    expect(commandDescription(namedCommand)).toBe('Inspect the diff.');
+    expect(commandDisplayName(command({ name: 'tests', displayName: undefined }))).toBe('tests');
+    expect(commandDescription(command({ description: undefined }))).toBe('');
+  });
 });
 
-function skill(overrides: Partial<BackendSkillSummary>): BackendSkillSummary {
+function skill(overrides: Partial<CodexSkillSummary>): CodexSkillSummary {
   return {
     name: 'frontend-polish',
     path: '/Users/nbonamy/.codex/skills/frontend-polish/SKILL.md',
@@ -88,10 +164,9 @@ function skill(overrides: Partial<BackendSkillSummary>): BackendSkillSummary {
   };
 }
 
-function command(overrides: Partial<BackendCommandSummary>): BackendCommandSummary {
+function command(overrides: Partial<CodexCommandSummary>): CodexCommandSummary {
   return {
     id: 'codex.ship',
-    backend: 'codex',
     name: 'ship',
     submitOnSelect: true,
     ...overrides,

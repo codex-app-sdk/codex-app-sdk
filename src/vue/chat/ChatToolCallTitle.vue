@@ -1,7 +1,7 @@
 <template>
   <span
-    class="chat-tool-call__title"
-    :class="{ 'chat-tool-call__title--running': running, 'text-shimmer': running }"
+    class="codex-chat-theme chat-tool-call__title"
+    :class="{ 'chat-tool-call__title--running': running, 'codex-text-shimmer': running }"
     :data-label="title"
   >
     <component v-if="icon" :is="icon" />
@@ -13,7 +13,7 @@
       {{ title }}
     </template>
   </span>
-  <span v-if="lineDiff" class="chat-tool-call__diff" aria-label="Line changes">
+  <span v-if="lineDiff" class="codex-chat-theme chat-tool-call__diff" aria-label="Line changes">
     <ChatAnimatedDiffStat
       v-if="lineDiff.addedLines"
       kind="added"

@@ -1,6 +1,6 @@
 import type { ApprovalPreset } from './contracts';
 
-export const defaultApprovalPreset: ApprovalPreset = 'full-access';
+export const defaultApprovalPreset: ApprovalPreset = 'ask-for-approval';
 
 export type ApprovalPresetOption = {
   id: ApprovalPreset;

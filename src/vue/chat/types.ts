@@ -33,7 +33,16 @@ export type MessageMedia = {
   url: string;
 };
 
+export type MessageAttachment = {
+  kind: 'file' | 'image';
+  name: string;
+  path?: string;
+  url?: string;
+  mimeType?: string;
+};
+
 export type MessagePart =
+  | { type: 'attachment'; attachment: MessageAttachment }
   | { type: 'text'; content: string }
   | { type: 'tool'; toolCall: MessageToolCall };
 

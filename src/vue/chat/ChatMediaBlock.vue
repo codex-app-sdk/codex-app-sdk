@@ -1,5 +1,5 @@
 <template>
-  <figure class="chat-media-block">
+  <figure ref="rootElement" class="codex-chat-theme chat-media-block">
     <button
       class="chat-media-block__image-button"
       type="button"
@@ -35,7 +35,9 @@
     <Teleport to="body">
       <div
         v-if="fullscreenOpen"
-        class="chat-media-block__fullscreen"
+        class="codex-chat-theme chat-media-block__fullscreen"
+        :data-codex-theme="portalTheme.mode"
+        :style="portalTheme.style"
         role="dialog"
         aria-modal="true"
         :aria-label="media.title || generatedLabel"
@@ -65,6 +67,7 @@ import { Download, Info, Maximize2, X } from '../icons/app-icons'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatIconButton from './ChatIconButton.vue'
 import type { MessageMedia } from './types'
+import { captureCodexPortalTheme, type CodexPortalTheme } from './portal-theme'
 
 defineProps<{
   media: MessageMedia
@@ -78,8 +81,11 @@ const generatedLabel = 'Generated media'
 const promptLabel = 'Prompt'
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
+const rootElement = ref<HTMLElement | null>(null)
+const portalTheme = ref<CodexPortalTheme>({ mode: 'light', style: {} })
 
 function openFullscreen() {
+  portalTheme.value = captureCodexPortalTheme(rootElement.value)
   fullscreenOpen.value = true
 }
 

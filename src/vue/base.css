@@ -1,34 +1,4 @@
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#app {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-}
-
-body {
-  overflow: hidden;
-  background: var(--color-background);
-  font-family: var(--font-family-base);
-  font-size: var(--app-ui-font-size, var(--font-size-15));
-  line-height: var(--line-height-20);
-}
-
-button,
-input,
-textarea {
-  font: inherit;
-}
-
-button {
-  outline: none;
-}
-
-.text-shimmer {
+.codex-text-shimmer {
   color: transparent;
   background:
     linear-gradient(
@@ -40,22 +10,46 @@ button {
   background-size: 300% 100%;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: text-shimmer 4.5s linear infinite;
+  animation: codex-text-shimmer 4.5s linear infinite;
+}
+
+.codex-chat-theme,
+.codex-chat-theme * {
+  box-sizing: border-box;
+  font-family: var(--font-family-base);
+}
+
+.codex-chat-theme::before,
+.codex-chat-theme::after,
+.codex-chat-theme *::before,
+.codex-chat-theme *::after {
+  box-sizing: border-box;
+}
+
+.codex-chat-theme :where(button, input, textarea) {
+  font: inherit;
 }
 
 /* Shiki injects these local variables on highlighted spans. */
 /* stylelint-disable lyliya/value-no-unknown-custom-properties */
-.shiki,
-.shiki span {
+.codex-markdown .shiki,
+.codex-markdown .shiki span {
   color: var(--shiki-light);
 }
 
-:root[data-effective-appearance='dark'] .shiki,
-:root[data-effective-appearance='dark'] .shiki span {
+:where(.codex-chat-theme--dark, [data-codex-theme="dark"]) .codex-markdown .shiki,
+:where(.codex-chat-theme--dark, [data-codex-theme="dark"]) .codex-markdown .shiki span {
   color: var(--shiki-dark);
 }
 
-.shiki {
+@media (prefers-color-scheme: dark) {
+  :where(.codex-chat-theme--system, [data-codex-theme="system"]) .codex-markdown .shiki,
+  :where(.codex-chat-theme--system, [data-codex-theme="system"]) .codex-markdown .shiki span {
+    color: var(--shiki-dark);
+  }
+}
+
+.codex-markdown .shiki {
   background: var(--color-surface-low) !important;
 }
 /* stylelint-enable lyliya/value-no-unknown-custom-properties */
@@ -175,13 +169,17 @@ button {
   vertical-align: -0.12em;
 }
 
-.codex-markdown .chat-message-link__icon--favicon {
-  background-image: var(--favicon-url, none);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  margin-left: var(--space-2);
-  margin-right: var(--space-3);
+.codex-markdown .chat-message-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-lg);
+}
+
+.codex-markdown .chat-message-image--blocked {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-style: italic;
 }
 
 .codex-markdown table {
@@ -203,7 +201,7 @@ button {
   font-weight: var(--font-weight-semibold);
 }
 
-@keyframes text-shimmer {
+@keyframes codex-text-shimmer {
   0% {
     background-position: 150% 0;
   }
@@ -211,213 +209,4 @@ button {
   100% {
     background-position: -150% 0;
   }
-}
-
-.codex-dialog.el-dialog {
-  overflow: visible;
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
-}
-
-.codex-dialog .el-dialog__header {
-  padding: var(--space-12) var(--space-20) var(--space-16);
-}
-
-.codex-dialog .el-dialog__body {
-  padding: 0 var(--space-12) var(--space-12);
-}
-
-.codex-dialog .el-dialog__body:has(form) {
-  padding-bottom: var(--space-16);
-}
-
-.codex-dialog .el-dialog__footer {
-  padding: var(--space-8) var(--space-12);
-  border-top: 1px solid var(--color-border);
-}
-
-.codex-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-8);
-}
-
-.codex-dialog__header--centered {
-  display: grid;
-  gap: var(--space-1);
-  justify-items: center;
-  text-align: center;
-}
-
-.codex-form-dialog__header {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
-  text-align: left;
-}
-
-.codex-dialog__title {
-  margin: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-20);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-28);
-}
-
-.codex-dialog__subtitle {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-18);
-}
-
-.codex-dialog__icon-button {
-  display: grid;
-  place-items: center;
-  width: var(--space-12);
-  height: var(--space-12);
-  padding: 0;
-  border: 0;
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.codex-dialog__icon-button svg {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-}
-
-.codex-dialog__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
-.codex-form-dialog {
-  display: grid;
-  gap: var(--space-8);
-  padding: 0 var(--space-8);
-}
-
-.codex-form-dialog__field {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.codex-form-dialog__field-heading {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.codex-form-dialog__label {
-  color: var(--color-text);
-  font-size: var(--font-size-15);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-22);
-}
-
-.codex-form-dialog__heading-separator {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  line-height: var(--line-height-18);
-}
-
-.codex-form-dialog__help {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.codex-form-dialog__control {
-  min-height: 44px;
-  width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-lowest);
-}
-
-.codex-form-dialog__input-control {
-  display: flex;
-  align-items: center;
-}
-
-.codex-form-dialog__input-control:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
-}
-
-.codex-form-dialog__control .el-select {
-  width: 100%;
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-regular);
-}
-
-.codex-form-dialog__control .el-select__wrapper {
-  min-height: 42px;
-  padding: 0 var(--space-6);
-  border-radius: calc(var(--radius-lg) - 1px);
-  background: transparent;
-  box-shadow: none;
-}
-
-.codex-form-dialog__control .el-select__wrapper:hover,
-.codex-form-dialog__control .el-select__wrapper.is-focused {
-  box-shadow: none;
-}
-
-.codex-form-dialog__control .el-select__placeholder,
-.codex-form-dialog__control .el-select__selected-item {
-  color: var(--color-text);
-  font-weight: var(--font-weight-regular);
-}
-
-.codex-form-dialog__text-input {
-  width: 100%;
-  min-width: 0;
-  padding: 0 var(--space-6);
-  border: 0;
-  color: var(--color-text);
-  background: transparent;
-  font: inherit;
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
-  outline: none;
-}
-
-.codex-form-dialog__text-input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.codex-form-dialog__button-control {
-  display: flex;
-  align-items: center;
-  padding: 0 var(--space-6);
-  color: var(--color-text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.codex-form-dialog__button-control:hover:not(:disabled) {
-  border-color: var(--color-primary);
-}
-
-.codex-form-dialog__button-control:disabled {
-  cursor: default;
-  opacity: 0.72;
-}
-
-.codex-popover {
-  padding: var(--space-2) !important;
-  border-radius: var(--radius-xl) !important;
-  background-color: var(--color-background) !important;
-  border-color: var(--color-border) !important;
 }

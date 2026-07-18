@@ -4,8 +4,8 @@ import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import CodexComposer from '../../src/vue/components/CodexComposer.vue';
-import { codexBackendCommands } from '../../src/vue/chat/backend-commands';
-import type { AgentContextUsage, AgentFileSearchItem, BackendCommandSummary, BackendModelOption, BackendSkillSummary, CodexChatTranscription } from '../../src/vue/chat/contracts';
+import { codexCommands } from '../../src/vue/chat/codex-commands';
+import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../../src/vue/chat/contracts';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
@@ -23,7 +23,7 @@ type ChatComposerProps = {
   placeholder: string;
 };
 
-const models: BackendModelOption[] = [
+const models: CodexModelOption[] = [
   {
     id: 'codex-max',
     model: 'gpt-5.1-codex-max',
@@ -39,7 +39,7 @@ const models: BackendModelOption[] = [
   },
 ];
 
-const skills: BackendSkillSummary[] = [
+const skills: CodexSkillSummary[] = [
   {
     name: 'frontend-design',
     displayName: 'Frontend Design',
@@ -58,7 +58,7 @@ const skills: BackendSkillSummary[] = [
   },
 ];
 
-const files: AgentFileSearchItem[] = [
+const files: CodexFileSearchItem[] = [
   { name: 'README.md', path: 'README.md' },
   { name: 'research.md', path: 'docs/research.md' },
   { name: 'ChatComposer.vue', path: 'src/renderer/components/ChatComposer.vue' },
@@ -255,7 +255,7 @@ describe('ChatComposer', () => {
 
   it('shows slash commands before skills and submits Codex compact', async () => {
     const wrapper = mountComposer({
-      commands: codexBackendCommands,
+      commands: codexCommands,
       skills,
     });
 
@@ -276,7 +276,7 @@ describe('ChatComposer', () => {
 
   it('submits Codex review from the slash command menu without showing a slash prefix', async () => {
     const wrapper = mountComposer({
-      commands: codexBackendCommands,
+      commands: codexCommands,
       skills,
     });
 
@@ -295,7 +295,7 @@ describe('ChatComposer', () => {
 
   it('submits Codex plan from the slash command menu without showing a slash prefix', async () => {
     const wrapper = mountComposer({
-      commands: codexBackendCommands,
+      commands: codexCommands,
       skills,
     });
 
@@ -314,7 +314,7 @@ describe('ChatComposer', () => {
 
   it('submits Codex goal from the slash command menu without showing a slash prefix', async () => {
     const wrapper = mountComposer({
-      commands: codexBackendCommands,
+      commands: codexCommands,
       skills,
     });
 
@@ -333,7 +333,7 @@ describe('ChatComposer', () => {
 
   it('falls through from slash commands to skills after command rows', async () => {
     const wrapper = mountComposer({
-      commands: codexBackendCommands,
+      commands: codexCommands,
       skills,
     });
 
@@ -417,14 +417,14 @@ describe('ChatComposer', () => {
 });
 
 function mountComposer(overrides: Partial<ChatComposerProps & {
-  contextUsage: AgentContextUsage;
-  commands: BackendCommandSummary[];
-  models: BackendModelOption[];
+  contextUsage: CodexContextUsage;
+  commands: readonly CodexCommandSummary[];
+  models: CodexModelOption[];
   planMode: boolean;
   selectedModelId: string;
   selectedReasoningEffort: string;
-  files: AgentFileSearchItem[];
-  skills: BackendSkillSummary[];
+  files: CodexFileSearchItem[];
+  skills: CodexSkillSummary[];
   transcribeAudio: CodexChatTranscription;
 }> = {}) {
   return mount(CodexComposer, {

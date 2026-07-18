@@ -12,7 +12,17 @@ export {
 export {
   CodexSurface,
   createCodexSurface,
+  type CodexConversation,
+  type CodexConversationHostOptions,
+  type CodexConversationLoadOptions,
+  type CodexDynamicTool,
+  type CodexDynamicToolCall,
+  type CodexDynamicToolContent,
+  type CodexDynamicToolResult,
+  type CodexSurfaceExtension,
   type CodexSurfaceOptions,
+  type CodexThreadStartExtension,
+  type ListCodexSkillsOptions,
 } from './codex-surface';
 export {
   codexItemToSurfaceMessage,
@@ -20,3 +30,9 @@ export {
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
 } from './codex-conversation-history';
+export {
+  resolveAppleSpeechAnalyzerPath,
+  transcribeWithAppleSpeechAnalyzer,
+  type AppleSpeechTranscriptionOptions,
+  type AppleSpeechTranscriptionResult,
+} from './apple-speech-transcription';

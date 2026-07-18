@@ -11,6 +11,7 @@
     "**/*.css"
   ],
   "files": [
+    "assets",
     "dist",
     "README.md",
     "LICENSE"
@@ -27,6 +28,10 @@
     "./electron": {
       "types": "./dist/electron/index.d.ts",
       "import": "./dist/electron.js"
+    },
+    "./electron/preload": {
+      "types": "./dist/electron/preload.d.ts",
+      "import": "./dist/electron-preload.js"
     },
     "./events": {
       "types": "./dist/events/index.d.ts",
@@ -48,7 +53,7 @@
   },
   "scripts": {
     "schema:generate": "node scripts/generate-codex-schema.mjs",
-    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
+    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/verify-package-css.mjs && node scripts/verify-native-assets.mjs",
     "typecheck": "vue-tsc --noEmit",
     "lint": "npm run typecheck",
     "test": "vitest run",

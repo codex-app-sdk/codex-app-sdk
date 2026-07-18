@@ -1,6 +1,13 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "codex-app-sdk/electron/preload": ["../../src/electron/preload.ts"],
+      "codex-app-sdk/electron": ["../../src/electron/index.ts"],
+      "codex-app-sdk/node": ["../../src/node/index.ts"],
+      "codex-app-sdk/surface": ["../../src/surface/index.ts"],
+      "codex-app-sdk/vue": ["../../src/vue/index.ts"]
+    },
     "types": ["node", "vitest/globals"]
   },
   "include": [

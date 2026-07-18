@@ -1,13 +1,13 @@
 <template>
   <div
-    class="chat-message chat-message--compaction"
+    class="codex-chat-theme chat-message chat-message--compaction"
     :class="{ 'chat-message--compaction-running': running }"
   >
     <div class="chat-message__compaction-line" />
     <span class="chat-message__compaction-title" :data-label="title">
       <span
         class="chat-message__compaction-label"
-        :class="{ 'text-shimmer': running }"
+        :class="{ 'codex-text-shimmer': running }"
       >
         {{ title }}
       </span>

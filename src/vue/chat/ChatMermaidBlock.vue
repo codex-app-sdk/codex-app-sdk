@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-mermaid-block">
+  <div ref="rootElement" class="codex-chat-theme chat-mermaid-block">
     <div class="chat-mermaid-block__actions">
       <ChatIconButton bordered :label="modeToggleLabel" @click="toggleMode">
         <EyeIcon v-if="showingCode" />
@@ -19,7 +19,9 @@
     <Teleport to="body">
       <div
         v-if="fullscreenOpen"
-        class="chat-mermaid-block__fullscreen"
+        class="codex-chat-theme chat-mermaid-block__fullscreen"
+        :data-codex-theme="portalTheme.mode"
+        :style="portalTheme.style"
         role="dialog"
         aria-modal="true"
         :aria-label="fullscreenLabel"
@@ -53,6 +55,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { renderMermaidSVG } from 'beautiful-mermaid'
 import { CodeIcon, EyeIcon, Maximize2, X } from '../icons/app-icons'
 import ChatIconButton from './ChatIconButton.vue'
+import { captureCodexPortalTheme, type CodexPortalTheme } from './portal-theme'
 
 const props = defineProps<{
   code: string
@@ -64,6 +67,8 @@ const renderLabel = 'Render diagram'
 const showCodeLabel = 'Show source'
 const fullscreenOpen = ref(false)
 const showingCode = ref(false)
+const rootElement = ref<HTMLElement | null>(null)
+const portalTheme = ref<CodexPortalTheme>({ mode: 'light', style: {} })
 const stylesheetImportPattern = /@import\s+url\([^)]*\);\s*/g
 const rawLabelAttributePattern = /\sdata-label="[^"]*"/g
 
@@ -96,6 +101,7 @@ function toggleMode() {
 }
 
 function openFullscreen() {
+  portalTheme.value = captureCodexPortalTheme(rootElement.value)
   fullscreenOpen.value = true
 }
 

@@ -38,7 +38,7 @@ function renderMenu(
   slots: Slots,
   select: (item: CodexComposerMenuSelectableItem<unknown>) => void,
   openSubmenus: Set<string>,
-  className = 'codex-composer-menu-list',
+  className = 'codex-chat-theme codex-composer-menu-list',
 ): VNode {
   const firstFocusableId = items.find((item) => item.type !== 'separator'
     && item.type !== 'heading'
@@ -134,7 +134,10 @@ function renderItem(
           slots,
           select,
           openSubmenus,
-          'codex-composer-menu-list codex-composer-menu-list__submenu-list',
+          [
+            'codex-composer-menu-list codex-composer-menu-list__submenu-list',
+            item.submenuWidth === 'wide' ? 'codex-composer-menu-list__submenu-list--wide' : '',
+          ].filter(Boolean).join(' '),
         )
         : null,
     ]);
@@ -156,8 +159,16 @@ function renderItem(
     onClick: () => select(item),
   }, [
     ...renderContent(item, slots),
-    item.type === 'checkbox' || item.type === 'radio'
-      ? h('span', { class: 'codex-composer-menu-list__selection', 'aria-hidden': 'true' }, item.checked ? '✓' : '')
+    item.type === 'checkbox' && item.accessory === 'switch'
+      ? h('span', {
+        class: [
+          'codex-composer-menu-list__switch',
+          item.checked ? 'codex-composer-menu-list__switch--checked' : null,
+        ],
+        'aria-hidden': 'true',
+      }, [h('span', { class: 'codex-composer-menu-list__switch-thumb' })])
+      : item.type === 'checkbox' || item.type === 'radio'
+        ? h('span', { class: 'codex-composer-menu-list__selection', 'aria-hidden': 'true' }, item.checked ? '✓' : '')
       : null,
   ]);
 }
@@ -215,7 +226,13 @@ function renderContent(item: CodexComposerMenuItemBase<unknown>, slots: Slots): 
   }
 
   const customIcon = slots.icon?.({ item });
-  const icon = customIcon?.length ? customIcon : (item.icon
+  const icon = customIcon?.length ? customIcon : ('leadingColor' in item && item.leadingColor
+    ? [h('span', {
+      class: 'codex-composer-menu-list__color-dot',
+      style: { backgroundColor: item.leadingColor },
+      'aria-hidden': 'true',
+    })]
+    : item.icon
     ? [h(item.icon as Component, { class: 'codex-composer-menu-list__icon', 'aria-hidden': 'true' })]
     : [h('span', {
       class: 'codex-composer-menu-list__icon codex-composer-menu-list__icon--empty',

@@ -3,17 +3,17 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import ChatModelReasoningSelector from '../../../src/vue/chat/ChatModelReasoningSelector.vue';
-import type { BackendModelOption, ReasoningEffort } from '../../../src/vue/chat/contracts';
+import type { CodexModelOption, ReasoningEffort } from '../../../src/vue/chat/contracts';
 
 type SelectorProps = {
   disabled?: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   modelId?: string | null;
-  models?: BackendModelOption[];
+  models?: CodexModelOption[];
   reasoningEffort?: ReasoningEffort | null;
 };
 
-const models: BackendModelOption[] = [
+const models: CodexModelOption[] = [
   {
     id: 'codex-fast',
     model: 'gpt-5.1-codex-fast',

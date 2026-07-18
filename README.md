@@ -21,13 +21,15 @@ normal GUI-app locations (including login-shell, Homebrew, user-bin, nvm, and
 Windows `PATHEXT` paths), launches app-server, and owns its lifecycle:
 
 ```ts
-import { ipcMain } from 'electron';
-import { registerCodexSurfaceIpc } from 'codex-app-sdk/electron';
+import { clipboard, dialog, ipcMain, shell } from 'electron';
+import { registerCodexElectronMain } from 'codex-app-sdk/electron';
 import { createCodexSurface } from 'codex-app-sdk/node';
 
 const surface = createCodexSurface();
-
-const disposeIpc = registerCodexSurfaceIpc(ipcMain, window.webContents, surface);
+const disposeSdk = registerCodexElectronMain({
+  clipboard, dialog, ipcMain, shell, surface,
+  sender: window.webContents,
+});
 ```
 
 Preload exposes the narrow SDK bridge; no Node or Electron primitive crosses
@@ -35,12 +37,9 @@ into the renderer:
 
 ```ts
 import { contextBridge, ipcRenderer } from 'electron';
-import { createCodexSurfaceRendererApi } from 'codex-app-sdk/electron';
+import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
 
-contextBridge.exposeInMainWorld(
-  'codexSurface',
-  createCodexSurfaceRendererApi(ipcRenderer),
-);
+exposeCodexElectronPreload(contextBridge, ipcRenderer);
 ```
 
 The main-process surface loads app-server's model and skill catalogs, permission
@@ -52,47 +51,33 @@ Vue binds the bridge to reactive state and uses the SDK conversation pane:
 
 ```vue
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
 import 'codex-app-sdk/styles.css';
 
-const draft = ref('');
 const surface = useCodexSurface(window.codexSurface);
-const { state, connect, selectConversation, sendMessage } = surface;
-onMounted(connect);
 </script>
 
 <template>
   <MyConversationList
-    :conversations="state.conversations"
-    @select="selectConversation"
+    :conversations="surface.state.conversations"
+    @create="surface.createConversation()"
+    @select="surface.selectConversation($event)"
   />
-  <CodexConversationPane
-    v-model="draft"
-    :approvals="state.approvals"
-    :busy="state.busy"
-    :context-usage="state.contextUsage"
-    :goal="state.goal"
-    :messages="state.messages"
-    :models="state.models"
-    :queued-prompts="state.queuedPrompts"
-    :skills="state.skills"
-    @client-response="surface.respondToClientRequest"
-    @delete-message="surface.deleteMessage"
-    @delete-queued-prompt="surface.deleteQueuedPrompt"
-    @edit-message="({ index, content }) => surface.editMessage(index, content)"
-    @interrupt="surface.interrupt"
-    @retry-message="surface.retryMessage"
-    @steer="surface.steerMessage"
-    @steer-queued-prompt="surface.steerQueuedPrompt"
-    @submit="sendMessage"
-  />
+  <CodexConversationPane :surface="surface" />
 </template>
 ```
 
+That bound-pane form auto-connects and owns the standard settings, approval,
+goal, message-action, attachment, copy, and voice-transcription wiring. All
+props and events remain available as additive overrides for provider-neutral or
+fully controlled hosts.
+
 `CodexSurface` exposes stable product operations: connect, list/refresh, create,
-select, send/queue/steer, interrupt, update settings, set/clear goals,
-approve/deny/respond, delete/edit/retry, subscribe, and close. `connect()` paginates the global, non-archived app-server thread list
+select/read/rename, send/queue/steer, interrupt, compact, start a review, update
+settings, set/clear goals, approve/deny/respond, delete/edit/retry, subscribe,
+and close. Its snapshots include per-thread live state, thread status, context
+usage, rate limits, goals, approvals, pending app-server questions, queued
+prompts, and turn git diffs. `connect()` paginates the global, non-archived app-server thread list
 without applying a cwd filter, then resumes the newest thread so the first
 snapshot already contains the real conversation history. By default the SDK does
 not override app-server's working directory; a host may pass `cwd` explicitly for
@@ -107,14 +92,110 @@ image, compaction, raw response, and agent items into the SDK's serializable
 surface model. Reasoning remains internal while the empty streaming assistant
 placeholder drives the standard Thinking shimmer.
 
+### Concurrent conversations and host extensions
+
+`CodexSurface` keeps every loaded conversation live. `conversation(id)` returns
+a stable, thread-scoped handle, so several agents can send, stream, wait for
+approval, steer, and finish concurrently without changing the conversation
+selected by the UI:
+
+```ts
+const build = surface.conversation(buildThreadId);
+const tests = surface.conversation(testThreadId);
+
+await Promise.all([
+  build.load({ cwd: '/workspace/build', extensionContext: { agentId: 'build' } }),
+  tests.load({ cwd: '/workspace/tests', extensionContext: { agentId: 'tests' } }),
+]);
+
+build.onStateChange((state) => renderBuildStatus(state));
+tests.onStateChange((state) => renderTestStatus(state));
+await Promise.all([build.sendMessage('Implement it'), tests.sendMessage('Test it')]);
+```
+
+Conversation snapshots expose `activeTurnId` and `turnIds`; handles also expose
+direct rollback, goals, settings, approvals, client responses, reviews, queues,
+and message editing. The original active-conversation methods remain available
+for a single `CodexConversationPane`. `listConversations({ cwd })` and the
+Node-only `listSkills({ cwd })` perform scoped discovery without leaking raw
+`thread/list` or `skills/list` protocol types.
+
+Use the typed semantic event stream for incremental host integration. Events are
+emitted after their matching state mutation, carry a monotonic sequence number,
+and identify whether they came from a host action, app-server notification, or
+surface lifecycle. The global surface receives catalog, runtime, rate-limit,
+conversation, message, turn, tool, plan, approval, and client-request events;
+thread handles receive only events for their conversation:
+
+```ts
+surface.onEvent((event) => persistOrRoute(event));
+build.onEvent((event) => routeBuildAgentEvent(event));
+```
+
+The same stream crosses the Electron bridge through `window.codexSurface.onEvent`
+and is exposed by `useCodexSurface` as `onEvent` and `lastEvent`. Snapshots remain
+the authoritative initial state and resynchronization mechanism; consumers do
+not need to reconstruct state by replaying events. `listModels()` performs a
+fresh, paginated visible-model read by default; pass `{ forceReload: false }`
+only when a cached catalog is explicitly desired.
+
+Main-process hosts can install product-neutral extensions. The SDK applies
+thread start/resume configuration and executes dynamic tool calls; application
+code never handles a JSON-RPC request or responder:
+
+```ts
+const surface = createCodexSurface({
+  extensions: [{
+    configureConversation: ({ operation, extensionContext }) => ({
+      config: { product_agent: (extensionContext as { agentId: string }).agentId },
+      developerInstructions: `Product agent (${operation})`,
+    }),
+    dynamicTools: [{
+      name: 'lookup_ticket',
+      description: 'Look up a ticket by id',
+      inputSchema: {
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+      },
+      execute: async ({ arguments: input, extensionContext }) => {
+        const ticket = await lookupTicket(
+          (input as { id: string }).id,
+          (extensionContext as { agentId: string }).agentId,
+        );
+        return JSON.stringify(ticket);
+      },
+    }],
+  }],
+});
+
+const created = await surface.createConversation(
+  { cwd: '/workspace/build', developerInstructions: 'Keep changes focused.' },
+  { extensionContext: { agentId: 'build' } },
+);
+const conversation = surface.conversation(created.activeConversationId!);
+```
+
+`extensionContext` is opaque host-only data. It is retained per conversation,
+passed to start/resume configuration and dynamic tools, and is never exposed by
+the renderer IPC API.
+
 The [basic Electron + Vue sample](./samples/basic) proves the complete boundary:
 its custom left pane renders the app-server conversation list from the SDK's
-reactive state, while its right pane configures and customizes
-`CodexConversationPane`. It contains no raw app-server or IPC plumbing. Run:
+reactive state and per-conversation status, while its right pane mounts one
+bound `CodexConversationPane`. SDK defaults supply native file picking and
+ingestion, image paste/drop, attachment previews, copy, audio capture and Apple
+speech transcription, models, permissions, plans, goals, and concurrent live
+conversation state without `App.vue` plumbing. It contains no raw app-server or
+IPC plumbing. Run:
 
 ```bash
 npm run sample:start
 ```
+
+For renderer HMR and automatic Electron restarts when sample or SDK source
+changes, run `npm run dev` inside `samples/basic`. The development command is
+owned by the developer; the SDK does not launch a background watcher itself.
 
 ## Generated app-server types
 
@@ -212,19 +293,29 @@ import 'codex-app-sdk/styles.css';
 ```
 
 `useCodexSurface` is the app-server-backed reactive controller. Applications own
-their shell and list/navigation UI, then bind the controller's state and actions
-to `CodexConversationPane`. The pane composes message-list, composer shelf,
-goals, queued prompts, error, header, and empty states plus app-owned approval
-prompts. It forwards header, empty-state,
-message, approval, composer, and menu slots, and accepts custom composer menu
-entries without requiring a fork.
+their shell, header, and list/navigation UI, then bind the controller's state
+and actions to `CodexConversationPane`. The pane is deliberately headerless: it
+composes the conversation history loader, message list, composer shelf, goals,
+queued prompts, errors, empty state, and approval prompts. It forwards
+empty-state, message, message-action, message-block, thinking, tool, approval,
+composer, and menu slots, and accepts custom composer menu entries without
+requiring a fork. Apps that want a measured sticky header/footer layout can
+compose the separately exported `CodexWorkbenchLayout`; apps can also use
+`CodexConversationHistoryLoader` independently.
 
 The SDK stylesheet owns the complete default presentation of every SDK-rendered
 component: typography, spacing, icons, menus, message blocks, composer states,
-and interaction feedback. Host applications own shell and navigation styling,
-plus the content of customization slots. Apps can theme SDK components through
-the documented `--codex-*` variables; the sample does not patch component
-internals.
+thinking shimmer, history loading, light/dark presentation, and interaction
+feedback. Host applications own shell and navigation styling, plus the content
+of customization slots. Import `codex-app-sdk/styles.css` once. Components apply
+the scoped `.codex-chat-theme` root themselves, so the stylesheet does not reset
+the host application. Set `data-codex-theme="dark"`,
+`data-codex-theme="system"`, `.codex-chat-theme--dark`, or
+`.codex-chat-theme--system` on an ancestor to choose a theme; override semantic
+`--codex-*` variables for product theming. The sample does not patch component
+internals. `applyCodexTheme(element, { mode, tokens })` is an optional helper
+for hosts that want the SDK to install and later clean up theme attributes and
+token overrides; direct CSS variables remain supported.
 
 `CodexComposerMenu` accepts nested action, checkbox, radio, separator, submenu,
 and custom entries. Typed payloads let a host application contribute its own
@@ -238,6 +329,7 @@ rendering while retaining tested layout and auto-scroll behavior. Components
 use `--codex-*` semantic CSS variables with neutral fallbacks and do not depend
 on Element Plus, Electron, application stores, or raw app-server types.
 
-Every public Vue component has one same-named isolated spec. A package-boundary
-test compares the component and test manifests so catch-all component suites
-cannot replace that one-to-one structure.
+Every top-level Vue component has one same-named isolated spec. Public leaf
+components copied from the conversation kit are also mounted directly by the
+Vue tests. Package-boundary tests enforce both inventories so a component cannot
+be shipped accidentally without executable coverage.

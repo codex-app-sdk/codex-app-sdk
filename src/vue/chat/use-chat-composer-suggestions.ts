@@ -1,8 +1,8 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type {
-  AgentFileSearchItem,
-  BackendCommandSummary,
-  BackendSkillSummary,
+  CodexFileSearchItem,
+  CodexCommandSummary,
+  CodexSkillSummary,
 } from './contracts'
 import { findActiveFileMention } from './composer-mentions'
 import { filterFileSearchItems } from './file-search'
@@ -11,14 +11,14 @@ import { filterComposerSkills, findActiveSkillTrigger } from './composer-skills'
 
 type ChatComposerSuggestionOptions = {
   caretPosition: Ref<number>
-  commands: () => readonly BackendCommandSummary[]
+  commands: () => readonly CodexCommandSummary[]
   disabled: () => boolean
-  files: () => readonly AgentFileSearchItem[]
+  files: () => readonly CodexFileSearchItem[]
   isSending: () => boolean
   onCommandSubmitted: (prompt: string) => void
   onTextInserted: (caretPosition: number) => void
   prompt: Ref<string>
-  skills: () => readonly BackendSkillSummary[]
+  skills: () => readonly CodexSkillSummary[]
   skillsEnabled: () => boolean
   textarea: Ref<HTMLTextAreaElement | null>
 }
@@ -134,7 +134,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     return false
   }
 
-  function selectFile(file: AgentFileSearchItem): void {
+  function selectFile(file: CodexFileSearchItem): void {
     const mention = activeFileMention.value
     if (!mention || !options.textarea.value) {
       return
@@ -142,21 +142,21 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     insert(`${file.path} `, mention.start, mention.end)
   }
 
-  function selectSkill(skill: BackendSkillSummary): void {
+  function selectSkill(skill: CodexSkillSummary): void {
     const mention = activeSkillSlash.value
     if (mention) {
       insert(`$${skill.name} `, mention.start, mention.end)
     }
   }
 
-  function selectSlashSkill(skill: BackendSkillSummary): void {
+  function selectSlashSkill(skill: CodexSkillSummary): void {
     const mention = activeCommandSlash.value
     if (mention) {
       insert(`/${skill.name} `, mention.start, mention.end)
     }
   }
 
-  function selectCommand(command: BackendCommandSummary): void {
+  function selectCommand(command: CodexCommandSummary): void {
     const mention = activeCommandSlash.value
     if (!mention || !options.textarea.value) {
       return

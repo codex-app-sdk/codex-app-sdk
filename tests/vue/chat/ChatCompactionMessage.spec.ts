@@ -16,7 +16,7 @@ describe('ChatCompactionMessage', () => {
 
     expect(wrapper.text()).toContain('Compacting context');
     expect(wrapper.classes()).toContain('chat-message--compaction-running');
-    expect(wrapper.get('.chat-message__compaction-label').classes()).toContain('text-shimmer');
+    expect(wrapper.get('.chat-message__compaction-label').classes()).toContain('codex-text-shimmer');
   });
 
   it('renders a completed compaction without shimmer', () => {
@@ -30,6 +30,6 @@ describe('ChatCompactionMessage', () => {
 
     expect(wrapper.text()).toContain('Context compacted');
     expect(wrapper.classes()).not.toContain('chat-message--compaction-running');
-    expect(wrapper.get('.chat-message__compaction-label').classes()).not.toContain('text-shimmer');
+    expect(wrapper.get('.chat-message__compaction-label').classes()).not.toContain('codex-text-shimmer');
   });
 });

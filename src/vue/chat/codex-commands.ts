@@ -1,9 +1,8 @@
-import type { AgentBackend, BackendCommandSummary } from './contracts';
+import type { CodexCommandSummary } from './contracts';
 
-export const codexBackendCommands: BackendCommandSummary[] = [
+export const codexCommands: readonly CodexCommandSummary[] = [
   {
     id: 'codex.compact',
-    backend: 'codex',
     name: 'compact',
     displayName: 'Compact',
     description: 'Compact the current Codex context.',
@@ -12,7 +11,6 @@ export const codexBackendCommands: BackendCommandSummary[] = [
   },
   {
     id: 'codex.review',
-    backend: 'codex',
     name: 'review',
     displayName: 'Review',
     description: 'Review current Codex changes and find issues.',
@@ -21,7 +19,6 @@ export const codexBackendCommands: BackendCommandSummary[] = [
   },
   {
     id: 'codex.plan',
-    backend: 'codex',
     name: 'plan',
     displayName: 'Plan',
     description: 'Switch to Codex Plan mode.',
@@ -30,27 +27,10 @@ export const codexBackendCommands: BackendCommandSummary[] = [
   },
   {
     id: 'codex.goal',
-    backend: 'codex',
     name: 'goal',
     displayName: 'Goal',
     description: 'Set or view the Codex thread goal.',
     slashName: 'goal',
     submitOnSelect: true,
   },
-];
-
-export const claudeBackendCommands: BackendCommandSummary[] = [
-  {
-    id: 'claude.plan',
-    backend: 'claude',
-    name: 'plan',
-    displayName: 'Plan',
-    description: 'Switch to Claude Plan mode.',
-    slashName: 'plan',
-    submitOnSelect: true,
-  },
-];
-
-export function defaultBackendCommands(backend: AgentBackend): BackendCommandSummary[] {
-  return backend === 'claude' ? claudeBackendCommands : codexBackendCommands;
-}
+] as const;

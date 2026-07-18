@@ -1,13 +1,13 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type WebContents } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { registerCodexSurfaceIpc } from 'codex-app-sdk/electron';
+import { registerCodexElectronMain } from 'codex-app-sdk/electron';
 import { createCodexSurface, type CodexSurface } from 'codex-app-sdk/node';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | null = null;
 let surface: CodexSurface | null = null;
-let unregisterSurfaceIpc: (() => void) | null = null;
+let unregisterSdk: (() => void) | null = null;
 
 async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
@@ -16,7 +16,6 @@ async function createWindow(): Promise<void> {
     minWidth: 760,
     minHeight: 520,
     backgroundColor: '#f7f7f5',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -24,6 +23,7 @@ async function createWindow(): Promise<void> {
       preload: path.join(directory, 'preload.cjs'),
     },
   });
+  installNavigationPolicy(mainWindow.webContents);
   const rendererUrl = process.env.CODEX_SAMPLE_RENDERER_URL;
   if (rendererUrl) {
     await mainWindow.loadURL(rendererUrl);
@@ -34,25 +34,57 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  surface = createCodexSurface({
-    clientInfo: { name: 'codex_sdk_basic_sample', title: 'Codex SDK Basic Sample', version: '0.1.0' },
+  const sdkSurface = createCodexSurface();
+  surface = sdkSurface;
+  unregisterSdk = registerCodexElectronMain({
+    clipboard,
+    dialog,
+    ipcMain,
+    shell,
+    surface: sdkSurface,
+    sender: { send: (channel, payload) => mainWindow?.webContents.send(channel, payload) },
   });
-  unregisterSurfaceIpc = registerCodexSurfaceIpc(ipcMain, {
-    send: (channel, payload) => mainWindow?.webContents.send(channel, payload),
-  }, surface);
   await createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow();
   });
 });
 
+function installNavigationPolicy(webContents: Pick<WebContents, 'on' | 'setWindowOpenHandler'>): void {
+  webContents.setWindowOpenHandler(({ url }) => {
+    openExternalUrl(url);
+    return { action: 'deny' };
+  });
+  webContents.on('will-navigate', (event, url) => {
+    event.preventDefault();
+    openExternalUrl(url);
+  });
+}
+
+function openExternalUrl(url: string): void {
+  const externalUrl = allowedExternalUrl(url);
+  if (externalUrl) void shell.openExternal(externalUrl).catch(() => undefined);
+}
+
+function allowedExternalUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const protocol = url.protocol.toLowerCase();
+    return protocol === 'http:' || protocol === 'https:' || protocol === 'mailto:' || protocol === 'tel:'
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
-  unregisterSurfaceIpc?.();
-  unregisterSurfaceIpc = null;
+  unregisterSdk?.();
+  unregisterSdk = null;
   void surface?.close().catch(() => undefined);
   surface = null;
 });

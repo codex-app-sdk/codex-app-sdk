@@ -82,6 +82,41 @@ describe('message block computation', () => {
     ]);
   });
 
+  it('keeps user text and attachment previews in their original order', () => {
+    const image = {
+      kind: 'image' as const,
+      name: 'diagram.png',
+      url: 'data:image/png;base64,cG5n',
+    };
+    const file = {
+      kind: 'file' as const,
+      name: 'notes.md',
+      path: '/tmp/notes.md',
+    };
+
+    expect(computeMessageBlocks({
+      role: 'user',
+      content: 'Visible text only',
+      parts: [
+        { type: 'text', content: '<context>hidden</context>\nFirst' },
+        { type: 'attachment', attachment: image },
+        { type: 'text', content: 'Second' },
+        { type: 'attachment', attachment: file },
+      ],
+    })).toStrictEqual([
+      { type: 'user-text', content: 'First' },
+      { type: 'attachment', attachment: image },
+      { type: 'user-text', content: 'Second' },
+      { type: 'attachment', attachment: file },
+    ]);
+
+    expect(computeMessageBlocks({
+      role: 'user',
+      content: '',
+      parts: [{ type: 'attachment', attachment: file }],
+    })).toStrictEqual([{ type: 'attachment', attachment: file }]);
+  });
+
   it('completes partial streaming follow-up and tool tags', () => {
     const blocks = computeMessageBlocks({
       role: 'assistant',

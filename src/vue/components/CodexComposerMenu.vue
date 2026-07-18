@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="codex-composer-menu" @keydown.escape.prevent.stop="close(true)">
+  <div ref="root" class="codex-chat-theme codex-composer-menu" @keydown.escape.prevent.stop="close(true)">
     <slot name="trigger" :open="menuOpen" :toggle="toggle">
       <button
         class="codex-composer-menu__trigger"
@@ -125,15 +125,15 @@ defineExpose({ close, open: () => setOpen(true), toggle });
   padding: 0;
   border: 0;
   border-radius: 999px;
-  color: var(--codex-muted-text-color, #777b82);
+  color: var(--codex-muted-text-color, var(--color-text-muted, #777b82));
   background: transparent;
   cursor: pointer;
 }
 
 .codex-composer-menu__trigger:hover:not(:disabled),
 .codex-composer-menu__trigger:focus-visible {
-  color: var(--codex-text-color, #202124);
-  background: var(--codex-hover-color, rgb(0 0 0 / 6%));
+  color: var(--codex-text-color, var(--color-text, #202124));
+  background: var(--codex-hover-color, var(--color-surface-low, rgb(0 0 0 / 6%)));
   outline: none;
 }
 

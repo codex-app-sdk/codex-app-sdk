@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { getToolDisplayTitle, getToolFallbackTitle, getToolLineDiff, parseToolStatusDescriptor } from '../../../src/vue/chat/tool-status';
+import { getToolDisplayTitle, getToolFallbackTitle, getToolLineDiff, parseToolStatusDescriptor, registerCodexToolTitlePresenter } from '../../../src/vue/chat/tool-status';
 import type { MessageToolCall } from '../../../src/vue/chat/types';
 
 describe('tool status helpers', () => {
@@ -96,82 +96,36 @@ describe('tool status helpers', () => {
     })).toBe('Updated plan');
   });
 
-  it.each([
-    ['team.register-agent', { agentId: 'agent-dina' }, 'Registered agent'],
-    ['team.list-agents', { agentId: 'agent-dina' }, 'Listed agents'],
-    ['team.check-messages', { agentId: 'agent-dina' }, 'Checked messages'],
-    ['team.display-markdown', { path: 'docs/mcp.md' }, 'Displayed mcp.md'],
-    ['mcp__team__display-markdown', { markdown: '# Plan', title: 'Plan' }, 'Displayed Plan'],
-    ['mcp_team_display-markdown', { markdown: '# Notes' }, 'Displayed Markdown'],
-    ['team.send-message', { to: 'Manny' }, 'Sent message to Manny'],
-    ['team.broadcast-message', { from: 'agent-dina' }, 'Broadcast message'],
-    ['team.set-status', { status: 'Running tests' }, 'Updated status'],
-    ['team.set-status', { status: '' }, 'Cleared status'],
-    ['team.mark-work-item-completed', { workItemId: 'work-item-12' }, 'Marked work item complete'],
-    ['mcp__team__send-message', { to: 'Manny' }, 'Sent message to Manny'],
-    ['mcp_team_send-message', { to: 'Manny' }, 'Sent message to Manny'],
-  ])('formats collaboration MCP %s titles', (name, args, expected) => {
-    expect(getToolDisplayTitle({
-      args,
-      done: true,
-      function: name,
-      id: 'tool',
-      result: undefined,
-      state: 'completed',
-      status: 'completed',
-    }, undefined)).toBe(expected);
-  });
-
-  it('formats collaboration MCP titles by running and failed state', () => {
+  it('uses the generic fallback for app-specific tools', () => {
     const tool: MessageToolCall = {
       args: { to: 'Manny' },
-      done: false,
+      done: true,
       function: 'team.send-message',
       id: 'tool',
       result: undefined,
-      state: 'running',
-      status: 'running',
-    };
-
-    expect(getToolDisplayTitle(tool, undefined)).toBe('Sending message to Manny');
-    expect(getToolDisplayTitle({ ...tool, done: true, state: 'error', status: 'failed' }, undefined)).toBe('Failed sending message to Manny');
-  });
-
-  it('formats collaboration display markdown titles by running and failed state', () => {
-    const tool: MessageToolCall = {
-      args: { path: '/workspace/project/README.md' },
-      done: false,
-      function: 'mcp__team__display-markdown',
-      id: 'tool',
-      result: undefined,
-      state: 'running',
-      status: 'running',
-    };
-
-    expect(getToolDisplayTitle(tool, undefined)).toBe('Displaying README.md');
-    expect(getToolDisplayTitle({ ...tool, done: true, state: 'error', status: 'failed' }, undefined)).toBe('Failed displaying README.md');
-  });
-
-  it('honors descriptor phases for collaboration MCP titles', () => {
-    const tool: MessageToolCall = {
-      args: {},
-      done: true,
-      function: 'team.list-agents',
-      id: 'tool',
-      result: undefined,
       state: 'completed',
       status: 'completed',
     };
 
-    expect(getToolDisplayTitle(tool, {
-      action: 'run',
-      phase: 'running',
-      source: 'mcp',
-    })).toBe('Listing agents');
-    expect(getToolDisplayTitle(tool, {
-      action: 'run',
-      phase: 'failed',
-      source: 'mcp',
-    })).toBe('Failed listing agents');
+    expect(getToolDisplayTitle(tool, undefined)).toBe('Ran team.send-message');
+  });
+
+  it('lets hosts register and dispose exact tool title presenters', () => {
+    const tool: MessageToolCall = {
+      args: { target: 'Preview' },
+      done: false,
+      function: 'host.display',
+      id: 'tool',
+      result: undefined,
+      state: 'running',
+      status: 'running',
+    };
+    const unregister = registerCodexToolTitlePresenter(({ toolCall }) => (
+      toolCall.function === 'host.display' ? 'Displaying host preview' : undefined
+    ));
+
+    expect(getToolDisplayTitle(tool, undefined)).toBe('Displaying host preview');
+    unregister();
+    expect(getToolDisplayTitle(tool, undefined)).toBe('Running host.display');
   });
 });

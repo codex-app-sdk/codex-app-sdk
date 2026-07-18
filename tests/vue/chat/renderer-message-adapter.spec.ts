@@ -234,6 +234,65 @@ describe('renderer message adapter', () => {
     ]);
   });
 
+  it('preserves ordered user attachments without flattening filenames into editable text', () => {
+    const rendererMessage: SurfaceMessage = {
+      createdAt: '2026-07-18T00:00:00.000Z',
+      id: 'user-turn-attachments',
+      parts: [
+        { type: 'text', text: 'Compare these.' },
+        {
+          type: 'attachment',
+          attachment: {
+            kind: 'image',
+            name: 'diagram.png',
+            path: '/tmp/diagram.png',
+            url: 'data:image/png;base64,cG5n',
+            mimeType: 'image/png',
+          },
+        },
+        {
+          type: 'attachment',
+          attachment: {
+            kind: 'file',
+            name: 'notes.md',
+            path: '/tmp/notes.md',
+            mimeType: 'text/markdown',
+          },
+        },
+        { type: 'text', text: 'Keep their order.' },
+      ],
+      role: 'user',
+      status: 'complete',
+    };
+
+    expect(surfaceMessageToChatMessage(rendererMessage)).toMatchObject({
+      content: 'Compare these.\n\nKeep their order.',
+      parts: [
+        { type: 'text', content: 'Compare these.' },
+        {
+          type: 'attachment',
+          attachment: {
+            kind: 'image',
+            name: 'diagram.png',
+            path: '/tmp/diagram.png',
+            url: 'data:image/png;base64,cG5n',
+            mimeType: 'image/png',
+          },
+        },
+        {
+          type: 'attachment',
+          attachment: {
+            kind: 'file',
+            name: 'notes.md',
+            path: '/tmp/notes.md',
+            mimeType: 'text/markdown',
+          },
+        },
+        { type: 'text', content: 'Keep their order.' },
+      ],
+    });
+  });
+
   it('uses renderer tool status text for confirmation descriptors', () => {
     const statusText = JSON.stringify({
       source: 'mcp',
