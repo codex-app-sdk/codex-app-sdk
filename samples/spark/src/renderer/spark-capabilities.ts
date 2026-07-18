@@ -1,6 +1,6 @@
 import type { CodexCapabilities } from 'codex-app-sdk/vue';
 
-export const kidsCapabilities: CodexCapabilities = {
+export const sparkCapabilities: CodexCapabilities = {
   models: false,
   skills: false,
   reasoningEffort: false,

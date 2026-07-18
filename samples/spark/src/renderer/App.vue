@@ -45,10 +45,10 @@
       <CodexConversationPane
         class="spark-chat"
         :surface="surface"
-        :capabilities="kidsCapabilities"
+        :capabilities="sparkCapabilities"
         :attach-enabled="false"
         :commands="[]"
-        :presentation="kidsPresentation"
+        :presentation="sparkPresentation"
         :can-delete-message="false"
         :can-edit-message="false"
         :can-retry-message="false"
@@ -90,7 +90,7 @@ import {
 } from 'codex-app-sdk/vue';
 import SparkLanding from './components/SparkLanding.vue';
 import SparkSidebar from './components/SparkSidebar.vue';
-import { kidsCapabilities } from './kids-capabilities';
+import { sparkCapabilities } from './spark-capabilities';
 
 const surface = useCodexSurface(window.codexSurface);
 const connectError = ref<string | null>(null);
@@ -125,7 +125,7 @@ const accountLabel = computed(() => {
   if (account?.type === 'amazonBedrock') return 'Amazon Bedrock';
   return 'Signed in';
 });
-const kidsPresentation: CodexConversationPresentation = {
+const sparkPresentation: CodexConversationPresentation = {
   composer: { actionMenu: false, contextUsage: false, voice: false },
   messages: {
     actions: { copy: false, delete: false, edit: false, quote: false, retry: false },

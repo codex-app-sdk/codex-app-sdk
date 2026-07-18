@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-describe('kids sample renderer security policy', () => {
+describe('Spark sample renderer security policy', () => {
   it('ships a restrictive CSP without remote scripts or executable inline script', () => {
     const html = readFileSync(resolve(import.meta.dirname, '../src/renderer/index.html'), 'utf8');
 

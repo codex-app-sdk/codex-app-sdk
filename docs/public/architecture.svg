@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-labelledby="title description">
+  <title id="title">Codex App SDK architecture</title>
+  <desc id="description">The Electron main-process surface connects Codex app-server and app-owned MCP servers to a constrained renderer controller and Vue conversation pane.</desc>
+  <style>
+    .panel { fill: #f6fbfa; stroke: #b9dcd4; stroke-width: 2; }
+    .card { fill: #ffffff; stroke: #c7d7d3; stroke-width: 2; }
+    .accent { fill: #e2f7f1; stroke: #58b9a5; stroke-width: 2; }
+    .external { fill: #eef3ff; stroke: #7d9fdf; stroke-width: 2; }
+    .label { fill: #12231f; font: 600 18px ui-sans-serif, system-ui, sans-serif; }
+    .small { fill: #4d625c; font: 500 14px ui-sans-serif, system-ui, sans-serif; }
+    .group { fill: #087f6a; font: 700 16px ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; }
+    .line { fill: none; stroke: #3c8f7e; stroke-linecap: round; stroke-width: 3; marker-end: url(#arrow); }
+    .line-blue { fill: none; stroke: #587bc4; stroke-linecap: round; stroke-width: 3; marker-end: url(#arrow-blue); }
+    @media (prefers-color-scheme: dark) {
+      .panel { fill: #121b1a; stroke: #315f55; }
+      .card { fill: #1a2422; stroke: #3b5550; }
+      .accent { fill: #123c34; stroke: #41b79d; }
+      .external { fill: #18243d; stroke: #6486ce; }
+      .label { fill: #eefcf8; }
+      .small { fill: #adc7c0; }
+      .group { fill: #62ddc1; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10Z" fill="#3c8f7e"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10Z" fill="#587bc4"/>
+    </marker>
+  </defs>
+
+  <rect class="panel" x="30" y="42" width="520" height="436" rx="28"/>
+  <text class="group" x="62" y="82">ELECTRON MAIN · TRUSTED</text>
+
+  <rect class="card" x="64" y="110" width="210" height="84" rx="16"/>
+  <text class="label" x="86" y="143">Product host</text>
+  <text class="small" x="86" y="169">Policy · services · state</text>
+
+  <rect class="accent" x="310" y="110" width="206" height="84" rx="16"/>
+  <text class="label" x="332" y="143">CodexSurface</text>
+  <text class="small" x="332" y="169">Snapshots · events · threads</text>
+
+  <rect class="card" x="64" y="234" width="210" height="84" rx="16"/>
+  <text class="label" x="86" y="267">Extensions</text>
+  <text class="small" x="86" y="293">Context · tools · instructions</text>
+
+  <rect class="card" x="310" y="234" width="206" height="84" rx="16"/>
+  <text class="label" x="332" y="267">Typed transport</text>
+  <text class="small" x="332" y="293">JSONL · lifecycle · schema</text>
+
+  <rect class="card" x="187" y="358" width="206" height="84" rx="16"/>
+  <text class="label" x="209" y="391">Electron bridge</text>
+  <text class="small" x="209" y="417">Surface IPC · native IPC</text>
+
+  <path class="line" d="M274 152H306"/>
+  <path class="line" d="M274 276H306"/>
+  <path class="line" d="M413 198V230"/>
+  <path class="line" d="M393 400H566"/>
+
+  <rect class="external" x="584" y="94" width="250" height="102" rx="20"/>
+  <text class="label" x="610" y="134">Codex app-server</text>
+  <text class="small" x="610" y="162">Models · threads · tools · auth</text>
+
+  <rect class="external" x="584" y="236" width="250" height="102" rx="20"/>
+  <text class="label" x="610" y="276">App-owned MCP</text>
+  <text class="small" x="610" y="304">Trusted stdio or HTTP servers</text>
+
+  <path class="line-blue" d="M516 276C550 276 550 145 580 145"/>
+  <path class="line-blue" d="M709 200V232"/>
+
+  <rect class="panel" x="868" y="42" width="302" height="436" rx="28"/>
+  <text class="group" x="900" y="82">RENDERER · SANDBOXED</text>
+
+  <rect class="accent" x="902" y="120" width="234" height="84" rx="16"/>
+  <text class="label" x="924" y="153">useCodexSurface</text>
+  <text class="small" x="924" y="179">Reactive state · typed actions</text>
+
+  <rect class="card" x="902" y="244" width="234" height="84" rx="16"/>
+  <text class="label" x="924" y="277">Conversation pane</text>
+  <text class="small" x="924" y="303">Messages · composer · tools</text>
+
+  <rect class="card" x="902" y="368" width="234" height="74" rx="16"/>
+  <text class="label" x="924" y="399">Product UI</text>
+  <text class="small" x="924" y="423">Shell · lists · business views</text>
+
+  <path class="line" d="M834 400H864"/>
+  <path class="line" d="M1019 208V240"/>
+  <path class="line" d="M1019 332V364"/>
+</svg>

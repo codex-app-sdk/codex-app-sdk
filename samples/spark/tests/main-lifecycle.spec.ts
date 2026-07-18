@@ -83,7 +83,7 @@ vi.mock('codex-app-sdk/node', () => ({
   createCodexSurface: mocks.createCodexSurface,
 }));
 
-describe('kids sample main lifecycle', () => {
+describe('Spark sample main lifecycle', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();

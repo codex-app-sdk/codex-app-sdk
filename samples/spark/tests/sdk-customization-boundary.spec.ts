@@ -4,15 +4,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-describe('kids sample SDK customization boundary', () => {
+describe('Spark sample SDK customization boundary', () => {
   it('reuses the default pane and styles it only through host classes and public tokens', () => {
     const app = readFileSync(resolve(import.meta.dirname, '../src/renderer/App.vue'), 'utf8');
     const styles = readFileSync(resolve(import.meta.dirname, '../src/renderer/styles.css'), 'utf8');
 
     expect(app).toContain('<CodexConversationPane');
     expect(app).toContain('class="spark-chat"');
-    expect(app).toContain(':capabilities="kidsCapabilities"');
-    expect(app).toContain(':presentation="kidsPresentation"');
+    expect(app).toContain(':capabilities="sparkCapabilities"');
+    expect(app).toContain(':presentation="sparkPresentation"');
     expect(styles).toContain('--codex-font-family:');
     expect(styles).toContain('--codex-message-font-size:');
     expect(styles).toContain('--codex-composer-control-size:');

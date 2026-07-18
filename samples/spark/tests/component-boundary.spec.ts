@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const sampleRoot = path.resolve(import.meta.dirname, '..');
 
-describe('kids sample component test boundary', () => {
+describe('Spark sample component test boundary', () => {
   it('keeps one isolated test file per Vue component', async () => {
     const components = ['App.vue', ...(await readdir(path.join(sampleRoot, 'src/renderer/components')))]
       .filter((name) => name.endsWith('.vue'))

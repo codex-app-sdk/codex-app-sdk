@@ -1,4 +1,4 @@
-# Spark kids chatbot
+# Spark chatbot
 
 Spark is a kid-friendly chatbot built from the public Codex App SDK surface.
 It deliberately reuses `CodexConversationPane` and customizes it through typed
@@ -27,11 +27,11 @@ The sample demonstrates:
 From the repository root:
 
 ```bash
-npm run kids:start
+npm run spark:start
 ```
 
 For renderer HMR and automatic Electron restarts:
 
 ```bash
-npm run kids:dev
+npm run spark:dev
 ```
