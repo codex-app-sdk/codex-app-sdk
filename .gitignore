@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 samples/*/dist-main/
+samples/*/dist-mcp/
 samples/*/dist-renderer/
 *.log
 .DS_Store

@@ -66,6 +66,11 @@
     "kids:start": "npm run start -w @codex-app-sdk/kids-sample",
     "kids:test": "npm run test -w @codex-app-sdk/kids-sample",
     "kids:typecheck": "npm run typecheck -w @codex-app-sdk/kids-sample",
+    "relay:build": "npm run build -w @codex-app-sdk/relay-sample",
+    "relay:dev": "npm run dev -w @codex-app-sdk/relay-sample",
+    "relay:start": "npm run start -w @codex-app-sdk/relay-sample",
+    "relay:test": "npm run test -w @codex-app-sdk/relay-sample",
+    "relay:typecheck": "npm run typecheck -w @codex-app-sdk/relay-sample",
     "prepare": "npm run build"
   },
   "dependencies": {

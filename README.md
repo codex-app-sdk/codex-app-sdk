@@ -260,6 +260,29 @@ through the high-level surface API. Run:
 npm run sample:start
 ```
 
+The [Spark kids chatbot sample](./samples/kids) shows a deliberately simpler
+product built from the same default conversation components. It uses its own
+`CODEX_HOME`, SDK-managed account/login state, host-owned Terra/medium
+conversation defaults, typed presentation controls that hide advanced UI, and
+public semantic theme tokens for larger, colorful controls. Run:
+
+```bash
+npm run kids:start
+```
+
+The [Relay logistics exception desk](./samples/relay) demonstrates a more
+complex business product built around one persistent conversation. Its
+sample-owned operations board sends explicit click context into an otherwise
+stock `CodexConversationPane`; the model reads and mutates authoritative
+shipment state through Relay's own stdio MCP server built with the official
+TypeScript MCP SDK. MCP tools use normal SDK rendering, progress, confirmation,
+and semantic events, while the renderer receives only a narrow read-only
+business snapshot API. Run:
+
+```bash
+npm run relay:start
+```
+
 For renderer HMR and automatic Electron restarts when sample or SDK source
 changes, run `npm run dev` inside `samples/basic`. The development command is
 owned by the developer; the SDK does not launch a background watcher itself.

@@ -1,0 +1,33 @@
+{
+  "name": "@codex-app-sdk/relay-sample",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-main/main.js",
+  "scripts": {
+    "build:mcp": "vite build --config vite.mcp.config.ts",
+    "build": "npm run build:mcp && vite build",
+    "dev": "npm run build:mcp && vite --mode electron",
+    "start": "npm run build && electron .",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "codex-app-sdk": "file:../..",
+    "vue": "^3.5.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "@vue/test-utils": "^2.4.6",
+    "electron": "^43.1.1",
+    "jsdom": "^29.0.0",
+    "typescript": "^6.0.0",
+    "vite": "^8.0.0",
+    "vite-plugin-electron": "^1.1.0",
+    "vitest": "^4.1.0",
+    "vue-tsc": "^3.3.0"
+  }
+}
