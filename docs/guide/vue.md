@@ -96,7 +96,7 @@ The package exports:
 
 - `provideCodexChatTranslate` and `defaultCodexChatTranslate`;
 - `registerCodexToolTitlePresenter` for domain-specific tool titles;
-- Markdown, code highlighting, mention parsing, and conversation-link helpers;
+- Markdown, KaTeX-powered LaTeX, code highlighting, mention parsing, and conversation-link helpers;
 - capabilities, presentation controls, and theme helpers.
 
 See [presentation and theming](/guide/presentation) and the

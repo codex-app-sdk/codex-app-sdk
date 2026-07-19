@@ -57,6 +57,31 @@
 }
 /* stylelint-enable lyliya/value-no-unknown-custom-properties */
 
+.codex-markdown .katex {
+  color: inherit;
+  font-size: 1.02em;
+}
+
+.codex-markdown .katex-display {
+  max-width: 100%;
+  margin: var(--space-8) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--space-2) 0;
+}
+
+.codex-markdown .katex-display > .katex {
+  display: block;
+  min-width: min-content;
+  text-align: center;
+}
+
+.codex-markdown .katex-error {
+  color: var(--color-text-muted) !important;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-13);
+}
+
 .codex-markdown {
   color: var(--color-text);
   font-size: var(--chat-font-size, var(--chat-message-font-size, var(--font-size-15)));

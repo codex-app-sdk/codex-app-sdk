@@ -1,4 +1,6 @@
 import { Marked, Renderer } from 'marked'
+import katex from 'katex'
+import markedKatex from 'marked-katex-extension'
 import { escapeAttribute, escapeHtml } from './html-escape'
 import { renderCodeBlock } from './syntax-highlighting'
 import { parseCodexEditorFileReference } from './conversation-links'
@@ -38,8 +40,54 @@ const markdown = new Marked({
   renderer,
 })
 
+markdown.use(markedKatex({
+  maxExpand: 1_000,
+  maxSize: 20,
+  nonStandard: false,
+  output: 'htmlAndMathml',
+  strict: 'ignore',
+  throwOnError: false,
+  trust: false,
+}))
+
 markdown.use({
   extensions: [
+    {
+      name: 'codexBlockKatex',
+      level: 'block',
+      tokenizer(src) {
+        const match = /^\\\[[ \t]*(?:\n([\s\S]+?)\n|([^\n]*?))[ \t]*\\\](?:\n|$)/.exec(src)
+        if (!match) return undefined
+        return {
+          type: 'codexBlockKatex',
+          raw: match[0],
+          text: (match[1] ?? match[2] ?? '').trim(),
+        }
+      },
+      renderer(token) {
+        return `${renderLatex((token as unknown as { text: string }).text, true)}\n`
+      },
+    },
+    {
+      name: 'codexInlineKatex',
+      level: 'inline',
+      start(src) {
+        const index = src.indexOf('\\(')
+        return index === -1 ? undefined : index
+      },
+      tokenizer(src) {
+        const match = /^\\\((.+?)\\\)/.exec(src)
+        if (!match) return undefined
+        return {
+          type: 'codexInlineKatex',
+          raw: match[0],
+          text: match[1]!.trim(),
+        }
+      },
+      renderer(token) {
+        return renderLatex((token as unknown as { text: string }).text, false)
+      },
+    },
     {
       name: 'taskList',
       renderer(token) {
@@ -82,6 +130,19 @@ function isMailtoUrl(value: string) {
   } catch {
     return false
   }
+}
+
+function renderLatex(source: string, displayMode: boolean): string {
+  const rendered = katex.renderToString(source, {
+    displayMode,
+    maxExpand: 1_000,
+    maxSize: 20,
+    output: 'htmlAndMathml',
+    strict: 'ignore',
+    throwOnError: false,
+    trust: false,
+  })
+  return displayMode ? `<span class="katex-display">${rendered}</span>` : rendered
 }
 
 const allowedAbsoluteProtocols = new Set(['file:', 'http:', 'https:', 'mailto:', 'tel:'])

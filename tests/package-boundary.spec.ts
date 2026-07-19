@@ -81,8 +81,10 @@ describe('package boundary', () => {
 
     expect(entrypoint).toContain("@import './chat-theme.css';");
     expect(entrypoint).toContain("@import './base.css';");
+    expect(entrypoint).toContain("@import 'katex/dist/katex.min.css';");
     expect(base).toContain('.codex-text-shimmer');
     expect(base).toContain('.codex-markdown');
+    expect(base).toContain('.codex-markdown .katex-display');
     expect(base).toContain('.codex-chat-theme');
     expect(theme).toContain(':where(.codex-chat-theme)');
     expect(theme).toContain('.codex-chat-theme--dark');
@@ -95,6 +97,7 @@ describe('package boundary', () => {
     expect(viteConfig).toContain("new URL('./scripts/vue-entry.mjs'");
     expect(vueBuildEntry).toContain("import '../src/vue/styles.css';");
     expect(JSON.parse(packageManifest).scripts.build).toContain('node scripts/verify-package-css.mjs');
+    expect(JSON.parse(packageManifest).scripts.build).toContain('node scripts/package-katex-assets.mjs');
     expect(bundleVerifier).toContain("'@media (prefers-color-scheme:dark)'");
     expect(bundleVerifier).toContain("'--font-size-15:15px'");
     expect(bundleVerifier).toContain("'--codex-message-font-size'");

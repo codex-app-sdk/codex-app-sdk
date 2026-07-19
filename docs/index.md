@@ -28,7 +28,7 @@ features:
     details: Keep several conversations loaded and streaming independently without coupling them to the selected UI thread.
   - icon: 💬
     title: Full conversation UI
-    details: Composer, messages, thinking, tools, approvals, goals, queues, generated media, Markdown, Mermaid, and native attachments.
+    details: Composer, messages, thinking, tools, approvals, goals, queues, generated media, Markdown, LaTeX, Mermaid, and native attachments.
   - icon: 🧱
     title: Narrow Electron boundary
     details: Main-process policy stays trusted while the renderer gets serializable snapshots, semantic events, and validated actions.

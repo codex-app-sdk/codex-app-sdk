@@ -33,6 +33,57 @@ describe('message markdown rendering', () => {
     expect(html).toContain('<code>code</code>');
   });
 
+  it('renders Codex bracket-delimited display and inline LaTeX with KaTeX', () => {
+    const html = renderMarkdown([
+      'I read your drawing as:',
+      '',
+      '\\[',
+      'y=x^2-4+x',
+      '\\]',
+      '',
+      'Vertex: \\(\\left(-\\frac12,-\\frac{17}{4}\\right)\\)',
+    ].join('\n'));
+
+    expect(html).toContain('class="katex-display"');
+    expect(html).toContain('class="katex"');
+    expect(html).toContain('class="katex-html"');
+    expect(html).toContain('class="katex-mathml"');
+    expect(html).toContain('<math');
+    expect(html).toContain('frac');
+  });
+
+  it('renders standard dollar-delimited inline and display LaTeX without interpreting currency', () => {
+    const html = renderMarkdown('Inline $x^2$ and\n\n$$\n\\boxed{x^2 + x - 4}\n$$\n\nBudget is $5 and $10.');
+
+    expect(html).toContain('display="block"');
+    expect(html).toContain('class="katex"');
+    expect(html).toContain('Budget is $5 and $10.');
+  });
+
+  it('keeps incomplete, inline-code, and fenced LaTeX source as code or text', () => {
+    const html = renderMarkdown([
+      'Incomplete \\(x + 1',
+      '',
+      '`\\(x^2\\)`',
+      '',
+      '```tex',
+      '\\[ x^2 \\]',
+      '```',
+    ].join('\n'));
+
+    expect(html).not.toContain('class="katex-display"');
+    expect(html).toContain('<code>\\(x^2\\)</code>');
+    expect(html).toContain('language-tex');
+  });
+
+  it('renders unsupported LaTeX as safe visible math rather than failing the message', () => {
+    const html = renderMarkdown('\\[\\notARealCommand{x}\\]');
+
+    expect(html).toContain('class="katex-display"');
+    expect(html).toContain('notARealCommand');
+    expect(html).not.toContain('<script>');
+  });
+
   it('syntax-highlights fenced code blocks with a known language', () => {
     const html = renderMarkdown('```ts\nconst ok = true\n```');
 
