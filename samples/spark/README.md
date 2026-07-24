@@ -7,7 +7,7 @@ SDK conversation UI.
 
 The sample demonstrates:
 
-- an app-specific `CODEX_HOME` under Electron's user-data directory;
+- an app-specific `~/.codex-spark` `CODEX_HOME`, separate from normal Codex;
 - authoritative SDK account state with a kid-friendly signed-out landing page
   and ChatGPT login opened through the SDK native bridge;
 - a grown-up account menu that calls the SDK's real `logout()` action and

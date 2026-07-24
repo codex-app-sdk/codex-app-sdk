@@ -43,7 +43,7 @@ const mocks = vi.hoisted(() => {
   const surface = { close: vi.fn(async () => undefined) };
   return {
     app: {
-      getPath: vi.fn(() => '/tmp/spark-user-data'),
+      getPath: vi.fn((name: string) => name === 'home' ? '/tmp/spark-home' : '/tmp/spark-user-data'),
       on: vi.fn((event: string, listener: () => void) => appHandlers.set(event, listener)),
       quit: vi.fn(),
       setName: vi.fn(),
@@ -97,12 +97,12 @@ describe('Spark sample main lifecycle', () => {
     await vi.waitFor(() => expect(mocks.windows).toHaveLength(1));
 
     expect(mocks.app.setName).toHaveBeenCalledWith('Spark');
-    expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/spark-user-data/codex-home', { recursive: true });
+    expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/spark-home/.codex-spark', { recursive: true });
     expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/spark-user-data/workspace', { recursive: true });
     expect(mocks.createCodexSurface).toHaveBeenCalledWith(expect.objectContaining({
       approvalMode: 'never',
       clientInfo: { name: 'spark', title: 'Spark', version: '0.1.0' },
-      codexHome: '/tmp/spark-user-data/codex-home',
+      codexHome: '/tmp/spark-home/.codex-spark',
       conversationDefaults: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' },
       cwd: '/tmp/spark-user-data/workspace',
       permissionMode: 'read-only',

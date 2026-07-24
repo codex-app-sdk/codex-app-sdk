@@ -41,7 +41,7 @@ async function createWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   const appData = app.getPath('userData');
-  const codexHome = path.join(appData, 'codex-home');
+  const codexHome = path.join(app.getPath('home'), '.codex-relay');
   const workspace = path.join(appData, 'workspace');
   const statePath = path.join(appData, 'relay-operations.json');
   const mcpServerPath = path.join(bundleDirectory, '../dist-mcp/server.js');

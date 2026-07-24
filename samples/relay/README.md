@@ -23,6 +23,10 @@ The renderer contains no raw app-server, MCP configuration, filesystem, or
 Electron primitives. Trusted stdio MCP configuration remains in the main
 process through `createCodexSurface({ mcpServers })`.
 
+Relay starts its own app-server process and gives that process the dedicated
+`~/.codex-relay` `CODEX_HOME`; it never connects to or modifies normal
+`~/.codex` conversations.
+
 ## MCP tools
 
 - `list_exceptions`

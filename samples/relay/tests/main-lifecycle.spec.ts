@@ -43,7 +43,7 @@ const mocks = vi.hoisted(() => {
   const surface = { close: vi.fn(async () => undefined) };
   return {
     app: {
-      getPath: vi.fn(() => '/tmp/relay-user-data'),
+      getPath: vi.fn((name: string) => name === 'home' ? '/tmp/relay-home' : '/tmp/relay-user-data'),
       on: vi.fn((event: string, listener: () => void) => appHandlers.set(event, listener)),
       quit: vi.fn(),
       setName: vi.fn(),
@@ -113,7 +113,7 @@ describe('Relay sample main lifecycle', () => {
       approvalPreset: 'ask-for-approval',
       autoSelectFirstConversation: true,
       clientInfo: { name: 'relay', title: 'Relay', version: '0.1.0' },
-      codexHome: '/tmp/relay-user-data/codex-home',
+      codexHome: '/tmp/relay-home/.codex-relay',
       conversationLimit: 1,
       cwd: '/tmp/relay-user-data/workspace',
       permissionMode: 'read-only',
