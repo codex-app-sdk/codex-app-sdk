@@ -1004,6 +1004,10 @@ describe('CodexSurface', () => {
       },
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const historyEvents: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => {
+      if (event.type === 'conversation.historyReplaced') historyEvents.push(event);
+    });
 
     const snapshot = await surface.connect();
 
@@ -1022,6 +1026,11 @@ describe('CodexSurface', () => {
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/turns/list'
     ))).toHaveLength(2);
+    expect(historyEvents.at(-1)).toMatchObject({
+      type: 'conversation.historyReplaced',
+      origin: 'lifecycle',
+      payload: { reason: 'resync' },
+    });
   });
 
   it('does not resurrect a completed turn from a stale background history page', async () => {

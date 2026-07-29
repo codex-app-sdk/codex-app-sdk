@@ -860,7 +860,7 @@ export class CodexSurface {
         } while (cursor !== null);
         if (!this.runtimes.has(threadId)) return;
         this.patchRuntime(threadId, { fullHistoryHydrated: true });
-        this.emitHistoryReplaced(threadId, 'resync', 'action');
+        this.emitHistoryReplaced(threadId, 'resync', 'lifecycle');
       } catch (error) {
         if (this.runtimes.has(threadId)) {
           this.patchRuntime(threadId, { error: `Could not load complete conversation history: ${errorMessage(error)}` });
