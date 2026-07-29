@@ -4,6 +4,10 @@ export {
   type CodexAppServerStdioTransportOptions,
 } from './codex-stdio-transport';
 export {
+  CodexAppServerUnixSocketTransport,
+  type CodexAppServerUnixSocketTransportOptions,
+} from './codex-unix-socket-transport';
+export {
   codexRuntimePathEntries,
   discoverCodexExecutable,
   withCodexRuntimePath,
@@ -26,6 +30,7 @@ export {
   type CodexMcpServerTransport,
   type CodexSurfaceExtension,
   type CodexSurfaceOptions,
+  type CodexAppServerTransportOptions,
   type CodexThreadStartExtension,
   type ListCodexSkillsOptions,
 } from './codex-surface';

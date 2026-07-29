@@ -73,6 +73,10 @@ import {
   CodexAppServerStdioTransport,
   type CodexAppServerStdioTransportOptions,
 } from './codex-stdio-transport';
+import {
+  CodexAppServerUnixSocketTransport,
+  type CodexAppServerUnixSocketTransportOptions,
+} from './codex-unix-socket-transport';
 
 type StateListener = (snapshot: CodexSurfaceSnapshot) => void;
 type ConversationStateListener = (snapshot: CodexConversationSnapshot) => void;
@@ -293,7 +297,7 @@ export type CodexSurfaceOptions = {
   /** Host-owned defaults used by explicit and implicit conversation creation. */
   conversationDefaults?: Readonly<CodexConversationDefaults>;
   conversationLimit?: number;
-  /** Trusted main-process CODEX_HOME for this app-server child. Never expose this through renderer IPC. */
+  /** Trusted main-process CODEX_HOME for the app-server. Never expose this through renderer IPC. */
   codexHome?: string;
   cwd?: string;
   autoSelectFirstConversation?: boolean;
@@ -303,7 +307,8 @@ export type CodexSurfaceOptions = {
   /** Receives notifications added by a newer app-server than this SDK schema. */
   onUnknownNotification?: (notification: { method: string; params?: unknown }) => void;
   permissionMode?: CodexSurfacePermissionMode;
-  transport?: CodexAppServerStdioTransportOptions;
+  /** Defaults to a spawned stdio child; use `{ type: 'unixSocket' }` to reuse an existing local daemon. */
+  transport?: CodexAppServerTransportOptions;
   /** Test and advanced embedding seam. Most apps should let the SDK create the client. */
   client?: CodexAppServerClient;
 };
@@ -388,9 +393,11 @@ export class CodexSurface {
       }
     }
     const transportOptions = surfaceTransportOptions(options);
-    this.client = options.client ?? new CodexAppServerClient(new CodexAppServerStdioTransport(
-      transportOptions,
-    ));
+    this.client = options.client ?? new CodexAppServerClient(
+      isUnixSocketTransportOptions(transportOptions)
+        ? new CodexAppServerUnixSocketTransport(transportOptions)
+        : new CodexAppServerStdioTransport(transportOptions),
+    );
     this.unsubscribeNotification = this.client.onNotification((notification) => this.handleNotification(notification));
     this.unsubscribeDisconnect = this.client.onDisconnect((error) => this.handleDisconnect(error));
     this.unsubscribeApprovals = registerCodexApprovalHandlers(this.client, (pending) => {
@@ -4439,7 +4446,13 @@ function safeLoginUrl(value: string): string {
   return url.href;
 }
 
-function surfaceTransportOptions(options: CodexSurfaceOptions): CodexAppServerStdioTransportOptions {
+export type CodexAppServerTransportOptions = CodexAppServerStdioTransportOptions | CodexAppServerUnixSocketTransportOptions;
+
+function isUnixSocketTransportOptions(options: CodexAppServerTransportOptions): options is CodexAppServerUnixSocketTransportOptions {
+  return 'type' in options && options.type === 'unixSocket';
+}
+
+function surfaceTransportOptions(options: CodexSurfaceOptions): CodexAppServerTransportOptions {
   const topLevelHome = options.codexHome === undefined
     ? undefined
     : absoluteCodexHome(options.codexHome);
@@ -4447,8 +4460,9 @@ function surfaceTransportOptions(options: CodexSurfaceOptions): CodexAppServerSt
   if (topLevelHome !== undefined && transportHome !== undefined && topLevelHome !== transportHome) {
     throw new Error('Codex surface codexHome conflicts with transport.codexHome');
   }
+  const transport = options.transport ?? {};
   return {
-    ...options.transport,
+    ...transport,
     ...(topLevelHome === undefined ? {} : { codexHome: topLevelHome }),
   };
 }

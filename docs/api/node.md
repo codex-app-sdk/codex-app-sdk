@@ -30,13 +30,31 @@ type CodexSurfaceOptions = {
   mcpServers?: readonly CodexMcpServerDefinition[];
   onUnknownNotification?: (notification: { method: string; params?: unknown }) => void;
   permissionMode?: 'read-only' | 'workspace-write' | 'full-access';
-  transport?: CodexAppServerStdioTransportOptions;
+  transport?: CodexAppServerTransportOptions;
   client?: CodexAppServerClient;
 };
 ```
 
 `client` is a test/advanced embedding seam. Most applications should let the SDK
 construct the client.
+
+### Reuse an existing app-server
+
+To send turns through a desktop-owned, Unix-socket app-server instead of
+spawning another child, opt in explicitly:
+
+```ts
+const surface = createCodexSurface({
+  transport: {
+    type: 'unixSocket',
+    socketPath: '/Users/me/.codex/app-server-control/app-server-control.sock',
+  },
+});
+```
+
+When `socketPath` is omitted, the SDK derives it from `codexHome` (or
+`CODEX_HOME`, then `~/.codex`). This transport never starts, stops, or restarts
+the server it connects to.
 
 ## `CodexSurface`
 
@@ -163,6 +181,7 @@ versions.
 ### Executable and transport
 
 - `CodexAppServerStdioTransport`
+- `CodexAppServerUnixSocketTransport`
 - `discoverCodexExecutable`
 - `codexRuntimePathEntries`
 - `withCodexRuntimePath`
