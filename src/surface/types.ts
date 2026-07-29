@@ -2,6 +2,7 @@ export type SurfaceMessageTextPart = {
   type: 'text';
   text: string;
   itemId?: string;
+  phase?: 'commentary' | 'final_answer';
 };
 
 export type SurfaceMessageStatusPart = {
@@ -424,6 +425,55 @@ export type CodexSurfaceTurnError = {
   codexErrorInfo: CodexSurfaceJsonValue | null;
 };
 
+/**
+ * Signed 16-bit little-endian PCM carried by a Codex realtime session.
+ *
+ * Realtime is an experimental app-server API. Audio remains ephemeral and is
+ * intentionally not projected into conversation history.
+ */
+export type CodexRealtimeAudioChunk = {
+  data: Uint8Array;
+  sampleRate: number;
+  numChannels: number;
+  samplesPerChannel: number | null;
+  itemId: string | null;
+};
+
+export type CodexRealtimeInputAudioChunk = Omit<
+  CodexRealtimeAudioChunk,
+  'samplesPerChannel' | 'itemId'
+> & {
+  samplesPerChannel?: number | null;
+  itemId?: string | null;
+};
+
+export type CodexRealtimeOutputModality = 'text' | 'audio';
+export type CodexRealtimeVersion = 'v1' | 'v2';
+export type CodexRealtimeTextRole = 'user' | 'developer' | 'assistant';
+export type CodexRealtimeTransport =
+  | { type: 'websocket' }
+  | { type: 'webrtc'; sdp: string };
+
+export type StartCodexRealtimeOptions = {
+  outputModality: CodexRealtimeOutputModality;
+  model?: string;
+  version?: CodexRealtimeVersion;
+  voice?: string;
+  includeStartupContext?: boolean;
+  prompt?: string | null;
+  /**
+   * Routes a partial transcript through Codex if the realtime transport ends
+   * before the backend finalizes that transcript.
+   */
+  flushTranscriptTailOnSessionEnd?: boolean;
+  /**
+   * Websocket accepts PCM through appendAudio and requires API-key auth.
+   * WebRTC accepts a browser-generated offer and carries audio over its media
+   * track; app-server returns the remote SDP on the session handle.
+   */
+  transport?: CodexRealtimeTransport;
+};
+
 type CodexSurfaceEventEnvelope<Type extends string, Payload> = {
   readonly seq: number;
   readonly occurredAt: string;
@@ -519,6 +569,33 @@ export type CodexSurfaceEvent =
   | CodexConversationEventEnvelope<'conversation.diffUpdated', {
     diff: CodexSurfaceTurnGitDiff | null;
   }>
+  | CodexConversationEventEnvelope<'realtime.started', {
+    realtimeSessionId: string | null;
+    version: CodexRealtimeVersion;
+  }>
+  | CodexConversationEventEnvelope<'realtime.itemAdded', {
+    item: CodexSurfaceJsonValue;
+  }>
+  | CodexConversationEventEnvelope<'realtime.transcriptDelta', {
+    role: string;
+    delta: string;
+  }>
+  | CodexConversationEventEnvelope<'realtime.transcriptCompleted', {
+    role: string;
+    text: string;
+  }>
+  | CodexConversationEventEnvelope<'realtime.audioDelta', {
+    audio: CodexRealtimeAudioChunk;
+  }>
+  | CodexConversationEventEnvelope<'realtime.sdp', {
+    sdp: string;
+  }>
+  | CodexConversationEventEnvelope<'realtime.error', {
+    message: string;
+  }>
+  | CodexConversationEventEnvelope<'realtime.closed', {
+    reason: string | null;
+  }>
   | CodexTurnEventEnvelope<'turn.started', {
     startedAt: string;
   }>
@@ -598,6 +675,7 @@ export type CodexSurfaceEvent =
   }> & { readonly turnId?: string };
 
 export type CodexConversationEvent = Extract<CodexSurfaceEvent, { conversationId: string }>;
+export type CodexRealtimeEvent = Extract<CodexConversationEvent, { type: `realtime.${string}` }>;
 
 export type ListCodexConversationsOptions = {
   archived?: boolean;

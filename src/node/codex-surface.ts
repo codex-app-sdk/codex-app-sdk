@@ -2,6 +2,7 @@ import { basename, extname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   CodexAppServerClient,
+  type RealtimeVoice,
   type CodexServerRequestResponder,
   type ServerRequest,
   type ServerNotification,
@@ -12,6 +13,8 @@ import type {
   CodexConversationEvent,
   CodexConversationHistory,
   CodexConversationSnapshot,
+  CodexRealtimeEvent,
+  CodexRealtimeInputAudioChunk,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalMode,
   CodexSurfaceApprovalPreset,
@@ -40,10 +43,12 @@ import type {
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
   SendCodexMessageOptions,
+  StartCodexRealtimeOptions,
   StartCodexReviewOptions,
   SurfaceMessage,
   SurfaceMessageAttachmentPart,
   SurfaceMessageMediaPart,
+  SurfaceMessageTextPart,
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
   UpdateCodexConversationSettings,
@@ -180,6 +185,11 @@ export type CodexConversation = {
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
+  /**
+   * Starts an experimental app-server realtime voice session for this
+   * conversation. The returned handle streams PCM without exposing JSON-RPC.
+   */
+  startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   compact(): Promise<CodexConversationSnapshot>;
   startReview(options?: StartCodexReviewOptions): Promise<CodexConversationSnapshot>;
   steerMessage(prompt: string): Promise<CodexConversationSnapshot>;
@@ -201,6 +211,17 @@ export type CodexConversation = {
   getSnapshot(): CodexConversationSnapshot;
   onStateChange(listener: (snapshot: CodexConversationSnapshot) => void): () => void;
   onEvent(listener: (event: CodexConversationEvent) => void): () => void;
+};
+
+export type CodexRealtimeSession = {
+  readonly conversationId: string;
+  readonly transport: 'websocket' | 'webrtc';
+  readonly remoteSdp: string | null;
+  appendAudio(audio: CodexRealtimeInputAudioChunk): Promise<void>;
+  appendText(text: string, role?: 'user' | 'developer' | 'assistant'): Promise<void>;
+  appendSpeech(text: string): Promise<void>;
+  stop(): Promise<void>;
+  onEvent(listener: (event: CodexRealtimeEvent) => void): () => void;
 };
 
 type ToolInputRequest = Extract<ServerRequest, { method: 'item/tool/requestUserInput' }>;
@@ -2178,6 +2199,7 @@ export class CodexSurface {
         await this.sendMessageToThread(id, prompt, options);
         return snapshot();
       },
+      startRealtime: (options) => this.startRealtimeForThread(id, options),
       compact: async () => {
         await this.compactConversationForThread(id);
         return snapshot();
@@ -2240,6 +2262,103 @@ export class CodexSurface {
     };
     this.conversationHandles.set(id, handle);
     return handle;
+  }
+
+  private async startRealtimeForThread(
+    threadId: string,
+    options: StartCodexRealtimeOptions,
+  ): Promise<CodexRealtimeSession> {
+    await this.ensureThreadReady(threadId);
+    const outputModality = options.outputModality;
+    if (outputModality !== 'text' && outputModality !== 'audio') {
+      throw new TypeError(`Invalid realtime output modality '${String(outputModality)}'`);
+    }
+    const version = options.version;
+    if (version !== undefined && version !== 'v1' && version !== 'v2') {
+      throw new TypeError(`Invalid realtime version '${String(version)}'`);
+    }
+    const model = normalizedOptionalRealtimeString(options.model, 'model');
+    const voice = normalizedOptionalRealtimeString(options.voice, 'voice');
+    const transport = options.transport ?? { type: 'websocket' };
+    if (transport.type !== 'websocket' && transport.type !== 'webrtc') {
+      throw new TypeError(`Invalid realtime transport '${String((transport as { type?: unknown }).type)}'`);
+    }
+    if (transport.type === 'webrtc' && !transport.sdp.trim()) {
+      throw new TypeError('WebRTC realtime transport requires a non-empty SDP offer');
+    }
+    const answer = transport.type === 'webrtc'
+      ? deferredRealtimeSdp(this, threadId)
+      : null;
+    try {
+      await this.client.request('thread/realtime/start', {
+        threadId,
+        outputModality,
+        ...(model ? { model } : {}),
+        ...(version ? { version } : {}),
+        ...(voice ? { voice: voice as RealtimeVoice } : {}),
+        ...(options.includeStartupContext !== undefined
+          ? { includeStartupContext: options.includeStartupContext }
+          : {}),
+        ...(options.prompt !== undefined ? { prompt: options.prompt } : {}),
+        ...(options.flushTranscriptTailOnSessionEnd !== undefined
+          ? { flushTranscriptTailOnSessionEnd: options.flushTranscriptTailOnSessionEnd }
+          : {}),
+        transport: transport.type === 'webrtc'
+          ? { type: 'webrtc', sdp: transport.sdp }
+          : { type: 'websocket' },
+      });
+    } catch (error) {
+      answer?.cancel();
+      throw error;
+    }
+    const remoteSdp = answer ? await answer.promise : null;
+
+    let stopped = false;
+    const requireActive = (): void => {
+      if (stopped) throw new Error(`Realtime session for '${threadId}' is stopped`);
+    };
+    return {
+      conversationId: threadId,
+      transport: transport.type,
+      remoteSdp,
+      appendAudio: async (audio) => {
+        requireActive();
+        if (transport.type === 'webrtc') {
+          throw new Error('WebRTC realtime audio must be sent through its negotiated media track');
+        }
+        await this.client.request('thread/realtime/appendAudio', {
+          threadId,
+          audio: realtimeAudioChunkParams(audio),
+        });
+      },
+      appendText: async (text, role = 'user') => {
+        requireActive();
+        const normalizedText = normalizedRealtimeText(text, 'text');
+        if (role !== 'user' && role !== 'developer' && role !== 'assistant') {
+          throw new TypeError(`Invalid realtime text role '${String(role)}'`);
+        }
+        await this.client.request('thread/realtime/appendText', {
+          threadId,
+          text: normalizedText,
+          role,
+        });
+      },
+      appendSpeech: async (text) => {
+        requireActive();
+        await this.client.request('thread/realtime/appendSpeech', {
+          threadId,
+          text: normalizedRealtimeText(text, 'speech'),
+        });
+      },
+      stop: async () => {
+        if (stopped) return;
+        await this.client.request('thread/realtime/stop', { threadId });
+        stopped = true;
+      },
+      onEvent: (listener) => this.onConversationEvent(threadId, (event) => {
+        if (event.type.startsWith('realtime.')) listener(event as CodexRealtimeEvent);
+      }),
+    };
   }
 
   getConversationSnapshot(conversationId: string): CodexConversationSnapshot {
@@ -3241,6 +3360,73 @@ export class CodexSurface {
       case 'account/login/completed':
         this.handleAccountLoginCompleted(notification.params);
         return;
+      case 'thread/realtime/started':
+        this.emitEvent('notification', {
+          type: 'realtime.started',
+          conversationId: notification.params.threadId,
+          payload: {
+            realtimeSessionId: notification.params.realtimeSessionId,
+            version: notification.params.version,
+          },
+        });
+        return;
+      case 'thread/realtime/itemAdded':
+        this.emitEvent('notification', {
+          type: 'realtime.itemAdded',
+          conversationId: notification.params.threadId,
+          payload: {
+            item: structuredClone(notification.params.item) as CodexSurfaceJsonValue,
+          },
+        });
+        return;
+      case 'thread/realtime/transcript/delta':
+        this.emitEvent('notification', {
+          type: 'realtime.transcriptDelta',
+          conversationId: notification.params.threadId,
+          payload: {
+            role: notification.params.role,
+            delta: notification.params.delta,
+          },
+        });
+        return;
+      case 'thread/realtime/transcript/done':
+        this.emitEvent('notification', {
+          type: 'realtime.transcriptCompleted',
+          conversationId: notification.params.threadId,
+          payload: {
+            role: notification.params.role,
+            text: notification.params.text,
+          },
+        });
+        return;
+      case 'thread/realtime/outputAudio/delta':
+        this.emitEvent('notification', {
+          type: 'realtime.audioDelta',
+          conversationId: notification.params.threadId,
+          payload: { audio: realtimeAudioChunk(notification.params.audio) },
+        });
+        return;
+      case 'thread/realtime/sdp':
+        this.emitEvent('notification', {
+          type: 'realtime.sdp',
+          conversationId: notification.params.threadId,
+          payload: { sdp: notification.params.sdp },
+        });
+        return;
+      case 'thread/realtime/error':
+        this.emitEvent('notification', {
+          type: 'realtime.error',
+          conversationId: notification.params.threadId,
+          payload: { message: notification.params.message },
+        });
+        return;
+      case 'thread/realtime/closed':
+        this.emitEvent('notification', {
+          type: 'realtime.closed',
+          conversationId: notification.params.threadId,
+          payload: { reason: notification.params.reason },
+        });
+        return;
       case 'hook/started':
       case 'hook/completed':
       case 'item/autoApprovalReview/started':
@@ -3270,14 +3456,6 @@ export class CodexSurface {
       case 'configWarning':
       case 'fuzzyFileSearch/sessionUpdated':
       case 'fuzzyFileSearch/sessionCompleted':
-      case 'thread/realtime/started':
-      case 'thread/realtime/itemAdded':
-      case 'thread/realtime/transcript/delta':
-      case 'thread/realtime/transcript/done':
-      case 'thread/realtime/outputAudio/delta':
-      case 'thread/realtime/sdp':
-      case 'thread/realtime/error':
-      case 'thread/realtime/closed':
       case 'windows/worldWritableWarning':
       case 'windowsSandbox/setupCompleted':
         return;
@@ -3645,7 +3823,10 @@ export class CodexSurface {
 
     if (params.item.type === 'agentMessage' || params.item.type === 'exitedReviewMode') {
       const text = params.item.type === 'agentMessage' ? params.item.text : params.item.review;
-      if (!text) return;
+      const phase = params.item.type === 'agentMessage'
+        ? params.item.phase ?? undefined
+        : undefined;
+      if (!text && params.item.type !== 'agentMessage') return;
       const previousMessageIds = new Set(runtime.messages.map((message) => message.id));
       const previousText = runtime.messages
         .flatMap((message) => message.parts)
@@ -3659,8 +3840,10 @@ export class CodexSurface {
           params.turnId,
           params.item.id,
           text,
+          phase,
         ),
       });
+      if (!text) return;
       const message = this.assistantMessageForTurn(params.threadId, params.turnId);
       if (message && !previousMessageIds.has(message.id)) {
         this.emitEvent('notification', {
@@ -3893,6 +4076,114 @@ export class CodexSurface {
       this.notifyConversationListeners(threadId);
     }
   }
+}
+
+function normalizedOptionalRealtimeString(
+  value: string | undefined,
+  field: string,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new TypeError(`Realtime ${field} must be a string`);
+  const normalized = value.trim();
+  if (!normalized) throw new TypeError(`Realtime ${field} cannot be empty`);
+  return normalized;
+}
+
+function normalizedRealtimeText(value: string, field: string): string {
+  if (typeof value !== 'string') throw new TypeError(`Realtime ${field} must be a string`);
+  const normalized = value.trim();
+  if (!normalized) throw new TypeError(`Realtime ${field} cannot be empty`);
+  return normalized;
+}
+
+function realtimeAudioChunkParams(audio: CodexRealtimeInputAudioChunk): v2.ThreadRealtimeAudioChunk {
+  if (!(audio.data instanceof Uint8Array)) {
+    throw new TypeError('Realtime audio data must be a Uint8Array');
+  }
+  const sampleRate = positiveInteger(audio.sampleRate, 'sampleRate');
+  const numChannels = positiveInteger(audio.numChannels, 'numChannels');
+  const samplesPerChannel = audio.samplesPerChannel === undefined
+    ? Math.floor(audio.data.byteLength / 2 / numChannels)
+    : nullableNonNegativeInteger(audio.samplesPerChannel, 'samplesPerChannel');
+  const itemId = audio.itemId === undefined ? null : audio.itemId;
+  if (itemId !== null && (typeof itemId !== 'string' || !itemId.trim())) {
+    throw new TypeError('Realtime audio itemId must be a non-empty string or null');
+  }
+  return {
+    data: Buffer.from(audio.data.buffer, audio.data.byteOffset, audio.data.byteLength).toString('base64'),
+    sampleRate,
+    numChannels,
+    samplesPerChannel,
+    itemId,
+  };
+}
+
+function realtimeAudioChunk(audio: v2.ThreadRealtimeAudioChunk): {
+  data: Uint8Array;
+  sampleRate: number;
+  numChannels: number;
+  samplesPerChannel: number | null;
+  itemId: string | null;
+} {
+  return {
+    data: new Uint8Array(Buffer.from(audio.data, 'base64')),
+    sampleRate: audio.sampleRate,
+    numChannels: audio.numChannels,
+    samplesPerChannel: audio.samplesPerChannel,
+    itemId: audio.itemId,
+  };
+}
+
+function deferredRealtimeSdp(
+  surface: CodexSurface,
+  threadId: string,
+): {
+  promise: Promise<string>;
+  cancel(): void;
+} {
+  let unsubscribe: () => void = () => undefined;
+  let timer: NodeJS.Timeout | null = null;
+  let settled = false;
+  const cleanup = () => {
+    if (settled) return;
+    settled = true;
+    if (timer) clearTimeout(timer);
+    unsubscribe();
+  };
+  const promise = new Promise<string>((resolve, reject) => {
+    unsubscribe = surface.onConversationEvent(threadId, (event) => {
+      if (event.type === 'realtime.sdp') {
+        cleanup();
+        resolve(event.payload.sdp);
+      } else if (event.type === 'realtime.error') {
+        cleanup();
+        reject(new Error(event.payload.message));
+      } else if (event.type === 'realtime.closed') {
+        cleanup();
+        reject(new Error('Realtime session closed before returning its WebRTC answer'));
+      }
+    });
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out waiting for the WebRTC realtime SDP answer'));
+    }, 30_000);
+  });
+  return { promise, cancel: cleanup };
+}
+
+function positiveInteger(value: number, field: string): number {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new TypeError(`Realtime audio ${field} must be a positive integer`);
+  }
+  return value;
+}
+
+function nullableNonNegativeInteger(value: number | null, field: string): number | null {
+  if (value === null) return null;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError(`Realtime audio ${field} must be a non-negative integer or null`);
+  }
+  return value;
 }
 
 export function createCodexSurface(options: CodexSurfaceOptions = {}): CodexSurface {
@@ -4816,6 +5107,7 @@ function upsertAssistantText(
   turnId: string,
   itemId: string,
   text: string,
+  phase?: SurfaceMessageTextPart['phase'],
 ): SurfaceMessage[] {
   const next = [...messages];
   for (let messageIndex = next.length - 1; messageIndex >= 0; messageIndex -= 1) {
@@ -4824,7 +5116,13 @@ function upsertAssistantText(
     const partIndex = message.parts.findIndex((part) => part.type === 'text' && part.itemId === itemId);
     if (partIndex < 0) continue;
     const parts = [...message.parts];
-    parts.splice(partIndex, 1, { type: 'text', text, itemId });
+    const existingPart = parts[partIndex] as SurfaceMessageTextPart;
+    parts.splice(partIndex, 1, {
+      ...existingPart,
+      text,
+      itemId,
+      ...(phase ? { phase } : {}),
+    });
     next.splice(messageIndex, 1, { ...message, parts });
     return pruneEmptyAssistantPlaceholders(next, threadId);
   }
@@ -4837,9 +5135,15 @@ function upsertAssistantText(
   ));
   const message = messageIndex >= 0 ? ensured[messageIndex] : undefined;
   if (!message) return ensured;
+  const textPart: SurfaceMessageTextPart = {
+    type: 'text',
+    text,
+    itemId,
+    ...(phase ? { phase } : {}),
+  };
   ensured.splice(messageIndex, 1, {
     ...message,
-    parts: [...message.parts, { type: 'text', text, itemId }],
+    parts: [...message.parts, textPart],
   });
   return pruneEmptyAssistantPlaceholders(ensured, threadId);
 }

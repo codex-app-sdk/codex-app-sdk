@@ -77,7 +77,12 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       const text = typeof item.text === 'string' ? item.text : '';
       if (text) {
         sawAssistantActivity = true;
-        assistantParts.push({ type: 'text', text, itemId: item.id });
+        assistantParts.push({
+          type: 'text',
+          text,
+          itemId: item.id,
+          ...(item.phase ? { phase: item.phase } : {}),
+        });
       }
       continue;
     }
@@ -133,7 +138,12 @@ export function codexItemToSurfaceMessage(
       role: 'assistant',
       status: surfaceMessageStatus(turn.status),
       turnId: turn.id,
-      parts: [{ type: 'text', text, itemId: item.id }],
+      parts: [{
+        type: 'text',
+        text,
+        itemId: item.id,
+        ...(item.type === 'agentMessage' && item.phase ? { phase: item.phase } : {}),
+      }],
       createdAt,
       metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
     } : null;

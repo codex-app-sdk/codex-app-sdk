@@ -106,12 +106,57 @@ type CodexConversation = {
   steerMessage(prompt: string): Promise<CodexConversationSnapshot>;
   interrupt(): Promise<CodexConversationSnapshot>;
   rollbackToTurn(turnId: string): Promise<CodexConversationSnapshot>;
+  startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   getSnapshot(): CodexConversationSnapshot;
   onStateChange(listener): () => void;
   onEvent(listener): () => void;
   // message, queue, approval, client request, and goal actions are also exposed
 };
 ```
+
+### Realtime voice
+
+`startRealtime()` exposes app-server's experimental realtime session as a
+high-level conversation handle:
+
+```ts
+const realtime = await conversation.startRealtime({
+  version: 'v2',
+  outputModality: 'audio',
+  transport: { type: 'websocket' },
+});
+
+const unsubscribe = realtime.onEvent((event) => {
+  if (event.type === 'realtime.transcriptCompleted') {
+    console.log(event.payload.text);
+  }
+  if (event.type === 'realtime.audioDelta') {
+    playPcm(event.payload.audio);
+  }
+});
+
+await realtime.appendAudio({
+  data: pcm16leBase64,
+  sampleRate: 24_000,
+  numChannels: 1,
+});
+
+await realtime.stop();
+unsubscribe();
+```
+
+The audio contract is mono signed PCM16LE at 24 kHz. App-server owns the
+realtime upstream connection, server-side VAD, transcription, and synthesized
+audio. `appendText()` and `appendSpeech()` are also available.
+
+The websocket transport accepts `appendAudio()` and requires API-key auth in
+Codex. ChatGPT-authenticated browser/webview hosts should instead create an
+`RTCPeerConnection`, add an audio track and the `oai-events` data channel, then
+pass `{ type: 'webrtc', sdp: offer.sdp }` with a WebRTC-compatible protocol
+version such as `v1`. The returned session's `remoteSdp` is the answer to apply
+with `setRemoteDescription()`; audio then travels over the WebRTC media track.
+Realtime is an experimental Codex protocol and may change between CLI
+versions.
 
 ## Runtime utilities
 

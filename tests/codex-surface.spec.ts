@@ -1244,6 +1244,50 @@ describe('CodexSurface', () => {
     ))).toBe(false);
   });
 
+  it('preserves agent message phase before and during streaming', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-live', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing',
+        turnId: 'turn-live',
+        startedAtMs: 1,
+        item: {
+          type: 'agentMessage',
+          id: 'agent-final',
+          text: '',
+          phase: 'final_answer',
+          memoryCitation: null,
+        },
+      },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing',
+        turnId: 'turn-live',
+        itemId: 'agent-final',
+        delta: 'Final response',
+      },
+    });
+
+    expect(surface.getSnapshot().messages.flatMap((message) => message.parts)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'text',
+          text: 'Final response',
+          itemId: 'agent-final',
+          phase: 'final_answer',
+        }),
+      ]),
+    );
+  });
+
   it('creates conversations with app-server-backed permission defaults and interrupts active turns', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -3654,6 +3698,165 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot().conversations).toHaveLength(1);
   });
 
+  it('exposes realtime voice as a typed conversation session', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    const conversation = surface.conversation('thread-existing');
+    const events: CodexSurfaceEvent[] = [];
+    conversation.onEvent((event) => events.push(event));
+
+    const session = await conversation.startRealtime({
+      outputModality: 'audio',
+      version: 'v2',
+      voice: 'marin',
+      includeStartupContext: true,
+      flushTranscriptTailOnSessionEnd: true,
+    });
+    expect(lastRequest(transport, 'thread/realtime/start')).toMatchObject({
+      params: {
+        threadId: 'thread-existing',
+        outputModality: 'audio',
+        version: 'v2',
+        voice: 'marin',
+        includeStartupContext: true,
+        flushTranscriptTailOnSessionEnd: true,
+        transport: { type: 'websocket' },
+      },
+    });
+
+    await session.appendAudio({
+      data: new Uint8Array([1, 2, 3, 4]),
+      sampleRate: 16_000,
+      numChannels: 1,
+    });
+    expect(lastRequest(transport, 'thread/realtime/appendAudio')).toMatchObject({
+      params: {
+        threadId: 'thread-existing',
+        audio: {
+          data: 'AQIDBA==',
+          sampleRate: 16_000,
+          numChannels: 1,
+          samplesPerChannel: 2,
+          itemId: null,
+        },
+      },
+    });
+
+    await session.appendText('check the tests', 'user');
+    await session.appendSpeech('I am checking the tests');
+    expect(lastRequest(transport, 'thread/realtime/appendText')).toMatchObject({
+      params: { threadId: 'thread-existing', text: 'check the tests', role: 'user' },
+    });
+    expect(lastRequest(transport, 'thread/realtime/appendSpeech')).toMatchObject({
+      params: { threadId: 'thread-existing', text: 'I am checking the tests' },
+    });
+
+    transport.emit({
+      method: 'thread/realtime/started',
+      params: { threadId: 'thread-existing', realtimeSessionId: 'rtc_123', version: 'v2' },
+    });
+    transport.emit({
+      method: 'thread/realtime/transcript/delta',
+      params: { threadId: 'thread-existing', role: 'user', delta: 'check the' },
+    });
+    transport.emit({
+      method: 'thread/realtime/transcript/done',
+      params: { threadId: 'thread-existing', role: 'user', text: 'check the tests' },
+    });
+    transport.emit({
+      method: 'thread/realtime/outputAudio/delta',
+      params: {
+        threadId: 'thread-existing',
+        audio: {
+          data: 'AQID',
+          sampleRate: 24_000,
+          numChannels: 1,
+          samplesPerChannel: 3,
+          itemId: 'audio-1',
+        },
+      },
+    });
+    transport.emit({
+      method: 'thread/realtime/closed',
+      params: { threadId: 'thread-existing', reason: 'requested' },
+    });
+
+    expect(events.map((event) => event.type)).toStrictEqual([
+      'realtime.started',
+      'realtime.transcriptDelta',
+      'realtime.transcriptCompleted',
+      'realtime.audioDelta',
+      'realtime.closed',
+    ]);
+    expect(events[3]).toMatchObject({
+      payload: {
+        audio: {
+          data: new Uint8Array([1, 2, 3]),
+          sampleRate: 24_000,
+          numChannels: 1,
+          samplesPerChannel: 3,
+          itemId: 'audio-1',
+        },
+      },
+    });
+
+    await session.stop();
+    await session.stop();
+    expect(requestsFor(transport, 'thread/realtime/stop')).toHaveLength(1);
+    await expect(session.appendText('too late')).rejects.toThrow(
+      "Realtime session for 'thread-existing' is stopped",
+    );
+  });
+
+  it('negotiates WebRTC realtime before returning the session handle', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    const conversation = surface.conversation('thread-existing');
+
+    const sessionPromise = conversation.startRealtime({
+      outputModality: 'audio',
+      version: 'v1',
+      transport: {
+        type: 'webrtc',
+        sdp: 'v=0\r\no=codex-remote-offer\r\n',
+      },
+    });
+    await vi.waitFor(() => {
+      expect(requestsFor(transport, 'thread/realtime/start')).toHaveLength(1);
+    });
+    expect(lastRequest(transport, 'thread/realtime/start')).toMatchObject({
+      params: {
+        threadId: 'thread-existing',
+        outputModality: 'audio',
+        version: 'v1',
+        transport: {
+          type: 'webrtc',
+          sdp: 'v=0\r\no=codex-remote-offer\r\n',
+        },
+      },
+    });
+
+    transport.emit({
+      method: 'thread/realtime/sdp',
+      params: {
+        threadId: 'thread-existing',
+        sdp: 'v=0\r\no=codex-remote-answer\r\n',
+      },
+    });
+    const session = await sessionPromise;
+    expect(session).toMatchObject({
+      conversationId: 'thread-existing',
+      transport: 'webrtc',
+      remoteSdp: 'v=0\r\no=codex-remote-answer\r\n',
+    });
+    await expect(session.appendAudio({
+      data: new Uint8Array([0, 0]),
+      sampleRate: 24_000,
+      numChannels: 1,
+    })).rejects.toThrow('must be sent through its negotiated media track');
+    await session.stop();
+  });
+
   it('explicitly tolerates every known notification that has no surface projection', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -3684,14 +3887,6 @@ describe('CodexSurface', () => {
       'configWarning',
       'fuzzyFileSearch/sessionUpdated',
       'fuzzyFileSearch/sessionCompleted',
-      'thread/realtime/started',
-      'thread/realtime/itemAdded',
-      'thread/realtime/transcript/delta',
-      'thread/realtime/transcript/done',
-      'thread/realtime/outputAudio/delta',
-      'thread/realtime/sdp',
-      'thread/realtime/error',
-      'thread/realtime/closed',
       'windows/worldWritableWarning',
       'windowsSandbox/setupCompleted',
     ];

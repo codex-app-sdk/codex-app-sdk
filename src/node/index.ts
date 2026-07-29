@@ -16,6 +16,7 @@ export {
   type CodexConversationDefaults,
   type CodexConversationHostOptions,
   type CodexConversationLoadOptions,
+  type CodexRealtimeSession,
   type CodexDynamicTool,
   type CodexDynamicToolCall,
   type CodexDynamicToolContent,
