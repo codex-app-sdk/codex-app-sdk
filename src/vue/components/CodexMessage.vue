@@ -19,7 +19,25 @@
     :class="[`chat-message--${chatMessage.role}`, { 'chat-message--editing': isEditing }]"
   >
     <div class="chat-message__body">
-      <div class="chat-message__stack">
+      <div
+        v-if="userAttachmentBlocks.length > 0"
+        class="chat-message__attachments"
+        aria-label="Message attachments"
+      >
+        <template
+          v-for="({ block, blockIndex }) in userAttachmentBlocks"
+          :key="`attachment-${blockIndex}`"
+        >
+          <slot name="block" :block="block" :block-index="blockIndex" :index="index" :message="chatMessage">
+            <ChatMessageBlock :block="block">
+              <template v-if="$slots.attachment" #attachment="scope">
+                <slot name="attachment" v-bind="scope" :index="index" :message="chatMessage" />
+              </template>
+            </ChatMessageBlock>
+          </slot>
+        </template>
+      </div>
+      <div v-if="isEditing || stackBlocks.length > 0 || showThinkingIndicator || showStreamingDot" class="chat-message__stack">
         <ChatMessageEditor
           v-if="isEditing"
           :cancel-label="t('chat.actions.cancel')"
@@ -30,7 +48,7 @@
           @save="saveEdit"
         />
         <template v-else>
-          <template v-for="(block, blockIndex) in blocks" :key="block.type === 'tool' ? block.toolCall.id : `${block.type}-${blockIndex}`">
+          <template v-for="({ block, blockIndex }) in stackBlocks" :key="block.type === 'tool' ? block.toolCall.id : `${block.type}-${blockIndex}`">
             <slot name="block" :block="block" :block-index="blockIndex" :index="index" :message="chatMessage">
               <ChatMessageBlock
                 :answered-client-request-ids="answeredClientRequestIds"
@@ -174,6 +192,17 @@ const effectivePresentation = computed(() => resolveCodexConversationPresentatio
 const blocks = computed(() => computeMessageBlocks(chatMessage.value).filter((block) => (
   effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
 )))
+const indexedBlocks = computed(() => blocks.value.map((block, blockIndex) => ({ block, blockIndex })))
+const userAttachmentBlocks = computed(() => (
+  chatMessage.value.role === 'user'
+    ? indexedBlocks.value.filter(({ block }) => block.type === 'attachment')
+    : []
+))
+const stackBlocks = computed(() => (
+  chatMessage.value.role === 'user'
+    ? indexedBlocks.value.filter(({ block }) => block.type !== 'attachment')
+    : indexedBlocks.value
+))
 const visibleUserContent = computed(() => stripMessageContext(chatMessage.value.content))
 const copied = ref(false)
 const isEditing = ref(false)
@@ -181,6 +210,7 @@ let copyResetTimeout: ReturnType<typeof setTimeout> | null = null
 
 const showActions = computed(() => (
   chatMessage.value.type !== 'compaction' &&
+  chatMessage.value.type !== 'steer' &&
   !isEditing.value
 ))
 const reserveActionSlot = computed(() => (
@@ -352,6 +382,16 @@ onBeforeUnmount(() => {
   max-width: 100%;
 }
 
+.chat-message__attachments {
+  display: flex;
+  max-width: 100%;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
 .chat-message--assistant .chat-message__stack {
   width: 100%;
 }
@@ -384,10 +424,6 @@ onBeforeUnmount(() => {
 .chat-message:hover .chat-message__actions--reserved,
 .chat-message:focus-within .chat-message__actions--reserved {
   visibility: hidden;
-}
-
-.chat-message:has(.chat-message--steer) .chat-message__actions {
-  display: none !important;
 }
 
 .chat-message__thinking {

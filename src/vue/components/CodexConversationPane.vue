@@ -522,12 +522,25 @@ function handleDrop(event: DragEvent): void {
 }
 
 function handlePaste(event: ClipboardEvent): void {
-  if (!effectiveAttachEnabled.value) return;
-  const images = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'));
+  const images = clipboardFiles(event).filter((file) => file.type.startsWith('image/'));
   if (images.length === 0) return;
-  // Keep the browser's normal text paste behavior when a clipboard contains
-  // both text and images; the images are ingested alongside it.
+  // Never let Chromium insert clipboard image HTML into the contenteditable.
+  // The composer inserts accompanying plain text while this pane owns the one
+  // attachment-ingestion path.
+  event.preventDefault();
+  if (!effectiveAttachEnabled.value) return;
   void ingestFiles(images);
+}
+
+function clipboardFiles(event: ClipboardEvent): File[] {
+  const clipboard = event.clipboardData;
+  if (!clipboard) return [];
+  const files = [...clipboard.files];
+  if (files.length > 0) return files;
+  return [...(clipboard.items ?? [])]
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null);
 }
 
 async function ingestFiles(files: readonly File[]): Promise<void> {

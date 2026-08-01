@@ -1,8 +1,8 @@
 # Samples
 
-The repository includes three Electron + Vue applications. Each demonstrates a
-different product boundary while reusing the same SDK runtime, IPC, and
-conversation components.
+The repository includes three Electron + Vue applications and one browser-only
+component lab. Each reuses the same SDK conversation components at a different
+product or testing boundary.
 
 ## Basic: multi-thread client
 
@@ -74,11 +74,27 @@ npm run relay:dev
 Relay uses a seeded local JSON store. It demonstrates the integration loop, not
 a production logistics backend.
 
+## Component lab: mocked visual scenarios
+
+Run it from the repository root:
+
+```bash
+npm run lab:dev
+```
+
+The browser-only component lab uses deterministic mock data instead of
+app-server. It provides selectable states for rich mentions, middle-of-text
+multiline editing, steering, tool calls, attachments, streaming responses, busy
+and queued work, context usage, turn diffs, empty conversations, errors, and
+light/dark/system themes. Use it to inspect SDK rendering and interactions
+without Codex authentication or Electron.
+
 ## Choose a starting point
 
 | Need | Sample |
 | --- | --- |
 | Full Codex client or custom thread list | Basic |
+| Visual regression and interaction inspection | Component lab |
 | Narrow branded assistant | Spark |
 | Model-assisted business workflow | Relay |
 

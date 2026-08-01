@@ -2,6 +2,7 @@
   <figure
     v-if="previewSource && !previewFailed"
     class="codex-chat-theme chat-attachment-block chat-attachment-block--image"
+    :title="attachment.path || attachment.url || attachment.name"
   >
     <img
       class="chat-attachment-block__preview"
@@ -9,10 +10,6 @@
       :src="previewSource"
       @error="previewFailed = true"
     >
-    <figcaption class="chat-attachment-block__caption" :title="attachment.path || attachment.url">
-      <PhotoIcon aria-hidden="true" />
-      <span class="chat-attachment-block__name">{{ attachment.name }}</span>
-    </figcaption>
   </figure>
   <component
     :is="chipHref ? 'a' : 'span'"
@@ -24,7 +21,6 @@
     <PhotoIcon v-if="attachment.kind === 'image'" aria-hidden="true" />
     <PaperclipIcon v-else aria-hidden="true" />
     <span class="chat-attachment-block__name">{{ attachment.name }}</span>
-    <span v-if="attachment.mimeType" class="chat-attachment-block__meta">{{ attachment.mimeType }}</span>
   </component>
 </template>
 
@@ -53,6 +49,7 @@ watch(previewSource, () => {
 
 function isSafeImageSource(value: string | undefined): value is string {
   if (!value) return false
+  if (/^(?:\.\.?\/|\/(?!\/))/.test(value)) return true
   return /^(?:https?:|file:|blob:)/i.test(value)
     || /^data:image\/(?:avif|bmp|gif|heic|heif|jpe?g|png|webp);base64,/i.test(value)
 }
@@ -80,8 +77,9 @@ function safeFileHref(value: string | undefined): string | undefined {
 }
 
 .chat-attachment-block--image {
-  width: min(320px, 100%);
-  margin: var(--space-3) var(--space-6);
+  width: min(160px, 100%);
+  margin: 0;
+  padding: var(--space-1);
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -91,12 +89,11 @@ function safeFileHref(value: string | undefined): string | undefined {
 .chat-attachment-block__preview {
   display: block;
   width: 100%;
-  max-height: 280px;
-  object-fit: contain;
-  background: var(--color-surface-low);
+  height: 120px;
+  border-radius: calc(var(--radius-lg) - var(--space-1));
+  object-fit: cover;
 }
 
-.chat-attachment-block__caption,
 .chat-attachment-block--chip {
   display: flex;
   min-width: 0;
@@ -104,13 +101,10 @@ function safeFileHref(value: string | undefined): string | undefined {
   gap: var(--space-3);
 }
 
-.chat-attachment-block__caption {
-  padding: var(--space-3) var(--space-4);
-}
-
 .chat-attachment-block--chip {
   width: fit-content;
-  margin: var(--space-3) var(--space-6);
+  max-width: 260px;
+  margin: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
@@ -138,9 +132,4 @@ a.chat-attachment-block--chip:hover {
   white-space: nowrap;
 }
 
-.chat-attachment-block__meta {
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-}
 </style>

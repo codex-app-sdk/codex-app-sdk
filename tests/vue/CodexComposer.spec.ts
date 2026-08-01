@@ -137,9 +137,79 @@ describe('ChatComposer', () => {
     await setEditorValue(wrapper, 'first line');
     await editor(wrapper).trigger('keydown', { key: 'Enter', shiftKey: true });
     expect(wrapper.emitted('send')).toBeUndefined();
+    expect(editorValue(wrapper)).toBe('first line\n');
+    expect(editor(wrapper).findAll('br')).toHaveLength(2);
+    expect(editor(wrapper).findAll('br')[1]?.attributes()).toHaveProperty('data-trailing-line-break');
+
+    const richEditor = wrapper.getComponent(ChatRichTextEditor).vm as unknown as CodexRichTextEditorExpose;
+    richEditor.insertTextAtSelection('second line');
+    expect(editorValue(wrapper)).toBe('first line\nsecond line');
+    expect(editor(wrapper).findAll('br')).toHaveLength(1);
 
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
-    expect(wrapper.emitted('send')).toStrictEqual([['first line']]);
+    expect(wrapper.emitted('send')).toStrictEqual([['first line\nsecond line']]);
+  });
+
+  it('splits text with Shift Enter at the current caret position', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'beforeafter');
+    const richEditor = wrapper.getComponent(ChatRichTextEditor).vm as unknown as CodexRichTextEditorExpose;
+    richEditor.setCaret('before'.length);
+
+    await editor(wrapper).trigger('keydown', { key: 'Enter', shiftKey: true });
+
+    expect(editorValue(wrapper)).toBe('before\nafter');
+    expect(wrapper.emitted('send')).toBeUndefined();
+  });
+
+  it('keeps native typing on the new line before a second Shift Enter', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'hello');
+    await editor(wrapper).trigger('keydown', { key: 'Enter', shiftKey: true });
+
+    const sentinel = editor(wrapper).get('[data-trailing-line-break]').element;
+    sentinel.before(document.createTextNode('b'));
+    await editor(wrapper).trigger('input');
+    await nextTick();
+    await appendNativeCharacter(wrapper, 'y');
+    await appendNativeCharacter(wrapper, 'e');
+
+    expect(editorValue(wrapper)).toBe('hello\nbye');
+    expect(editor(wrapper).find('[data-trailing-line-break]').exists()).toBe(false);
+    expect(richEditorVm(wrapper).getSelectionRange().end).toBe('hello\nbye'.length);
+
+    await editor(wrapper).trigger('keydown', { key: 'Enter', shiftKey: true });
+    expect(editorValue(wrapper)).toBe('hello\nbye\n');
+    expect(editor(wrapper).findAll('br')).toHaveLength(3);
+  });
+
+  it('counts existing line breaks when splitting a later line at the caret', async () => {
+    const wrapper = mountComposer();
+    richEditorVm(wrapper).setText('hello\nbye', 'hello\nb'.length);
+
+    await editor(wrapper).trigger('keydown', { key: 'Enter', shiftKey: true });
+
+    expect(editorValue(wrapper)).toBe('hello\nb\nye');
+  });
+
+  it('pastes plain text and blocks rich content from entering the contenteditable', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'Before ');
+    const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(paste, 'clipboardData', {
+      value: {
+        files: [new File(['png'], 'clipboard.png', { type: 'image/png' })],
+        getData: (type: string) => type === 'text/plain' ? 'after' : '<img src="data:image/png;base64,cG5n">',
+        types: ['text/plain', 'text/html', 'Files'],
+      },
+    });
+
+    editor(wrapper).element.dispatchEvent(paste);
+    await nextTick();
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(editorValue(wrapper)).toBe('Before after');
+    expect(editor(wrapper).find('img').exists()).toBe(false);
   });
 
   it('steers with Command Enter', async () => {
@@ -520,6 +590,26 @@ function editorValue(wrapper: ReturnType<typeof mountComposer>): string {
 
 async function setEditorValue(wrapper: ReturnType<typeof mountComposer>, value: string): Promise<void> {
   editor(wrapper).element.textContent = value;
+  await editor(wrapper).trigger('input');
+  await nextTick();
+}
+
+async function appendNativeCharacter(
+  wrapper: ReturnType<typeof mountComposer>,
+  character: string,
+  reportedCaretOffsetFromEnd = 0,
+): Promise<void> {
+  const element = editor(wrapper).element;
+  const lastTextNode = [...element.childNodes].reverse()
+    .find((node): node is Text => node.nodeType === Node.TEXT_NODE);
+  if (!lastTextNode) throw new Error('Expected an editor text node');
+  lastTextNode.data += character;
+  const range = document.createRange();
+  range.setStart(lastTextNode, lastTextNode.length - reportedCaretOffsetFromEnd);
+  range.collapse(true);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
   await editor(wrapper).trigger('input');
   await nextTick();
 }

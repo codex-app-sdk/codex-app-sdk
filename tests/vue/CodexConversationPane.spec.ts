@@ -161,7 +161,7 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
   });
 
-  it('ingests pasted images without suppressing accompanying text paste behavior', async () => {
+  it('ingests a pasted image once while inserting only its accompanying plain text', async () => {
     const file = new File(['png'], 'clipboard.png', { type: 'image/png' });
     const ingestAttachments = vi.fn(async () => [{
       id: 'clipboard-image',
@@ -174,15 +174,13 @@ describe('CodexConversationPane', () => {
     const wrapper = mount(CodexConversationPane, {
       props: { ingestAttachments, messages, modelValue: '' },
     });
-    await wrapper.setProps({ modelValue: 'pasted text' });
-    expect(composerEditor(wrapper).text()).toBe('pasted text');
     const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
     Object.defineProperty(paste, 'clipboardData', {
       value: { files: [file], getData: () => 'pasted text' },
     });
     composerEditor(wrapper).element.dispatchEvent(paste);
 
-    expect(paste.defaultPrevented).toBe(false);
+    expect(paste.defaultPrevented).toBe(true);
     expect(composerEditor(wrapper).text()).toBe('pasted text');
     await vi.waitFor(() => expect(ingestAttachments).toHaveBeenCalledWith([
       expect.objectContaining({ name: 'clipboard.png', mimeType: 'image/png' }),
@@ -231,7 +229,7 @@ describe('CodexConversationPane', () => {
     pane.element.dispatchEvent(drop);
     await wrapper.vm.$nextTick();
 
-    expect(paste.defaultPrevented).toBe(false);
+    expect(paste.defaultPrevented).toBe(true);
     expect(drop.defaultPrevented).toBe(false);
     expect(ingestAttachments).not.toHaveBeenCalled();
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);

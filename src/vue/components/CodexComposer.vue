@@ -380,11 +380,13 @@ function handleCaretChange(range: { end: number }): void {
 }
 
 function handleEditorPaste(event: ClipboardEvent): void {
-  if ((event.clipboardData?.files.length ?? 0) > 0) return;
-  const text = event.clipboardData?.getData('text/plain') ?? '';
-  if (!text) return;
+  const clipboard = event.clipboardData;
+  if (!clipboard) return;
+  const text = clipboard.getData('text/plain');
+  const containsRichOrFileContent = clipboard.files.length > 0 || [...(clipboard.types ?? [])].includes('text/html');
+  if (!text && !containsRichOrFileContent) return;
   event.preventDefault();
-  editorEl.value?.insertTextAtSelection(text);
+  if (text) editorEl.value?.insertTextAtSelection(text);
 }
 
 function focusAt(caret: number): void {

@@ -141,14 +141,14 @@ describe('basic sample App', () => {
     await flushPromises();
 
     const pastedImage = imageFile('clipboard.png');
-    await setComposerText(wrapper, 'Keep the pasted text');
+    await setComposerText(wrapper, 'Keep ');
     const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
     Object.defineProperty(paste, 'clipboardData', {
-      value: { files: [pastedImage], getData: () => 'Keep the pasted text' },
+      value: { files: [pastedImage], getData: () => 'the pasted text' },
     });
     composerEditor(wrapper).element.dispatchEvent(paste);
 
-    expect(paste.defaultPrevented).toBe(false);
+    expect(paste.defaultPrevented).toBe(true);
     expect(composerEditor(wrapper).text()).toBe('Keep the pasted text');
     await vi.waitFor(() => expect(ingestAttachments).toHaveBeenCalledOnce());
     expect(ingestAttachments).toHaveBeenLastCalledWith([{

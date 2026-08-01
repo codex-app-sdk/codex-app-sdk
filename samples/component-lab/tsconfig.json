@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "paths": {
+      "codex-app-sdk/surface": ["../../src/surface/index.ts"],
+      "codex-app-sdk/vue": ["../../src/vue/index.ts"]
+    },
+    "types": ["node", "vite/client", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts", "vite*.config.ts"]
+}

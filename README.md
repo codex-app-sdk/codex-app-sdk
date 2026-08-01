@@ -74,6 +74,7 @@ npm install --save-dev electron
 | Sample | Product shape | Run |
 | --- | --- | --- |
 | [Basic](./samples/basic) | Custom conversation sidebar and the full stock pane | `cd samples/basic && npm run dev` |
+| [Component lab](./samples/component-lab) | Fully mocked conversation, composer, streaming, and lifecycle scenarios | `npm run lab:dev` |
 | [Spark](./samples/spark) | Focused themed chat with isolated auth and fixed defaults | `npm run spark:dev` |
 | [Relay](./samples/relay) | Logistics operations UI backed by an app-owned MCP server | `npm run relay:dev` |
 

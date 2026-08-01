@@ -54,7 +54,8 @@
             >
               <path d="M8 3v4" />
               <path d="M16 3v4" />
-              <path d="M6 7h12v3a6 6 0 0 1-6 6v5" />
+              <path d="M6 7h12v3a6 6 0 0 1-12 0V7" />
+              <path d="M12 16v5" />
               <path d="M9 21h6" />
             </svg>
             <svg

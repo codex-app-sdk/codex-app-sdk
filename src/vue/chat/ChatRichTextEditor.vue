@@ -79,7 +79,11 @@ function onInput(): void {
     ? selection
     : { end: caretPosition.value, start: caretPosition.value, valid: false });
   emit('input');
-  autoResize();
+  if (!value.endsWith('\n') && editor.value?.querySelector('br[data-trailing-line-break]')) {
+    renderText(value, caretPosition.value, { focus: true });
+  } else {
+    autoResize();
+  }
 }
 
 function autoResize(): void {
@@ -102,7 +106,7 @@ function canonicalNodeText(node: Node): string {
   if (node.dataset.pluginName) return `@${node.dataset.pluginName}`;
   if (node.dataset.fileMention) return `@${node.dataset.fileMention}`;
   if (node.dataset.skillName) return `${node.dataset.skillTrigger || '$'}${node.dataset.skillName}`;
-  if (node.tagName === 'BR') return '\n';
+  if (node.tagName === 'BR') return node.dataset.trailingLineBreak === undefined ? '\n' : '';
   return Array.from(node.childNodes).map(canonicalNodeText).join('');
 }
 
@@ -142,7 +146,7 @@ function canonicalOffsetForDomPosition(root: HTMLElement, target: Node, offset: 
       found = true;
       return;
     }
-    if (node.nodeType === Node.TEXT_NODE || isChipHost(node)) {
+    if (node.nodeType === Node.TEXT_NODE || node instanceof HTMLBRElement || isChipHost(node)) {
       position += canonicalNodeLength(node);
       return;
     }
@@ -259,6 +263,11 @@ function renderText(value: string, caret = caretPosition.value, options: { focus
     lastIndex = tokenEnd;
   }
   appendTextNode(fragment, value.slice(lastIndex));
+  if (value.endsWith('\n')) {
+    const trailingLineBreak = document.createElement('br');
+    trailingLineBreak.dataset.trailingLineBreak = '';
+    fragment.append(trailingLineBreak);
+  }
   unmountChipHosts();
   element.replaceChildren(fragment);
   setCaret(Math.min(caret, value.length), { focus: shouldFocus });

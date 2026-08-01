@@ -107,10 +107,13 @@ describe('CodexMessage', () => {
     });
 
     expect(wrapper.get('.chat-message-block--text').text()).toBe('Review both');
+    expect(wrapper.get('.chat-message__attachments').element.nextElementSibling)
+      .toBe(wrapper.get('.chat-message__stack').element);
+    expect(wrapper.get('.chat-message__attachments').findAll('.chat-attachment-block')).toHaveLength(2);
     expect(wrapper.get('.chat-attachment-block__preview').attributes('src'))
       .toBe('data:image/png;base64,cG5n');
     expect(wrapper.findAll('.chat-attachment-block').map((block) => block.text()))
-      .toStrictEqual(['preview.png', 'notes.mdtext/markdown']);
+      .toStrictEqual(['', 'notes.md']);
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/notes.md');
   });
 
@@ -167,6 +170,20 @@ describe('CodexMessage', () => {
     expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
     expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
+  it('does not render an action toolbar for steer markers', () => {
+    const wrapper = mount(CodexMessage, {
+      props: {
+        message: { id: 'steer-1', role: 'user', content: 'Focus on the renderer.', type: 'steer' },
+      },
+      slots: {
+        actions: '<div class="custom-message-actions">Actions</div>',
+      },
+    });
+
+    expect(wrapper.find('.chat-message__actions').exists()).toBe(false);
+    expect(wrapper.find('.custom-message-actions').exists()).toBe(false);
   });
 
   it('combines message capabilities with presentation action visibility', () => {
