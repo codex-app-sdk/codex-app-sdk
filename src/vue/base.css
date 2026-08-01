@@ -85,8 +85,18 @@
 .codex-markdown {
   color: var(--color-text);
   font-size: var(--chat-font-size, var(--chat-message-font-size, var(--font-size-15)));
-  line-height: var(--chat-message-line-height, var(--line-height-22));
+  line-height:
+    var(
+      --chat-message-line-height,
+      calc(var(--chat-font-size, var(--chat-message-font-size, var(--font-size-15))) + 9px)
+    );
   overflow-wrap: anywhere;
+}
+
+.codex-markdown.chat-message-block--text {
+  font-size: calc(var(--chat-font-size, var(--chat-message-font-size, var(--font-size-15))) - 0.5px);
+  font-weight: var(--chat-message-font-weight, 350);
+  line-height: var(--chat-message-line-height, 1.55);
 }
 
 .codex-markdown > *:first-child {
@@ -97,13 +107,17 @@
   margin-bottom: 0;
 }
 
+.codex-markdown.chat-user-text {
+  padding: var(--space-3) var(--space-6);
+}
+
 .codex-markdown p,
 .codex-markdown ul,
 .codex-markdown ol,
 .codex-markdown blockquote,
 .codex-markdown pre,
 .codex-markdown table {
-  margin: 0 0 var(--space-6);
+  margin: 0 0 0.6875rem;
 }
 
 .codex-markdown h1,
@@ -112,24 +126,25 @@
 .codex-markdown h4,
 .codex-markdown h5,
 .codex-markdown h6 {
-  margin: var(--space-8) 0 var(--space-4);
+  margin: var(--space-10) 0 calc(var(--space-6) - 2px);
   color: var(--color-text);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-24);
 }
 
 .codex-markdown h1 {
-  font-size: var(--font-size-20);
+  font-size: var(--font-size-24);
   line-height: var(--line-height-28);
 }
 
 .codex-markdown h2 {
-  font-size: var(--font-size-18);
+  font-size: var(--font-size-20);
 }
 
 .codex-markdown h3,
 .codex-markdown h4 {
-  font-size: var(--font-size-16);
+  font-size: calc(var(--font-size-16) + 1px);
+  line-height: var(--line-height-22);
 }
 
 .codex-markdown h5,
@@ -139,26 +154,40 @@
 
 .codex-markdown ul,
 .codex-markdown ol {
-  padding-left: var(--space-12);
+  padding-left: 1.3125rem;
+}
+
+.codex-markdown li + li {
+  margin-top: var(--space-4);
+}
+
+.codex-markdown li > :first-child,
+.codex-markdown li > :last-child {
+  margin-bottom: 0;
 }
 
 .codex-markdown strong {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--chat-message-strong-font-weight, 500);
 }
 
 .codex-markdown code {
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
-  background: var(--color-surface-low);
+  box-decoration-break: clone;
+  border-radius: var(--radius-md);
+  padding: 1px var(--space-3);
+  background: color-mix(in srgb, var(--color-surface-low) 60%, var(--color-text) 6%);
   font-family: var(--font-family-mono);
-  font-size: calc(var(--code-font-size, var(--font-size-13)) + 1px);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-decoration-break: clone;
 }
 
 .codex-markdown pre {
+  margin: 14px 0;
   overflow: auto;
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: var(--radius-lg);
-  padding: var(--space-8);
+  padding: var(--space-4);
   background: var(--color-surface-low);
 }
 
@@ -172,9 +201,38 @@
 }
 
 .codex-markdown blockquote {
-  border-left: 3px solid var(--color-border-strong);
-  padding-left: var(--space-8);
-  color: var(--color-text-muted);
+  position: relative;
+  margin: 0 0 var(--space-4);
+  border: 0;
+  padding: var(--space-4) 0 var(--space-4) var(--space-12);
+  color: var(--color-text);
+}
+
+.codex-markdown blockquote::after {
+  content: "";
+  position: absolute;
+  top: var(--space-4);
+  bottom: var(--space-4);
+  left: 0;
+  width: var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--color-border-strong);
+}
+
+.codex-markdown blockquote > :first-child {
+  margin-top: 0;
+}
+
+.codex-markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.codex-markdown hr {
+  clear: both;
+  height: 0;
+  margin: 28px 0;
+  border: 0;
+  border-top: 1px solid var(--color-border-strong);
 }
 
 .codex-markdown a {
@@ -212,21 +270,37 @@
 
 .codex-markdown table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--font-size-14);
 }
 
 .codex-markdown th,
 .codex-markdown td {
-  border: 1px solid var(--color-border);
-  padding: var(--space-3) var(--space-4);
+  border: 0;
+  padding: var(--space-4) var(--space-12) var(--space-4) 0;
   text-align: left;
   vertical-align: top;
 }
 
 .codex-markdown th {
-  background: var(--color-surface-low);
-  font-weight: var(--font-weight-semibold);
+  border-bottom: 1px solid var(--color-border-strong);
+  background: transparent;
+  font-weight: var(--font-weight-bold);
+}
+
+.codex-markdown td {
+  padding-top: calc(var(--space-4) + 2px);
+  padding-bottom: calc(var(--space-4) + 2px);
+}
+
+.codex-markdown tbody tr:not(:last-child) td {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.codex-markdown th:last-child,
+.codex-markdown td:last-child {
+  padding-right: 0;
 }
 
 @keyframes codex-text-shimmer {

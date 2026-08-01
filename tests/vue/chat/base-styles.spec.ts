@@ -13,6 +13,60 @@ beforeEach(() => {
 });
 
 describe('base conversation styles', () => {
+  it('keeps normal message text slightly lighter and smaller than the configured size', () => {
+    expect(baseStyles).toContain('.codex-markdown.chat-message-block--text {');
+    expect(baseStyles).toContain('font-size: calc(var(--chat-font-size, var(--chat-message-font-size, var(--font-size-15))) - 0.5px);');
+    expect(baseStyles).toContain('font-weight: var(--chat-message-font-weight, 350);');
+  });
+
+  it('matches Codex message rhythm and emphasis', () => {
+    document.body.innerHTML = `
+      <div
+        class="codex-markdown chat-user-text chat-message-block--text"
+        style="
+          --chat-font-size: 15px;
+          --font-size-14: 14px;
+          --font-size-15: 15px;
+          --font-size-16: 16px;
+          --font-size-20: 20px;
+          --font-size-24: 24px;
+          --font-weight-bold: 600;
+          --line-height-22: 22px;
+          --line-height-24: 24px;
+          --line-height-28: 28px;
+          --space-2: 4px;
+          --space-3: 6px;
+          --space-4: 8px;
+          --space-6: 12px;
+          --space-10: 20px;
+          --space-12: 24px;
+          --radius-xs: 2px;
+          --radius-md: 6px;
+        "
+      >
+        <p>Paragraph with <strong>emphasis</strong> and <code>inline code</code>.</p>
+        <ul><li>First</li><li>Second</li></ul>
+        <h1>Heading</h1>
+        <blockquote><p>Quoted text</p></blockquote>
+      </div>
+    `;
+
+    const markdown = document.querySelector('.codex-markdown')!;
+    const strong = document.querySelector('strong')!;
+    const inlineCode = document.querySelector('code')!;
+    const secondItem = document.querySelector('li + li')!;
+    const heading = document.querySelector('h1')!;
+    const quote = document.querySelector('blockquote')!;
+
+    expect(getComputedStyle(markdown).lineHeight).toBe('var(--chat-message-line-height, 1.55)');
+    expect(baseStyles).toContain('.codex-markdown.chat-user-text {\n  padding: var(--space-3) var(--space-6);\n}');
+    expect(getComputedStyle(strong).fontWeight).toBe('var(--chat-message-strong-font-weight, 500)');
+    expect(getComputedStyle(inlineCode).borderRadius).toBe('var(--radius-md)');
+    expect(getComputedStyle(secondItem).marginTop).toBe('var(--space-4)');
+    expect(getComputedStyle(heading).fontSize).toBe('var(--font-size-24)');
+    expect(getComputedStyle(quote).color).toBe('var(--color-text)');
+  });
+
   it('lets highlighted code tokens inherit the monospace code font', () => {
     const codeBlock = renderMarkdown([
       '```sh',
