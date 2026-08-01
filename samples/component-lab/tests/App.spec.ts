@@ -14,8 +14,10 @@ describe('component lab', () => {
     expect(wrapper.find('.chat-user-text__mention--plugin').text()).toContain('Gmail');
     expect(wrapper.get('.chat-attachment-block__preview').attributes('alt')).toBe('composer-broken.png');
     expect(wrapper.text()).toContain('layout-notes.md');
-    expect(wrapper.text()).toContain('Finding composer code');
-    expect(wrapper.text()).toContain('38 tests passed');
+    const toolHeader = wrapper.get('.chat-tool-group__header');
+    expect(toolHeader.text()).toContain('3 actions done');
+    expect(toolHeader.get('.chat-animated-diff-stat--added').text()).toBe('+128');
+    expect(toolHeader.get('.chat-animated-diff-stat--deleted').text()).toBe('-96');
     const steer = wrapper.get('.chat-message:has(.chat-message--steer)');
     expect(steer.text()).toContain('Steered conversation');
     expect(steer.find('.chat-message__actions').exists()).toBe(false);

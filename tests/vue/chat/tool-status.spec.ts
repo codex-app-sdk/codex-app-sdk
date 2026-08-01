@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { getToolDisplayTitle, getToolFallbackTitle, getToolLineDiff, parseToolStatusDescriptor, registerCodexToolTitlePresenter } from '../../../src/vue/chat/tool-status';
+import { getToolDisplayTitle, getToolFallbackTitle, getToolGroupLineDiff, getToolLineDiff, parseToolStatusDescriptor, registerCodexToolTitlePresenter } from '../../../src/vue/chat/tool-status';
 import type { MessageToolCall } from '../../../src/vue/chat/types';
 
 describe('tool status helpers', () => {
@@ -30,6 +30,30 @@ describe('tool status helpers', () => {
       params: { addedLines: 3, removedLines: 1 },
       source: 'codex',
     })).toStrictEqual({ addedLines: 3, removedLines: 1 });
+  });
+
+  it('sums line diffs across grouped tool calls', () => {
+    const tool = (id: string, addedLines?: number, removedLines?: number): MessageToolCall => ({
+      args: undefined,
+      done: true,
+      function: 'fileChange',
+      id,
+      result: undefined,
+      state: 'completed',
+      status: JSON.stringify({
+        action: 'edit',
+        phase: 'completed',
+        source: 'codex',
+        params: { addedLines, removedLines },
+      }),
+    });
+
+    expect(getToolGroupLineDiff([
+      tool('one', 31, 26),
+      tool('two', 97, 70),
+      { ...tool('no-diff'), status: 'completed' },
+    ])).toStrictEqual({ addedLines: 128, removedLines: 96 });
+    expect(getToolGroupLineDiff([])).toBeUndefined();
   });
 
   it('formats fallback titles by running state', () => {

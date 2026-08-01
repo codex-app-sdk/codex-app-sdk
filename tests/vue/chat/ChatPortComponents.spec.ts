@@ -430,6 +430,31 @@ describe('ported id8 chat components', () => {
     expect(wrapper.findAll('.chat-tool-call').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('shows the sum of completed edit diffs in a grouped header', async () => {
+    const edit = (id: string, addedLines: number, removedLines: number): MessageToolCall => ({
+      ...completedTool,
+      function: 'fileChange',
+      id,
+      status: JSON.stringify({
+        action: 'edit',
+        phase: 'completed',
+        source: 'codex',
+        params: { addedLines, removedLines, target: `${id}.ts` },
+      }),
+    });
+    const wrapper = mount(ChatToolGroup, {
+      props: { toolCalls: [edit('one', 31, 26), edit('two', 97, 70)] },
+    });
+
+    const header = wrapper.get('.chat-tool-group__header');
+    expect(header.text()).toContain('2 actions done');
+    expect(header.get('.chat-animated-diff-stat--added').text()).toBe('+128');
+    expect(header.get('.chat-animated-diff-stat--deleted').text()).toBe('-96');
+
+    await header.trigger('click');
+    expect(wrapper.findAll('.chat-tool-call__diff')).toHaveLength(2);
+  });
+
   it('renders MCP tool confirmations and emits the selected decision', async () => {
     const wrapper = mount(ChatToolConfirmation, {
       props: {

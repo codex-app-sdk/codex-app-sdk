@@ -151,8 +151,8 @@ const scenarios: [Scenario, ...Scenario[]] = [
       },
       {
         id: 'conversation-assistant', role: 'assistant', status: 'complete', createdAt: '2026-08-01T12:00:01Z', parts: [
-          { type: 'tool', id: 'tool-running', title: 'Searching source files', kind: 'search', status: 'running', statusText: 'Finding composer code' },
-          { type: 'tool', id: 'tool-complete', title: 'Ran component tests', kind: 'command', status: 'completed', statusText: '38 tests passed', output: 'Test Files 3 passed' },
+          { type: 'tool', id: 'tool-edit-one', title: 'Edited attachment renderer', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'edit', phase: 'completed', params: { target: '2 files', addedLines: 31, removedLines: 26 } }) },
+          { type: 'tool', id: 'tool-edit-two', title: 'Edited composer', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'edit', phase: 'completed', params: { target: 'ChatRichTextEditor.vue', addedLines: 97, removedLines: 70 } }) },
           { type: 'tool', id: 'tool-failed', title: 'Captured preview', kind: 'browser', status: 'failed', statusText: 'Browser was not open' },
           { type: 'text', text: 'I checked the screenshot and the relevant files.' },
         ],
@@ -170,7 +170,10 @@ const scenarios: [Scenario, ...Scenario[]] = [
     contextUsage: { totalTokens: 64_000, inputTokens: 48_000, cachedInputTokens: 8_000, outputTokens: 12_000, reasoningOutputTokens: 4_000, lastTotalTokens: 8_000, modelContextWindow: 200_000, usedPercent: 32 },
     queuedPrompts: [{ id: 'queued-1', text: 'Run the visual checks next' }],
     turnGitDiff: { turnId: 'turn-lab', addedLines: 42, removedLines: 7, updatedAt: '2026-08-01T12:00:00Z' },
-    messages: [{ id: 'busy-assistant', role: 'assistant', status: 'streaming', parts: [{ type: 'text', text: 'Updating the composer and checking every interaction…', phase: 'commentary' }] }],
+    messages: [{ id: 'busy-assistant', role: 'assistant', status: 'streaming', parts: [
+      { type: 'tool', id: 'tool-running', title: 'Searching source files', kind: 'search', status: 'running', statusText: 'Finding composer code' },
+      { type: 'text', text: 'Updating the composer and checking every interaction…', phase: 'commentary' },
+    ] }],
   },
   {
     id: 'empty',

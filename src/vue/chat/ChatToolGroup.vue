@@ -24,6 +24,20 @@
         >
           {{ summary }}
         </span>
+        <span v-if="lineDiff" class="chat-tool-group__diff" aria-label="Total line changes">
+          <ChatAnimatedDiffStat
+            v-if="lineDiff.addedLines"
+            kind="added"
+            label="Total added lines"
+            :value="lineDiff.addedLines"
+          />
+          <ChatAnimatedDiffStat
+            v-if="lineDiff.removedLines"
+            kind="deleted"
+            label="Total removed lines"
+            :value="lineDiff.removedLines"
+          />
+        </span>
         <component :is="expanded ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
       </template>
     </button>
@@ -48,9 +62,10 @@
 import { ChevronDown, ChevronUp } from '../icons/app-icons'
 import { computed, ref } from 'vue'
 import type { ClientRequestResponse } from './contracts'
+import ChatAnimatedDiffStat from './ChatAnimatedDiffStat.vue'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolCall from './ChatToolCall.vue'
-import { parseToolStatusDescriptor } from './tool-status'
+import { getToolGroupLineDiff, parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
 
 const props = defineProps<{
@@ -74,6 +89,7 @@ const singleConfirmationToolCall = computed(() => {
 })
 const activeToolCall = computed(() => props.toolCalls.find(isActiveToolCall))
 const headerToolCall = computed(() => activeToolCall.value ?? (isSingleTool.value ? props.toolCalls[0] : undefined))
+const lineDiff = computed(() => getToolGroupLineDiff(props.toolCalls))
 const summary = computed(() => {
   if (props.toolCalls.length > 0) {
     return `${formatActions(props.toolCalls.length)} done`
@@ -155,6 +171,13 @@ function isConfirmationTool(toolCall: MessageToolCall) {
   font-size: var(--font-size-15);
   line-height: var(--line-height-20);
   font-weight: var(--font-weight-light);
+}
+
+.chat-tool-group__diff {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .chat-tool-group__body {

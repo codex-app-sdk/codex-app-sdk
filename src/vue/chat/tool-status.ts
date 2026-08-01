@@ -56,6 +56,17 @@ export function getToolLineDiff(descriptor: ToolStatusDescriptor | undefined): T
   return addedLines || removedLines ? { addedLines, removedLines } : undefined;
 }
 
+export function getToolGroupLineDiff(toolCalls: readonly MessageToolCall[]): ToolLineDiff | undefined {
+  let addedLines = 0;
+  let removedLines = 0;
+  for (const toolCall of toolCalls) {
+    const lineDiff = getToolLineDiff(parseToolStatusDescriptor(toolCall.status));
+    addedLines += lineDiff?.addedLines ?? 0;
+    removedLines += lineDiff?.removedLines ?? 0;
+  }
+  return addedLines || removedLines ? { addedLines, removedLines } : undefined;
+}
+
 export function getToolDisplayTitle(
   toolCall: MessageToolCall,
   descriptor: ToolStatusDescriptor | undefined,
