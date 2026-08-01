@@ -33,6 +33,7 @@ export {
   IconPaperclip as PaperclipIcon,
   IconPalette as PaletteIcon,
   IconPencil as PencilIcon,
+  IconPlugConnected as PlugIcon,
   IconPlayerPlay as PlayerPlayIcon,
   IconPhoto as PhotoIcon,
   IconPlus as PlusIcon,

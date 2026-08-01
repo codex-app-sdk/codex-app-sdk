@@ -274,6 +274,11 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 
+.chat-message--user :deep(.chat-user-text__mention) {
+  padding: var(--space-2);
+  background: transparent;
+}
+
 .chat-message--assistant {
   justify-content: flex-start;
 }

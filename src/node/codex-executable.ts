@@ -33,11 +33,20 @@ export function codexRuntimePathEntries(
   const delimiter = pathDelimiter(dependencies);
   const env = dependencies.env ?? process.env;
   return unique([
+    ...bundledApplicationBinaryPaths(dependencies),
     ...pathEntries(env.PATH, delimiter),
     ...pathEntries(loginShellPath(dependencies), delimiter),
     ...commonUserBinaryPaths(dependencies),
     ...nvmBinaryPaths(dependencies),
   ]);
+}
+
+function bundledApplicationBinaryPaths(dependencies: CodexExecutableDiscoveryDependencies): string[] {
+  if ((dependencies.platform ?? process.platform) !== 'darwin') return [];
+  return [
+    '/Applications/ChatGPT.app/Contents/Resources',
+    '/Applications/Codex.app/Contents/Resources',
+  ].filter((entry) => executableExists(path.join(entry, 'codex'), dependencies));
 }
 
 export function withCodexRuntimePath(

@@ -52,6 +52,41 @@ describe('ChatUserText', () => {
     expect(wrapper.text()).not.toContain('/Users/nbonamy');
   });
 
+  it('renders plain skill and plugin prompts as compact inline chips', () => {
+    const wrapper = mount(ChatUserText, {
+      props: {
+        content: 'Use $update-bank-balance-sheet and @gmail',
+        plugins: [gmail],
+        skills: [bankSkill],
+      },
+    });
+
+    const mentions = wrapper.findAll('.chat-user-text__mention');
+    expect(mentions).toHaveLength(2);
+    expect(mentions[0]?.text()).toBe('Update Bank Balance Sheet');
+    expect(mentions[1]?.text()).toBe('Gmail');
+    expect(wrapper.text()).not.toContain('$update-bank-balance-sheet');
+    expect(wrapper.text()).not.toContain('@gmail');
+  });
+
+  it('matches display names and parenthesized skill aliases case-insensitively', () => {
+    const commitPush: CodexSurfaceSkill = {
+      name: 'Commit-Push (cp)',
+      path: '/Users/nbonamy/.codex/skills/commit-push/SKILL.md',
+      enabled: true,
+    };
+    const wrapper = mount(ChatUserText, {
+      props: {
+        content: 'Use $Commit-Push (cp) or $cp',
+        skills: [commitPush],
+      },
+    });
+
+    const mentions = wrapper.findAll('.chat-user-text__mention--skill');
+    expect(mentions).toHaveLength(2);
+    expect(mentions.every((mention) => mention.text() === 'Commit-Push (cp)')).toBe(true);
+  });
+
   it('falls back immediately and enriches reactively when catalogs arrive', async () => {
     const content = [
       'Open [@app-694546cd042881919bb746a8dc300f38]',

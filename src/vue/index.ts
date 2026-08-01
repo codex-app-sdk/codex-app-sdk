@@ -16,6 +16,11 @@ export { default as CodexComposerActiveModes } from './chat/ChatComposerActiveMo
 export { default as CodexComposerFileMentionMenu } from './chat/ChatComposerFileMentionMenu.vue';
 export { default as CodexComposerShelf } from './chat/ChatComposerShelf.vue';
 export { default as CodexComposerSkillMenu } from './chat/ChatComposerSkillMenu.vue';
+export { default as CodexComposerPluginMenu } from './chat/ChatComposerPluginMenu.vue';
+export { default as CodexComposerAtMentionMenu } from './chat/ChatComposerAtMentionMenu.vue';
+export { default as CodexMentionChip } from './chat/ChatMentionChip.vue';
+export { default as CodexRichTextEditor } from './chat/ChatRichTextEditor.vue';
+export type { CodexRichTextEditorExpose } from './chat/ChatRichTextEditor.vue';
 export { default as CodexComposerSlashMenu } from './chat/ChatComposerSlashMenu.vue';
 export { default as CodexComposerVoiceButton } from './chat/ChatComposerVoiceButton.vue';
 export { default as CodexComposerVoiceField } from './chat/ChatComposerVoiceField.vue';
@@ -60,7 +65,16 @@ export {
   promptSkillInputsFromText,
   skillDescription,
   skillDisplayName,
+  skillInsertText,
+  skillMatchesMention,
 } from './chat/composer-skills';
+export {
+  filterComposerPlugins,
+  pluginDescription,
+  pluginDisplayName,
+  pluginInsertText,
+  pluginMatchesMention,
+} from './chat/composer-plugins';
 export { renderMarkdown } from './chat/message-markdown';
 export { humanizeMentionName, parseCodexUserText } from './chat/user-text';
 export type { CodexUserTextToken } from './chat/user-text';
@@ -107,6 +121,7 @@ export type {
   ToolConfirmationDecision,
   TurnGitDiff,
 } from './chat/contracts';
+export type { CodexSurfacePlugin } from '../surface/types';
 export type {
   MessageAttachment as CodexMessageAttachment,
   Message as CodexChatMessage,

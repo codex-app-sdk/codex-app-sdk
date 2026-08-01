@@ -1,5 +1,6 @@
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import type { CodexNativeAttachmentInput, CodexNativeRendererApi } from 'codex-app-sdk/electron';
 import type { CodexSurfaceRendererApi, CodexSurfaceSnapshot } from 'codex-app-sdk/surface';
 import App from '../src/renderer/App.vue';
@@ -34,12 +35,12 @@ describe('basic sample App', () => {
     await flushPromises();
     expect(api.deleteConversation).toHaveBeenCalledWith('thread-2');
 
-    await wrapper.get('textarea').setValue('Build a new surface');
+    await setComposerText(wrapper, 'Build a new surface');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(api.sendMessage).toHaveBeenCalledWith('Build a new surface', undefined);
 
-    await wrapper.get('textarea').setValue('/goal Ship the sample');
+    await setComposerText(wrapper, '/goal Ship the sample');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(api.sendMessage).toHaveBeenLastCalledWith('/goal Ship the sample', undefined);
@@ -109,7 +110,7 @@ describe('basic sample App', () => {
     expect(window.codexAppSdkNative.pickAttachments).toHaveBeenCalledOnce();
     expect(wrapper.get('.codex-conversation-pane__attachment-preview').attributes('src')).toBe(attachment.previewUrl);
 
-    await wrapper.get('textarea').setValue('Review this image');
+    await setComposerText(wrapper, 'Review this image');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(api.sendMessage).toHaveBeenCalledWith('Review this image', {
@@ -140,15 +141,15 @@ describe('basic sample App', () => {
     await flushPromises();
 
     const pastedImage = imageFile('clipboard.png');
-    await wrapper.get('textarea').setValue('Keep the pasted text');
+    await setComposerText(wrapper, 'Keep the pasted text');
     const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
     Object.defineProperty(paste, 'clipboardData', {
       value: { files: [pastedImage], getData: () => 'Keep the pasted text' },
     });
-    wrapper.get('textarea').element.dispatchEvent(paste);
+    composerEditor(wrapper).element.dispatchEvent(paste);
 
     expect(paste.defaultPrevented).toBe(false);
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Keep the pasted text');
+    expect(composerEditor(wrapper).text()).toBe('Keep the pasted text');
     await vi.waitFor(() => expect(ingestAttachments).toHaveBeenCalledOnce());
     expect(ingestAttachments).toHaveBeenLastCalledWith([{
       name: 'clipboard.png',
@@ -244,6 +245,16 @@ const snapshot: CodexSurfaceSnapshot = {
   historyLoading: false,
   error: null,
 };
+
+function composerEditor(wrapper: VueWrapper) {
+  return wrapper.get<HTMLElement>('.chat-rich-text-editor');
+}
+
+async function setComposerText(wrapper: VueWrapper, value: string): Promise<void> {
+  composerEditor(wrapper).element.textContent = value;
+  await composerEditor(wrapper).trigger('input');
+  await nextTick();
+}
 
 function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<typeof vi.fn>> {
   return {

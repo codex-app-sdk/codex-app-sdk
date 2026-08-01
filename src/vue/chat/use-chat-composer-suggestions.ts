@@ -4,23 +4,29 @@ import type {
   CodexCommandSummary,
   CodexSkillSummary,
 } from './contracts'
-import { findActiveFileMention } from './composer-mentions'
+import type { CodexSurfacePlugin } from '../../surface/types'
+import { findActiveFileMention, findActivePluginMention } from './composer-mentions'
 import { filterFileSearchItems } from './file-search'
 import { filterComposerCommands, findActiveCommandSlash } from './composer-commands'
-import { filterComposerSkills, findActiveSkillTrigger } from './composer-skills'
+import { filterComposerSkills, findActiveSkillTrigger, skillInsertText } from './composer-skills'
+import { filterComposerPlugins } from './composer-plugins'
 
 type ChatComposerSuggestionOptions = {
   caretPosition: Ref<number>
   commands: () => readonly CodexCommandSummary[]
   disabled: () => boolean
   files: () => readonly CodexFileSearchItem[]
+  plugins?: () => readonly CodexSurfacePlugin[]
+  pluginsEnabled?: () => boolean
   isSending: () => boolean
   onCommandSubmitted: (prompt: string) => void
   onTextInserted: (caretPosition: number) => void
   prompt: Ref<string>
   skills: () => readonly CodexSkillSummary[]
   skillsEnabled: () => boolean
-  textarea: Ref<HTMLTextAreaElement | null>
+  editor: Ref<{
+    getSelectionRange: () => { end: number; start: number; valid: boolean }
+  } | null>
 }
 
 export function useChatComposerSuggestions(options: ChatComposerSuggestionOptions) {
@@ -28,6 +34,9 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   const activeFileIndex = ref(0)
   const skillMenuOpen = ref(false)
   const activeSkillIndex = ref(0)
+  const pluginMenuOpen = ref(false)
+  const activePluginIndex = ref(0)
+  const activeAtIndex = ref(0)
   const slashMenuOpen = ref(false)
   const activeSlashIndex = ref(0)
 
@@ -51,6 +60,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     !inputDisabled()
   ))
   const activeSkillSlash = computed(() => findActiveSkillTrigger(options.prompt.value, options.caretPosition.value, '$'))
+  const activePluginMention = computed(() => findActivePluginMention(options.prompt.value, options.caretPosition.value))
   const visibleSkills = computed(() => filterComposerSkills([...options.skills()], activeSkillSlash.value?.query ?? ''))
   const skillMenuVisible = computed(() => (
     skillMenuOpen.value &&
@@ -59,10 +69,24 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     options.skills().length > 0 &&
     !inputDisabled()
   ))
+  const visiblePlugins = computed(() => filterComposerPlugins([...(options.plugins?.() ?? [])], activePluginMention.value?.query ?? ''))
+  const pluginMenuVisible = computed(() => (
+    pluginMenuOpen.value &&
+    (options.pluginsEnabled?.() ?? false) &&
+    activePluginMention.value?.trigger === '$' &&
+    visiblePlugins.value.length > 0 &&
+    !inputDisabled()
+  ))
+  const atItemCount = computed(() => visiblePlugins.value.length + visibleFiles.value.length)
+  const atMenuVisible = computed(() => (
+    activeFileMention.value !== null &&
+    (atItemCount.value > 0 || fileMenuShowsHint.value) &&
+    !inputDisabled()
+  ))
   const activeCommandSlash = computed(() => findActiveCommandSlash(options.prompt.value, options.caretPosition.value))
   const visibleSlashCommands = computed(() => filterComposerCommands([...options.commands()], activeCommandSlash.value?.query ?? ''))
   const visibleSlashSkills = computed(() => options.skillsEnabled()
-    ? filterComposerSkills([...options.skills()], activeCommandSlash.value?.query ?? '')
+    ? []
     : [])
   const slashItemCount = computed(() => visibleSlashCommands.value.length + visibleSlashSkills.value.length)
   const slashMenuVisible = computed(() => (
@@ -75,6 +99,10 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   watch([visibleSkills, activeSkillSlash], () => {
     activeSkillIndex.value = 0
   })
+  watch([visiblePlugins, activePluginMention], () => {
+    activePluginIndex.value = 0
+    activeAtIndex.value = 0
+  })
   watch([visibleSlashCommands, visibleSlashSkills, activeCommandSlash], () => {
     activeSlashIndex.value = 0
   })
@@ -83,9 +111,13 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   })
 
   function handleKeydown(event: KeyboardEvent): boolean {
-    if (handleMenuKeydown(event, fileMenuVisible.value, visibleFiles.value.length, activeFileIndex, () => {
-      const file = visibleFiles.value[activeFileIndex.value]
-      if (file) selectFile(file)
+    if (handleMenuKeydown(event, atMenuVisible.value, atItemCount.value, activeAtIndex, () => {
+      const plugin = visiblePlugins.value[activeAtIndex.value]
+      if (plugin) selectPlugin(plugin)
+      else {
+        const file = visibleFiles.value[activeAtIndex.value - visiblePlugins.value.length]
+        if (file) selectFile(file)
+      }
     })) {
       return true
     }
@@ -136,29 +168,36 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
 
   function selectFile(file: CodexFileSearchItem): void {
     const mention = activeFileMention.value
-    if (!mention || !options.textarea.value) {
+    if (!mention || !options.editor.value) {
       return
     }
-    insert(`${file.path} `, mention.start, mention.end)
+    insert(`@${file.path} `, mention.start, mention.end)
   }
 
   function selectSkill(skill: CodexSkillSummary): void {
     const mention = activeSkillSlash.value
     if (mention) {
-      insert(`$${skill.name} `, mention.start, mention.end)
+      insert(`$${skillInsertText(skill)} `, mention.start, mention.end)
+    }
+  }
+
+  function selectPlugin(plugin: CodexSurfacePlugin): void {
+    const mention = activePluginMention.value
+    if (mention) {
+      insert(`@${plugin.name || plugin.id} `, mention.start, mention.end)
     }
   }
 
   function selectSlashSkill(skill: CodexSkillSummary): void {
     const mention = activeCommandSlash.value
     if (mention) {
-      insert(`/${skill.name} `, mention.start, mention.end)
+      insert(`/${skillInsertText(skill)} `, mention.start, mention.end)
     }
   }
 
   function selectCommand(command: CodexCommandSummary): void {
     const mention = activeCommandSlash.value
-    if (!mention || !options.textarea.value) {
+    if (!mention || !options.editor.value) {
       return
     }
 
@@ -193,8 +232,10 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     options.onTextInserted(nextCaret)
   }
 
-  function updateCaretPosition(): void {
-    options.caretPosition.value = options.textarea.value?.selectionEnd ?? options.prompt.value.length
+  function updateCaretPosition(range?: { end: number }): void {
+    options.caretPosition.value = range?.end
+      ?? options.editor.value?.getSelectionRange().end
+      ?? options.prompt.value.length
     sync()
   }
 
@@ -205,11 +246,13 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   function close(): void {
     fileMenuOpen.value = false
     skillMenuOpen.value = false
+    pluginMenuOpen.value = false
     slashMenuOpen.value = false
   }
 
   function sync(): void {
     if (activeFileMention.value !== null) {
+      pluginMenuOpen.value = true
       fileMenuOpen.value = true
       skillMenuOpen.value = false
       slashMenuOpen.value = false
@@ -217,6 +260,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     }
     if (activeSkillSlash.value !== null) {
       skillMenuOpen.value = true
+      pluginMenuOpen.value = false
       fileMenuOpen.value = false
       slashMenuOpen.value = false
       return
@@ -235,9 +279,12 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   }
 
   return {
+    activeAtIndex,
     activeFileIndex,
     activeSkillIndex,
+    activePluginIndex,
     activeSlashIndex,
+    atMenuVisible,
     close,
     closeSoon,
     fileMenuShowsHint,
@@ -246,13 +293,16 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     selectCommand,
     selectFile,
     selectSkill,
+    selectPlugin,
     selectSlashSkill,
     skillMenuVisible,
+    pluginMenuVisible,
     slashMenuVisible,
     sync,
     updateCaretPosition,
     visibleFiles,
     visibleSkills,
+    visiblePlugins,
     visibleSlashCommands,
     visibleSlashSkills,
   }

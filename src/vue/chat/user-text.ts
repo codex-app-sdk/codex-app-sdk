@@ -1,4 +1,6 @@
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../surface/types';
+import { skillMatchesMention } from './composer-skills';
+import { pluginMatchesMention } from './composer-plugins';
 
 export type CodexUserTextToken =
   | { type: 'text'; text: string }
@@ -19,7 +21,7 @@ export type CodexUserTextToken =
     skill?: CodexSurfaceSkill;
   };
 
-const userTextTokenRegex = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\n]+)\)|(\n)/g;
+const userTextTokenRegex = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\n]+)\)|(?<![\w.%+-])([$@/])([A-Za-z0-9_.-]+(?:[ \t]+\([A-Za-z0-9_.-]+\))?)|(\n)/g;
 const opaqueAppNameRegex = /^app[-_]?[a-f\d]{16,}$/i;
 
 export function parseCodexUserText(
@@ -38,10 +40,14 @@ export function parseCodexUserText(
     const code = match[1];
     const label = match[2];
     const href = match[3];
+    const bareTrigger = match[4];
+    const bareName = match[5];
     if (code !== undefined) {
       tokens.push({ type: 'code', text: code });
     } else if (label !== undefined && href !== undefined) {
       tokens.push(mentionToken(label, href, plugins, skills) ?? { type: 'text', text: raw });
+    } else if (bareTrigger !== undefined && bareName !== undefined) {
+      tokens.push(bareMentionToken(bareTrigger, bareName, plugins, skills) ?? { type: 'text', text: raw });
     } else {
       tokens.push({ type: 'line-break' });
     }
@@ -50,6 +56,37 @@ export function parseCodexUserText(
 
   if (lastIndex < content.length) tokens.push({ type: 'text', text: content.slice(lastIndex) });
   return tokens;
+}
+
+function bareMentionToken(
+  trigger: string,
+  name: string,
+  plugins: readonly CodexSurfacePlugin[],
+  skills: readonly CodexSurfaceSkill[],
+): Extract<CodexUserTextToken, { type: 'plugin-mention' | 'skill-mention' }> | null {
+  if (trigger === '$') {
+    const skill = skills.find((candidate) => skillMatchesMention(candidate, name));
+    if (skill) {
+      return {
+        type: 'skill-mention',
+        displayName: skill.displayName || skill.name,
+        href: skill.path,
+        label: `${trigger}${name}`,
+        skill,
+      };
+    }
+  }
+
+  if (trigger !== '@') return null;
+  const plugin = plugins.find((candidate) => pluginMatchesMention(candidate, name));
+  if (!plugin) return null;
+  return {
+    type: 'plugin-mention',
+    displayName: plugin.displayName || plugin.name,
+    href: `plugin://${plugin.id}`,
+    label: `${trigger}${name}`,
+    plugin,
+  };
 }
 
 function mentionToken(

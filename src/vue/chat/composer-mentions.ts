@@ -2,8 +2,30 @@ export type ActiveComposerMention = {
   end: number;
   query: string;
   start: number;
-  trigger: '@';
+  trigger: '@' | '$';
 };
+
+export function findActivePluginMention(value: string, caretPosition: number): ActiveComposerMention | null {
+  const safeCaret = Math.max(0, Math.min(caretPosition, value.length));
+  const beforeCaret = value.slice(0, safeCaret);
+  const atIndex = beforeCaret.lastIndexOf('@');
+  const dollarIndex = beforeCaret.lastIndexOf('$');
+  const start = Math.max(atIndex, dollarIndex);
+  if (start < 0) return null;
+
+  const previous = start > 0 ? beforeCaret[start - 1] : '';
+  if (previous && /[\w.%+-]/.test(previous)) return null;
+
+  const query = beforeCaret.slice(start + 1);
+  if (/[\s@$/]/.test(query)) return null;
+
+  return {
+    end: safeCaret,
+    query,
+    start,
+    trigger: beforeCaret[start] as '@' | '$',
+  };
+}
 
 export function findActiveFileMention(value: string, caretPosition: number): ActiveComposerMention | null {
   const safeCaret = Math.max(0, Math.min(caretPosition, value.length));

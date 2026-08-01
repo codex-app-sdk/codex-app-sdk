@@ -54,6 +54,24 @@ export function skillDescription(skill: CodexSkillSummary): string {
   return skill.shortDescription || skill.description || '';
 }
 
+export function skillInsertText(skill: Pick<CodexSkillSummary, 'name' | 'path'>): string {
+  const alias = /\(([A-Za-z0-9_.-]+)\)\s*$/.exec(skill.name)?.[1];
+  if (alias) return alias;
+  if (/^[A-Za-z0-9_.-]+$/.test(skill.name)) return skill.name;
+  const directoryName = skill.path.replace(/[\\/]+SKILL\.md$/i, '').split(/[\\/]/).at(-1);
+  return directoryName || skill.name.trim().replace(/\s+/g, '-').toLowerCase();
+}
+
+export function skillMatchesMention(
+  skill: { id?: string; name: string; displayName?: string; path: string },
+  mention: string,
+): boolean {
+  const normalized = mention.trim().toLowerCase();
+  const directoryName = skill.path.replace(/[\\/]+SKILL\.md$/i, '').split(/[\\/]/).at(-1);
+  return [skill.id, skill.name, skill.displayName, directoryName, skillInsertText(skill)]
+    .some((candidate) => candidate?.trim().toLowerCase() === normalized);
+}
+
 export function promptSkillInputsFromText(text: string, skills: CodexSkillSummary[]): PromptSkillInput[] {
   const names = new Set<string>();
   const pattern = /(?:^|[^\w.%+-])[$/]([A-Za-z0-9_.-]+)/g;
@@ -64,7 +82,7 @@ export function promptSkillInputsFromText(text: string, skills: CodexSkillSummar
   }
 
   return skills
-    .filter((skill) => names.has(skill.name) && Boolean(skill.path))
+    .filter((skill) => [...names].some((name) => skillMatchesMention(skill, name)) && Boolean(skill.path))
     .map((skill) => ({
       name: skill.name,
       path: skill.path,

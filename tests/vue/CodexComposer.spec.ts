@@ -4,8 +4,11 @@ import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import CodexComposer from '../../src/vue/components/CodexComposer.vue';
+import CodexComposerPluginMenu from '../../src/vue/chat/ChatComposerPluginMenu.vue';
+import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../src/vue/chat/ChatRichTextEditor.vue';
 import { codexCommands } from '../../src/vue/chat/codex-commands';
 import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../../src/vue/chat/contracts';
+import type { CodexSurfacePlugin } from '../../src/surface';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
@@ -60,25 +63,33 @@ const files: CodexFileSearchItem[] = [
   { name: 'ChatComposer.vue', path: 'src/renderer/components/ChatComposer.vue' },
 ];
 
+const plugins: CodexSurfacePlugin[] = [{
+  id: 'gmail@openai-curated-remote',
+  name: 'gmail',
+  displayName: 'Gmail',
+  shortDescription: 'Read and manage Gmail',
+  enabled: true,
+}];
+
 describe('ChatComposer', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('emits a trimmed prompt and clears the textarea', async () => {
+  it('emits a trimmed prompt and clears the editor', async () => {
     const wrapper = mountComposer();
 
-    await wrapper.get('textarea').setValue('  ship the ui  ');
+    await setEditorValue(wrapper, '  ship the ui  ');
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('send')).toStrictEqual([['ship the ui']]);
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(editorValue(wrapper)).toBe('');
   });
 
   it('sends from the shared send button', async () => {
     const wrapper = mountComposer();
 
-    await wrapper.get('textarea').setValue('ship it');
+    await setEditorValue(wrapper, 'ship it');
     await wrapper.get('.chat-composer__send').trigger('click');
 
     expect(wrapper.emitted('send')).toStrictEqual([['ship it']]);
@@ -91,21 +102,21 @@ describe('ChatComposer', () => {
     });
     await nextTick();
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('quoted prompt');
+    expect(editorValue(wrapper)).toBe('quoted prompt');
   });
 
-  it('caps the growing textarea at three composer lines', async () => {
+  it('caps the growing editor at three composer lines', async () => {
     const wrapper = mountComposer();
-    const textarea = wrapper.get('textarea').element as HTMLTextAreaElement;
-    Object.defineProperty(textarea, 'scrollHeight', {
+    const richEditor = editor(wrapper).element;
+    Object.defineProperty(richEditor, 'scrollHeight', {
       configurable: true,
       value: 240,
     });
 
-    await wrapper.get('textarea').setValue('one\ntwo\nthree\nfour\nfive');
+    await setEditorValue(wrapper, 'one\ntwo\nthree\nfour\nfive');
     await nextTick();
 
-    expect(textarea.style.height).toBe('88px');
+    expect(richEditor.style.height).toBe('88px');
   });
 
   it('interrupts from the shared send button while Codex is working without a draft', async () => {
@@ -123,19 +134,19 @@ describe('ChatComposer', () => {
   it('submits with Enter and preserves Shift Enter for multiline drafts', async () => {
     const wrapper = mountComposer();
 
-    await wrapper.get('textarea').setValue('first line');
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter', shiftKey: true });
+    await setEditorValue(wrapper, 'first line');
+    await editor(wrapper).trigger('keydown', { key: 'Enter', shiftKey: true });
     expect(wrapper.emitted('send')).toBeUndefined();
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
     expect(wrapper.emitted('send')).toStrictEqual([['first line']]);
   });
 
   it('steers with Command Enter', async () => {
     const wrapper = mountComposer({ isSending: true });
 
-    await wrapper.get('textarea').setValue('switch to the smaller fix');
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter', metaKey: true });
+    await setEditorValue(wrapper, 'switch to the smaller fix');
+    await editor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
 
     expect(wrapper.emitted('steer')).toStrictEqual([['switch to the smaller fix']]);
     expect(wrapper.emitted('send')).toBeUndefined();
@@ -159,7 +170,7 @@ describe('ChatComposer', () => {
 
     expect(wrapper.text()).toContain('Plan');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Tab', shiftKey: true });
+    await editor(wrapper).trigger('keydown', { key: 'Tab', shiftKey: true });
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
   });
@@ -180,11 +191,11 @@ describe('ChatComposer', () => {
     expect(empty.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
 
     const disabled = mountComposer({ disabled: true });
-    await disabled.get('textarea').setValue('hello');
+    await setEditorValue(disabled, 'hello');
     expect(disabled.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
 
     const sending = mountComposer({ isSending: true });
-    await sending.get('textarea').setValue('hello');
+    await setEditorValue(sending, 'hello');
     expect(sending.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
     await sending.get('form').trigger('submit');
     expect(sending.emitted('send')).toStrictEqual([['hello']]);
@@ -254,34 +265,67 @@ describe('ChatComposer', () => {
     expect(minimal.find('.chat-composer-action-menu__root').exists()).toBe(false);
     expect(minimal.find('.chat-context-usage').exists()).toBe(false);
     expect(minimal.find('.chat-composer__voice').exists()).toBe(false);
-    expect(minimal.find('textarea').exists()).toBe(true);
+    expect(minimal.find('.chat-rich-text-editor').exists()).toBe(true);
     expect(minimal.find('.chat-composer__send').exists()).toBe(true);
   });
 
   it('opens a dollar skill menu, filters skills, and inserts the selected skill', async () => {
     const wrapper = mountComposer({ skills });
 
-    await wrapper.get('textarea').setValue('$front');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, '$front');
+    await editor(wrapper).trigger('keyup');
 
     expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(true);
     expect(wrapper.text()).toContain('Frontend Design');
     expect(wrapper.text()).not.toContain('skill-creator');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('$frontend-design ');
+    expect(editorValue(wrapper)).toBe('$frontend-design ');
+  });
+
+  it('opens a combined at-mention menu and inserts the canonical plugin name', async () => {
+    const wrapper = mountComposer({ plugins });
+
+    await setEditorValue(wrapper, '@g');
+    await editor(wrapper).trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-at-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Gmail');
+
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
+
+    expect(editorValue(wrapper)).toBe('@gmail ');
+    expect(editor(wrapper).find('[data-plugin-name="gmail"]').exists()).toBe(true);
+  });
+
+  it('keeps @ mentions available for file search when plugins are configured', async () => {
+    const wrapper = mountComposer({ plugins, files });
+
+    await setEditorValue(wrapper, '@resea');
+    await editor(wrapper).trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-at-menu').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Files');
+  });
+
+  it('mounts the exported plugin menu component', () => {
+    const wrapper = mount(CodexComposerPluginMenu, {
+      props: { activeIndex: 0, visiblePlugins: plugins },
+    });
+
+    expect(wrapper.get('[role="option"]').text()).toContain('Gmail');
   });
 
   it('navigates dollar skills with arrow keys and inserts with enter', async () => {
     const wrapper = mountComposer({ skills });
 
-    await wrapper.get('textarea').setValue('$');
-    await wrapper.get('textarea').trigger('keyup');
-    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await setEditorValue(wrapper, '$');
+    await editor(wrapper).trigger('keyup');
+    await editor(wrapper).trigger('keydown', { key: 'ArrowDown' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('$skill-creator ');
+    expect(editorValue(wrapper)).toBe('$skill-creator ');
   });
 
   it('shows slash commands before skills and submits Codex compact', async () => {
@@ -290,8 +334,8 @@ describe('ChatComposer', () => {
       skills,
     });
 
-    await wrapper.get('textarea').setValue('/comp');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, '/comp');
+    await editor(wrapper).trigger('keyup');
 
     expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
     expect(wrapper.text()).toContain('Commands');
@@ -299,10 +343,10 @@ describe('ChatComposer', () => {
     expect(wrapper.text()).not.toContain('/compact');
     expect(wrapper.text()).not.toContain('/frontend-design');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
     expect(wrapper.emitted('send')).toStrictEqual([['/compact']]);
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(editorValue(wrapper)).toBe('');
   });
 
   it('submits Codex review from the slash command menu without showing a slash prefix', async () => {
@@ -311,17 +355,17 @@ describe('ChatComposer', () => {
       skills,
     });
 
-    await wrapper.get('textarea').setValue('/rev');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, '/rev');
+    await editor(wrapper).trigger('keyup');
 
     expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
     expect(wrapper.text()).toContain('review');
     expect(wrapper.text()).not.toContain('/review');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
     expect(wrapper.emitted('send')).toStrictEqual([['/review']]);
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(editorValue(wrapper)).toBe('');
   });
 
   it('submits Codex plan from the slash command menu without showing a slash prefix', async () => {
@@ -330,17 +374,17 @@ describe('ChatComposer', () => {
       skills,
     });
 
-    await wrapper.get('textarea').setValue('/pla');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, '/pla');
+    await editor(wrapper).trigger('keyup');
 
     expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
     expect(wrapper.text()).toContain('plan');
     expect(wrapper.text()).not.toContain('/plan');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
     expect(wrapper.emitted('send')).toStrictEqual([['/plan']]);
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(editorValue(wrapper)).toBe('');
   });
 
   it('submits Codex goal from the slash command menu without showing a slash prefix', async () => {
@@ -349,54 +393,48 @@ describe('ChatComposer', () => {
       skills,
     });
 
-    await wrapper.get('textarea').setValue('/goa');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, '/goa');
+    await editor(wrapper).trigger('keyup');
 
     expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
     expect(wrapper.text()).toContain('goal');
     expect(wrapper.text()).not.toContain('/goal');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
     expect(wrapper.emitted('send')).toStrictEqual([['/goal']]);
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(editorValue(wrapper)).toBe('');
   });
 
-  it('falls through from slash commands to skills after command rows', async () => {
+  it('keeps slash suggestions limited to commands', async () => {
     const wrapper = mountComposer({
       commands: codexCommands,
       skills,
     });
 
-    await wrapper.get('textarea').setValue('/');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, '/');
+    await editor(wrapper).trigger('keyup');
 
     expect(wrapper.text()).toContain('Commands');
-    expect(wrapper.text()).toContain('Skills');
+    expect(wrapper.text()).not.toContain('Skills');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
-    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
-    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
-    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
-
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/frontend-design ');
-    expect(wrapper.emitted('send')).toBeUndefined();
+    expect(editor(wrapper).find('[data-skill-name]').exists()).toBe(false);
   });
 
   it('opens an @ file menu, filters files, and inserts the selected relative path', async () => {
     const wrapper = mountComposer({ files });
 
-    await wrapper.get('textarea').setValue('read @resea');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, 'read @resea');
+    await editor(wrapper).trigger('keyup');
 
-    expect(wrapper.find('.chat-composer-file-menu').exists()).toBe(true);
+    expect(wrapper.find('.chat-composer-at-menu').exists()).toBe(true);
     expect(wrapper.text()).toContain('research.md');
     expect(wrapper.text()).toContain('docs/research.md');
 
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('read docs/research.md ');
+    expect(editorValue(wrapper)).toBe('read @docs/research.md ');
+    expect(editor(wrapper).find('[data-file-mention="docs/research.md"]').exists()).toBe(true);
   });
 
   it('navigates @ file results with arrow keys', async () => {
@@ -407,18 +445,18 @@ describe('ChatComposer', () => {
       ],
     });
 
-    await wrapper.get('textarea').setValue('inspect @');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, 'inspect @');
+    await editor(wrapper).trigger('keyup');
 
-    expect(wrapper.find('.chat-composer-file-menu__hint').exists()).toBe(true);
+    expect(wrapper.find('.chat-composer-at-menu__hint').exists()).toBe(true);
 
-    await wrapper.get('textarea').setValue('inspect @ts');
-    await wrapper.get('textarea').trigger('keyup');
+    await setEditorValue(wrapper, 'inspect @ts');
+    await editor(wrapper).trigger('keyup');
     await nextTick();
-    await wrapper.get('textarea').trigger('keydown', { key: 'ArrowDown' });
-    await wrapper.get('textarea').trigger('keydown', { key: 'Enter' });
+    await editor(wrapper).trigger('keydown', { key: 'ArrowDown' });
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('inspect src/beta.ts ');
+    expect(editorValue(wrapper)).toBe('inspect @src/beta.ts ');
   });
 
   it('records audio and inserts the Apple speech transcript at the caret', async () => {
@@ -426,10 +464,8 @@ describe('ChatComposer', () => {
     const transcribeAppleSpeech = vi.fn(async () => ({ text: 'dictated change' }));
     const wrapper = mountComposer({ transcribeAudio: transcribeAppleSpeech });
 
-    await wrapper.get('textarea').setValue('please');
-    const textarea = wrapper.get('textarea').element as HTMLTextAreaElement;
-    textarea.setSelectionRange(6, 6);
-    await wrapper.get('textarea').trigger('select');
+    await setEditorValue(wrapper, 'please');
+    richEditorVm(wrapper).setCaret(6);
     await wrapper.get('.chat-composer__voice').trigger('click');
     await vi.waitFor(() => {
       expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
@@ -438,7 +474,7 @@ describe('ChatComposer', () => {
 
     await wrapper.get('.chat-composer__voice').trigger('click');
     await vi.waitFor(() => {
-      expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('please dictated change');
+      expect(editorValue(wrapper)).toBe('please dictated change');
     });
 
     expect(transcribeAppleSpeech).toHaveBeenCalledWith(expect.any(ArrayBuffer), {
@@ -470,6 +506,24 @@ describe('ChatComposer', () => {
   });
 });
 
+function editor(wrapper: ReturnType<typeof mountComposer>) {
+  return wrapper.get<HTMLElement>('.chat-rich-text-editor');
+}
+
+function richEditorVm(wrapper: ReturnType<typeof mountComposer>): CodexRichTextEditorExpose {
+  return wrapper.findComponent(ChatRichTextEditor).vm as unknown as CodexRichTextEditorExpose;
+}
+
+function editorValue(wrapper: ReturnType<typeof mountComposer>): string {
+  return richEditorVm(wrapper).readText();
+}
+
+async function setEditorValue(wrapper: ReturnType<typeof mountComposer>, value: string): Promise<void> {
+  editor(wrapper).element.textContent = value;
+  await editor(wrapper).trigger('input');
+  await nextTick();
+}
+
 function mountComposer(overrides: Partial<ChatComposerProps & {
   contextUsage: CodexContextUsage;
   commands: readonly CodexCommandSummary[];
@@ -480,6 +534,7 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
   selectedReasoningEffort: string;
   files: CodexFileSearchItem[];
   skills: CodexSkillSummary[];
+  plugins: CodexSurfacePlugin[];
   transcribeAudio: CodexChatTranscription;
 }> = {}) {
   return mount(CodexComposer, {

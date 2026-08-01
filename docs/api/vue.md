@@ -37,9 +37,11 @@ current Vue effect scope.
 
 `CodexComposerMenu`, `CodexComposerMenuList`, `CodexComposerSendButton`,
 `CodexComposerActionMenu`, `CodexComposerActiveModes`,
-`CodexComposerFileMentionMenu`, `CodexComposerSkillMenu`,
+`CodexComposerFileMentionMenu`, `CodexComposerPluginMenu`,
+`CodexComposerSkillMenu`,
 `CodexComposerSlashMenu`, `CodexComposerVoiceButton`, `CodexComposerVoiceField`,
-`CodexComposerWaveform`, `CodexContextUsageIndicator`, and
+`CodexComposerWaveform`, `CodexMentionChip`, `CodexRichTextEditor`,
+`CodexContextUsageIndicator`, and
 `CodexModelReasoningSelector`.
 
 ### Messages and media
@@ -60,8 +62,8 @@ current Vue effect scope.
 - `CodexCapabilities`
 - `CodexConversationPresentation` and its composer/message/shelf subtypes
 - `CodexComposerMenuItem` discriminated union
-- model, reasoning, skill, command, context-usage, goal, diff, and client-request
-  view types
+- model, reasoning, skill, plugin, command, context-usage, goal, diff, and
+  client-request view types
 - `CodexChatMessage`, block, attachment, media, tool, and status types
 
 ## Utilities
@@ -86,11 +88,18 @@ current Vue effect scope.
 - conversation-link parsing helpers
 - surface-to-chat message adapters
 
+`CodexUserText` recognizes both linked mentions and the composer’s plain
+`$skill` and `@plugin` forms when matching catalogs are supplied,
+rendering recognized names as compact mention chips.
+
+`CodexComposer` uses the same catalog-backed chip renderer while editing. It
+keeps `$skill`, `@plugin`, and `@path` as the canonical submitted prompt text. Slash-prefixed text remains reserved for commands. Plugin and file results share the `@` suggestion menu; files appear only when the host supplies a thread/CWD-backed file catalog.
+
 ### Customization
 
 - `provideCodexChatTranslate`
 - `registerCodexToolTitlePresenter`
 - capability/presentation resolvers
-- composer command, skill, queue, and mention helpers
+- composer command, plugin, skill, queue, and mention helpers
 
 See the [Vue guide](/guide/vue) and [presentation guide](/guide/presentation).

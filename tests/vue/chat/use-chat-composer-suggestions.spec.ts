@@ -3,6 +3,7 @@
 import { nextTick, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexFileSearchItem, CodexCommandSummary, CodexSkillSummary } from '../../../src/vue/chat/contracts';
+import type { CodexSurfacePlugin } from '../../../src/surface';
 import { useChatComposerSuggestions } from '../../../src/vue/chat/use-chat-composer-suggestions';
 
 const files: CodexFileSearchItem[] = [
@@ -16,12 +17,20 @@ const skills: CodexSkillSummary[] = [
 const commands: CodexCommandSummary[] = [
   { id: 'codex:compact', name: 'compact', slashName: 'compact', submitOnSelect: true },
 ];
+const plugins: CodexSurfacePlugin[] = [
+  { id: 'ts@remote', name: 'ts', displayName: 'TypeScript', enabled: true },
+];
 
-function setup(initialPrompt: string) {
+function setup(initialPrompt: string, configuredPlugins: CodexSurfacePlugin[] = []) {
   const prompt = ref(initialPrompt);
   const caretPosition = ref(initialPrompt.length);
-  const textarea = ref(document.createElement('textarea'));
-  textarea.value.setSelectionRange(initialPrompt.length, initialPrompt.length);
+  const editor = ref({
+    getSelectionRange: () => ({
+      end: caretPosition.value,
+      start: caretPosition.value,
+      valid: true,
+    }),
+  });
   const onCommandSubmitted = vi.fn();
   const onTextInserted = vi.fn();
   const suggestions = useChatComposerSuggestions({
@@ -29,16 +38,18 @@ function setup(initialPrompt: string) {
     commands: () => commands,
     disabled: () => false,
     files: () => files,
+    plugins: () => configuredPlugins,
+    pluginsEnabled: () => true,
     isSending: () => false,
     onCommandSubmitted,
     onTextInserted,
     prompt,
     skills: () => skills,
     skillsEnabled: () => true,
-    textarea,
+    editor,
   });
   suggestions.sync();
-  return { caretPosition, onCommandSubmitted, onTextInserted, prompt, suggestions, textarea };
+  return { caretPosition, editor, onCommandSubmitted, onTextInserted, prompt, suggestions };
 }
 
 function key(key: string): KeyboardEvent {
@@ -55,8 +66,21 @@ describe('useChatComposerSuggestions', () => {
     expect(state.suggestions.handleKeydown(key('ArrowDown'))).toBe(true);
     expect(state.suggestions.handleKeydown(key('Enter'))).toBe(true);
 
-    expect(state.prompt.value).toBe('inspect src/beta.ts ');
+    expect(state.prompt.value).toBe('inspect @src/beta.ts ');
     expect(state.onTextInserted).toHaveBeenCalledWith(state.prompt.value.length);
+  });
+
+  it('navigates plugin and file matches in one at-mention result list', async () => {
+    const state = setup('inspect @ts', plugins);
+    await nextTick();
+
+    expect(state.suggestions.atMenuVisible.value).toBe(true);
+    expect(state.suggestions.visiblePlugins.value.map((plugin) => plugin.name)).toStrictEqual(['ts']);
+    expect(state.suggestions.visibleFiles.value).toHaveLength(2);
+
+    expect(state.suggestions.handleKeydown(key('ArrowDown'))).toBe(true);
+    expect(state.suggestions.handleKeydown(key('Enter'))).toBe(true);
+    expect(state.prompt.value).toBe('inspect @src/alpha.ts ');
   });
 
   it('inserts skills and submits immediate slash commands', async () => {

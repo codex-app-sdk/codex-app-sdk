@@ -6,12 +6,14 @@
     @submit.prevent="submitPrompt"
   >
     <slot name="before" />
-    <ChatComposerFileMentionMenu
-      v-if="fileMenuVisible"
-      :active-index="activeFileIndex"
-      :show-hint="fileMenuShowsHint"
+    <ChatComposerAtMentionMenu
+      v-if="atMenuVisible"
+      :active-index="activeAtIndex"
+      :show-file-hint="fileMenuShowsHint"
       :visible-files="visibleFiles"
-      @select="selectFile"
+      :visible-plugins="visiblePlugins"
+      @select-file="selectFile"
+      @select-plugin="selectPlugin"
     />
 
     <ChatComposerSkillMenu
@@ -54,21 +56,23 @@
       :recorder="recorder"
       :recording="isRecording"
     />
-    <textarea
+    <ChatRichTextEditor
       v-else
-      ref="textareaEl"
+      ref="editorEl"
       v-model="prompt"
       class="chat-composer__input"
       :placeholder="placeholder"
-      aria-label="Prompt"
-      rows="1"
       :disabled="disabled && !isSending"
+      :files="files"
+      :plugins="plugins"
+      :skills="skills"
       @blur="closeComposerMenusSoon"
       @click="updateCaretPosition"
-      @input="handleTextareaInput"
-      @keydown="handleTextareaKeydown"
+      @caret-change="handleCaretChange"
+      @input="handleEditorInput"
+      @keydown="handleEditorKeydown"
       @keyup="updateCaretPosition"
-      @select="updateCaretPosition"
+      @paste="handleEditorPaste"
     />
     <slot name="after-input" />
 
@@ -117,6 +121,7 @@
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapabilities, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription, CodexConversationPresentation, ReasoningEffort } from '../chat/contracts';
+import type { CodexSurfacePlugin } from '../../surface/types';
 import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands } from '../chat/codex-commands';
@@ -127,9 +132,10 @@ import ChatComposerVoiceButton from '../chat/ChatComposerVoiceButton.vue';
 import ChatComposerVoiceField from '../chat/ChatComposerVoiceField.vue';
 import ChatContextUsageIndicator from '../chat/ChatContextUsageIndicator.vue';
 import ChatModelReasoningSelector from '../chat/ChatModelReasoningSelector.vue';
-import ChatComposerFileMentionMenu from '../chat/ChatComposerFileMentionMenu.vue';
+import ChatComposerAtMentionMenu from '../chat/ChatComposerAtMentionMenu.vue';
 import ChatComposerSkillMenu from '../chat/ChatComposerSkillMenu.vue';
 import ChatComposerSlashMenu from '../chat/ChatComposerSlashMenu.vue';
+import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../chat/ChatRichTextEditor.vue';
 import { useChatComposerSuggestions } from '../chat/use-chat-composer-suggestions';
 import { useChatComposerVoice } from '../chat/use-chat-composer-voice';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
@@ -143,6 +149,7 @@ const props = defineProps<{
   draft?: string;
   draftRevision?: number;
   files?: readonly CodexFileSearchItem[];
+  plugins?: readonly CodexSurfacePlugin[];
   capabilities?: CodexCapabilities;
   commands?: readonly CodexCommandSummary[];
   isSending: boolean;
@@ -173,10 +180,8 @@ const emit = defineEmits<{
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();
 
-const DEFAULT_CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX = 88;
-
 const prompt = ref('');
-const textareaEl = ref<HTMLTextAreaElement | null>(null);
+const editorEl = ref<CodexRichTextEditorExpose | null>(null);
 const caretPosition = ref(0);
 const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCapabilities);
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
@@ -209,16 +214,17 @@ const {
 
 watch(voiceError, (message) => emit('error', message));
 const {
-  activeFileIndex,
+  activeAtIndex,
   activeSkillIndex,
   activeSlashIndex,
   close: closeComposerMenus,
   closeSoon: closeComposerMenusSoon,
   fileMenuShowsHint,
-  fileMenuVisible,
+  atMenuVisible,
   handleKeydown: handleSuggestionKeydown,
   selectCommand,
   selectFile,
+  selectPlugin,
   selectSkill,
   selectSlashSkill,
   skillMenuVisible,
@@ -226,6 +232,7 @@ const {
   sync: syncComposerMenus,
   updateCaretPosition,
   visibleFiles,
+  visiblePlugins,
   visibleSkills,
   visibleSlashCommands,
   visibleSlashSkills,
@@ -234,16 +241,18 @@ const {
   commands: () => props.commands ?? codexCommands,
   disabled: () => props.disabled,
   files: () => props.files ?? [],
+  plugins: () => props.plugins ?? [],
+  pluginsEnabled: () => true,
   isSending: () => props.isSending,
   onCommandSubmitted: (command) => {
     emit('send', command);
-    void nextTick(resizeTextarea);
+    void nextTick(resizeEditor);
   },
   onTextInserted: focusAt,
   prompt,
   skills: () => props.skills ?? [],
   skillsEnabled: () => effectiveCodexCapabilities.value.skills,
-  textarea: textareaEl,
+  editor: editorEl,
 });
 
 watch(() => props.draftRevision, () => {
@@ -252,7 +261,7 @@ watch(() => props.draftRevision, () => {
 
 onMounted(() => {
   if (props.autofocus) {
-    textareaEl.value?.focus();
+    editorEl.value?.focusEnd();
   }
 });
 
@@ -286,7 +295,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   } else {
     emit('steer', trimmed);
   }
-  void nextTick(resizeTextarea);
+  void nextTick(resizeEditor);
 }
 
 function insertTranscript(text: string): void {
@@ -295,9 +304,9 @@ function insertTranscript(text: string): void {
     return;
   }
 
-  const textarea = textareaEl.value;
-  const start = textarea?.selectionStart ?? caretPosition.value;
-  const end = textarea?.selectionEnd ?? caretPosition.value;
+  const selection = editorEl.value?.getSelectionRange();
+  const start = selection?.start ?? caretPosition.value;
+  const end = selection?.end ?? caretPosition.value;
   const before = prompt.value.slice(0, start);
   const after = prompt.value.slice(end);
   const prefix = before && !/\s$/.test(before) ? ' ' : '';
@@ -308,9 +317,8 @@ function insertTranscript(text: string): void {
   caretPosition.value = nextCaret;
   closeComposerMenus();
   void nextTick(() => {
-    textareaEl.value?.focus();
-    textareaEl.value?.setSelectionRange(nextCaret, nextCaret);
-    resizeTextarea();
+    editorEl.value?.setCaret(nextCaret);
+    resizeEditor();
   });
 }
 
@@ -320,13 +328,13 @@ function setComposerText(value: string): void {
   caretPosition.value = nextCaret;
   closeComposerMenus();
   void nextTick(() => {
-    textareaEl.value?.focus();
-    textareaEl.value?.setSelectionRange(nextCaret, nextCaret);
-    resizeTextarea();
+    if (prompt.value !== value) return;
+    editorEl.value?.setText(value, nextCaret, { focus: true });
+    resizeEditor();
   });
 }
 
-function handleTextareaKeydown(event: KeyboardEvent): void {
+function handleEditorKeydown(event: KeyboardEvent): void {
   if (handleSuggestionKeydown(event)) {
     return;
   }
@@ -344,7 +352,9 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
   }
 
   if (event.shiftKey) {
-    resizeTextareaSoon();
+    event.preventDefault();
+    editorEl.value?.insertTextAtSelection('\n');
+    resizeEditorSoon();
     return;
   }
 
@@ -359,36 +369,37 @@ function handleTextareaKeydown(event: KeyboardEvent): void {
   }
 }
 
-function handleTextareaInput(): void {
+function handleEditorInput(): void {
   updateCaretPosition();
-  resizeTextarea();
+  resizeEditor();
   syncComposerMenus();
+}
+
+function handleCaretChange(range: { end: number }): void {
+  updateCaretPosition(range);
+}
+
+function handleEditorPaste(event: ClipboardEvent): void {
+  if ((event.clipboardData?.files.length ?? 0) > 0) return;
+  const text = event.clipboardData?.getData('text/plain') ?? '';
+  if (!text) return;
+  event.preventDefault();
+  editorEl.value?.insertTextAtSelection(text);
 }
 
 function focusAt(caret: number): void {
   void nextTick(() => {
-    textareaEl.value?.focus();
-    textareaEl.value?.setSelectionRange(caret, caret);
-    resizeTextarea();
+    editorEl.value?.setCaret(caret);
+    resizeEditor();
   });
 }
 
-function resizeTextarea(): void {
-  const textarea = textareaEl.value;
-  if (!textarea) {
-    return;
-  }
-
-  textarea.style.height = '0px';
-  const cssMaxHeight = Number.parseFloat(window.getComputedStyle(textarea).maxHeight || '');
-  const maxHeight = Number.isFinite(cssMaxHeight) && cssMaxHeight > 0
-    ? cssMaxHeight
-    : DEFAULT_CHAT_COMPOSER_INPUT_MAX_HEIGHT_PX;
-  textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+function resizeEditor(): void {
+  editorEl.value?.autoResize();
 }
 
-function resizeTextareaSoon(): void {
-  void nextTick(resizeTextarea);
+function resizeEditorSoon(): void {
+  void nextTick(resizeEditor);
 }
 </script>
 

@@ -129,6 +129,7 @@
             :draft="localDraft"
             :draft-revision="draftRevision"
             :files="files"
+            :plugins="effectivePlugins"
             :is-sending="effectiveBusy"
             :menu-items="menuItems"
             :model-catalog-status="effectiveModelCatalogStatus"

@@ -21,6 +21,9 @@ const requiredMarkers = [
   '--codex-message-action-control-size',
   '.codex-composer-menu-list__switch',
   '.codex-conversation-pane',
+  '.chat-rich-text-editor',
+  '.chat-mention-chip',
+  '.chat-composer-at-menu',
 ];
 const missingMarkers = requiredMarkers.filter((marker) => !css.includes(marker));
 

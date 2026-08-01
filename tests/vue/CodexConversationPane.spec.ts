@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils';
-import { h, reactive } from 'vue';
+import { mount, type VueWrapper } from '@vue/test-utils';
+import { h, nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CodexConversationPane,
@@ -82,7 +82,7 @@ describe('CodexConversationPane', () => {
     });
 
     await wrapper.get('[aria-label="Quote"]').trigger('click');
-    expect(wrapper.get('textarea').element.value).toBe('Find a rental car');
+    expect(composerEditor(wrapper).text()).toBe('Find a rental car');
     expect(wrapper.emitted('update:modelValue')).toContainEqual(['Find a rental car']);
   });
 
@@ -143,7 +143,7 @@ describe('CodexConversationPane', () => {
       attachment.previewUrl,
     );
 
-    await wrapper.get('textarea').setValue('review this image');
+    await setComposerText(wrapper, 'review this image');
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
@@ -174,15 +174,16 @@ describe('CodexConversationPane', () => {
     const wrapper = mount(CodexConversationPane, {
       props: { ingestAttachments, messages, modelValue: '' },
     });
-    await wrapper.get('textarea').setValue('pasted text');
+    await wrapper.setProps({ modelValue: 'pasted text' });
+    expect(composerEditor(wrapper).text()).toBe('pasted text');
     const paste = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
     Object.defineProperty(paste, 'clipboardData', {
       value: { files: [file], getData: () => 'pasted text' },
     });
-    wrapper.get('textarea').element.dispatchEvent(paste);
+    composerEditor(wrapper).element.dispatchEvent(paste);
 
     expect(paste.defaultPrevented).toBe(false);
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('pasted text');
+    expect(composerEditor(wrapper).text()).toBe('pasted text');
     await vi.waitFor(() => expect(ingestAttachments).toHaveBeenCalledWith([
       expect.objectContaining({ name: 'clipboard.png', mimeType: 'image/png' }),
     ]));
@@ -262,10 +263,10 @@ describe('CodexConversationPane', () => {
     const wrapper = mount(CodexConversationPane, {
       props: { conversationKey: 'thread-1', messages, modelValue: '' },
     });
-    await wrapper.get('textarea').setValue('thread one draft');
+    await setComposerText(wrapper, 'thread one draft');
     await wrapper.setProps({ conversationKey: 'thread-2' });
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
+    expect(composerEditor(wrapper).text()).toBe('');
     expect(wrapper.emitted('update:modelValue')).toContainEqual(['']);
   });
 
@@ -275,7 +276,7 @@ describe('CodexConversationPane', () => {
 
     await vi.waitFor(() => expect(controller.connect).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(wrapper.text()).toContain('Bound controller message'));
-    await wrapper.get('textarea').setValue('/goal ship the SDK');
+    await setComposerText(wrapper, '/goal ship the SDK');
     await wrapper.get('form').trigger('submit');
     expect(controller.sendMessage).toHaveBeenCalledWith('/goal ship the SDK', undefined);
 
@@ -299,7 +300,7 @@ describe('CodexConversationPane', () => {
 
     await wrapper.get('[aria-label="Disable plan mode"]').trigger('click');
     await vi.waitFor(() => expect(controller.updateConversationSettings).toHaveBeenLastCalledWith({ planMode: false }));
-    await wrapper.get('textarea').setValue('/plan');
+    await setComposerText(wrapper, '/plan');
     await wrapper.get('form').trigger('submit');
     await vi.waitFor(() => expect(controller.sendMessage).toHaveBeenCalledWith('/plan', undefined));
     expect(wrapper.text()).toContain('Plan');
@@ -316,7 +317,7 @@ describe('CodexConversationPane', () => {
     controller.state.historyLoading = false;
     controller.state.status = 'connecting';
     await wrapper.vm.$nextTick();
-    expect(wrapper.get('textarea').attributes()).toHaveProperty('disabled');
+    expect(composerEditor(wrapper).attributes('aria-disabled')).toBe('true');
   });
 
   it('clears a stale local action error after the bound conversation recovers', async () => {
@@ -513,7 +514,7 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('.chat-composer-action-menu__root').exists()).toBe(false);
     expect(wrapper.find('.chat-context-usage').exists()).toBe(false);
     expect(wrapper.find('.chat-composer__voice').exists()).toBe(false);
-    expect(wrapper.find('textarea').exists()).toBe(true);
+    expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(true);
     expect(wrapper.find('.chat-composer__send').exists()).toBe(true);
   });
 
@@ -537,6 +538,16 @@ describe('CodexConversationPane', () => {
     expect(wrapper.get('.custom-message-action').text()).toBe('Action 0');
   });
 });
+
+function composerEditor(wrapper: VueWrapper) {
+  return wrapper.get<HTMLElement>('.chat-rich-text-editor');
+}
+
+async function setComposerText(wrapper: VueWrapper, value: string): Promise<void> {
+  composerEditor(wrapper).element.textContent = value;
+  await composerEditor(wrapper).trigger('input');
+  await nextTick();
+}
 
 function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurfaceSnapshot } {
   const state = reactive<CodexSurfaceSnapshot>({

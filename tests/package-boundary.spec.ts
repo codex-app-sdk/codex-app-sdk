@@ -102,6 +102,9 @@ describe('package boundary', () => {
     expect(bundleVerifier).toContain("'--font-size-15:15px'");
     expect(bundleVerifier).toContain("'--codex-message-font-size'");
     expect(bundleVerifier).toContain("'--codex-composer-control-size'");
+    expect(bundleVerifier).toContain("'.chat-rich-text-editor'");
+    expect(bundleVerifier).toContain("'.chat-mention-chip'");
+    expect(bundleVerifier).toContain("'.chat-composer-at-menu'");
 
     const shippedStyles = `${base}\n${theme}`;
     expect(shippedStyles).not.toMatch(/(^|\n)\s*(?:\*|html|body|#app|:root|\.el-)/);

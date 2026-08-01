@@ -139,12 +139,15 @@ function isSafeBrandColor(value: string | undefined): value is string {
 }
 
 .chat-user-text__mention {
-  --codex-mention-color: var(--color-accent);
+  --codex-mention-color: var(--color-primary);
   display: inline-flex;
   align-items: center;
   gap: 0.3em;
   max-width: 100%;
-  color: var(--codex-mention-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--codex-mention-color) 12%, var(--color-primary-container));
+  color: color-mix(in srgb, var(--codex-mention-color) 42%, var(--color-on-primary-container));
   font-weight: var(--font-weight-medium);
   line-height: 1;
   vertical-align: -0.12em;

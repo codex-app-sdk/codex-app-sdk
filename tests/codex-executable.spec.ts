@@ -67,6 +67,16 @@ describe('Codex executable discovery', () => {
     })).toMatch(/codex\.cmd$/i);
   });
 
+  it('prefers the bundled macOS Codex binary over unrelated PATH commands', () => {
+    const bundled = '/Applications/ChatGPT.app/Contents/Resources/codex';
+    expect(discoverCodexExecutable({
+      env: { PATH: '/unrelated/bin' },
+      execFileSync: vi.fn(() => ''),
+      existsSync: vi.fn((filePath: string) => filePath === bundled || filePath === '/unrelated/bin/codex'),
+      platform: 'darwin',
+    })).toBe(bundled);
+  });
+
   it('returns an enriched copy of the process environment', () => {
     const env = withCodexRuntimePath({ PATH: '/usr/bin', SURFACE_TEST: '1' }, {
       execFileSync: vi.fn(() => '/opt/homebrew/bin:/usr/bin'),
