@@ -386,6 +386,10 @@ onBeforeUnmount(() => {
   visibility: hidden;
 }
 
+.chat-message:has(.chat-message--steer) .chat-message__actions {
+  display: none !important;
+}
+
 .chat-message__thinking {
   align-self: flex-start;
   overflow: hidden;
