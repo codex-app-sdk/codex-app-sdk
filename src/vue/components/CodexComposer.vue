@@ -460,6 +460,12 @@ function resizeEditor(): void {
 function resizeEditorSoon(): void {
   void nextTick(resizeEditor);
 }
+
+function focus(): void {
+  editorEl.value?.focusEnd();
+}
+
+defineExpose({ focus });
 </script>
 
 <style scoped>

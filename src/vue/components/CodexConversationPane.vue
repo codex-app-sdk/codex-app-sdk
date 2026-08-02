@@ -121,6 +121,7 @@
           </div>
           <CodexComposer
             :key="effectiveConversationKey ?? 'no-conversation'"
+            ref="composer"
             class="codex-conversation-pane__composer"
             :autofocus="autofocus"
             :attach-enabled="effectiveAttachEnabled"
@@ -363,6 +364,7 @@ const emit = defineEmits<{
 }>();
 
 const draftRevision = ref(0);
+const composer = ref<{ focus(): void } | null>(null);
 const initialComposerState = normalizeCodexComposerState(props.composerState ?? {
   text: props.modelValue,
   selectionStart: props.modelValue.length,
@@ -753,6 +755,12 @@ function handleComposerError(error: string | null): void {
   localError.value = error;
   emit('error', error);
 }
+
+function focusComposer(): void {
+  composer.value?.focus();
+}
+
+defineExpose({ focusComposer });
 </script>
 
 <style scoped>

@@ -22,6 +22,19 @@ const messages: SurfaceMessage[] = [{
 }];
 
 describe('CodexConversationPane', () => {
+  it('exposes an application-level composer focus action', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { messages, modelValue: 'Profile this conversation' },
+    });
+
+    (wrapper.vm as unknown as { focusComposer(): void }).focusComposer();
+    await nextTick();
+
+    expect(document.activeElement).toBe(composerEditor(wrapper).element);
+    wrapper.unmount();
+  });
+
   it('renders messages, empty state, and errors without owning an application header', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: { error: 'Connection lost', messages, modelValue: '' },
