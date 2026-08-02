@@ -143,6 +143,7 @@
             :presentation="effectivePresentation"
             :selected-model-id="effectiveSelectedModelId"
             :selected-reasoning-effort="effectiveSelectedReasoningEffort"
+            :selected-service-tier="effectiveSelectedServiceTier"
             :skill-catalog-status="effectiveSkillCatalogStatus"
             :skills="effectiveSkills"
             :transcribe-audio="transcribeAudio"
@@ -157,6 +158,7 @@
             @update:composer-state="updateComposerState"
             @update:plan-mode="updatePlanMode"
             @update:reasoning-effort="updateReasoningEffort"
+            @update:service-tier="updateServiceTier"
           >
             <template v-if="$slots['menu-icon']" #menu-icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
             <template v-if="$slots['menu-item']" #menu-item="scope"><slot name="menu-item" v-bind="scope" /></template>
@@ -267,6 +269,7 @@ const props = withDefaults(defineProps<{
   queuedPrompts?: readonly QueuedChatPrompt[];
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  selectedServiceTier?: string | null;
   showToolDetails?: boolean;
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skills?: readonly CodexSkillSummary[];
@@ -356,6 +359,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: string];
   'update:planMode': [enabled: boolean];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
+  'update:serviceTier': [serviceTier: string | null];
 }>();
 
 const draftRevision = ref(0);
@@ -409,6 +413,11 @@ const effectiveSelectedReasoningEffort = computed(() => (
   props.selectedReasoningEffort !== undefined
     ? props.selectedReasoningEffort
     : surfaceState.value?.selectedReasoningEffort
+));
+const effectiveSelectedServiceTier = computed(() => (
+  props.selectedServiceTier !== undefined
+    ? props.selectedServiceTier
+    : surfaceState.value?.selectedServiceTier
 ));
 const effectiveSkillCatalogStatus = computed(() => (
   props.skillCatalogStatus ?? surfaceState.value?.skillCatalogStatus
@@ -720,6 +729,11 @@ function updatePlanMode(planMode: boolean): void {
 function updateReasoningEffort(reasoningEffort: ReasoningEffort): void {
   emit('update:reasoningEffort', reasoningEffort);
   if (props.surface) void runSurfaceAction(() => props.surface!.updateConversationSettings({ reasoningEffort }));
+}
+
+function updateServiceTier(serviceTier: string | null): void {
+  emit('update:serviceTier', serviceTier);
+  if (props.surface) void runSurfaceAction(() => props.surface!.updateConversationSettings({ serviceTier }));
 }
 
 async function runSurfaceAction(action: () => Promise<unknown>): Promise<void> {

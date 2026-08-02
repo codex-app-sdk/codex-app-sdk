@@ -64,9 +64,9 @@
           @submit="submitPrompt"
         >
           <template #message-header="{ message }">
-            <p v-if="messageHeaderFor(message)" class="lab-message-header">
+            <span v-if="messageHeaderFor(message)">
               {{ messageHeaderFor(message) }}
-            </p>
+            </span>
           </template>
         </CodexConversationPane>
       </div>
@@ -139,6 +139,8 @@ const models: [CodexModelOption, ...CodexModelOption[]] = [{
     { reasoningEffort: 'high', description: 'Deep' },
   ],
   defaultReasoningEffort: 'medium',
+  serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Faster responses when available' }],
+  defaultServiceTier: null,
   isDefault: true,
 }];
 

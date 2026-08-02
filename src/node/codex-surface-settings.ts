@@ -10,6 +10,7 @@ import type {
 export type SurfaceSelection = Pick<
   CodexSurfaceSnapshot,
   'approvalPreset' | 'planMode' | 'selectedModelId' | 'selectedReasoningEffort'
+  | 'selectedServiceTier'
 >;
 
 export function selectedModel(
@@ -44,6 +45,22 @@ export function defaultReasoningEffort(model: CodexSurfaceModel): string | null 
   return model.defaultReasoningEffort
     ?? model.supportedReasoningEfforts?.[0]?.reasoningEffort
     ?? null;
+}
+
+export function defaultServiceTier(model: CodexSurfaceModel): string | null {
+  return model.defaultServiceTier ?? null;
+}
+
+export function validateServiceTier(
+  model: CodexSurfaceModel | null,
+  serviceTier: string | null | undefined,
+): void {
+  if (!serviceTier) return;
+  if (!model) throw new Error(`Cannot select service tier '${serviceTier}' without a model`);
+  const supported = model.serviceTiers?.map((option) => option.id) ?? [];
+  if (supported.length > 0 && !supported.includes(serviceTier)) {
+    throw new Error(`Service tier '${serviceTier}' is not available for '${model.displayName}'`);
+  }
 }
 
 export function approvalPresetsForProfiles(
@@ -140,6 +157,9 @@ export function sessionSelection(
     planMode: current.planMode,
     selectedModelId: model?.id ?? current.selectedModelId,
     selectedReasoningEffort: response.reasoningEffort ?? (model ? defaultReasoningEffort(model) : null),
+    selectedServiceTier: response.serviceTier !== undefined
+      ? response.serviceTier
+      : model ? defaultServiceTier(model) : null,
   };
 }
 
@@ -159,6 +179,9 @@ export function threadSettingsSelection(
     planMode: settings.collaborationMode.mode === 'plan',
     selectedModelId: model?.id ?? current.selectedModelId,
     selectedReasoningEffort: settings.effort ?? (model ? defaultReasoningEffort(model) : null),
+    selectedServiceTier: settings.serviceTier !== undefined
+      ? settings.serviceTier
+      : model ? defaultServiceTier(model) : null,
   };
 }
 
@@ -173,6 +196,9 @@ export function nextSelection(
   }
 
   let reasoningEffort = settings.reasoningEffort ?? current.selectedReasoningEffort;
+  let serviceTier = settings.serviceTier !== undefined
+    ? settings.serviceTier
+    : current.selectedServiceTier ?? null;
   const supported = model?.supportedReasoningEfforts?.map((option) => option.reasoningEffort) ?? [];
   if (settings.reasoningEffort && supported.length > 0 && !supported.includes(settings.reasoningEffort)) {
     throw new Error(`Reasoning effort '${settings.reasoningEffort}' is not available for '${model?.displayName}'`);
@@ -180,12 +206,18 @@ export function nextSelection(
   if (settings.modelId && supported.length > 0 && (!reasoningEffort || !supported.includes(reasoningEffort))) {
     reasoningEffort = model ? defaultReasoningEffort(model) : null;
   }
+  if (settings.serviceTier !== undefined) validateServiceTier(model, serviceTier);
+  if (settings.serviceTier === undefined && settings.modelId && serviceTier
+    && !model?.serviceTiers?.some((tier) => tier.id === serviceTier)) {
+    serviceTier = model ? defaultServiceTier(model) : null;
+  }
 
   return {
     approvalPreset: settings.approvalPreset ?? current.approvalPreset,
     planMode: settings.planMode ?? current.planMode,
     selectedModelId: model?.id ?? null,
     selectedReasoningEffort: reasoningEffort,
+    selectedServiceTier: serviceTier,
   };
 }
 
@@ -207,7 +239,7 @@ export function collaborationMode(
 export function turnSettings(
   state: CodexSurfaceSnapshot,
   options: SendCodexMessageOptions,
-): Pick<v2.TurnStartParams, 'collaborationMode' | 'effort' | 'model'> {
+): Pick<v2.TurnStartParams, 'collaborationMode' | 'effort' | 'model' | 'serviceTier'> {
   const selected = selectedModel(state.models, state.selectedModelId);
   const model = options.model ?? selected?.model;
   const effort = options.reasoningEffort ?? state.selectedReasoningEffort;
@@ -216,5 +248,8 @@ export function turnSettings(
     ...(model ? { model } : {}),
     ...(effort ? { effort } : {}),
     ...(model ? { collaborationMode: collaborationMode(planMode, model, effort) } : {}),
+    ...(options.serviceTier !== undefined
+      ? { serviceTier: options.serviceTier }
+      : state.selectedServiceTier ? { serviceTier: state.selectedServiceTier } : {}),
   };
 }

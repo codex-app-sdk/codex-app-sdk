@@ -196,6 +196,12 @@ export type CodexSurfaceReasoningEffortOption = {
   description: string;
 };
 
+export type CodexSurfaceServiceTier = {
+  id: string;
+  name: string;
+  description: string;
+};
+
 export type CodexSurfaceModel = {
   id: string;
   model: string;
@@ -204,6 +210,8 @@ export type CodexSurfaceModel = {
   hidden?: boolean;
   supportedReasoningEfforts?: CodexSurfaceReasoningEffortOption[];
   defaultReasoningEffort?: string | null;
+  serviceTiers?: CodexSurfaceServiceTier[];
+  defaultServiceTier?: string | null;
   isDefault?: boolean;
   providerMetadata?: Record<string, unknown>;
 };
@@ -387,6 +395,8 @@ export type CodexSurfaceSnapshot = {
   approvalPreset: CodexSurfaceApprovalPreset | null;
   selectedModelId: string | null;
   selectedReasoningEffort: string | null;
+  /** Selected app-server service tier. Optional for backwards-compatible snapshots. */
+  selectedServiceTier?: string | null;
   planMode: boolean;
   contextUsage: CodexSurfaceContextUsage | null;
   goal: CodexSurfaceGoal | null;
@@ -548,6 +558,7 @@ export type CodexSurfaceEvent =
     approvalPreset: CodexSurfaceApprovalPreset | null;
     selectedModelId: string | null;
     selectedReasoningEffort: string | null;
+    selectedServiceTier?: string | null;
     planMode: boolean;
   }>
   | CodexConversationEventEnvelope<'conversation.goalChanged', {
@@ -701,18 +712,20 @@ export type CreateCodexConversationOptions = {
   developerInstructions?: string;
   model?: string;
   reasoningEffort?: string;
+  serviceTier?: string | null;
   permissionMode?: CodexSurfacePermissionMode;
 };
 
 export type CreateCodexRendererConversationOptions = Pick<
   CreateCodexConversationOptions,
-  'approvalPreset' | 'model' | 'reasoningEffort'
+  'approvalPreset' | 'model' | 'reasoningEffort' | 'serviceTier'
 >;
 
 export type SendCodexMessageOptions = {
   attachments?: readonly CodexSurfaceAttachment[];
   model?: string;
   reasoningEffort?: string;
+  serviceTier?: string | null;
   planMode?: boolean;
   skills?: readonly CodexSurfaceSkillInput[];
   outputSchema?: CodexSurfaceJsonValue;
@@ -758,6 +771,7 @@ export type UpdateCodexConversationSettings = {
   approvalPreset?: CodexSurfaceApprovalPreset;
   modelId?: string;
   reasoningEffort?: string;
+  serviceTier?: string | null;
   planMode?: boolean;
 };
 

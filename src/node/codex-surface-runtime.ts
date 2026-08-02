@@ -23,6 +23,7 @@ export type ThreadRuntimeState = {
   skillCatalogStatus: CodexSurfaceSnapshot['skillCatalogStatus'];
   selectedModelId: string | null;
   selectedReasoningEffort: string | null;
+  selectedServiceTier: string | null;
   planMode: boolean;
   contextUsage: CodexSurfaceSnapshot['contextUsage'];
   goal: CodexSurfaceSnapshot['goal'];
@@ -65,6 +66,7 @@ export function initialSurfaceSnapshot(authentication: CodexSurfaceAuthenticatio
     approvalPreset: null,
     selectedModelId: null,
     selectedReasoningEffort: null,
+    selectedServiceTier: null,
     planMode: false,
     contextUsage: null,
     goal: null,
@@ -98,6 +100,7 @@ export function createThreadRuntime(
     skillCatalogStatus: state.skillCatalogStatus,
     selectedModelId: state.selectedModelId,
     selectedReasoningEffort: state.selectedReasoningEffort,
+    selectedServiceTier: state.selectedServiceTier ?? null,
     planMode: false,
     contextUsage: null,
     goal: null,
@@ -136,6 +139,7 @@ export function runtimeProjection(
   | 'queuedPrompts'
   | 'selectedModelId'
   | 'selectedReasoningEffort'
+  | 'selectedServiceTier'
   | 'skillCatalogStatus'
   | 'skills'
   | 'threadStatus'
@@ -158,6 +162,7 @@ export function runtimeProjection(
     queuedPrompts: runtime.queuedPrompts,
     selectedModelId: runtime.selectedModelId,
     selectedReasoningEffort: runtime.selectedReasoningEffort,
+    selectedServiceTier: runtime.selectedServiceTier,
     skillCatalogStatus: runtime.skillCatalogStatus,
     skills: runtime.skills,
     threadStatus: runtime.threadStatus,

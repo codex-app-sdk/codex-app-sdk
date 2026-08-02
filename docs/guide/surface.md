@@ -59,13 +59,15 @@ const workspaceThreads = await surface.listConversations({
 
 ## Host-owned conversation defaults
 
-Fixed product experiences can own the default model and reasoning effort:
+Fixed product experiences can own the default model, reasoning effort, and
+service tier:
 
 ```ts
 const surface = createCodexSurface({
   conversationDefaults: {
     model: 'a-model-id-known-to-this-host',
     reasoningEffort: 'medium',
+    serviceTier: 'priority',
   },
 });
 ```

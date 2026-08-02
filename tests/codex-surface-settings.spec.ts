@@ -15,6 +15,7 @@ import {
   threadSettingsSelection,
   turnSettings,
   validateReasoningEffort,
+  validateServiceTier,
 } from '../src/node/codex-surface-settings';
 
 const models: CodexSurfaceModel[] = [
@@ -27,6 +28,8 @@ const models: CodexSurfaceModel[] = [
       { reasoningEffort: 'medium', description: 'Medium' },
     ],
     defaultReasoningEffort: 'medium',
+    serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast mode' }],
+    defaultServiceTier: null,
   },
   {
     id: 'default-id',
@@ -50,6 +53,8 @@ describe('Codex surface settings policy', () => {
     expect(() => validateReasoningEffort(null, 'high')).toThrow("without a model");
     expect(() => validateReasoningEffort(models[0]!, 'high')).toThrow("not available for 'Fast'");
     expect(() => validateReasoningEffort(models[0]!, 'low')).not.toThrow();
+    expect(() => validateServiceTier(models[0]!, 'priority')).not.toThrow();
+    expect(() => validateServiceTier(models[0]!, 'unknown')).toThrow("not available for 'Fast'");
     expect(() => validateReasoningEffort({ id: 'open', model: 'open', displayName: 'Open' }, 'custom'))
       .not.toThrow();
     expect(defaultReasoningEffort(models[0]!)).toBe('medium');
@@ -109,6 +114,7 @@ describe('Codex surface settings policy', () => {
       models,
       selectedModelId: 'fast-id',
       selectedReasoningEffort: 'low',
+      selectedServiceTier: null,
       approvalPreset: 'ask-for-approval',
       planMode: false,
     });
@@ -117,6 +123,7 @@ describe('Codex surface settings policy', () => {
       planMode: false,
       selectedModelId: 'fast-id',
       selectedReasoningEffort: 'low',
+      selectedServiceTier: null,
     });
     expect(nextSelection(current, {
       approvalPreset: 'full-access', modelId: 'default-id', planMode: true,
@@ -125,9 +132,12 @@ describe('Codex surface settings policy', () => {
       planMode: true,
       selectedModelId: 'default-id',
       selectedReasoningEffort: 'high',
+      selectedServiceTier: null,
     });
     expect(nextSelection(current, { modelId: 'fast-id', reasoningEffort: 'medium' }).selectedReasoningEffort)
       .toBe('medium');
+    expect(nextSelection({ ...current, selectedServiceTier: 'priority' }, { modelId: 'default-id' })
+      .selectedServiceTier).toBeNull();
     expect(() => nextSelection(current, { modelId: 'missing' })).toThrow("Unknown model 'missing'");
     expect(() => nextSelection(current, { reasoningEffort: 'high' })).toThrow("not available for 'Fast'");
     expect(nextSelection(snapshot({ models: [], selectedModelId: null }), { planMode: true }))
@@ -149,12 +159,14 @@ describe('Codex surface settings policy', () => {
       sandbox: { type: 'readOnly' },
       activePermissionProfile: null,
       reasoningEffort: null,
+      serviceTier: null,
     } as v2.ThreadStartResponse, models, current);
     expect(session).toStrictEqual({
       approvalPreset: 'approve-for-me',
       planMode: true,
       selectedModelId: 'fast-id',
       selectedReasoningEffort: 'medium',
+      selectedServiceTier: null,
     });
 
     const thread = threadSettingsSelection({
@@ -171,6 +183,7 @@ describe('Codex surface settings policy', () => {
       planMode: true,
       selectedModelId: 'default-id',
       selectedReasoningEffort: 'high',
+      selectedServiceTier: null,
     });
 
     expect(sessionSelection({
@@ -192,10 +205,12 @@ describe('Codex surface settings policy', () => {
       models,
       selectedModelId: 'fast-id',
       selectedReasoningEffort: 'low',
+      selectedServiceTier: null,
       planMode: false,
-    }), { model: 'explicit', reasoningEffort: 'high', planMode: true })).toStrictEqual({
+    }), { model: 'explicit', reasoningEffort: 'high', planMode: true, serviceTier: 'priority' })).toStrictEqual({
       model: 'explicit',
       effort: 'high',
+      serviceTier: 'priority',
       collaborationMode: {
         mode: 'plan',
         settings: { model: 'explicit', reasoning_effort: 'high', developer_instructions: null },

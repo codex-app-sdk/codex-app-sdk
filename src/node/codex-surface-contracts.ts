@@ -61,7 +61,7 @@ export type CodexConversationHostOptions = {
 
 export type CodexConversationDefaults = Pick<
   CreateCodexConversationOptions,
-  'model' | 'reasoningEffort'
+  'model' | 'reasoningEffort' | 'serviceTier'
 >;
 
 export type CodexConversationLoadOptions = CodexConversationHostOptions & {

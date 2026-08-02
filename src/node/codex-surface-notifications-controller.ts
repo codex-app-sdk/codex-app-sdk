@@ -188,6 +188,7 @@ export class CodexSurfaceNotificationsController {
         const changed = runtime.approvalPreset !== next.approvalPreset
           || runtime.selectedModelId !== next.selectedModelId
           || runtime.selectedReasoningEffort !== next.selectedReasoningEffort
+          || runtime.selectedServiceTier !== next.selectedServiceTier
           || runtime.planMode !== next.planMode;
         this.host.patchRuntime(notification.params.threadId, next);
         if (changed) this.host.emitConversationSettings(notification.params.threadId, 'notification');

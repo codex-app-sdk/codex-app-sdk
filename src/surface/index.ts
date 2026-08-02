@@ -50,6 +50,7 @@ export type {
   CodexSurfaceSnapshot,
   CodexSurfaceSkill,
   CodexSurfaceSkillInput,
+  CodexSurfaceServiceTier,
   CodexSurfaceStatus,
   CodexSurfaceThreadStatus,
   CodexSurfaceTurnError,

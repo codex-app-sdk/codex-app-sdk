@@ -121,6 +121,7 @@ export class CodexSurfaceConversationSettingsController {
     const changed = runtime.approvalPreset !== next.approvalPreset
       || runtime.selectedModelId !== next.selectedModelId
       || runtime.selectedReasoningEffort !== next.selectedReasoningEffort
+      || runtime.selectedServiceTier !== next.selectedServiceTier
       || runtime.planMode !== next.planMode;
     if (settings.approvalPreset && !runtimeSnapshot.approvalPresets.includes(settings.approvalPreset)) {
       throw new Error(`Approval preset '${settings.approvalPreset}' is not available`);
@@ -131,6 +132,9 @@ export class CodexSurfaceConversationSettingsController {
       ...(settings.approvalPreset ? approvalPresetUpdateParams(settings.approvalPreset) : {}),
       ...(settings.modelId && model ? { model: model.model } : {}),
       ...(settings.reasoningEffort || settings.modelId ? { effort: next.selectedReasoningEffort } : {}),
+      ...(settings.serviceTier !== undefined || settings.modelId
+        ? { serviceTier: next.selectedServiceTier }
+        : {}),
       ...(model && (
         typeof settings.planMode === 'boolean'
         || Boolean(settings.modelId)

@@ -130,7 +130,7 @@ export type {
   ToolConfirmationDecision,
   TurnGitDiff,
 } from './chat/contracts';
-export type { CodexSurfacePlugin } from '../surface/types';
+export type { CodexSurfacePlugin, CodexSurfaceServiceTier } from '../surface/types';
 export type {
   MessageAttachment as CodexMessageAttachment,
   Message as CodexChatMessage,

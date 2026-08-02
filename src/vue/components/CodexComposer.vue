@@ -93,9 +93,12 @@
         :model-catalog-status="modelCatalogStatus"
         :model-id="selectedModelId"
         :reasoning-effort="selectedReasoningEffort"
+        :service-tier="selectedServiceTier"
+        :show-service-tier="effectiveCodexCapabilities.serviceTier"
         :show-reasoning="effectiveCodexCapabilities.reasoningEffort"
         @update:model-id="$emit('update:modelId', $event)"
         @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
+        @update:service-tier="$emit('update:serviceTier', $event)"
       />
       <ChatComposerVoiceButton
         v-if="voiceVisible"
@@ -165,6 +168,7 @@ const props = defineProps<{
   presentation?: CodexConversationPresentation;
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  selectedServiceTier?: string | null;
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skills?: readonly CodexSkillSummary[];
   transcribeAudio?: CodexChatTranscription;
@@ -182,6 +186,7 @@ const emit = defineEmits<{
   selectApprovalPreset: [preset: ApprovalPreset];
   'update:planMode': [enabled: boolean];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
+  'update:serviceTier': [serviceTier: string | null];
 }>();
 
 const prompt = ref('');

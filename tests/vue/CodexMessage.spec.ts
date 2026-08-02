@@ -39,6 +39,7 @@ describe('CodexMessage', () => {
     });
 
     expect(wrapper.findAll('.test-message-header')).toHaveLength(1);
+    expect(wrapper.get('.chat-message--steer').text()).toContain('Header 2');
     expect(wrapper.get('.test-message-header').text()).toBe('Header 2');
     expect(wrapper.get('.chat-message-block--text').text()).toContain('Keep SDK rendering');
     expect(wrapper.get('.test-message-header').element.compareDocumentPosition(

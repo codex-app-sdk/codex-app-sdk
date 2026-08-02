@@ -4,6 +4,7 @@ export const codexCapabilities: CodexCapabilities = {
   models: true,
   skills: true,
   reasoningEffort: true,
+  serviceTier: true,
   planMode: true,
   goals: true,
   steerPrompt: true,

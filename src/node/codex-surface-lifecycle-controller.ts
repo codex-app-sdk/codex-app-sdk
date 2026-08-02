@@ -29,6 +29,7 @@ import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-run
 import {
   collaborationMode,
   defaultReasoningEffort,
+  validateServiceTier,
   requireCatalogModel,
   selectedModel,
   sessionSelection,
@@ -130,7 +131,13 @@ export class CodexSurfaceLifecycleController {
         ? state.selectedReasoningEffort
         : requestedModel ? defaultReasoningEffort(requestedModel) : null)
       ?? undefined;
+    const requestedServiceTier = options.serviceTier !== undefined
+      ? options.serviceTier
+      : requestedModel?.id === currentModel?.id
+        ? (state.selectedServiceTier ?? null)
+        : requestedModel?.defaultServiceTier ?? null;
     validateReasoningEffort(requestedModel, requestedReasoningEffort);
+    validateServiceTier(requestedModel, requestedServiceTier);
     const mcpServers = hostOptions.mcpServers === undefined
       ? this.extensions.defaultMcpServers
       : normalizeMcpServers(hostOptions.mcpServers);
@@ -151,6 +158,7 @@ export class CodexSurfaceLifecycleController {
       ...(extension.config === undefined ? {} : { config: extension.config as v2.ThreadStartParams['config'] }),
       ...(this.extensions.hasDynamicTools() ? { dynamicTools: this.extensions.dynamicToolSpecs() } : {}),
       ...settings,
+      ...(requestedServiceTier === undefined ? {} : { serviceTier: requestedServiceTier }),
       serviceName: 'codex_app_sdk',
     });
     const selection = sessionSelection(response, state.models, state);
@@ -164,6 +172,7 @@ export class CodexSurfaceLifecycleController {
       });
       selection.selectedReasoningEffort = requestedReasoningEffort;
     }
+    if (requestedServiceTier !== undefined) selection.selectedServiceTier = requestedServiceTier;
     if (requestedModel) selection.selectedModelId = requestedModel.id;
     if (inheritedApprovalPreset) selection.approvalPreset = inheritedApprovalPreset;
     const runtime = this.host.createRuntime(response.thread.id, {

@@ -288,6 +288,7 @@ export class CodexSurfaceConnectionController {
       approvalPreset: null,
       selectedModelId: null,
       selectedReasoningEffort: null,
+      selectedServiceTier: null,
       planMode: false,
       contextUsage: null,
       goal: null,

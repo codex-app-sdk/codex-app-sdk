@@ -27,7 +27,7 @@ attachments, just like `sendMessage`.
 | Component | Purpose |
 | --- | --- |
 | `CodexConversationPane` | Complete bound or unbound conversation surface |
-| `CodexComposer` | Full composer with menus, attachments, voice, settings, and send/steer behavior |
+| `CodexComposer` | Full composer with menus, attachments, voice, model/reasoning/Fast mode settings, and send/steer behavior |
 | `CodexMessageList` | Conversation message collection |
 | `CodexMessage` | One message with blocks, status, thinking, and actions |
 | `CodexApprovalPrompt` | Command, file-change, and permission approval UI |
@@ -100,7 +100,7 @@ An explicit component prop takes precedence over the provided value.
 - `CodexCapabilities`
 - `CodexConversationPresentation` and its composer/message/shelf subtypes
 - `CodexComposerMenuItem` discriminated union
-- model, reasoning, skill, plugin, command, context-usage, goal, diff, and
+- model, reasoning, service-tier/Fast mode, skill, plugin, command, context-usage, goal, diff, and
   client-request view types
 - `CodexChatMessage`, block, attachment, media, tool, and status types
 

@@ -79,7 +79,7 @@ export function responseFor(method: string, params: unknown): unknown {
           displayName: 'GPT-5', description: 'Test model', hidden: false,
           supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
           defaultReasoningEffort: 'medium', inputModalities: ['text'], supportsPersonality: true,
-          additionalSpeedTiers: [], serviceTiers: [], defaultServiceTier: null, isDefault: true,
+          additionalSpeedTiers: [], serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast mode' }], defaultServiceTier: null, isDefault: true,
         },
         {
           id: 'gpt-mini', model: 'gpt-mini-runtime', upgrade: null, upgradeInfo: null, availabilityNux: null,
@@ -89,7 +89,7 @@ export function responseFor(method: string, params: unknown): unknown {
             { reasoningEffort: 'high', description: 'Deep' },
           ],
           defaultReasoningEffort: 'medium', inputModalities: ['text'], supportsPersonality: true,
-          additionalSpeedTiers: [], serviceTiers: [], defaultServiceTier: null, isDefault: false,
+          additionalSpeedTiers: [], serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast mode' }], defaultServiceTier: null, isDefault: false,
         },
       ],
       nextCursor: null,

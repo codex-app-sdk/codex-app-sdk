@@ -105,6 +105,7 @@ describe('CodexSurface', () => {
     const snapshot = await surface.updateConversationSettings({
       modelId: 'gpt-mini',
       reasoningEffort: 'high',
+      serviceTier: 'priority',
       approvalPreset: 'full-access',
       planMode: true,
     });
@@ -114,6 +115,7 @@ describe('CodexSurface', () => {
         threadId: 'thread-existing',
         model: 'gpt-mini-runtime',
         effort: 'high',
+        serviceTier: 'priority',
         approvalPolicy: 'never',
         approvalsReviewer: 'user',
         permissions: ':danger-full-access',
@@ -126,6 +128,7 @@ describe('CodexSurface', () => {
     expect(snapshot).toMatchObject({
       selectedModelId: 'gpt-mini',
       selectedReasoningEffort: 'high',
+      selectedServiceTier: 'priority',
       approvalPreset: 'full-access',
       planMode: true,
     });

@@ -96,9 +96,14 @@ the SDK body, attachments, tools, or actions:
 
 ## Catalog-driven controls
 
-Model, reasoning, skill, plugin, and approval controls are driven by the
+Model, reasoning, service-tier, skill, plugin, and approval controls are driven by the
 surface catalogs. The pane does not invent model IDs, reasoning efforts, or
 permission presets.
+
+When the selected model advertises a `priority` or `fast` service tier, the
+model menu includes a Fast mode toggle below Reasoning. The toggle emits
+`update:serviceTier` with the tier ID when enabled and `null` when disabled;
+bound panes apply it through `updateConversationSettings({ serviceTier })`.
 
 File mentions are host-provided through the `files` prop. Attachments, paste,
 and drag/drop use the native capability bridge automatically when available.

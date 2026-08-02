@@ -17,6 +17,7 @@ import {
   requireCatalogModel,
   selectedModel,
   validateReasoningEffort,
+  validateServiceTier,
 } from './codex-surface-settings';
 
 export function threadToSummary(thread: v2.Thread): CodexConversationSummary {
@@ -49,6 +50,7 @@ export function validatedSendOptions(
     ? requireCatalogModel(state.models, options.model)
     : selectedModel(state.models, state.selectedModelId);
   validateReasoningEffort(model, options.reasoningEffort);
+  validateServiceTier(model, options.serviceTier);
   return {
     ...options,
     ...(options.attachments ? { attachments: validateAttachments(options.attachments) } : {}),

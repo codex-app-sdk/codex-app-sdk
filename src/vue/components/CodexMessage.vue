@@ -19,7 +19,9 @@
     :class="[`chat-message--${chatMessage.role}`, { 'chat-message--editing': isEditing }]"
   >
     <div class="chat-message__body">
-      <slot name="header" :index="index" :message="chatMessage" />
+      <div v-if="$slots.header" class="chat-message--steer">
+        <slot name="header" :index="index" :message="chatMessage" />
+      </div>
       <div
         v-if="userAttachmentBlocks.length > 0"
         class="chat-message__attachments"

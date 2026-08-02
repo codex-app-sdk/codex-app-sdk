@@ -46,7 +46,7 @@ import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../
 import CodexComposerMenu from '../components/CodexComposerMenu.vue';
 
 type SelectorCommand = {
-  kind: 'model' | 'reasoning';
+  kind: 'model' | 'reasoning' | 'serviceTier';
   value: string;
 };
 
@@ -56,6 +56,8 @@ const props = withDefaults(defineProps<{
   modelId?: string | null;
   models?: readonly CodexModelOption[];
   reasoningEffort?: ReasoningEffort | null;
+  serviceTier?: string | null;
+  showServiceTier?: boolean;
   showReasoning?: boolean;
 }>(), {
   disabled: false,
@@ -63,12 +65,15 @@ const props = withDefaults(defineProps<{
   modelId: null,
   models: () => [],
   reasoningEffort: null,
+  serviceTier: null,
+  showServiceTier: true,
   showReasoning: true,
 });
 
 const emit = defineEmits<{
   'update:modelId': [modelId: string];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
+  'update:serviceTier': [serviceTier: string | null];
 }>();
 
 const selectedModel = computed(() => (
@@ -88,6 +93,12 @@ const effectiveReasoningEffort = computed(() => (
   reasoningEfforts.value[0]?.reasoningEffort ??
   null
 ));
+
+const serviceTiers = computed(() => selectedModel.value?.serviceTiers ?? []);
+const showServiceTier = computed(() => props.showServiceTier && serviceTiers.value.length > 0);
+const fastServiceTier = computed(() => serviceTiers.value.find((tier) => (
+  /^(fast|priority)$/i.test(tier.id) || /fast|priority/i.test(tier.name)
+)) ?? null);
 
 const controlDisabled = computed(() => props.disabled);
 
@@ -116,6 +127,21 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
       payload: { kind: 'reasoning' as const, value: effort.reasoningEffort },
       type: 'radio' as const,
     })));
+  }
+
+  if (showServiceTier.value && fastServiceTier.value) {
+    items.push({ id: 'model-service-tier-separator', type: 'separator' });
+    items.push({ id: 'service-tier-heading', type: 'heading', label: 'Speed' });
+    items.push({
+      accessory: 'switch',
+      checked: props.serviceTier === fastServiceTier.value.id,
+      closeOnSelect: false,
+      description: fastServiceTier.value.description,
+      id: `service-tier:${fastServiceTier.value.id}`,
+      label: 'Fast mode',
+      payload: { kind: 'serviceTier' as const, value: fastServiceTier.value.id },
+      type: 'checkbox' as const,
+    });
   }
 
   return items;
@@ -182,8 +208,10 @@ function onSelect(item: CodexComposerMenuSelectableItem<SelectorCommand>): void 
 
   if (command.kind === 'model') {
     emit('update:modelId', command.value);
-  } else if (showReasoning.value) {
+  } else if (command.kind === 'reasoning' && showReasoning.value) {
     emit('update:reasoningEffort', command.value);
+  } else if (command.kind === 'serviceTier' && fastServiceTier.value) {
+    emit('update:serviceTier', props.serviceTier === fastServiceTier.value.id ? null : command.value);
   }
 }
 </script>

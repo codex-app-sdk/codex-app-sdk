@@ -23,7 +23,7 @@ describe('Codex surface catalog codecs', () => {
       defaultReasoningEffort: 'medium',
       isDefault: true,
       inputModalities: ['text', 'image'],
-      serviceTiers: [{ id: 'priority', displayName: 'Priority' }],
+      serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Faster responses' }],
       supportsPersonality: true,
       upgrade: 'next-model',
       upgradeInfo: { message: 'Upgrade available' },
@@ -37,6 +37,7 @@ describe('Codex surface catalog codecs', () => {
       hidden: false,
       supportedReasoningEfforts: model.supportedReasoningEfforts,
       defaultReasoningEffort: 'medium',
+      serviceTiers: model.serviceTiers,
       isDefault: true,
       providerMetadata: {
         inputModalities: ['text', 'image'],

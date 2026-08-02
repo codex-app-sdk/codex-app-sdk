@@ -21,6 +21,7 @@ type CodexSurfaceOptions = {
   conversationDefaults?: {
     model?: string;
     reasoningEffort?: string;
+    serviceTier?: string | null;
   };
   conversationLimit?: number;
   codexHome?: string;
@@ -136,6 +137,10 @@ type CodexConversation = {
 `sendMessage` and `steerMessage` accept the same attachment options. Steering
 maps attachments to app-server `UserInput` blocks and includes them in the
 optimistic user steer message.
+
+`serviceTier` is accepted by conversation creation, settings updates, and
+message options. Passing `null` to settings or message options clears Fast mode
+for subsequent turns; omitted values preserve the current tier.
 
 ### Realtime voice
 

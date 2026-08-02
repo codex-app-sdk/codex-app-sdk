@@ -22,6 +22,7 @@ data source.
 await surface.createConversation({
   model: 'available-model-id',
   reasoningEffort: 'medium',
+  serviceTier: 'priority',
 });
 
 await surface.selectConversation(existingId);

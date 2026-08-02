@@ -11,6 +11,7 @@ type SelectorProps = {
   modelId?: string | null;
   models?: CodexModelOption[];
   reasoningEffort?: ReasoningEffort | null;
+  serviceTier?: string | null;
 };
 
 const models: CodexModelOption[] = [
@@ -39,6 +40,8 @@ const models: CodexModelOption[] = [
       { reasoningEffort: 'xhigh', description: 'Maximum reasoning' },
     ],
     defaultReasoningEffort: 'high',
+    serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast responses' }],
+    defaultServiceTier: null,
     isDefault: true,
   },
 ];
@@ -73,6 +76,17 @@ describe('ChatModelReasoningSelector', () => {
     expect(wrapper.emitted('update:reasoningEffort')).toStrictEqual([['medium']]);
   });
 
+  it('renders and toggles Fast mode when the model exposes a priority service tier', async () => {
+    const wrapper = mountSelector({ modelId: 'codex-max' });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+
+    const fastMode = wrapper.findAll('[role="menuitemcheckbox"]');
+    expect(fastMode).toHaveLength(1);
+    expect(fastMode[0]!.text()).toContain('Fast mode');
+    await fastMode[0]!.trigger('click');
+    expect(wrapper.emitted('update:serviceTier')).toStrictEqual([['priority']]);
+  });
+
   it('keeps disabled controls inert when the model catalog has not loaded', () => {
     const wrapper = mountSelector({
       models: [],
@@ -101,8 +115,9 @@ describe('ChatModelReasoningSelector', () => {
     expect(wrapper.findAll('.codex-composer-menu-list__heading').map((heading) => heading.text())).toStrictEqual([
       'Model',
       'Reasoning',
+      'Speed',
     ]);
-    expect(wrapper.findAll('.codex-composer-menu-list__description')).toHaveLength(0);
+    expect(wrapper.findAll('.codex-composer-menu-list__description')).toHaveLength(1);
     expect(wrapper.findAll('.chat-model-selector__menu')).toHaveLength(1);
   });
 });

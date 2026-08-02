@@ -20,6 +20,7 @@ import type { SurfaceEventInput } from './codex-surface-events';
 import {
   approvalPresetsForProfiles,
   defaultReasoningEffort,
+  defaultServiceTier,
   selectedModel,
 } from './codex-surface-settings';
 import type { ListCodexSkillsOptions } from './codex-surface-contracts';
@@ -232,6 +233,7 @@ export class CodexSurfaceCatalogController {
       modelCatalogStatus: 'loaded',
       selectedModelId: selected?.id ?? null,
       selectedReasoningEffort: selected ? defaultReasoningEffort(selected) : null,
+      selectedServiceTier: selected ? defaultServiceTier(selected) : null,
     });
     this.emitModels(models, 'loaded', origin);
   }

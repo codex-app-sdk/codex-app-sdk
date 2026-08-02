@@ -161,6 +161,7 @@ export class CodexSurfaceRuntimeController {
       approvalPreset: runtime.approvalPreset,
       selectedModelId: runtime.selectedModelId,
       selectedReasoningEffort: runtime.selectedReasoningEffort,
+      selectedServiceTier: runtime.selectedServiceTier,
       planMode: runtime.planMode,
     };
     const fingerprint = JSON.stringify(payload);

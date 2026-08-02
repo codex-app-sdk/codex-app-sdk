@@ -1,4 +1,5 @@
 import type { CodexSpeechTranscriptionResult as NativeSpeechTranscriptionResult } from '../../native/types';
+import type { CodexSurfaceServiceTier } from '../../surface/types';
 
 export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
 
@@ -8,6 +9,7 @@ export type CodexCapabilities = {
   models: boolean;
   skills: boolean;
   reasoningEffort: boolean;
+  serviceTier?: boolean;
   planMode: boolean;
   goals: boolean;
   steerPrompt: boolean;
@@ -33,6 +35,8 @@ export type CodexModelOption = {
   hidden?: boolean;
   supportedReasoningEfforts?: readonly CodexReasoningEffortOption[];
   defaultReasoningEffort?: ReasoningEffort | null;
+  serviceTiers?: readonly CodexSurfaceServiceTier[];
+  defaultServiceTier?: string | null;
   isDefault?: boolean;
   providerMetadata?: Record<string, unknown>;
 };

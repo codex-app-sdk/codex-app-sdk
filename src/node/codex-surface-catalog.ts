@@ -14,6 +14,14 @@ export function codexModelToSurfaceModel(model: v2.Model): CodexSurfaceModel {
     hidden: model.hidden,
     supportedReasoningEfforts: model.supportedReasoningEfforts,
     defaultReasoningEffort: model.defaultReasoningEffort,
+    ...(model.serviceTiers.length > 0 ? {
+      serviceTiers: model.serviceTiers.map((tier) => ({
+        id: tier.id,
+        name: tier.name,
+        description: tier.description,
+      })),
+    } : {}),
+    ...(model.defaultServiceTier ? { defaultServiceTier: model.defaultServiceTier } : {}),
     isDefault: model.isDefault,
     providerMetadata: {
       inputModalities: model.inputModalities,

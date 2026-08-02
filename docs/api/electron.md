@@ -30,7 +30,7 @@ returns them as `CodexElectronRendererApis`.
 - `CodexSurfaceRendererApi`
 
 The renderer variant narrows conversation creation to `approvalPreset`, `model`,
-and `reasoningEffort`.
+`reasoningEffort`, and `serviceTier`.
 
 ## Native IPC
 

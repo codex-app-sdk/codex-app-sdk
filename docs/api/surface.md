@@ -26,6 +26,7 @@ type CodexSurfaceSnapshot = {
   approvalPreset: CodexSurfaceApprovalPreset | null;
   selectedModelId: string | null;
   selectedReasoningEffort: string | null;
+  selectedServiceTier?: string | null;
   planMode: boolean;
   contextUsage: CodexSurfaceContextUsage | null;
   goal: CodexSurfaceGoal | null;
@@ -41,6 +42,19 @@ type CodexSurfaceSnapshot = {
 
 `CodexConversationSnapshot` adds a non-null conversation ID, `activeTurnId`, and
 all known turn IDs.
+
+Models may advertise service tiers through `serviceTiers` and
+`defaultServiceTier`. The selected tier is exposed as `selectedServiceTier`;
+`serviceTier: null` clears it. The standard Vue selector presents the
+`priority`/`fast` tier as a Fast mode toggle.
+
+```ts
+type CodexSurfaceServiceTier = {
+  id: string;
+  name: string;
+  description: string;
+};
+```
 
 ## Messages
 
@@ -71,12 +85,12 @@ This is the stable renderer model for both restored and live conversations.
 
 ### `CreateCodexConversationOptions`
 
-Trusted Node creation options include model, reasoning, raw permission/approval
+Trusted Node creation options include model, reasoning, service tier, raw permission/approval
 modes, preset, cwd, base/developer instructions, and config.
 
 ### `CreateCodexRendererConversationOptions`
 
-Renderer-safe subset: model, reasoning effort, and advertised approval preset.
+Renderer-safe subset: model, reasoning effort, service tier, and advertised approval preset.
 
 ### `SendCodexMessageOptions`
 
@@ -85,6 +99,7 @@ type SendCodexMessageOptions = {
   attachments?: readonly CodexSurfaceAttachment[];
   model?: string;
   reasoningEffort?: string;
+  serviceTier?: string | null;
   planMode?: boolean;
   skills?: readonly CodexSurfaceSkillInput[];
   outputSchema?: CodexSurfaceJsonValue;
