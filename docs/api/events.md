@@ -13,6 +13,10 @@ surface.onEvent((event) => {
     case 'tool.completed':
       console.log(event.conversationId, event.payload.toolPart);
       break;
+    case 'file.activity':
+      // The host can reveal or focus the file in its own sidebar.
+      console.log(event.payload.action, event.payload.path);
+      break;
   }
 });
 ```
@@ -30,8 +34,36 @@ Event families cover:
 - `message.*`
 - `turn.*`
 - `tool.*`
+- `file.activity`
 - `approval.*`
 - `clientRequest.*`
+
+## File activity
+
+`file.activity` is a host-facing notification emitted when a live Codex tool
+identifies a file operation. It is intentionally additive: the SDK does not
+open, edit, or display the file, so an application can use it to reveal a file
+in its own sidebar or editor.
+
+```ts
+type FileActivityEvent = {
+  type: 'file.activity';
+  conversationId: string;
+  turnId: string;
+  payload: {
+    messageId: string;
+    itemId: string;
+    path: string;
+    action: 'read' | 'edit' | 'create';
+    status: 'running' | 'completed' | 'failed';
+  };
+};
+```
+
+`path` is an absolute path whenever the app-server provides a working
+directory. `action` describes the operation, and `status` can be emitted more
+than once as a tool progresses. Delete operations do not produce this event;
+hosts that need delete notifications should use the underlying tool events.
 
 ## `CodexConversationEvent`
 

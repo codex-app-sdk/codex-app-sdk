@@ -57,6 +57,9 @@ surface controller. Or build a different layout from exported components:
 - `CodexCompactionMessage`
 - message editor and actions
 
+The latest completed assistant message keeps its actions visible for quick
+follow-up. Older messages reveal actions on hover or focus as usual.
+
 ### Tools and state
 
 - `CodexToolCall`, `CodexToolGroup`, and `CodexToolCallTitle`
@@ -81,6 +84,12 @@ surface controller. Or build a different layout from exported components:
 
 Use `message-block` for media-specific overrides, or mount
 `CodexMediaBlock` directly.
+
+Read, edit, and create tool titles expose an interactive file target when the
+SDK can resolve an absolute path. Clicking the target emits the pane's
+`openLink` event with a file link containing `filepath` and `action`; it does
+not expand or collapse the tool details. Hosts can use this event to reveal
+the file in a sidebar or editor.
 
 Use `message-header` to add host-owned context above a message without replacing
 the SDK body, attachments, tools, or actions:

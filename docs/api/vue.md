@@ -87,6 +87,32 @@ transcript is scrolled away from the bottom. It accepts an optional accessible
 `label` and emits `click`; use it directly when composing a custom message
 layout.
 
+Pass `busy` to `CodexMessageList` (the conversation pane wires this from its
+surface state) to keep a `Thinking` shimmer visible while a turn is accepted
+but the app-server has not yet materialized its first assistant row.
+
+Message actions remain visible on the latest completed assistant message. Older
+message rows keep the hover/focus visibility behavior.
+
+File-operation targets in read, edit, and create tool titles are interactive
+targets when the SDK can resolve an absolute path from the tool input. Clicking
+a target emits the existing `CodexConversationPane` `openLink` event and does
+not toggle tool details. File links emitted from tool titles include the canonical
+`filepath` and the operation `action` (`read`, `edit`, or `create`) alongside
+the normal file-link `path` for compatibility:
+
+```ts
+openLink: [link: {
+  href: string;
+  kind: 'file';
+  path: string;
+  filepath?: string;
+  action?: 'read' | 'edit' | 'create';
+  line?: number;
+  column?: number;
+}]
+```
+
 Raw tool-call input and output are inaccessible by default: stock tool rows do
 not render a disclosure control or place those values in the DOM. Enable access
 for one component tree with the `show-tool-details` prop on

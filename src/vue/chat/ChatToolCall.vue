@@ -21,8 +21,10 @@
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
+        :title-target-link="titleTargetLink"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
+        @open-link="emit('open-link', $event)"
       />
       <component
         :is="isOpen ? ChevronUp : ChevronDown"
@@ -42,8 +44,10 @@
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
+        :title-target-link="titleTargetLink"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
+        @open-link="emit('open-link', $event)"
       />
     </div>
 
@@ -54,8 +58,10 @@
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
+        :title-target-link="titleTargetLink"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
+        @open-link="emit('open-link', $event)"
       />
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-call__chevron" :size="15" />
     </button>
@@ -93,12 +99,12 @@ import { computed, ref } from 'vue'
 import { useCodexChatTranslate } from './chat-i18n'
 import { useCodexToolPresentation } from './tool-presentation'
 import { ChevronDown, ChevronUp } from '../icons/app-icons'
-import type { ClientRequestResponse } from './contracts'
+import type { ClientRequestResponse, CodexConversationLink } from './contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolConfirmation from './ChatToolConfirmation.vue'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import ChatToolUserInputRequest from './ChatToolUserInputRequest.vue'
-import { getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
+import { getToolDisplayTargetLink, getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
 import { getMessageToolCallArgs, type MessageToolCall } from './types'
 import { useCodexToolCallDetails } from './tool-call-details'
 
@@ -115,6 +121,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
+  'open-link': [link: CodexConversationLink]
 }>()
 
 const t = useCodexChatTranslate()
@@ -157,6 +164,11 @@ const titleParts = computed(() => {
   }
   return getToolDisplayTitleParts(props.toolCall, descriptor, t)
 })
+const titleTargetLink = computed(() => getToolDisplayTargetLink(
+  props.toolCall,
+  statusDescriptor.value,
+  titleParts.value.target,
+))
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)
 const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)

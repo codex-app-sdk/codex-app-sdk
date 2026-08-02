@@ -1,4 +1,7 @@
+import { isAbsolute, resolve } from 'node:path';
 import type {
+  CodexSurfaceFileActivityAction,
+  CodexSurfaceFileActivityStatus,
   SurfaceMessageToolPart as RendererToolPart,
   SurfaceMessageToolPartUpdate as RendererToolPartUpdate,
 } from '../surface/types';
@@ -8,7 +11,45 @@ const structuredToolResultNotice = 'Result returned in structuredContent.';
 
 export type CodexToolPartAdapterOptions = {
   includeCommandOutput?: boolean;
+  cwd?: string | null;
 };
+
+export type CodexFileActivity = {
+  action: CodexSurfaceFileActivityAction;
+  path: string;
+  status: CodexSurfaceFileActivityStatus;
+};
+
+export function codexToolPartFileActivities(
+  toolPart: RendererToolPart,
+  cwd?: string | null,
+): CodexFileActivity[] {
+  const status = toolPart.status;
+  if (toolPart.kind === 'command') {
+    const input = isRecord(toolPart.input) ? toolPart.input : {};
+    const commandCwd = typeof input.cwd === 'string' ? input.cwd : cwd ?? undefined;
+    const actions = normalizedCommandActions(input.commandActions);
+    return actions.flatMap((action) => {
+      if (action.type !== 'read') return [];
+      const path = fullFilePath(action.path ?? action.name, commandCwd);
+      return path ? [{ action: 'read' as const, path, status }] : [];
+    });
+  }
+
+  if (toolPart.kind !== 'fileChange') return [];
+  const input = isRecord(toolPart.input) ? toolPart.input : {};
+  const metadata = toolPart.metadata ?? {};
+  const changes = Array.isArray(metadata.changes)
+    ? metadata.changes
+    : Array.isArray(input.changes) ? input.changes : [];
+  return changes.flatMap((change) => {
+    if (!isRecord(change) || typeof change.path !== 'string') return [];
+    const kind = patchChangeKind(change.kind) ?? 'update';
+    if (kind === 'delete') return [];
+    const path = fullFilePath(change.path, cwd ?? undefined);
+    return path ? [{ action: kind === 'add' ? 'create' as const : 'edit' as const, path, status }] : [];
+  });
+}
 
 export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartAdapterOptions = {}): RendererToolPart | null {
   if (!isRecord(item) || typeof item.id !== 'string' || typeof item.type !== 'string') {
@@ -103,6 +144,7 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
       input: { changes },
       metadata: {
         changes,
+        ...(typeof item.cwd === 'string' ? { cwd: item.cwd } : options.cwd ? { cwd: options.cwd } : {}),
       },
     };
   }
@@ -259,13 +301,13 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
   }
 
   if (actionTypes.size === 1 && actionTypes.has('read')) {
-    const names = uniqueNonEmpty(knownActions.map((action) => action.name));
+    const names = uniqueNonEmpty(knownActions.map((action) => action.name ?? action.path));
     return {
       action: 'read',
       phase: status,
       params: {
         names,
-        target: formatTargetList(names, command),
+        target: formatReadTargetList(names, command),
       },
       source: 'codex',
     };
@@ -379,6 +421,10 @@ function formatTargetList(values: string[], fallback: string): string {
   return `${values.slice(0, 3).join(', ')} and ${values.length - 3} more`;
 }
 
+function formatReadTargetList(values: string[], fallback: string): string {
+  return values.length > 0 ? values.join(', ') : fallback;
+}
+
 function fileChangeStatusText(status: RendererToolPart['status'], changes: unknown[]): string | undefined {
   const descriptor = fileChangeStatusDescriptor(status, changes);
   return descriptor ? JSON.stringify(descriptor) : undefined;
@@ -484,6 +530,14 @@ function patchChangeKind(kind: unknown): 'add' | 'delete' | 'update' | undefined
   }
 
   return undefined;
+}
+
+function fullFilePath(value: string | undefined, cwd: string | undefined): string | undefined {
+  const path = value?.trim();
+  if (!path) return undefined;
+  if (isAbsolute(path)) return path;
+  if (!cwd || !isAbsolute(cwd)) return undefined;
+  return resolve(cwd, path);
 }
 
 function rawContentLineCount(content: string | undefined): number {

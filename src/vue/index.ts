@@ -106,6 +106,7 @@ export type {
   CodexContextUsage,
   CodexComposerPresentation,
   CodexComposerShelfPresentation,
+  CodexConversationFileAction,
   CodexConversationPresentation,
   CodexConversationLink,
   CodexFileSearchItem,

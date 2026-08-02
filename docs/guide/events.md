@@ -34,6 +34,7 @@ The matching snapshot mutation is applied before the event is emitted.
 | Messages | add/update/complete/delete, generated media |
 | Turns | start/complete/error, interruption, context compaction |
 | Tools | start/progress/complete, confirmations, user input |
+| File activity | read, edit, and create paths for host-owned navigation |
 | Plans and goals | plan updates, goal set/clear/status |
 | Queues and diffs | queued prompts, git diff updates |
 | Usage | context usage and account rate limits |
@@ -68,6 +69,8 @@ Vue scope disposal automatically unregisters the underlying renderer listeners.
 
 - Render from snapshots.
 - Trigger business refreshes or analytics from semantic events.
+- Use `file.activity` to reveal or focus the full path in an app-owned sidebar;
+  the SDK reports the operation but does not own file navigation.
 - Never rebuild full conversation state by replaying events.
 - Use `readConversationHistory` after a history-replacement event when an
   integration needs the full historical payload.

@@ -16,7 +16,10 @@
   <div
     v-else
     class="codex-chat-theme chat-message"
-    :class="[`chat-message--${chatMessage.role}`, { 'chat-message--editing': isEditing }]"
+    :class="[`chat-message--${chatMessage.role}`, {
+      'chat-message--actions-visible': actionsAlwaysVisible && !reserveActionSlot,
+      'chat-message--editing': isEditing,
+    }]"
   >
     <div class="chat-message__body">
       <div v-if="$slots.header" class="chat-message--steer">
@@ -62,6 +65,7 @@
                 :skills="skills"
                 @cancel="emit('cancel')"
                 @client-response="emit('client-response', $event)"
+                @open-link="emit('open-link', $event)"
                 @send-follow-up="emit('send-follow-up', $event)"
               >
                 <template v-if="$slots.attachment" #attachment="scope">
@@ -127,7 +131,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useCodexChatTranslate } from '../chat/chat-i18n'
-import type { ClientRequestResponse, CodexConversationPresentation } from '../chat/contracts'
+import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
@@ -142,6 +146,7 @@ import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
+  actionsAlwaysVisible?: boolean
   answeredClientRequestIds?: ReadonlySet<string>
   canDeleteMessage?: boolean
   canEditMessage?: boolean
@@ -185,6 +190,7 @@ defineSlots<{
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
+  'open-link': [link: CodexConversationLink]
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]
@@ -417,6 +423,10 @@ onBeforeUnmount(() => {
 
 .chat-message__actions {
   visibility: hidden;
+}
+
+.chat-message--actions-visible .chat-message__actions {
+  visibility: visible;
 }
 
 .chat-message__actions--reserved {

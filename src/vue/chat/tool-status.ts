@@ -1,3 +1,5 @@
+import type { CodexConversationFileAction, CodexConversationLink } from './contracts';
+import { codexConversationLinkFromHref } from './conversation-links';
 import { getMessageToolCallName, type MessageToolCall, type ToolStatusDescriptor } from './types';
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
@@ -101,13 +103,41 @@ export function getToolDisplayTitleParts(
   t: Translate = defaultToolTranslate,
 ): { prefix?: string; target?: string; title: string } {
   const title = getToolDisplayTitle(toolCall, descriptor, t);
-  if (descriptor?.source !== 'codex' || descriptor.action !== 'edit') {
+  if (
+    descriptor?.source !== 'codex'
+    || !['create', 'delete', 'edit', 'read'].includes(descriptor.action)
+  ) {
     return { title };
   }
 
   const target = commandTarget(descriptor, getMessageToolCallName(toolCall));
   const prefix = title.endsWith(target) ? title.slice(0, -target.length).trimEnd() : undefined;
   return prefix ? { prefix, target, title } : { title };
+}
+
+export function getToolDisplayTargetLink(
+  toolCall: MessageToolCall,
+  descriptor: ToolStatusDescriptor | undefined,
+  target?: string,
+): CodexConversationLink | undefined {
+  if (
+    descriptor?.source !== 'codex'
+    || !['create', 'edit', 'read'].includes(descriptor.action)
+  ) {
+    return undefined;
+  }
+
+  const displayTarget = target?.trim() || commandTarget(descriptor, getMessageToolCallName(toolCall));
+  const filePath = toolFilePath(toolCall, displayTarget);
+  if (!filePath) return undefined;
+  const link = codexConversationLinkFromHref(filePath);
+  return link?.kind === 'file'
+    ? {
+      ...link,
+      filepath: link.path,
+      action: descriptor.action as CodexConversationFileAction,
+    }
+    : undefined;
 }
 
 export function getToolFallbackTitle(toolCall: MessageToolCall, t: Translate = defaultToolTranslate) {
@@ -119,7 +149,64 @@ export function getToolFallbackTitle(toolCall: MessageToolCall, t: Translate = d
 
 function commandTarget(descriptor: ToolStatusDescriptor, fallback: string) {
   const target = descriptor.params?.target;
-  return typeof target === 'string' && target.trim() ? target : fallback;
+  if (typeof target === 'string' && target.trim()) return target;
+
+  for (const key of ['names', 'targets', 'actions']) {
+    const values = descriptor.params?.[key];
+    if (Array.isArray(values)) {
+      const summary = values.filter((value): value is string => typeof value === 'string' && value.trim().length > 0).join(', ');
+      if (summary) return summary;
+    }
+  }
+
+  return fallback;
+}
+
+function toolFilePath(toolCall: MessageToolCall, target: string): string | undefined {
+  if (!target || /,|\band \d+ more\b/u.test(target)) return undefined;
+  const args = isRecord(toolCall.args) ? toolCall.args : {};
+  const cwd = absolutePath(typeof args.cwd === 'string' ? args.cwd : toolCall.metadata?.cwd);
+  const candidates = [
+    ...filePathsFromArray(args.commandActions, target),
+    ...filePathsFromArray(args.changes, target),
+    ...filePathsFromArray(toolCall.metadata?.changes, target),
+    ...(typeof args.path === 'string' ? [args.path] : []),
+    ...(typeof args.name === 'string' ? [args.name] : []),
+  ];
+  const candidate = candidates[0] ?? target;
+  return absolutePath(candidate) ?? (cwd ? joinPath(cwd, candidate) : undefined);
+}
+
+function filePathsFromArray(value: unknown, target: string): string[] {
+  if (!Array.isArray(value)) return [];
+  const entries = value.filter(isRecord);
+  const matching = entries.filter((entry) => (
+    [entry.path, entry.name].some((value) => (
+      typeof value === 'string' && (value === target || fileName(value) === fileName(target))
+    ))
+  ));
+  const selected = matching.length > 0 ? matching : entries.length === 1 ? entries : [];
+  return selected.flatMap((entry) => (
+    typeof entry.path === 'string' ? [entry.path] : typeof entry.name === 'string' ? [entry.name] : []
+  ));
+}
+
+function absolutePath(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const path = value.trim();
+  return /^(?:[a-z]:[\\/]|\/)/iu.test(path) ? path : undefined;
+}
+
+function joinPath(cwd: string, path: string): string {
+  return `${cwd.replace(/[\\/]$/u, '')}/${path.replace(/^[\\/]+/u, '')}`;
+}
+
+function fileName(value: string): string {
+  return value.split(/[\\/]/u).filter(Boolean).at(-1) ?? value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 function commandPhase(phase: string) {

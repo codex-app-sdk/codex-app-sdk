@@ -27,6 +27,8 @@ export type {
   CodexSurfaceClientRequestResponse,
   CodexSurfaceContextUsage,
   CodexSurfaceEvent,
+  CodexSurfaceFileActivityAction,
+  CodexSurfaceFileActivityStatus,
   CodexSurfaceEventOrigin,
   CodexSurfaceGoal,
   CodexSurfaceHistoryReason,

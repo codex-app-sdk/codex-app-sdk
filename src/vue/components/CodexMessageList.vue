@@ -9,14 +9,15 @@
       @scroll="updateStickiness"
     >
       <div class="codex-message-list__content">
-        <slot v-if="messages.length === 0" name="empty">
+        <slot v-if="displayMessages.length === 0" name="empty">
           <p class="codex-message-list__empty">{{ emptyLabel }}</p>
         </slot>
-        <template v-for="(message, index) in messages" v-else :key="message.id ?? index">
+        <template v-for="(message, index) in displayMessages" v-else :key="message.id ?? index">
           <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(message)" :index="index" />
           <CodexMessage
             v-else
             :actions-disabled="actionsDisabled"
+            :actions-always-visible="shouldKeepAssistantActionsVisible(message, index)"
             :answered-client-request-ids="answeredClientRequestIds"
             :can-delete-message="canDeleteMessage"
             :can-edit-message="canEditMessage"
@@ -33,6 +34,7 @@
             @copy-message="emit('copy-message', $event)"
             @delete-message="emit('delete-message', $event)"
             @edit-message="emit('edit-message', $event)"
+            @open-link="emit('open-link', $event)"
             @quote-message="emit('quote-message', $event)"
             @retry-message="emit('retry-message', $event)"
             @send-follow-up="emit('send-follow-up', $event)"
@@ -59,9 +61,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
-import type { ClientRequestResponse, CodexConversationPresentation } from '../chat/contracts'
+import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
@@ -72,6 +74,7 @@ const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
   ariaLabel?: string
   answeredClientRequestIds?: ReadonlySet<string>
+  busy?: boolean
   bottomThreshold?: number
   canDeleteMessage?: boolean
   canEditMessage?: boolean
@@ -87,6 +90,7 @@ const props = withDefaults(defineProps<{
   skills?: readonly CodexSurfaceSkill[]
 }>(), {
   ariaLabel: 'Conversation',
+  busy: false,
   bottomThreshold: 24,
   canDeleteMessage: true,
   canEditMessage: true,
@@ -125,11 +129,40 @@ const emit = defineEmits<{
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]
+  'open-link': [link: CodexConversationLink]
   'quote-message': [index: number]
   'retry-message': [index: number]
   'send-follow-up': [prompt: string]
   'stickiness-change': [stuckToBottom: boolean]
 }>()
+
+const thinkingPlaceholder: SurfaceMessage = {
+  id: 'codex-thinking-placeholder',
+  role: 'assistant',
+  status: 'streaming',
+  parts: [],
+}
+const hasStreamingAssistant = computed(() => props.messages.some((message) => (
+  message.role === 'assistant' && (
+    'content' in message ? message.streaming === true : message.status === 'streaming'
+  )
+)))
+const displayMessages = computed(() => (
+  props.busy && !hasStreamingAssistant.value
+    ? [...props.messages, thinkingPlaceholder]
+    : props.messages
+))
+const latestAssistantIndex = computed(() => {
+  for (let index = displayMessages.value.length - 1; index >= 0; index -= 1) {
+    if (displayMessages.value[index]?.role === 'assistant') return index;
+  }
+  return -1;
+});
+
+function shouldKeepAssistantActionsVisible(message: Message | SurfaceMessage, index: number): boolean {
+  if (message.role !== 'assistant' || index !== latestAssistantIndex.value) return false;
+  return 'content' in message ? message.streaming !== true : message.status !== 'streaming';
+}
 
 const scrollElement = ref<HTMLElement | null>(null)
 const stickToBottom = ref(true)

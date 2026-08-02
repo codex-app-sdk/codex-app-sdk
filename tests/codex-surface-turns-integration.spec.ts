@@ -133,6 +133,58 @@ describe('CodexSurface', () => {
     await expect(surface.connect()).rejects.toThrow('Codex surface is closed');
   });
 
+  it('emits file activity events for read and file changes as paths become known', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-files', startedAtMs: 1,
+        item: {
+          type: 'commandExecution', id: 'read-file', command: 'cat README.md', cwd: '/tmp/project',
+          source: 'unifiedExec', status: 'inProgress', commandActions: [
+            { type: 'read', name: 'README.md', path: 'README.md' },
+          ],
+        },
+      },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-files', completedAtMs: 2,
+        item: {
+          type: 'fileChange', id: 'create-file', status: 'completed', changes: [
+            { kind: 'add', path: 'src/new-file.ts' },
+          ],
+        },
+      },
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'file.activity',
+        conversationId: 'thread-existing',
+        turnId: 'turn-files',
+        payload: expect.objectContaining({
+          messageId: 'assistant-turn-files', itemId: 'read-file',
+          path: '/tmp/project/README.md', action: 'read', status: 'running',
+        }),
+      }),
+      expect.objectContaining({
+        type: 'file.activity',
+        conversationId: 'thread-existing',
+        turnId: 'turn-files',
+        payload: expect.objectContaining({
+          messageId: 'assistant-turn-files', itemId: 'create-file',
+          path: '/tmp/project/src/new-file.ts', action: 'create', status: 'completed',
+        }),
+      }),
+    ]));
+  });
+
   it('projects live generated images once while preserving technical tool events', async () => {
     const { surface, transport } = createSurface();
     const events: CodexSurfaceEvent[] = [];

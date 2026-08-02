@@ -24,6 +24,7 @@
         :actions-disabled="effectiveActionsDisabled"
         :answered-client-request-ids="effectiveAnsweredClientRequestIds"
         :aria-label="ariaLabel"
+        :busy="effectiveBusy"
         :can-delete-message="canDeleteMessage"
         :can-edit-message="canEditMessage"
         :can-retry-message="canRetryMessage"
@@ -41,6 +42,7 @@
         @copy-message="emit('copyMessage', $event)"
         @delete-message="deleteMessage"
         @edit-message="editMessage"
+        @open-link="handleConversationLink"
         @quote-message="quoteMessage"
         @retry-message="retryMessage"
         @send-follow-up="sendFollowUp"
@@ -536,6 +538,10 @@ function handleConversationClick(event: MouseEvent): void {
   event.preventDefault();
   const link = codexConversationLinkFromHref(href);
   if (!link) return;
+  handleConversationLink(link);
+}
+
+function handleConversationLink(link: CodexConversationLink): void {
   emit('openLink', link);
   if (props.openConversationLink) {
     void Promise.resolve(props.openConversationLink(link)).catch(setLocalError);

@@ -136,6 +136,40 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-tool');
   });
 
+  it('emits a full file link only when a file target is clicked', async () => {
+    const toolCall: MessageToolCall = {
+      args: {
+        commandActions: [{ type: 'read', name: 'app-state.spec.ts', path: 'tests/app-state.spec.ts' }],
+        cwd: '/workspace/project',
+      },
+      done: true,
+      function: 'cat app-state.spec.ts',
+      id: 'read-file-target',
+      result: undefined,
+      state: 'completed',
+      status: JSON.stringify({
+        action: 'read',
+        phase: 'completed',
+        source: 'codex',
+        params: { target: 'app-state.spec.ts' },
+      }),
+    };
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    expect(wrapper.find('.chat-tool-call__title-target--link').exists()).toBe(true);
+    expect(wrapper.emitted('open-link')).toBeUndefined();
+    await wrapper.get('.chat-tool-call__title-target--link').trigger('click');
+    expect(wrapper.emitted('open-link')).toEqual([[
+      {
+        action: 'read',
+        filepath: '/workspace/project/tests/app-state.spec.ts',
+        href: '/workspace/project/tests/app-state.spec.ts',
+        kind: 'file',
+        path: '/workspace/project/tests/app-state.spec.ts',
+      },
+    ]]);
+  });
+
   it('keeps SDK fallback presentation when an app returns an undefined icon', () => {
     const toolCall: MessageToolCall = {
       args: undefined,

@@ -512,6 +512,50 @@ describe('CodexConversationPane', () => {
     expect(openConversationLink).toHaveBeenCalledWith(expected);
   });
 
+  it('emits an absolute file link with the operation when a tool target is clicked', async () => {
+    const openConversationLink = vi.fn();
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages: [{
+          id: 'assistant-file-tool',
+          role: 'assistant',
+          status: 'complete',
+          parts: [{
+            type: 'tool',
+            id: 'read-file',
+            kind: 'command',
+            title: 'cat app-state.spec.ts',
+            status: 'completed',
+            statusText: JSON.stringify({
+              action: 'read',
+              phase: 'completed',
+              source: 'codex',
+              params: { target: 'app-state.spec.ts' },
+            }),
+            input: {
+              cwd: '/workspace/project',
+              commandActions: [{ type: 'read', name: 'app-state.spec.ts', path: 'tests/app-state.spec.ts' }],
+            },
+          }],
+        }],
+        modelValue: '',
+        openConversationLink,
+      },
+    });
+
+    const target = wrapper.get('.chat-tool-call__title-target--link');
+    await target.trigger('click');
+    const expected = {
+      action: 'read',
+      filepath: '/workspace/project/tests/app-state.spec.ts',
+      href: '/workspace/project/tests/app-state.spec.ts',
+      kind: 'file',
+      path: '/workspace/project/tests/app-state.spec.ts',
+    };
+    expect(wrapper.emitted('openLink')).toStrictEqual([[expected]]);
+    expect(openConversationLink).toHaveBeenCalledWith(expected);
+  });
+
   it.each(['javascript:alert(1)', 'data:text/html,boom', '\\\\server\\share\\file.ts'])('blocks unsupported link %s without delegating it', async (href) => {
     const wrapper = mount(CodexConversationPane, {
       props: { messages, modelValue: '' },

@@ -72,9 +72,21 @@ export type CodexFileSearchItem = {
   path: string;
 };
 
+export type CodexConversationFileAction = 'read' | 'edit' | 'create';
+
 export type CodexConversationLink =
   | { href: string; kind: 'external' }
-  | { href: string; kind: 'file'; path: string; line?: number; column?: number };
+  | {
+    href: string;
+    kind: 'file';
+    path: string;
+    /** Canonical alias for hosts handling a clicked tool target. */
+    filepath?: string;
+    /** Present for file-operation tool targets; absent for ordinary markdown links. */
+    action?: CodexConversationFileAction;
+    line?: number;
+    column?: number;
+  };
 
 export type PromptSkillInput = {
   name: string;

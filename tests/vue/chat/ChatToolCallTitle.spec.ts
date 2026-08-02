@@ -54,4 +54,31 @@ describe('ChatToolCallTitle', () => {
     expect(wrapper.get('.chat-tool-call__title-text').text()).toBe('ReadREADME.md');
     expect(wrapper.get('.chat-tool-call__title-target').text()).toBe('README.md');
   });
+
+  it('renders interactive file targets and emits only on click', async () => {
+    const wrapper = mount(ChatToolCallTitle, {
+      props: {
+        title: 'Read app-state.spec.ts',
+        titlePrefix: 'Read',
+        titleTarget: 'app-state.spec.ts',
+        titleTargetLink: {
+          href: '/workspace/project/tests/app-state.spec.ts',
+          kind: 'file',
+          path: '/workspace/project/tests/app-state.spec.ts',
+        },
+      },
+    });
+
+    const target = wrapper.get('.chat-tool-call__title-target--link');
+    expect(target.attributes('href')).toBe('/workspace/project/tests/app-state.spec.ts');
+    expect(wrapper.emitted('open-link')).toBeUndefined();
+    await target.trigger('click');
+    expect(wrapper.emitted('open-link')).toEqual([[
+      {
+        href: '/workspace/project/tests/app-state.spec.ts',
+        kind: 'file',
+        path: '/workspace/project/tests/app-state.spec.ts',
+      },
+    ]]);
+  });
 });

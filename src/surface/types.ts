@@ -424,6 +424,8 @@ export type CodexConversationHistory = {
 export type CodexSurfaceEventOrigin = 'action' | 'notification' | 'lifecycle';
 export type CodexSurfaceHistoryReason = 'load' | 'resume' | 'rollback' | 'resync';
 export type CodexSurfaceTurnStatus = 'completed' | 'interrupted' | 'failed' | 'inProgress';
+export type CodexSurfaceFileActivityAction = 'read' | 'edit' | 'create';
+export type CodexSurfaceFileActivityStatus = 'running' | 'completed' | 'failed';
 export type CodexSurfacePlanStepStatus = 'pending' | 'inProgress' | 'completed';
 export type CodexSurfacePlanStep = {
   step: string;
@@ -644,6 +646,13 @@ export type CodexSurfaceEvent =
   | CodexTurnEventEnvelope<'tool.completed', {
     messageId: string;
     toolPart: SurfaceMessageToolPart;
+  }>
+  | CodexTurnEventEnvelope<'file.activity', {
+    messageId: string;
+    itemId: string;
+    path: string;
+    action: CodexSurfaceFileActivityAction;
+    status: CodexSurfaceFileActivityStatus;
   }>
   | CodexTurnEventEnvelope<'plan.delta', {
     itemId: string;

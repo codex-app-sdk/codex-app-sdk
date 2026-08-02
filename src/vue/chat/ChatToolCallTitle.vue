@@ -12,7 +12,15 @@
     />
     <span v-if="titlePrefix && titleTarget" class="chat-tool-call__title-text">
       <span>{{ titlePrefix }}</span>
-      <span class="chat-tool-call__title-target">{{ titleTarget }}</span>
+      <a
+        v-if="titleTargetLink"
+        class="chat-tool-call__title-target chat-tool-call__title-target--link"
+        :href="titleTargetLink.href"
+        @click.stop.prevent="emit('open-link', titleTargetLink)"
+        @keydown.enter.stop.prevent="emit('open-link', titleTargetLink)"
+        @keydown.space.stop.prevent="emit('open-link', titleTargetLink)"
+      >{{ titleTarget }}</a>
+      <span v-else class="chat-tool-call__title-target">{{ titleTarget }}</span>
     </span>
     <template v-else>
       {{ title }}
@@ -37,6 +45,7 @@
 <script setup lang="ts">
 import ChatAnimatedDiffStat from './ChatAnimatedDiffStat.vue'
 import ChatToolIcon from './ChatToolIcon.vue'
+import type { CodexConversationLink } from './contracts'
 import type { ToolLineDiff } from './tool-status'
 import type { CodexToolPresentation } from './tool-presentation'
 import type { MessageToolCall } from './types'
@@ -47,9 +56,14 @@ defineProps<{
   title: string
   titlePrefix?: string
   titleTarget?: string
+  titleTargetLink?: CodexConversationLink
   icon?: any
   toolCall?: MessageToolCall
   toolPresentation?: CodexToolPresentation
+}>()
+
+const emit = defineEmits<{
+  'open-link': [link: CodexConversationLink]
 }>()
 </script>
 
@@ -97,5 +111,10 @@ defineProps<{
   color: var(--color-secondary);
   font-weight: var(--font-weight-regular);
   text-overflow: ellipsis;
+}
+
+.chat-tool-call__title-target--link {
+  cursor: pointer;
+  text-decoration: none;
 }
 </style>

@@ -5,6 +5,7 @@
     :tool-call="singleConfirmationToolCall"
     @cancel="emit('cancel')"
     @client-response="emit('client-response', $event)"
+    @open-link="emit('open-link', $event)"
   />
   <section v-else class="codex-chat-theme chat-tool-group">
     <component
@@ -25,6 +26,7 @@
         :tool-call="headerToolCall"
         @cancel="emit('cancel')"
         @client-response="emit('client-response', $event)"
+        @open-link="emit('open-link', $event)"
       />
       <template v-else>
         <span
@@ -62,6 +64,7 @@
           :tool-call="toolCall"
           @cancel="emit('cancel')"
           @client-response="emit('client-response', $event)"
+          @open-link="emit('open-link', $event)"
         />
       </div>
     </ChatFoldTransition>
@@ -88,6 +91,7 @@
             :tool-call="toolCall"
             @cancel="emit('cancel')"
             @client-response="emit('client-response', $event)"
+            @open-link="emit('open-link', $event)"
           />
         </div>
       </div>
@@ -99,6 +103,7 @@
 import { ChevronDown, ChevronUp } from '../icons/app-icons'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ClientRequestResponse } from './contracts'
+import type { CodexConversationLink } from './contracts'
 import ChatAnimatedDiffStat from './ChatAnimatedDiffStat.vue'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolCall from './ChatToolCall.vue'
@@ -117,6 +122,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
+  'open-link': [link: CodexConversationLink]
 }>()
 
 const expanded = ref(false)

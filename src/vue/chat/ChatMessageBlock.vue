@@ -34,6 +34,7 @@
       :tool-call="block.toolCall"
       @cancel="emit('cancel')"
       @client-response="emit('client-response', $event)"
+      @open-link="emit('open-link', $event)"
     />
   </slot>
   <slot v-else-if="block.type === 'tool-group'" name="tool" :block="block" :tool-calls="block.toolCalls">
@@ -43,6 +44,7 @@
       :tool-calls="block.toolCalls"
       @cancel="emit('cancel')"
       @client-response="emit('client-response', $event)"
+      @open-link="emit('open-link', $event)"
     />
   </slot>
   <ChatFollowUps
@@ -63,7 +65,7 @@ import ChatToolCall from './ChatToolCall.vue'
 import ChatUserText from './ChatUserText.vue'
 import { renderMarkdown } from './message-markdown'
 import type { MessageBlock } from './message-blocks'
-import type { ClientRequestResponse } from './contracts'
+import type { ClientRequestResponse, CodexConversationLink } from './contracts'
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../surface/types'
 
 defineSlots<{
@@ -95,6 +97,7 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
+  'open-link': [link: CodexConversationLink]
   'send-follow-up': [prompt: string]
 }>()
 </script>

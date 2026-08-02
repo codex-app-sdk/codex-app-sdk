@@ -36,6 +36,21 @@ const messages: Message[] = [
 ];
 
 describe('CodexMessageList', () => {
+  it('keeps the thinking shimmer visible while a busy turn has no assistant row yet', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        busy: true,
+        messages: [messages[0]!],
+      },
+    });
+
+    expect(wrapper.get('.chat-message__thinking').classes()).toContain('codex-text-shimmer');
+    expect(wrapper.text()).toContain('Thinking');
+
+    await wrapper.setProps({ busy: false });
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+  });
+
   it('renders user text, markdown, streaming assistant state, follow-ups, and tool groups', () => {
     const wrapper = mount(CodexMessageList, {
       props: {
@@ -97,6 +112,22 @@ describe('CodexMessageList', () => {
     expect(wrapper.text()).toContain('Steered conversation');
     expect(wrapper.text()).toContain('read every markdown file');
     expect(wrapper.find('.chat-message--steer').exists()).toBe(true);
+  });
+
+  it('keeps actions visible on the latest completed assistant message only', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages: [
+          { role: 'assistant', content: 'Earlier answer' },
+          { role: 'user', content: 'Follow up' },
+          { role: 'assistant', content: 'Latest answer' },
+        ],
+      },
+    });
+
+    const rows = wrapper.findAll('.chat-message');
+    expect(rows[0]?.classes()).not.toContain('chat-message--actions-visible');
+    expect(rows[2]?.classes()).toContain('chat-message--actions-visible');
   });
 
   it('forwards provider capability flags to message actions', () => {

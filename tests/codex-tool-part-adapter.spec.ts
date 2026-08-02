@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  codexToolPartFileActivities,
   codexThreadItemToToolPart,
   commandOutputDeltaToToolPartUpdate,
   fileChangePatchToToolPartUpdate,
@@ -10,6 +11,37 @@ import {
 } from '../src/node/codex-tool-part-adapter';
 
 describe('tool-part-adapter', () => {
+  it('extracts full-path read, create, and edit file activities', () => {
+    const readPart = codexThreadItemToToolPart({
+      type: 'commandExecution',
+      id: 'cmd-read-activity',
+      command: "sed -n '1,20p' docs/SKILL.md",
+      cwd: '/workspace/project',
+      status: 'inProgress',
+      commandActions: [{ type: 'read', name: 'SKILL.md', path: 'docs/SKILL.md' }],
+    });
+    expect(readPart ? codexToolPartFileActivities(readPart, '/workspace/project') : []).toStrictEqual([{
+      action: 'read',
+      path: '/workspace/project/docs/SKILL.md',
+      status: 'running',
+    }]);
+
+    const changePart = codexThreadItemToToolPart({
+      type: 'fileChange',
+      id: 'patch-activity',
+      status: 'completed',
+      changes: [
+        { kind: 'add', path: 'src/new.ts' },
+        { kind: 'update', path: 'src/existing.ts' },
+        { kind: 'delete', path: 'src/old.ts' },
+      ],
+    });
+    expect(changePart ? codexToolPartFileActivities(changePart, '/workspace/project') : []).toStrictEqual([
+      { action: 'create', path: '/workspace/project/src/new.ts', status: 'completed' },
+      { action: 'edit', path: '/workspace/project/src/existing.ts', status: 'completed' },
+    ]);
+  });
+
   it('maps Codex command executions into renderer tool parts without raw output by default', () => {
     expect(codexThreadItemToToolPart({
       type: 'commandExecution',
@@ -119,6 +151,25 @@ describe('tool-part-adapter', () => {
         target: 'README.md',
       },
       source: 'codex',
+    });
+
+    const multiRead = codexThreadItemToToolPart({
+      type: 'commandExecution',
+      id: 'cmd-multi-read',
+      command: 'cat README.md package.json src/index.ts',
+      status: 'completed',
+      commandActions: [
+        { type: 'read', name: 'README.md' },
+        { type: 'read', name: 'package.json' },
+        { type: 'read', name: 'src/index.ts' },
+      ],
+    });
+    expect(multiRead?.statusText ? JSON.parse(multiRead.statusText) : null).toMatchObject({
+      action: 'read',
+      params: {
+        names: ['README.md', 'package.json', 'src/index.ts'],
+        target: 'README.md, package.json, src/index.ts',
+      },
     });
 
     const completedExplore = codexThreadItemToToolPart({

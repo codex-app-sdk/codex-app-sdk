@@ -389,7 +389,7 @@ describe('ported id8 chat components', () => {
         toolCall: runningTool,
       },
     });
-    expect(summary.text()).toContain('Reading src/main.ts');
+    expect(summary.text()).toContain('Readingsrc/main.ts');
 
     const customStatus = mount(ChatToolCall, {
       props: {
@@ -407,7 +407,7 @@ describe('ported id8 chat components', () => {
         },
       },
     });
-    expect(completedRead.text()).toContain('Read README.md');
+    expect(completedRead.text()).toContain('ReadREADME.md');
 
     const writingPlan = mount(ChatToolCall, {
       props: {
@@ -462,7 +462,7 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Reading src/main.ts');
+    expect(wrapper.text()).toContain('Readingsrc/main.ts');
     expect(wrapper.text()).toContain('+2');
     expect(wrapper.text()).toContain('-1');
     await wrapper.get('.chat-tool-group__header').trigger('click');

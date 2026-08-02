@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { getToolDisplayTitle, getToolFallbackTitle, getToolGroupLineDiff, getToolLineDiff, parseToolStatusDescriptor, registerCodexToolTitlePresenter } from '../../../src/vue/chat/tool-status';
+import { getToolDisplayTitle, getToolDisplayTitleParts, getToolFallbackTitle, getToolGroupLineDiff, getToolLineDiff, parseToolStatusDescriptor, registerCodexToolTitlePresenter } from '../../../src/vue/chat/tool-status';
 import type { MessageToolCall } from '../../../src/vue/chat/types';
 
 describe('tool status helpers', () => {
@@ -95,6 +95,32 @@ describe('tool status helpers', () => {
     })).toBe('Deleted old.ts');
   });
 
+  it('separates read and file-operation targets for highlighting', () => {
+    const tool: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'command',
+      id: 'tool',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    expect(getToolDisplayTitleParts(tool, {
+      action: 'read',
+      phase: 'completed',
+      params: { target: 'SKILL.md' },
+      source: 'codex',
+    })).toStrictEqual({ title: 'Read SKILL.md', prefix: 'Read', target: 'SKILL.md' });
+
+    expect(getToolDisplayTitleParts(tool, {
+      action: 'create',
+      phase: 'completed',
+      params: { target: 'new-file.ts' },
+      source: 'codex',
+    })).toStrictEqual({ title: 'Created new-file.ts', prefix: 'Created', target: 'new-file.ts' });
+  });
+
   it('formats Codex plan progress titles by operation and phase', () => {
     const tool: MessageToolCall = {
       args: undefined,
@@ -137,6 +163,25 @@ describe('tool status helpers', () => {
       params: { actions: ['listFiles', 'search'], target: 'src' },
       source: 'codex',
     })).toBe('Explored src');
+  });
+
+  it('keeps exploration titles informative when the target is omitted', () => {
+    const tool: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'explore',
+      id: 'tool-explore-empty-target',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    expect(getToolDisplayTitle(tool, {
+      action: 'explore',
+      phase: 'completed',
+      params: { actions: ['listFiles', 'search'] },
+      source: 'codex',
+    })).toBe('Explored listFiles, search');
   });
 
   it('uses the generic fallback for app-specific tools', () => {

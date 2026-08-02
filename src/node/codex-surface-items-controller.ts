@@ -4,6 +4,7 @@ import type {
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
   SurfaceMessage,
+  SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
 } from '../surface/types';
 import {
@@ -29,6 +30,7 @@ import {
 } from './codex-surface-message-state';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
 import {
+  codexToolPartFileActivities,
   shouldForwardCommandExecutionOutput,
 } from './codex-tool-part-adapter';
 
@@ -52,11 +54,13 @@ export type CodexSurfaceItemsHost = {
 
 export class CodexSurfaceItemsController {
   private readonly commandOutputForwardItemIds = new Set<string>();
+  private readonly fileActivityKeys = new Set<string>();
 
   constructor(private readonly host: CodexSurfaceItemsHost) {}
 
   reset(): void {
     this.commandOutputForwardItemIds.clear();
+    this.fileActivityKeys.clear();
   }
 
   isForwardingCommandOutput(threadId: string, itemId: string): boolean {
@@ -143,6 +147,14 @@ export class CodexSurfaceItemsController {
         turnId: params.turnId,
         payload: { messageId: message.id, toolPart: structuredClone(event.payload.toolPart) },
       });
+      this.emitFileActivities(
+        params.threadId,
+        params.turnId,
+        message.id,
+        event.payload.toolPart.id,
+        event.payload.toolPart,
+        runtime.cwd,
+      );
     }
   }
 
@@ -254,7 +266,7 @@ export class CodexSurfaceItemsController {
     }
 
     const includeCommandOutput = this.shouldForwardCommandOutput(params.threadId, completed, params.item);
-    const toolPart = codexItemToToolPart(params.item, { includeCommandOutput });
+    const toolPart = codexItemToToolPart(params.item, { includeCommandOutput, cwd: runtime.cwd });
     const mediaPart = codexItemToMediaPart(params.item);
     if (!toolPart && !mediaPart) return;
     const mediaChanged = mediaPart ? !runtime.messages.some((message) => (
@@ -274,6 +286,16 @@ export class CodexSurfaceItemsController {
       turnId: params.turnId,
       payload: { messageId: message.id, toolPart: structuredClone(toolPart) },
     });
+    if (message && toolPart) {
+      this.emitFileActivities(
+        params.threadId,
+        params.turnId,
+        message.id,
+        toolPart.id,
+        toolPart,
+        runtime.cwd,
+      );
+    }
     if (message && mediaPart && mediaChanged) this.host.emitEvent('notification', {
       type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
       payload: { message: structuredClone(message) },
@@ -299,14 +321,50 @@ export class CodexSurfaceItemsController {
   applyToolUpdate(threadId: string, turnId: string, update: SurfaceMessageToolPartUpdate): void {
     const runtime = this.host.requireRuntime(threadId);
     this.host.markRuntimeTurnActive(runtime, turnId);
+    const effectiveUpdate = runtime.cwd && hasFileChangeData(update)
+      ? { ...update, metadata: { ...update.metadata, cwd: runtime.cwd } }
+      : update;
     this.host.patchRuntime(threadId, {
-      messages: updateAssistantToolPart(runtime.messages, threadId, turnId, update),
+      messages: updateAssistantToolPart(runtime.messages, threadId, turnId, effectiveUpdate),
     });
     const message = this.host.messageContainingTool(threadId, turnId, update.itemId);
     if (message) this.host.emitEvent('notification', {
       type: 'tool.updated', conversationId: threadId, turnId,
-      payload: { messageId: message.id, update: structuredClone(update) },
+      payload: { messageId: message.id, update: structuredClone(effectiveUpdate) },
     });
+    const toolPart = message?.parts.find((part): part is SurfaceMessageToolPart => (
+      part.type === 'tool' && part.id === update.itemId
+    ));
+    if (message && toolPart) {
+      this.emitFileActivities(threadId, turnId, message.id, toolPart.id, toolPart, runtime.cwd);
+    }
+  }
+
+  private emitFileActivities(
+    threadId: string,
+    turnId: string,
+    messageId: string,
+    itemId: string,
+    toolPart: SurfaceMessageToolPart,
+    cwd: string | null,
+  ): void {
+    for (const activity of codexToolPartFileActivities(toolPart, cwd)) {
+      const key = `${threadId}\u0000${itemId}\u0000${activity.action}\u0000${activity.path}\u0000${activity.status}`;
+      if (this.fileActivityKeys.has(key)) continue;
+      this.fileActivityKeys.add(key);
+      this.host.emitEvent('notification', {
+        type: 'file.activity',
+        conversationId: threadId,
+        turnId,
+        payload: {
+          messageId,
+          itemId,
+          path: activity.path,
+          action: activity.action,
+          status: activity.status,
+        },
+      });
+    }
   }
 
   applyTurnCompleted(params: v2.TurnCompletedNotification): void {
@@ -350,4 +408,16 @@ export class CodexSurfaceItemsController {
     runtime.planMarkdownByTurn.delete(params.turn.id);
     this.host.sendNextQueuedPrompt(params.threadId);
   }
+}
+
+function hasFileChangeData(update: SurfaceMessageToolPartUpdate): boolean {
+  if (update.fallbackToolPart?.kind === 'fileChange') return true;
+  const input = update.input;
+  const metadata = update.metadata;
+  return (isRecord(input) && Array.isArray(input.changes))
+    || (isRecord(metadata) && Array.isArray(metadata.changes));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

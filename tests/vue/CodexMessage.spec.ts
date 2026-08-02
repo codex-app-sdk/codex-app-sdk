@@ -327,4 +327,13 @@ describe('CodexMessage', () => {
     expect(streaming.get('.chat-message__actions').classes()).toContain('chat-message__actions--reserved');
     expect(streaming.get('.chat-message__actions').attributes('aria-hidden')).toBe('true');
   });
+
+  it('marks completed assistant actions for persistent visibility when requested', () => {
+    const wrapper = mountMessage({
+      actionsAlwaysVisible: true,
+      message: { role: 'assistant', content: 'Answer' },
+    });
+
+    expect(wrapper.get('.chat-message').classes()).toContain('chat-message--actions-visible');
+  });
 });
