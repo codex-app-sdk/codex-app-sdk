@@ -422,7 +422,12 @@ function formatTargetList(values: string[], fallback: string): string {
 }
 
 function formatReadTargetList(values: string[], fallback: string): string {
-  return values.length > 0 ? values.join(', ') : fallback;
+  return formatFileTargetList(values, fallback);
+}
+
+function formatFileTargetList(values: string[], fallback: string): string {
+  const names = uniqueNonEmpty(values.map(fileName));
+  return formatTargetList(names, fallback);
 }
 
 function fileChangeStatusText(status: RendererToolPart['status'], changes: unknown[]): string | undefined {
@@ -459,7 +464,7 @@ function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes:
   const addedLines = normalizedChanges.reduce((total, change) => total + change.addedLines, 0);
   const removedLines = normalizedChanges.reduce((total, change) => total + change.removedLines, 0);
   const paths = uniqueNonEmpty(normalizedChanges.map((change) => change.path));
-  const target = paths.length === 1 ? fileName(paths[0] ?? '') : `${normalizedChanges.length} files`;
+  const target = formatFileTargetList(paths, `${normalizedChanges.length} files`);
   return {
     action: fileChangeAction(normalizedChanges.map((change) => change.kind)),
     phase: status,

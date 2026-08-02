@@ -19,6 +19,12 @@ export type CodexToolTitlePresenter = (
   context: CodexToolTitlePresenterContext,
 ) => string | undefined;
 
+export type CodexToolDisplayTargetPart = {
+  label: string;
+  link?: CodexConversationLink;
+  separator?: string;
+};
+
 const toolTitlePresenters = new Set<CodexToolTitlePresenter>();
 
 export function registerCodexToolTitlePresenter(presenter: CodexToolTitlePresenter): () => void {
@@ -120,6 +126,14 @@ export function getToolDisplayTargetLink(
   descriptor: ToolStatusDescriptor | undefined,
   target?: string,
 ): CodexConversationLink | undefined {
+  return getToolDisplayTargetParts(toolCall, descriptor, target)?.find((part) => part.link)?.link;
+}
+
+export function getToolDisplayTargetParts(
+  toolCall: MessageToolCall,
+  descriptor: ToolStatusDescriptor | undefined,
+  target?: string,
+): CodexToolDisplayTargetPart[] | undefined {
   if (
     descriptor?.source !== 'codex'
     || !['create', 'edit', 'read'].includes(descriptor.action)
@@ -128,16 +142,34 @@ export function getToolDisplayTargetLink(
   }
 
   const displayTarget = target?.trim() || commandTarget(descriptor, getMessageToolCallName(toolCall));
-  const filePath = toolFilePath(toolCall, displayTarget);
-  if (!filePath) return undefined;
-  const link = codexConversationLinkFromHref(filePath);
-  return link?.kind === 'file'
-    ? {
-      ...link,
-      filepath: link.path,
-      action: descriptor.action as CodexConversationFileAction,
-    }
-    : undefined;
+  const targetTokens = splitFileTargetDisplay(displayTarget);
+  const filePaths = toolFilePaths(toolCall);
+  if (!targetTokens.length || !filePaths.length) return undefined;
+
+  const action = descriptor.action as CodexConversationFileAction;
+  const parts = targetTokens.map((token, index) => {
+    const filePath = filePaths.find((candidate) => (
+      candidate === token || fileName(candidate) === fileName(token)
+    ));
+    const link = filePath ? codexConversationLinkFromHref(filePath) : undefined;
+    return {
+      label: token,
+      ...(link?.kind === 'file' ? {
+        link: {
+          ...link,
+          filepath: link.path,
+          action,
+        },
+      } : {}),
+      separator: index === 0 ? '' : ', ',
+    } satisfies CodexToolDisplayTargetPart;
+  });
+
+  const truncatedCount = fileTargetTruncationCount(displayTarget);
+  if (truncatedCount > 0) {
+    parts.push({ label: `and ${truncatedCount} more`, separator: ' ' });
+  }
+  return parts;
 }
 
 export function getToolFallbackTitle(toolCall: MessageToolCall, t: Translate = defaultToolTranslate) {
@@ -162,33 +194,37 @@ function commandTarget(descriptor: ToolStatusDescriptor, fallback: string) {
   return fallback;
 }
 
-function toolFilePath(toolCall: MessageToolCall, target: string): string | undefined {
-  if (!target || /,|\band \d+ more\b/u.test(target)) return undefined;
+function toolFilePaths(toolCall: MessageToolCall): string[] {
   const args = isRecord(toolCall.args) ? toolCall.args : {};
   const cwd = absolutePath(typeof args.cwd === 'string' ? args.cwd : toolCall.metadata?.cwd);
   const candidates = [
-    ...filePathsFromArray(args.commandActions, target),
-    ...filePathsFromArray(args.changes, target),
-    ...filePathsFromArray(toolCall.metadata?.changes, target),
+    ...filePathsFromArray(args.commandActions),
+    ...filePathsFromArray(args.changes),
+    ...filePathsFromArray(toolCall.metadata?.changes),
     ...(typeof args.path === 'string' ? [args.path] : []),
     ...(typeof args.name === 'string' ? [args.name] : []),
   ];
-  const candidate = candidates[0] ?? target;
-  return absolutePath(candidate) ?? (cwd ? joinPath(cwd, candidate) : undefined);
+  return [...new Set(candidates.map((candidate) => (
+    absolutePath(candidate) ?? (cwd ? joinPath(cwd, candidate) : undefined)
+  )).filter((candidate): candidate is string => Boolean(candidate)))];
 }
 
-function filePathsFromArray(value: unknown, target: string): string[] {
+function filePathsFromArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  const entries = value.filter(isRecord);
-  const matching = entries.filter((entry) => (
-    [entry.path, entry.name].some((value) => (
-      typeof value === 'string' && (value === target || fileName(value) === fileName(target))
-    ))
-  ));
-  const selected = matching.length > 0 ? matching : entries.length === 1 ? entries : [];
-  return selected.flatMap((entry) => (
+  return value.filter(isRecord).flatMap((entry) => (
     typeof entry.path === 'string' ? [entry.path] : typeof entry.name === 'string' ? [entry.name] : []
   ));
+}
+
+function splitFileTargetDisplay(target: string): string[] {
+  const withoutTruncation = target.replace(/\s+and\s+\d+\s+more$/u, '').trim();
+  if (!withoutTruncation) return [];
+  return withoutTruncation.split(/,\s*/u).map((value) => fileName(value.trim())).filter(Boolean);
+}
+
+function fileTargetTruncationCount(target: string): number {
+  const match = target.match(/\s+and\s+(\d+)\s+more$/u);
+  return match ? Number(match[1]) : 0;
 }
 
 function absolutePath(value: unknown): string | undefined {

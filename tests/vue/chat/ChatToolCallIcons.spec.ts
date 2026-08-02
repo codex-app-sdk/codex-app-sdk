@@ -170,6 +170,75 @@ describe('ChatToolCall action icons', () => {
     ]]);
   });
 
+  it('renders each changed filename as an individually clickable target', async () => {
+    const toolCall: MessageToolCall = {
+      args: {
+        changes: [
+          { kind: 'update', path: '/workspace/project/tests/app-state.spec.ts' },
+          { kind: 'update', path: '/workspace/project/src/ConversationPane.vue' },
+        ],
+      },
+      done: true,
+      function: 'fileChange',
+      id: 'edit-file-targets',
+      result: undefined,
+      state: 'completed',
+      status: JSON.stringify({
+        action: 'edit',
+        phase: 'completed',
+        source: 'codex',
+        params: {
+          addedLines: 2,
+          removedLines: 0,
+          target: 'app-state.spec.ts, ConversationPane.vue',
+        },
+      }),
+    };
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    const targets = wrapper.findAll('.chat-tool-call__title-target--link');
+    expect(targets.map((target) => target.text())).toEqual(['app-state.spec.ts', 'ConversationPane.vue']);
+    expect(wrapper.text()).not.toContain('2 files');
+
+    await targets[0]!.trigger('click');
+    await targets[1]!.trigger('click');
+    expect(wrapper.emitted('open-link')).toEqual([
+      [{ action: 'edit', filepath: '/workspace/project/tests/app-state.spec.ts', href: '/workspace/project/tests/app-state.spec.ts', kind: 'file', path: '/workspace/project/tests/app-state.spec.ts' }],
+      [{ action: 'edit', filepath: '/workspace/project/src/ConversationPane.vue', href: '/workspace/project/src/ConversationPane.vue', kind: 'file', path: '/workspace/project/src/ConversationPane.vue' }],
+    ]);
+  });
+
+  it('renders each read filename as an individually clickable target', async () => {
+    const toolCall: MessageToolCall = {
+      args: {
+        commandActions: [
+          { type: 'read', name: 'app-state.spec.ts', path: '/workspace/project/tests/app-state.spec.ts' },
+          { type: 'read', name: 'ConversationPane.vue', path: '/workspace/project/src/ConversationPane.vue' },
+        ],
+      },
+      done: true,
+      function: 'cat files',
+      id: 'read-file-targets',
+      result: undefined,
+      state: 'completed',
+      status: JSON.stringify({
+        action: 'read',
+        phase: 'completed',
+        source: 'codex',
+        params: { target: 'app-state.spec.ts, ConversationPane.vue' },
+      }),
+    };
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    const targets = wrapper.findAll('.chat-tool-call__title-target--link');
+    expect(targets.map((target) => target.text())).toEqual(['app-state.spec.ts', 'ConversationPane.vue']);
+
+    await targets[1]!.trigger('click');
+    expect(wrapper.emitted('open-link')).toEqual([[
+      { action: 'read', filepath: '/workspace/project/src/ConversationPane.vue', href: '/workspace/project/src/ConversationPane.vue', kind: 'file', path: '/workspace/project/src/ConversationPane.vue' },
+    ]]);
+  });
+
   it('keeps SDK fallback presentation when an app returns an undefined icon', () => {
     const toolCall: MessageToolCall = {
       args: undefined,

@@ -12,15 +12,31 @@
     />
     <span v-if="titlePrefix && titleTarget" class="chat-tool-call__title-text">
       <span>{{ titlePrefix }}</span>
-      <a
-        v-if="titleTargetLink"
-        class="chat-tool-call__title-target chat-tool-call__title-target--link"
-        :href="titleTargetLink.href"
-        @click.stop.prevent="emit('open-link', titleTargetLink)"
-        @keydown.enter.stop.prevent="emit('open-link', titleTargetLink)"
-        @keydown.space.stop.prevent="emit('open-link', titleTargetLink)"
-      >{{ titleTarget }}</a>
-      <span v-else class="chat-tool-call__title-target">{{ titleTarget }}</span>
+      <span class="chat-tool-call__title-target-list">
+        <template v-if="titleTargetParts?.length">
+          <template v-for="(part, index) in titleTargetParts" :key="`${part.label}-${index}`">
+            <span v-if="part.separator" class="chat-tool-call__title-target-separator">{{ part.separator }}</span>
+            <a
+              v-if="part.link"
+              class="chat-tool-call__title-target chat-tool-call__title-target--link"
+              :href="part.link.href"
+              @click.stop.prevent="emit('open-link', part.link)"
+              @keydown.enter.stop.prevent="emit('open-link', part.link)"
+              @keydown.space.stop.prevent="emit('open-link', part.link)"
+            >{{ part.label }}</a>
+            <span v-else class="chat-tool-call__title-target">{{ part.label }}</span>
+          </template>
+        </template>
+        <a
+          v-else-if="titleTargetLink"
+          class="chat-tool-call__title-target chat-tool-call__title-target--link"
+          :href="titleTargetLink.href"
+          @click.stop.prevent="emit('open-link', titleTargetLink)"
+          @keydown.enter.stop.prevent="emit('open-link', titleTargetLink)"
+          @keydown.space.stop.prevent="emit('open-link', titleTargetLink)"
+        >{{ titleTarget }}</a>
+        <span v-else class="chat-tool-call__title-target">{{ titleTarget }}</span>
+      </span>
     </span>
     <template v-else>
       {{ title }}
@@ -46,7 +62,7 @@
 import ChatAnimatedDiffStat from './ChatAnimatedDiffStat.vue'
 import ChatToolIcon from './ChatToolIcon.vue'
 import type { CodexConversationLink } from './contracts'
-import type { ToolLineDiff } from './tool-status'
+import type { CodexToolDisplayTargetPart, ToolLineDiff } from './tool-status'
 import type { CodexToolPresentation } from './tool-presentation'
 import type { MessageToolCall } from './types'
 
@@ -57,6 +73,7 @@ defineProps<{
   titlePrefix?: string
   titleTarget?: string
   titleTargetLink?: CodexConversationLink
+  titleTargetParts?: readonly CodexToolDisplayTargetPart[]
   icon?: any
   toolCall?: MessageToolCall
   toolPresentation?: CodexToolPresentation
@@ -99,13 +116,31 @@ const emit = defineEmits<{
 }
 
 .chat-tool-call__title-text {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: inline;
   min-width: 0;
 }
 
+.chat-tool-call__title-target-list {
+  display: inline;
+  font-size: 0;
+  min-width: 0;
+}
+
+.chat-tool-call__title-text > span:first-child {
+  margin-right: var(--space-3);
+}
+
+.chat-tool-call__title-target-separator {
+  font-size: var(--font-size-15);
+  line-height: var(--line-height-20);
+  white-space: pre;
+}
+
 .chat-tool-call__title-target {
+  display: inline;
+  font-size: var(--font-size-15);
+  line-height: var(--line-height-20);
+  gap: var(--space-3);
   min-width: 0;
   overflow: hidden;
   color: var(--color-secondary);

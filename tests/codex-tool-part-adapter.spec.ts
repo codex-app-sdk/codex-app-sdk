@@ -168,7 +168,7 @@ describe('tool-part-adapter', () => {
       action: 'read',
       params: {
         names: ['README.md', 'package.json', 'src/index.ts'],
-        target: 'README.md, package.json, src/index.ts',
+        target: 'README.md, package.json, index.ts',
       },
     });
 
@@ -560,7 +560,7 @@ describe('tool-part-adapter', () => {
       { path: 'src/b.ts', kind: 'delete', diff: 'old\r\n\r\n' },
       { kind: { type: 'move' }, diff: undefined },
     ])).toMatchObject({
-      statusText: expect.stringContaining('"target":"3 files"'),
+      statusText: expect.stringContaining('"target":"a.ts, b.ts"'),
       body: 'null\nadd src/a.ts\ndelete src/b.ts\nupdate unknown',
     });
     expect(lineDiffFromUnifiedDiff(undefined)).toStrictEqual({ addedLines: 0, removedLines: 0 });

@@ -21,7 +21,7 @@
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
-        :title-target-link="titleTargetLink"
+        :title-target-parts="titleTargetParts"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
         @open-link="emit('open-link', $event)"
@@ -44,7 +44,7 @@
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
-        :title-target-link="titleTargetLink"
+        :title-target-parts="titleTargetParts"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
         @open-link="emit('open-link', $event)"
@@ -58,7 +58,7 @@
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
-        :title-target-link="titleTargetLink"
+        :title-target-parts="titleTargetParts"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
         @open-link="emit('open-link', $event)"
@@ -104,7 +104,7 @@ import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolConfirmation from './ChatToolConfirmation.vue'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import ChatToolUserInputRequest from './ChatToolUserInputRequest.vue'
-import { getToolDisplayTargetLink, getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
+import { getToolDisplayTargetParts, getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
 import { getMessageToolCallArgs, type MessageToolCall } from './types'
 import { useCodexToolCallDetails } from './tool-call-details'
 
@@ -164,7 +164,7 @@ const titleParts = computed(() => {
   }
   return getToolDisplayTitleParts(props.toolCall, descriptor, t)
 })
-const titleTargetLink = computed(() => getToolDisplayTargetLink(
+const titleTargetParts = computed(() => getToolDisplayTargetParts(
   props.toolCall,
   statusDescriptor.value,
   titleParts.value.target,
