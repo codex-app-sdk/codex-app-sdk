@@ -11,20 +11,17 @@
       :tool-call="toolCall"
     />
     <span v-if="titlePrefix && titleTarget" class="chat-tool-call__title-text">
-      <span>{{ titlePrefix }}</span>
-      <span class="chat-tool-call__title-target-list">
+      <span>{{ titlePrefix }}</span>{{ ' ' }}<span class="chat-tool-call__title-target-list">
         <template v-if="titleTargetParts?.length">
           <template v-for="(part, index) in titleTargetParts" :key="`${part.label}-${index}`">
-            <span v-if="part.separator" class="chat-tool-call__title-target-separator">{{ part.separator }}</span>
-            <a
+            <span v-if="part.separator" class="chat-tool-call__title-target-separator">{{ part.separator }}</span><a
               v-if="part.link"
               class="chat-tool-call__title-target chat-tool-call__title-target--link"
               :href="part.link.href"
               @click.stop.prevent="emit('open-link', part.link)"
               @keydown.enter.stop.prevent="emit('open-link', part.link)"
               @keydown.space.stop.prevent="emit('open-link', part.link)"
-            >{{ part.label }}</a>
-            <span v-else class="chat-tool-call__title-target">{{ part.label }}</span>
+            >{{ part.label }}</a><span v-else class="chat-tool-call__title-target">{{ part.label }}</span>
           </template>
         </template>
         <a
@@ -122,25 +119,15 @@ const emit = defineEmits<{
 
 .chat-tool-call__title-target-list {
   display: inline;
-  font-size: 0;
   min-width: 0;
 }
 
-.chat-tool-call__title-text > span:first-child {
-  margin-right: var(--space-3);
-}
-
 .chat-tool-call__title-target-separator {
-  font-size: var(--font-size-15);
-  line-height: var(--line-height-20);
   white-space: pre;
 }
 
 .chat-tool-call__title-target {
   display: inline;
-  font-size: var(--font-size-15);
-  line-height: var(--line-height-20);
-  gap: var(--space-3);
   min-width: 0;
   overflow: hidden;
   color: var(--color-secondary);

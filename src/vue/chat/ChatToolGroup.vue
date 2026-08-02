@@ -128,7 +128,7 @@ const emit = defineEmits<{
 const expanded = ref(false)
 const recentlyCompletedIds = ref<ReadonlySet<string>>(new Set())
 const recentCompletionTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const recentCompletionRetentionMs = 3_000
+const recentCompletionRetentionMs = 1_500
 let previousActiveIds = new Set(props.toolCalls.filter(isActiveToolCall).map((toolCall) => toolCall.id))
 const providedToolDetails = useCodexToolCallDetails()
 const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)

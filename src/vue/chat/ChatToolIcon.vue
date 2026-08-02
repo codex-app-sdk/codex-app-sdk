@@ -15,7 +15,6 @@ import {
   FolderIcon,
   ListDetailsIcon,
   PencilIcon,
-  PlusCircleIcon,
   SearchIcon,
   Terminal2Icon,
   ToolIcon,
@@ -37,7 +36,7 @@ const resolvedIcon = computed<Component | undefined>(() => {
   const descriptor = parseToolStatusDescriptor(props.toolCall.status)
   if (descriptor?.source === 'codex') {
     switch (descriptor.action) {
-      case 'create': return PlusCircleIcon
+      case 'create': return PencilIcon
       case 'delete': return Trash2Icon
       case 'edit': return PencilIcon
       case 'explore': return EyeIcon

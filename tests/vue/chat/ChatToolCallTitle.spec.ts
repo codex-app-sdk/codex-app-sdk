@@ -51,7 +51,7 @@ describe('ChatToolCallTitle', () => {
       },
     });
 
-    expect(wrapper.get('.chat-tool-call__title-text').text()).toBe('ReadREADME.md');
+    expect(wrapper.get('.chat-tool-call__title-text').text()).toBe('Read README.md');
     expect(wrapper.get('.chat-tool-call__title-target').text()).toBe('README.md');
   });
 

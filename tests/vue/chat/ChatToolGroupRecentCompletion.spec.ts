@@ -51,7 +51,7 @@ const newlyCompletedTool: MessageToolCall = {
 describe('ChatToolGroup recent completions', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('keeps a newly completed tool below a collapsed header for 3 seconds', async () => {
+  it('keeps a newly completed tool below a collapsed header for 1.5 seconds', async () => {
     vi.useFakeTimers();
     const wrapper = mount(ChatToolGroup, {
       props: { toolCalls: [completedTool, runningTool] },
@@ -64,7 +64,7 @@ describe('ChatToolGroup recent completions', () => {
     expect(wrapper.get('.chat-tool-group__title').text()).toBe('2 actions done');
     expect(wrapper.get('.chat-tool-group__running').text()).toContain('Ran git status');
 
-    await vi.advanceTimersByTimeAsync(2_999);
+    await vi.advanceTimersByTimeAsync(1_499);
     expect(wrapper.get('.chat-tool-group__running').text()).toContain('Ran git status');
 
     await vi.advanceTimersByTimeAsync(1);

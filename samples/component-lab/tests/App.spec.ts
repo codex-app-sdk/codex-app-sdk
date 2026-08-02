@@ -54,7 +54,7 @@ describe('component lab', () => {
     for (const toolHeader of toolHeaders) await toolHeader.trigger('click');
 
     const expected = [
-      ['Created src/vue/chat/ToolGallery.vue', 'circle-plus'],
+      ['Created src/vue/chat/ToolGallery.vue', 'pencil'],
       ['Deleted src/vue/chat/LegacyTool.vue', 'trash'],
       ['Edited src/vue/chat/ChatToolCall.vue', 'pencil'],
       ['Explored src/vue/chat', 'eye'],

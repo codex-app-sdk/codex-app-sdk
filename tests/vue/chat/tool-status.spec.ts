@@ -95,6 +95,30 @@ describe('tool status helpers', () => {
     })).toBe('Deleted old.ts');
   });
 
+  it('derives multi-file edit titles from tool payload paths', () => {
+    const tool: MessageToolCall = {
+      args: {
+        changes: [
+          { path: '/workspace/project/app-state.spec.ts' },
+          { path: '/workspace/project/ConversationPane.vue' },
+        ],
+      },
+      done: true,
+      function: 'fileChange',
+      id: 'multi-file-edit',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    expect(getToolDisplayTitle(tool, {
+      action: 'edit',
+      phase: 'completed',
+      params: { addedLines: 31, removedLines: 26, target: '2 files' },
+      source: 'codex',
+    })).toBe('Edited app-state.spec.ts, ConversationPane.vue');
+  });
+
   it('separates read and file-operation targets for highlighting', () => {
     const tool: MessageToolCall = {
       args: undefined,

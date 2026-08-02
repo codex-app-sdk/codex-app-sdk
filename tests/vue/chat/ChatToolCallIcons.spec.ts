@@ -9,7 +9,7 @@ import { provideCodexToolPresentation } from '../../../src/vue/chat/tool-present
 import type { MessageToolCall } from '../../../src/vue/chat/types';
 
 const actions = [
-  ['create', 'circle-plus'],
+  ['create', 'pencil'],
   ['delete', 'trash'],
   ['edit', 'pencil'],
   ['explore', 'eye'],

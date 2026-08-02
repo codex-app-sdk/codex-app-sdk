@@ -92,7 +92,7 @@ export function getToolDisplayTitle(
       return t(`chat.tool.command.plan.${operation}.${phase}`);
     }
 
-    const target = commandTarget(descriptor, getMessageToolCallName(toolCall));
+    const target = displayFileTarget(toolCall, descriptor, commandTarget(descriptor, getMessageToolCallName(toolCall)));
     return t(`chat.tool.command.${descriptor.action}.${phase}`, target ? { target } : undefined);
   }
 
@@ -116,7 +116,7 @@ export function getToolDisplayTitleParts(
     return { title };
   }
 
-  const target = commandTarget(descriptor, getMessageToolCallName(toolCall));
+  const target = displayFileTarget(toolCall, descriptor, commandTarget(descriptor, getMessageToolCallName(toolCall)));
   const prefix = title.endsWith(target) ? title.slice(0, -target.length).trimEnd() : undefined;
   return prefix ? { prefix, target, title } : { title };
 }
@@ -141,7 +141,11 @@ export function getToolDisplayTargetParts(
     return undefined;
   }
 
-  const displayTarget = target?.trim() || commandTarget(descriptor, getMessageToolCallName(toolCall));
+  const displayTarget = displayFileTarget(
+    toolCall,
+    descriptor,
+    target?.trim() || commandTarget(descriptor, getMessageToolCallName(toolCall)),
+  );
   const targetTokens = splitFileTargetDisplay(displayTarget);
   const filePaths = toolFilePaths(toolCall);
   if (!targetTokens.length || !filePaths.length) return undefined;
@@ -192,6 +196,37 @@ function commandTarget(descriptor: ToolStatusDescriptor, fallback: string) {
   }
 
   return fallback;
+}
+
+function displayFileTarget(
+  toolCall: MessageToolCall,
+  descriptor: ToolStatusDescriptor,
+  target: string,
+): string {
+  if (!['create', 'edit', 'read'].includes(descriptor.action)) return target;
+  const values = fileTargetValues(toolCall);
+  if (values.length === 0) return target;
+  if (values.length <= 3) return values.join(', ');
+  return `${values.slice(0, 3).join(', ')} and ${values.length - 3} more`;
+}
+
+function fileTargetValues(toolCall: MessageToolCall): string[] {
+  const args = isRecord(toolCall.args) ? toolCall.args : {};
+  const values = [
+    ...rawFileTargetValues(args.commandActions),
+    ...rawFileTargetValues(args.changes),
+    ...rawFileTargetValues(toolCall.metadata?.changes),
+    ...(typeof args.path === 'string' ? [args.path] : []),
+    ...(typeof args.name === 'string' ? [args.name] : []),
+  ];
+  return [...new Set(values.map(fileName).filter(Boolean))];
+}
+
+function rawFileTargetValues(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).flatMap((entry) => (
+    typeof entry.path === 'string' ? [entry.path] : typeof entry.name === 'string' ? [entry.name] : []
+  ));
 }
 
 function toolFilePaths(toolCall: MessageToolCall): string[] {

@@ -122,7 +122,7 @@ describe('ChatMessageBlock', () => {
     });
 
     expect(wrapper.get('.chat-tool-group__title').text()).toBe('1 action done');
-    expect(wrapper.get('.chat-tool-group__running').text()).toContain('Readingsrc/main.ts');
+    expect(wrapper.get('.chat-tool-group__running').text()).toContain('Reading main.ts');
     expect(wrapper.get('.chat-tool-group__running').text()).toContain('Running git status');
     expect(wrapper.get('.chat-tool-group__running').findAll('.chat-tool-call')).toHaveLength(2);
     expect(wrapper.get('.chat-tool-group__body').findAll('.chat-tool-call')).toHaveLength(1);
@@ -131,7 +131,7 @@ describe('ChatMessageBlock', () => {
     expect(wrapper.get('.chat-tool-group__running').classes()).toContain('chat-tool-group__running--after-completed');
     const titles = wrapper.findAll('.chat-tool-call__title').map((title) => title.text());
     expect(titles[0]).toContain('Ran npm test');
-    expect(titles.slice(1)).toEqual(expect.arrayContaining(['Readingsrc/main.ts', 'Running git status']));
+    expect(titles.slice(1)).toEqual(expect.arrayContaining(['Reading main.ts', 'Running git status']));
   });
 
   it('does not render a zero-count header while every tool is running', () => {
@@ -150,7 +150,7 @@ describe('ChatMessageBlock', () => {
     });
 
     expect(wrapper.find('.chat-tool-group__header').exists()).toBe(false);
-    expect(wrapper.get('.chat-tool-group__running').text()).toContain('Readingsrc/main.ts');
+    expect(wrapper.get('.chat-tool-group__running').text()).toContain('Reading main.ts');
   });
 
   it('forwards tool cancellation and client response events', async () => {
