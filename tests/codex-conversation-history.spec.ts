@@ -75,6 +75,9 @@ describe('codexThreadToSurfaceMessages', () => {
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'failed' }, {
       type: 'exitedReviewMode', id: 'review', review: 'Failed review',
     })).toMatchObject({ status: 'error', parts: [{ text: 'Failed review' }] });
+    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'interrupted' }, {
+      type: 'agentMessage', id: 'interrupted', text: 'Partial response', phase: null, memoryCitation: null,
+    })).toMatchObject({ status: 'complete', parts: [{ text: 'Partial response' }] });
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'userMessage', id: 'user', clientId: null, content: [],
     })).toBeNull();

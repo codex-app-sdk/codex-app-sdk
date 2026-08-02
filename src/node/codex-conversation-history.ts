@@ -334,9 +334,9 @@ function startsWithBytes(bytes: Uint8Array, prefix: readonly number[]): boolean 
 }
 
 function surfaceMessageStatus(status: Turn['status']): SurfaceMessage['status'] {
-  if (status === 'completed') return 'complete';
+  if (status === 'inProgress') return 'streaming';
   if (status === 'failed') return 'error';
-  return 'streaming';
+  return 'complete';
 }
 
 function timestampToIso(timestamp: number | null | undefined): string {
