@@ -78,6 +78,7 @@ describe('ChatModelReasoningSelector', () => {
 
   it('renders and toggles Fast mode when the model exposes a priority service tier', async () => {
     const wrapper = mountSelector({ modelId: 'codex-max' });
+    expect(wrapper.find('.chat-model-selector__leading-icon').exists()).toBe(false);
     await wrapper.get('.chat-model-selector__button').trigger('click');
 
     const fastMode = wrapper.findAll('[role="menuitemcheckbox"]');
@@ -85,6 +86,12 @@ describe('ChatModelReasoningSelector', () => {
     expect(fastMode[0]!.text()).toContain('Fast mode');
     await fastMode[0]!.trigger('click');
     expect(wrapper.emitted('update:serviceTier')).toStrictEqual([['priority']]);
+  });
+
+  it('shows the Fast mode icon only when the fast tier is selected', () => {
+    const wrapper = mountSelector({ modelId: 'codex-max', serviceTier: 'priority' });
+
+    expect(wrapper.find('.chat-model-selector__leading-icon').exists()).toBe(true);
   });
 
   it('keeps disabled controls inert when the model catalog has not loaded', () => {

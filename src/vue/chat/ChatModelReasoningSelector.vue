@@ -29,7 +29,11 @@
           :disabled="controlDisabled"
           @click="toggle"
         >
-          <BoltIcon v-if="selectedModel" class="chat-model-selector__leading-icon" aria-hidden="true" />
+          <BoltIcon
+            v-if="selectedModel && fastServiceTier && props.serviceTier === fastServiceTier.id"
+            class="chat-model-selector__leading-icon"
+            aria-hidden="true"
+          />
           <span class="chat-model-selector__label">{{ selectorLabel }}</span>
           <ChevronDown class="chat-model-selector__chevron" aria-hidden="true" />
         </button>
