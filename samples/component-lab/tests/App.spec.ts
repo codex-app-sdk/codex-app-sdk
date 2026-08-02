@@ -6,7 +6,7 @@ import App from '../src/App.vue';
 
 describe('component lab', () => {
   afterEach(() => vi.useRealTimers());
-  it('renders a dense multi-turn fixture with mentions, attachments, tools, and steering', () => {
+  it('renders a dense multi-turn fixture with mentions, attachments, tools, and steering', async () => {
     const wrapper = mount(App);
     expect(wrapper.text()).toContain('Component lab');
     expect(wrapper.text()).toContain('Multi-turn conversation');
@@ -15,9 +15,13 @@ describe('component lab', () => {
     expect(wrapper.get('.chat-attachment-block__preview').attributes('alt')).toBe('composer-broken.png');
     expect(wrapper.text()).toContain('layout-notes.md');
     const toolHeader = wrapper.get('.chat-tool-group__header');
-    expect(toolHeader.text()).toContain('3 actions done');
+    expect(toolHeader.text()).toContain('4 actions done');
     expect(toolHeader.get('.chat-animated-diff-stat--added').text()).toBe('+128');
     expect(toolHeader.get('.chat-animated-diff-stat--deleted').text()).toBe('-96');
+    await toolHeader.trigger('click');
+    expect(wrapper.text()).toContain('Explored src/vue');
+    expect(wrapper.find('.tabler-icon-eye').exists()).toBe(true);
+    expect(wrapper.find('.tabler-icon-tool').exists()).toBe(true);
     const steer = wrapper.get('.chat-message:has(.chat-message--steer)');
     expect(steer.text()).toContain('Steered conversation');
     expect(steer.find('.chat-message__actions').exists()).toBe(false);

@@ -88,7 +88,20 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useCodexChatI18n } from './chat-i18n'
-import { ChevronDown, ChevronUp, ListDetailsIcon, PencilIcon } from '../icons/app-icons'
+import {
+  ChevronDown,
+  ChevronUp,
+  EyeIcon,
+  FileTextIcon,
+  FolderIcon,
+  ListDetailsIcon,
+  PencilIcon,
+  PlusCircleIcon,
+  SearchIcon,
+  TerminalIcon,
+  ToolIcon,
+  Trash2Icon,
+} from '../icons/app-icons'
 import type { ClientRequestResponse } from './contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolConfirmation from './ChatToolConfirmation.vue'
@@ -145,15 +158,20 @@ const titleParts = computed(() => {
 })
 const titleIcon = computed(() => {
   if (statusDescriptor.value?.source !== 'codex') {
-    return undefined
+    return ToolIcon
   }
-  if (statusDescriptor.value.action === 'edit') {
-    return PencilIcon
+  switch (statusDescriptor.value.action) {
+    case 'create': return PlusCircleIcon
+    case 'delete': return Trash2Icon
+    case 'edit': return PencilIcon
+    case 'explore': return EyeIcon
+    case 'list': return FolderIcon
+    case 'plan': return ListDetailsIcon
+    case 'read': return FileTextIcon
+    case 'run': return TerminalIcon
+    case 'search': return SearchIcon
+    default: return ToolIcon
   }
-  if (statusDescriptor.value.action === 'plan') {
-    return ListDetailsIcon
-  }
-  return undefined
 })
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)

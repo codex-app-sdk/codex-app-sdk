@@ -120,6 +120,25 @@ describe('tool status helpers', () => {
     })).toBe('Updated plan');
   });
 
+  it('includes the target in mixed exploration titles', () => {
+    const tool: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'find src -type f | sort',
+      id: 'tool',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    expect(getToolDisplayTitle(tool, {
+      action: 'explore',
+      phase: 'completed',
+      params: { actions: ['listFiles', 'search'], target: 'src' },
+      source: 'codex',
+    })).toBe('Explored src');
+  });
+
   it('uses the generic fallback for app-specific tools', () => {
     const tool: MessageToolCall = {
       args: { to: 'Manny' },

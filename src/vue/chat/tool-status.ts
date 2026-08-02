@@ -84,7 +84,7 @@ export function getToolDisplayTitle(
       return t(`chat.tool.command.plan.${operation}.${phase}`);
     }
 
-    const target = descriptor.action === 'explore' ? undefined : commandTarget(descriptor, getMessageToolCallName(toolCall));
+    const target = commandTarget(descriptor, getMessageToolCallName(toolCall));
     return t(`chat.tool.command.${descriptor.action}.${phase}`, target ? { target } : undefined);
   }
 
@@ -146,9 +146,9 @@ export function defaultToolTranslate(key: string, params?: Record<string, unknow
     'chat.tool.command.delete.completed': 'Deleted {target}',
     'chat.tool.command.delete.failed': 'Failed deleting {target}',
     'chat.tool.command.delete.running': 'Deleting {target}',
-    'chat.tool.command.explore.completed': 'Explored',
-    'chat.tool.command.explore.failed': 'Failed exploring',
-    'chat.tool.command.explore.running': 'Exploring',
+    'chat.tool.command.explore.completed': 'Explored {target}',
+    'chat.tool.command.explore.failed': 'Failed exploring {target}',
+    'chat.tool.command.explore.running': 'Exploring {target}',
     'chat.tool.command.list.completed': 'Listed {target}',
     'chat.tool.command.list.failed': 'Failed listing {target}',
     'chat.tool.command.list.running': 'Listing {target}',

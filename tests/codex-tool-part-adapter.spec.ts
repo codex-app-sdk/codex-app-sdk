@@ -131,6 +131,7 @@ describe('tool-part-adapter', () => {
       phase: 'completed',
       params: {
         actions: ['listFiles', 'search'],
+        target: 'src',
       },
       source: 'codex',
     });

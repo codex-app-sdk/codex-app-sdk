@@ -313,9 +313,14 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
     phase: status,
     params: {
       actions: knownActions.map((action) => action.type),
+      target: formatTargetList(uniqueNonEmpty(knownActions.map(commandActionTarget)), command),
     },
     source: 'codex',
   };
+}
+
+function commandActionTarget(action: NormalizedCommandAction): string | undefined {
+  return action.path ?? action.name ?? action.query ?? action.command;
 }
 
 type NormalizedCommandAction = {
