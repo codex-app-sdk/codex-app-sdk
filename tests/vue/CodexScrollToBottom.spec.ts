@@ -14,6 +14,7 @@ describe('CodexScrollToBottom', () => {
     expect(button.attributes('aria-label')).toBe('Jump to latest');
     expect(button.attributes('title')).toBe('Jump to latest');
     expect(button.find('svg').exists()).toBe(true);
+    expect(button.find('svg').attributes('aria-hidden')).toBe('true');
 
     await button.trigger('click');
     expect(wrapper.emitted('click')).toStrictEqual([[]]);

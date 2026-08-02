@@ -39,7 +39,12 @@ const emit = defineEmits<{
   background: var(--codex-scroll-to-bottom-background, var(--color-surface-lowest, #fff));
   box-shadow: var(--codex-scroll-to-bottom-shadow, 0 1px 3px rgb(0 0 0 / 8%));
   cursor: pointer;
+  pointer-events: auto;
   transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.codex-scroll-to-bottom > svg {
+  pointer-events: none;
 }
 
 .codex-scroll-to-bottom:hover,
