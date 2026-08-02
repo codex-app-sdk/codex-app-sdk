@@ -49,8 +49,20 @@ const resolvedIcon = computed<Component | undefined>(() => {
     }
   }
 
-  return props.toolCall.kind === 'command' ? TerminalIcon : ToolIcon
+  return isCommandLikeToolCall(props.toolCall) ? TerminalIcon : ToolIcon
 })
+
+function isCommandLikeToolCall(toolCall: MessageToolCall): boolean {
+  if (toolCall.kind === 'command') return true
+  if (isRecord(toolCall.args) && typeof toolCall.args.command === 'string') return true
+
+  const name = toolCall.function.trim()
+  return /^(?:\/bin\/)?(?:bash|cmd|fish|powershell|pwsh|sh|zsh)(?:\s|$)/i.test(name)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
 </script>
 
 <style scoped>

@@ -72,6 +72,25 @@ describe('component lab', () => {
     }
   });
 
+  it('shows active tools below the counter and completed tools first when expanded', async () => {
+    const wrapper = mount(App);
+    const busyButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Busy and queued'));
+    expect(busyButton).toBeDefined();
+    await busyButton!.trigger('click');
+
+    const group = wrapper.get('.chat-tool-group');
+    expect(group.get('.chat-tool-group__title').text()).toBe('2 actions done');
+    expect(group.get('.chat-tool-group__running').text()).toContain('Finding composer code');
+    expect(group.get('.chat-tool-group__running').text()).toContain('Running npm run build');
+    expect(group.get('.chat-fold').classes()).not.toContain('chat-fold--open');
+
+    await group.get('.chat-tool-group__header').trigger('click');
+    const titles = group.findAll('.chat-tool-call__title').map((title) => title.text());
+    expect(titles.slice(0, 2)).toEqual(['Ran npm test', 'Read README.md']);
+    expect(titles.slice(2)).toEqual(expect.arrayContaining(['Finding composer code', 'Running npm run build']));
+  });
+
   it('submits multiline prompts without a backend', async () => {
     const wrapper = mount(App);
     const editor = wrapper.get('[role="textbox"][contenteditable]');

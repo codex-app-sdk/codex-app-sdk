@@ -51,20 +51,6 @@
       </template>
     </component>
 
-    <div v-if="activeToolCalls.length > 0" class="chat-tool-group__running" aria-live="polite">
-      <ChatToolCall
-        v-for="toolCall in activeToolCalls"
-        :key="toolCall.id"
-        class="chat-tool-group__active"
-        :summary-only="!toolDetailsEnabled"
-        :answered-client-request-ids="answeredClientRequestIds"
-        :show-tool-details="toolDetailsEnabled"
-        :tool-call="toolCall"
-        @cancel="emit('cancel')"
-        @client-response="emit('client-response', $event)"
-      />
-    </div>
-
     <ChatFoldTransition :open="expanded">
       <div class="chat-tool-group__body">
         <ChatToolCall
@@ -79,6 +65,25 @@
         />
       </div>
     </ChatFoldTransition>
+
+    <div
+      v-if="activeToolCalls.length > 0"
+      class="chat-tool-group__running"
+      :class="{ 'chat-tool-group__running--after-completed': expanded }"
+      aria-live="polite"
+    >
+      <ChatToolCall
+        v-for="toolCall in activeToolCalls"
+        :key="toolCall.id"
+        class="chat-tool-group__active"
+        :summary-only="!toolDetailsEnabled"
+        :answered-client-request-ids="answeredClientRequestIds"
+        :show-tool-details="toolDetailsEnabled"
+        :tool-call="toolCall"
+        @cancel="emit('cancel')"
+        @client-response="emit('client-response', $event)"
+      />
+    </div>
   </section>
 </template>
 
@@ -216,6 +221,10 @@ function hasToolDetails(toolCall: MessageToolCall) {
   flex-direction: column;
   gap: var(--space-4);
   padding-top: var(--space-2);
+}
+
+.chat-tool-group__running--after-completed {
+  padding-top: calc(var(--space-2) + (var(--space-1) * 2));
 }
 
 .chat-tool-group__title {

@@ -91,7 +91,7 @@ describe('ChatMessageBlock', () => {
     expect(group.text()).toContain('2 actions done');
   });
 
-  it('keeps the completed counter while showing every active tool below it', () => {
+  it('keeps the completed counter while showing every active tool below it', async () => {
     const completed = {
       args: { command: 'npm test' },
       done: true,
@@ -126,6 +126,12 @@ describe('ChatMessageBlock', () => {
     expect(wrapper.get('.chat-tool-group__running').text()).toContain('Running git status');
     expect(wrapper.get('.chat-tool-group__running').findAll('.chat-tool-call')).toHaveLength(2);
     expect(wrapper.get('.chat-tool-group__body').findAll('.chat-tool-call')).toHaveLength(1);
+
+    await wrapper.get('.chat-tool-group__header').trigger('click');
+    expect(wrapper.get('.chat-tool-group__running').classes()).toContain('chat-tool-group__running--after-completed');
+    const titles = wrapper.findAll('.chat-tool-call__title').map((title) => title.text());
+    expect(titles[0]).toContain('Ran npm test');
+    expect(titles.slice(1)).toEqual(expect.arrayContaining(['Reading src/main.ts', 'Running git status']));
   });
 
   it('does not render a zero-count header while every tool is running', () => {

@@ -206,6 +206,22 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
   });
 
+  it('recognizes command-shaped calls when app-server kind metadata is missing', () => {
+    const toolCall: MessageToolCall = {
+      args: { command: 'npm test' },
+      done: true,
+      function: 'exec_command',
+      id: 'command-shaped-tool',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+  });
+
   it('allows a scoped resolver to suppress an icon explicitly', () => {
     const toolCall: MessageToolCall = {
       args: undefined,
