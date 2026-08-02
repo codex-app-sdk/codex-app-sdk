@@ -222,6 +222,22 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
   });
 
+  it('recognizes completed shell commands from their rendered status text', () => {
+    const toolCall: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'exec',
+      id: 'completed-shell-status',
+      result: undefined,
+      state: 'completed',
+      status: "Ran /bin/bash -lc 'git add src/vue/chat/ChatToolGroup.vue'",
+    };
+
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+  });
+
   it('allows a scoped resolver to suppress an icon explicitly', () => {
     const toolCall: MessageToolCall = {
       args: undefined,

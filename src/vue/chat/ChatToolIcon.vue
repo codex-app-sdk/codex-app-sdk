@@ -56,8 +56,10 @@ function isCommandLikeToolCall(toolCall: MessageToolCall): boolean {
   if (toolCall.kind === 'command') return true
   if (isRecord(toolCall.args) && typeof toolCall.args.command === 'string') return true
 
-  const name = toolCall.function.trim()
-  return /^(?:\/bin\/)?(?:bash|cmd|fish|powershell|pwsh|sh|zsh)(?:\s|$)/i.test(name)
+  return [toolCall.function, toolCall.status].some((value) => (
+    typeof value === 'string'
+    && /(?:^|\s)(?:\/bin\/)?(?:bash|cmd|fish|powershell|pwsh|sh|zsh)(?:\s|$)/i.test(value.trim())
+  ))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
