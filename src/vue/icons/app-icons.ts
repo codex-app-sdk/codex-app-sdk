@@ -51,6 +51,7 @@ export {
   IconSquareCheck as SquareCheck,
   IconSquareDashed as SquareDashed,
   IconSquareX as SquareX,
+  IconSteeringWheel as SteeringWheelIcon,
   IconSwitchHorizontal as SwitchHorizontalIcon,
   IconTargetArrow as TargetArrowIcon,
   IconTerminal as TerminalIcon,

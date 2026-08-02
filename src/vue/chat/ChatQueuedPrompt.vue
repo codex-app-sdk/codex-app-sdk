@@ -10,7 +10,7 @@
         title="Steer now"
         @click="emit('steer', prompt.id)"
       >
-        <BoltIcon aria-hidden="true" />
+        <SteeringWheelIcon aria-hidden="true" />
         <span>Steer</span>
       </button>
       <button
@@ -27,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import { BoltIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
+import { SteeringWheelIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
 import type { QueuedChatPrompt } from './queued-prompts';
 
 defineProps<{

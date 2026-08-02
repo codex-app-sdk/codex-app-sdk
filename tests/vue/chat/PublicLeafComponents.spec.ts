@@ -163,6 +163,7 @@ describe('public conversation leaf components', () => {
 
   it('mounts queued prompts independently', async () => {
     const wrapper = mount(ChatQueuedPrompt, { props: { prompt: { id: 'queue-1', text: 'Run tests' } } });
+    expect(wrapper.get('[aria-label="Steer queued prompt now"] svg').attributes('class')).toContain('tabler-icon-steering-wheel');
     await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
     expect(wrapper.emitted('steer')).toStrictEqual([['queue-1']]);
   });
