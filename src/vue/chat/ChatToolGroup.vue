@@ -67,13 +67,13 @@
     </ChatFoldTransition>
 
     <div
-      v-if="activeToolCalls.length > 0"
+      v-if="statusToolCalls.length > 0"
       class="chat-tool-group__running"
       :class="{ 'chat-tool-group__running--after-completed': expanded }"
       aria-live="polite"
     >
       <ChatToolCall
-        v-for="toolCall in activeToolCalls"
+        v-for="toolCall in statusToolCalls"
         :key="toolCall.id"
         class="chat-tool-group__active"
         :summary-only="!toolDetailsEnabled"
@@ -89,7 +89,7 @@
 
 <script setup lang="ts">
 import { ChevronDown, ChevronUp } from '../icons/app-icons'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ClientRequestResponse } from './contracts'
 import ChatAnimatedDiffStat from './ChatAnimatedDiffStat.vue'
 import ChatFoldTransition from './ChatFoldTransition.vue'
@@ -112,6 +112,9 @@ const emit = defineEmits<{
 }>()
 
 const expanded = ref(false)
+const recentlyCompletedIds = ref<ReadonlySet<string>>(new Set())
+const recentCompletionTimers = new Map<string, ReturnType<typeof setTimeout>>()
+let previousActiveIds = new Set(props.toolCalls.filter(isActiveToolCall).map((toolCall) => toolCall.id))
 const providedToolDetails = useCodexToolCallDetails()
 const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
 
@@ -123,11 +126,18 @@ const singleConfirmationToolCall = computed(() => {
 
   return props.toolCalls[0]
 })
-const activeToolCalls = computed(() => props.toolCalls.filter(isActiveToolCall))
 const completedToolCalls = computed(() => props.toolCalls.filter((toolCall) => !isActiveToolCall(toolCall)))
 const headerToolCall = computed(() => (
   isSingleTool.value && completedToolCalls.value.length === 1 ? props.toolCalls[0] : undefined
 ))
+const statusToolCalls = computed(() => props.toolCalls.filter((toolCall) => (
+  isActiveToolCall(toolCall)
+  || (
+    !expanded.value
+    && recentlyCompletedIds.value.has(toolCall.id)
+    && headerToolCall.value?.id !== toolCall.id
+  )
+)))
 const lineDiff = computed(() => getToolGroupLineDiff(props.toolCalls))
 const canExpand = computed(() => (
   props.toolCalls.length > 1
@@ -141,6 +151,32 @@ const summary = computed(() => {
   return 'No actions'
 })
 
+watch(
+  () => props.toolCalls.map((toolCall) => ({ id: toolCall.id, active: isActiveToolCall(toolCall) })),
+  (toolStates) => {
+    const currentIds = new Set(toolStates.map((toolCall) => toolCall.id))
+    const currentActiveIds = new Set(
+      toolStates.filter((toolCall) => toolCall.active).map((toolCall) => toolCall.id),
+    )
+
+    for (const id of previousActiveIds) {
+      if (!currentActiveIds.has(id) && currentIds.has(id)) retainCompletedTool(id)
+    }
+    for (const id of currentActiveIds) clearRecentCompletion(id)
+    for (const id of recentlyCompletedIds.value) {
+      if (!currentIds.has(id)) clearRecentCompletion(id)
+    }
+
+    previousActiveIds = currentActiveIds
+  },
+  { flush: 'sync' },
+)
+
+onBeforeUnmount(() => {
+  for (const timer of recentCompletionTimers.values()) clearTimeout(timer)
+  recentCompletionTimers.clear()
+})
+
 function toggleExpanded() {
   if (!canExpand.value) return
   expanded.value = !expanded.value
@@ -148,6 +184,22 @@ function toggleExpanded() {
 
 function formatActions(count: number) {
   return `${count} ${count === 1 ? 'action' : 'actions'}`
+}
+
+function retainCompletedTool(id: string) {
+  clearRecentCompletion(id)
+  recentlyCompletedIds.value = new Set(recentlyCompletedIds.value).add(id)
+  recentCompletionTimers.set(id, setTimeout(() => clearRecentCompletion(id), 1_500))
+}
+
+function clearRecentCompletion(id: string) {
+  const timer = recentCompletionTimers.get(id)
+  if (timer !== undefined) clearTimeout(timer)
+  recentCompletionTimers.delete(id)
+  if (!recentlyCompletedIds.value.has(id)) return
+  const next = new Set(recentlyCompletedIds.value)
+  next.delete(id)
+  recentlyCompletedIds.value = next
 }
 
 function isActiveToolCall(toolCall: MessageToolCall) {

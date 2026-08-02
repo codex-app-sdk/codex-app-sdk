@@ -79,6 +79,7 @@ describe('component lab', () => {
   });
 
   it('shows active tools below the counter and completed tools first when expanded', async () => {
+    vi.useFakeTimers();
     const wrapper = mount(App);
     const busyButton = wrapper.findAll('nav button')
       .find((button) => button.text().includes('Busy and queued'));
@@ -91,10 +92,20 @@ describe('component lab', () => {
     expect(group.get('.chat-tool-group__running').text()).toContain('Running npm run build');
     expect(group.get('.chat-fold').classes()).not.toContain('chat-fold--open');
 
+    await vi.advanceTimersByTimeAsync(600);
+    expect(group.get('.chat-tool-group__title').text()).toBe('3 actions done');
+    expect(group.get('.chat-tool-group__running').text()).toContain('Searched composer code');
+
+    await vi.advanceTimersByTimeAsync(1_499);
+    expect(group.get('.chat-tool-group__running').text()).toContain('Searched composer code');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(group.get('.chat-tool-group__running').text()).not.toContain('Searched composer code');
+    expect(group.get('.chat-tool-group__running').text()).toContain('Running npm run build');
+
     await group.get('.chat-tool-group__header').trigger('click');
     const titles = group.findAll('.chat-tool-call__title').map((title) => title.text());
-    expect(titles.slice(0, 2)).toEqual(['Ran npm test', 'Read README.md']);
-    expect(titles.slice(2)).toEqual(expect.arrayContaining(['Finding composer code', 'Running npm run build']));
+    expect(titles.slice(0, 3)).toEqual(['Ran npm test', 'Read README.md', 'Searched composer code']);
+    expect(titles.slice(3)).toEqual(['Running npm run build']);
   });
 
   it('submits multiline prompts without a backend', async () => {

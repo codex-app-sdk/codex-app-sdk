@@ -273,6 +273,32 @@ function resetScenario(): void {
   draft.value = '';
   messages.value = selected.value.messages.map((message) => ({ ...message, parts: [...message.parts] }));
   activity.value = 'Scenario reset';
+  if (selected.value.id === 'busy') startBusyToolCompletion();
+}
+
+function startBusyToolCompletion(): void {
+  const timer = window.setTimeout(() => {
+    streamTimers.delete(timer);
+    messages.value = messages.value.map((message) => message.id === 'busy-assistant'
+      ? {
+          ...message,
+          parts: message.parts.map((part) => part.type === 'tool' && part.id === 'busy-running-search'
+            ? {
+                ...part,
+                status: 'completed',
+                statusText: JSON.stringify({
+                  source: 'codex',
+                  action: 'search',
+                  phase: 'completed',
+                  params: { target: 'composer code' },
+                }),
+              }
+            : part),
+        }
+      : message);
+    activity.value = 'Quick search completed';
+  }, 600);
+  streamTimers.add(timer);
 }
 
 function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
