@@ -27,6 +27,44 @@ describe('component lab', () => {
     expect(steer.find('.chat-message__actions').exists()).toBe(false);
   });
 
+  it('renders every tool action icon and label in the tool gallery', async () => {
+    const wrapper = mount(App);
+    const galleryButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Tool icon gallery'));
+    expect(galleryButton).toBeDefined();
+    await galleryButton!.trigger('click');
+
+    const toolHeaders = wrapper.findAll('.chat-tool-group__header');
+    expect(toolHeaders).toHaveLength(2);
+    expect(toolHeaders[0]?.text()).toContain('5 actions done');
+    expect(toolHeaders[0]?.get('.chat-animated-diff-stat--added').text()).toBe('+12');
+    expect(toolHeaders[0]?.get('.chat-animated-diff-stat--deleted').text()).toBe('-3');
+    expect(toolHeaders[1]?.text()).toContain('4 actions done');
+    for (const toolHeader of toolHeaders) await toolHeader.trigger('click');
+
+    const expected = [
+      ['Created src/vue/chat/ToolGallery.vue', 'circle-plus'],
+      ['Deleted src/vue/chat/LegacyTool.vue', 'trash'],
+      ['Edited src/vue/chat/ChatToolCall.vue', 'pencil'],
+      ['Explored src/vue/chat', 'eye'],
+      ['Listed src/vue/chat', 'folder'],
+      ['Updated plan', 'list-details'],
+      ['Read README.md', 'file-text'],
+      ['Ran npm test', 'terminal'],
+      ['Searched registerCodexToolTitlePresenter', 'search'],
+      ['Claw synchronization complete', 'tool'],
+    ] as const;
+    const toolCalls = wrapper.findAll('.chat-tool-call');
+    expect(toolCalls).toHaveLength(expected.length);
+    for (const [index, [label, icon]] of expected.entries()) {
+      const toolCall = toolCalls[index];
+      expect(toolCall).toBeDefined();
+      if (!toolCall) continue;
+      expect(toolCall.text().replace(/\s/g, '')).toContain(label.replace(/\s/g, ''));
+      expect(toolCall.get('.chat-tool-call__title svg').classes()).toContain(`tabler-icon-${icon}`);
+    }
+  });
+
   it('submits multiline prompts without a backend', async () => {
     const wrapper = mount(App);
     const editor = wrapper.get('[role="textbox"][contenteditable]');
