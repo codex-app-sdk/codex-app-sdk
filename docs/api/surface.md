@@ -45,8 +45,9 @@ all known turn IDs.
 
 Models may advertise service tiers through `serviceTiers` and
 `defaultServiceTier`. The selected tier is exposed as `selectedServiceTier`;
-`serviceTier: null` clears it. The standard Vue selector presents the
-`priority`/`fast` tier as a Fast mode toggle.
+`serviceTier: null` clears it. The app-server's reserved `default` tier remains
+valid even when it is not repeated in `serviceTiers`. The standard Vue selector
+presents the `priority`/`fast` tier as a Fast mode toggle.
 
 ```ts
 type CodexSurfaceServiceTier = {

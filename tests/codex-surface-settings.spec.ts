@@ -54,6 +54,8 @@ describe('Codex surface settings policy', () => {
     expect(() => validateReasoningEffort(models[0]!, 'high')).toThrow("not available for 'Fast'");
     expect(() => validateReasoningEffort(models[0]!, 'low')).not.toThrow();
     expect(() => validateServiceTier(models[0]!, 'priority')).not.toThrow();
+    expect(() => validateServiceTier(models[0]!, 'default')).not.toThrow();
+    expect(() => validateServiceTier({ ...models[0]!, defaultServiceTier: 'standard' }, 'standard')).not.toThrow();
     expect(() => validateServiceTier(models[0]!, 'unknown')).toThrow("not available for 'Fast'");
     expect(() => validateReasoningEffort({ id: 'open', model: 'open', displayName: 'Open' }, 'custom'))
       .not.toThrow();

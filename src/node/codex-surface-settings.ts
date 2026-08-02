@@ -57,6 +57,7 @@ export function validateServiceTier(
 ): void {
   if (!serviceTier) return;
   if (!model) throw new Error(`Cannot select service tier '${serviceTier}' without a model`);
+  if (serviceTier === 'default' || serviceTier === model.defaultServiceTier) return;
   const supported = model.serviceTiers?.map((option) => option.id) ?? [];
   if (supported.length > 0 && !supported.includes(serviceTier)) {
     throw new Error(`Service tier '${serviceTier}' is not available for '${model.displayName}'`);
