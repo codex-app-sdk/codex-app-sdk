@@ -185,6 +185,35 @@ describe('ChatRichTextEditor', () => {
 
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['use  now']);
   });
+
+  it('discards the browser placeholder break after deleting the last character', async () => {
+    const wrapper = mount(ChatRichTextEditor, { props: { modelValue: 'x' } });
+    const element = wrapper.get('[role="textbox"]');
+    element.element.replaceChildren(document.createElement('br'));
+
+    await element.trigger('input');
+
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['']);
+    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('');
+    expect(element.element.childNodes).toHaveLength(0);
+  });
+
+  it('keeps one intentional newline when deleting the final character of its line', async () => {
+    const wrapper = mount(ChatRichTextEditor, { props: { modelValue: 'hello\nx' } });
+    const element = wrapper.get('[role="textbox"]');
+    element.element.replaceChildren(
+      document.createTextNode('hello'),
+      document.createElement('br'),
+      document.createElement('br'),
+    );
+
+    await element.trigger('input');
+
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['hello\n']);
+    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('hello\n');
+    expect(element.findAll('br')).toHaveLength(2);
+    expect(element.findAll('br')[1]?.attributes()).toHaveProperty('data-trailing-line-break');
+  });
 });
 
 function domRect(top: number, bottom: number): DOMRect {

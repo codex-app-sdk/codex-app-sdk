@@ -85,6 +85,7 @@ function handleDocumentSelectionChange(): void {
 }
 
 function onInput(): void {
+  normalizeTrailingBrowserLineBreak();
   const selection = getSelectionRange();
   const value = readText();
   caretPosition.value = selection.valid ? selection.end : value.length;
@@ -98,6 +99,16 @@ function onInput(): void {
   } else {
     autoResize();
   }
+}
+
+function normalizeTrailingBrowserLineBreak(): void {
+  const lastChild = editor.value?.lastChild;
+  if (!(lastChild instanceof HTMLBRElement) || lastChild.dataset.trailingLineBreak !== undefined) return;
+
+  // Chromium keeps a terminal BR as a visual caret placeholder after native
+  // deletion. Intentional trailing newlines already have an SDK sentinel, so
+  // this unmarked terminal BR is browser-owned and must not enter the model.
+  lastChild.dataset.trailingLineBreak = '';
 }
 
 function autoResize(): void {
