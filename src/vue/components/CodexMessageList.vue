@@ -1,49 +1,53 @@
 <template>
   <div
-    ref="element"
-    class="codex-chat-theme codex-message-list message-list"
+    class="codex-chat-theme codex-message-list"
     :aria-label="ariaLabel"
-    @scroll="updateStickiness"
   >
-    <div class="codex-message-list__content">
-      <slot v-if="messages.length === 0" name="empty">
-        <p class="codex-message-list__empty">{{ emptyLabel }}</p>
-      </slot>
-      <template v-for="(message, index) in messages" v-else :key="message.id ?? index">
-        <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(message)" :index="index" />
-        <CodexMessage
-          v-else
-          :actions-disabled="actionsDisabled"
-          :answered-client-request-ids="answeredClientRequestIds"
-          :can-delete-message="canDeleteMessage"
-          :can-edit-message="canEditMessage"
-          :can-retry-message="canRetryMessage"
-          :follow-ups-disabled="followUpsDisabled"
-          :index="index"
-          :message="message"
-          :plugins="plugins"
-          :presentation="presentation"
-          :show-tool-details="showToolDetails"
-          :skills="skills"
-          @cancel="emit('cancel')"
-          @client-response="emit('client-response', $event)"
-          @copy-message="emit('copy-message', $event)"
-          @delete-message="emit('delete-message', $event)"
-          @edit-message="emit('edit-message', $event)"
-          @quote-message="emit('quote-message', $event)"
-          @retry-message="emit('retry-message', $event)"
-          @send-follow-up="emit('send-follow-up', $event)"
-        >
-          <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
-          <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
-          <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
-          <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
-          <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
-          <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
-          <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
-          <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
-        </CodexMessage>
-      </template>
+    <div
+      ref="scrollElement"
+      class="codex-message-list__viewport message-list"
+      @scroll="updateStickiness"
+    >
+      <div class="codex-message-list__content">
+        <slot v-if="messages.length === 0" name="empty">
+          <p class="codex-message-list__empty">{{ emptyLabel }}</p>
+        </slot>
+        <template v-for="(message, index) in messages" v-else :key="message.id ?? index">
+          <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(message)" :index="index" />
+          <CodexMessage
+            v-else
+            :actions-disabled="actionsDisabled"
+            :answered-client-request-ids="answeredClientRequestIds"
+            :can-delete-message="canDeleteMessage"
+            :can-edit-message="canEditMessage"
+            :can-retry-message="canRetryMessage"
+            :follow-ups-disabled="followUpsDisabled"
+            :index="index"
+            :message="message"
+            :plugins="plugins"
+            :presentation="presentation"
+            :show-tool-details="showToolDetails"
+            :skills="skills"
+            @cancel="emit('cancel')"
+            @client-response="emit('client-response', $event)"
+            @copy-message="emit('copy-message', $event)"
+            @delete-message="emit('delete-message', $event)"
+            @edit-message="emit('edit-message', $event)"
+            @quote-message="emit('quote-message', $event)"
+            @retry-message="emit('retry-message', $event)"
+            @send-follow-up="emit('send-follow-up', $event)"
+          >
+            <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
+            <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
+            <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
+            <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
+            <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
+            <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
+            <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
+            <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
+          </CodexMessage>
+        </template>
+      </div>
     </div>
     <CodexScrollToBottom
       v-if="!stickToBottom"
@@ -127,7 +131,7 @@ const emit = defineEmits<{
   'stickiness-change': [stuckToBottom: boolean]
 }>()
 
-const element = ref<HTMLElement | null>(null)
+const scrollElement = ref<HTMLElement | null>(null)
 const stickToBottom = ref(true)
 let contentObserver: MutationObserver | null = null
 let contentResizeObserver: ResizeObserver | null = null
@@ -136,7 +140,7 @@ let scrollFrame: number | ReturnType<typeof setTimeout> | null = null
 onMounted(async () => {
   await nextTick()
   scrollToBottom()
-  const content = element.value?.querySelector('.codex-message-list__content')
+  const content = scrollElement.value?.querySelector('.codex-message-list__content')
   if (content && typeof MutationObserver !== 'undefined') {
     contentObserver = new MutationObserver(() => {
       if (stickToBottom.value) queueScrollToBottom()
@@ -167,7 +171,7 @@ watch(() => props.resetKey, async () => {
 })
 
 function updateStickiness(): void {
-  const target = element.value
+  const target = scrollElement.value
   const next = target
     ? target.scrollHeight - target.scrollTop - target.clientHeight <= props.bottomThreshold
     : true
@@ -178,10 +182,10 @@ function updateStickiness(): void {
 }
 
 function scrollToBottom(): void {
-  if (!element.value) {
+  if (!scrollElement.value) {
     return
   }
-  element.value.scrollTop = element.value.scrollHeight
+  scrollElement.value.scrollTop = scrollElement.value.scrollHeight
   if (!stickToBottom.value) {
     stickToBottom.value = true
     emit('stickiness-change', true)
@@ -219,6 +223,16 @@ defineExpose({ scrollToBottom })
 <style scoped>
 .codex-message-list {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.codex-message-list__viewport {
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;

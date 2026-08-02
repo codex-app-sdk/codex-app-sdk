@@ -272,6 +272,7 @@ describe('CodexMessageList', () => {
 
     const button = wrapper.get('.codex-message-list__scroll-to-bottom');
     expect(button.attributes('aria-label')).toBe('Scroll to bottom');
+    expect(button.element.parentElement).toBe(wrapper.get('.codex-message-list').element);
     await button.trigger('click');
     expect(scrollEl.scrollTop).toBe(900);
     expect(wrapper.find('.codex-message-list__scroll-to-bottom').exists()).toBe(false);

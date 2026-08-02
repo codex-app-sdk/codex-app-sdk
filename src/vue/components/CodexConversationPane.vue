@@ -797,7 +797,7 @@ defineExpose({ focusComposer });
   flex: 1 1 auto;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--color-shell-main);
   --message-list-content-width: var(--codex-conversation-content-width);
   --message-list-content-padding-top: var(--space-12);
