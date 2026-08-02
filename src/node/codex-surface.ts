@@ -170,6 +170,24 @@ export type ListCodexSkillsOptions = {
   forceReload?: boolean;
 };
 
+/** State returned by the app-server remote-control connection. */
+export type CodexSurfaceRemoteControlStatus = v2.RemoteControlStatusReadResponse;
+
+/** One-time remote-control pairing details returned by the app-server. */
+export type CodexSurfaceRemoteControlPairing = v2.RemoteControlPairingStartResponse;
+
+/** Result of checking whether a remote-control pairing code was claimed. */
+export type CodexSurfaceRemoteControlPairingStatus = v2.RemoteControlPairingStatusResponse;
+
+/** A device currently paired with a remote-control environment. */
+export type CodexSurfaceRemoteControlClient = v2.RemoteControlClient;
+
+/** A page of devices paired with a remote-control environment. */
+export type CodexSurfaceRemoteControlClientPage = v2.RemoteControlClientsListResponse;
+
+/** Managed configuration requirements relevant to the host surface. */
+export type CodexSurfaceConfigRequirements = v2.ConfigRequirements;
+
 export type CodexSurfaceExtension = {
   dynamicTools?: readonly CodexDynamicTool[];
   configureConversation?: (context: {
@@ -546,6 +564,66 @@ export class CodexSurface {
       if (this.chatGptLoginPromise === start) this.chatGptLoginPromise = null;
     }).catch(() => undefined);
     return start;
+  }
+
+  /** Reads the app-server's current remote-control connection state. */
+  async readRemoteControlStatus(): Promise<CodexSurfaceRemoteControlStatus> {
+    await this.ensureConnected();
+    return this.client.request('remoteControl/status/read', undefined);
+  }
+
+  /** Enables the app-server's official remote-control connection. */
+  async enableRemoteControl(
+    options: v2.RemoteControlEnableParams = {},
+  ): Promise<CodexSurfaceRemoteControlStatus> {
+    await this.ensureConnected();
+    return this.client.request('remoteControl/enable', options);
+  }
+
+  /** Disables the app-server's official remote-control connection. */
+  async disableRemoteControl(
+    options: v2.RemoteControlDisableParams = {},
+  ): Promise<CodexSurfaceRemoteControlStatus> {
+    await this.ensureConnected();
+    return this.client.request('remoteControl/disable', options);
+  }
+
+  /** Starts a one-time remote-control pairing flow. Treat the returned code as opaque. */
+  async startRemoteControlPairing(
+    options: v2.RemoteControlPairingStartParams = {},
+  ): Promise<CodexSurfaceRemoteControlPairing> {
+    await this.ensureConnected();
+    return this.client.request('remoteControl/pairing/start', options);
+  }
+
+  /** Checks whether a remote-control pairing code has been claimed. */
+  async readRemoteControlPairingStatus(
+    options: v2.RemoteControlPairingStatusParams = {},
+  ): Promise<CodexSurfaceRemoteControlPairingStatus> {
+    await this.ensureConnected();
+    return this.client.request('remoteControl/pairing/status', options);
+  }
+
+  /** Lists devices paired with a remote-control environment. */
+  async listRemoteControlClients(
+    options: v2.RemoteControlClientsListParams,
+  ): Promise<CodexSurfaceRemoteControlClientPage> {
+    await this.ensureConnected();
+    return this.client.request('remoteControl/client/list', options);
+  }
+
+  /** Revokes one device from a remote-control environment. */
+  async revokeRemoteControlClient(
+    options: v2.RemoteControlClientsRevokeParams,
+  ): Promise<v2.RemoteControlClientsRevokeResponse> {
+    await this.ensureConnected();
+    return this.client.request('remoteControl/client/revoke', options);
+  }
+
+  /** Reads managed app-server requirements, including allowRemoteControl. */
+  async readConfigRequirements(): Promise<CodexSurfaceConfigRequirements | null> {
+    await this.ensureConnected();
+    return (await this.client.request('configRequirements/read', undefined)).requirements;
   }
 
   async cancelLogin(loginId = this.state.authentication.login.loginId ?? ''): Promise<CodexSurfaceSnapshot> {
