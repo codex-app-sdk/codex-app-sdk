@@ -17,7 +17,7 @@ import {
   PencilIcon,
   PlusCircleIcon,
   SearchIcon,
-  TerminalIcon,
+  Terminal2Icon,
   ToolIcon,
   Trash2Icon,
 } from '../icons/app-icons'
@@ -44,12 +44,12 @@ const resolvedIcon = computed<Component | undefined>(() => {
       case 'list': return FolderIcon
       case 'plan': return ListDetailsIcon
       case 'read': return FileTextIcon
-      case 'run': return TerminalIcon
+      case 'run': return Terminal2Icon
       case 'search': return SearchIcon
     }
   }
 
-  return isCommandLikeToolCall(props.toolCall) ? TerminalIcon : ToolIcon
+  return isCommandLikeToolCall(props.toolCall) ? Terminal2Icon : ToolIcon
 })
 
 function isCommandLikeToolCall(toolCall: MessageToolCall): boolean {

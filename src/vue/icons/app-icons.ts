@@ -54,6 +54,7 @@ export {
   IconSwitchHorizontal as SwitchHorizontalIcon,
   IconTargetArrow as TargetArrowIcon,
   IconTerminal as TerminalIcon,
+  IconTerminal2 as Terminal2Icon,
   IconTool as ToolIcon,
   IconTextWrap as TextWrapIcon,
   IconTextWrapDisabled as TextWrapDisabledIcon,

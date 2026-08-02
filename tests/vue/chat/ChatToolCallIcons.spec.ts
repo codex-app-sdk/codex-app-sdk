@@ -16,7 +16,7 @@ const actions = [
   ['list', 'folder'],
   ['plan', 'list-details'],
   ['read', 'file-text'],
-  ['run', 'terminal'],
+  ['run', 'terminal-2'],
   ['search', 'search'],
 ] as const;
 
@@ -185,7 +185,7 @@ describe('ChatToolCall action icons', () => {
     const wrapper = mount(Host);
 
     expect(wrapper.get('.chat-tool-call__title').text()).toContain('Ran /bin/bash -lc npm test');
-    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal-2');
   });
 
   it('uses the command kind when a completed update has no structured descriptor', () => {
@@ -203,7 +203,7 @@ describe('ChatToolCall action icons', () => {
     const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
 
     expect(wrapper.get('.chat-tool-call__title').text()).toContain('Ran /bin/bash -lc npm test');
-    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal-2');
   });
 
   it('recognizes command-shaped calls when app-server kind metadata is missing', () => {
@@ -219,7 +219,7 @@ describe('ChatToolCall action icons', () => {
 
     const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
 
-    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal-2');
   });
 
   it('recognizes completed shell commands from their rendered status text', () => {
@@ -235,7 +235,7 @@ describe('ChatToolCall action icons', () => {
 
     const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
 
-    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal-2');
   });
 
   it('allows a scoped resolver to suppress an icon explicitly', () => {

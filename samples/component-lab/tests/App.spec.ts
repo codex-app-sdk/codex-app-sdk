@@ -61,7 +61,7 @@ describe('component lab', () => {
       ['Listed src/vue/chat', 'folder'],
       ['Updated plan', 'list-details'],
       ['Read README.md', 'file-text'],
-      ['Ran /bin/bash -lc "npm test && npm run typecheck && npm run build"', 'terminal'],
+      ['Ran /bin/bash -lc "npm test && npm run typecheck && npm run build"', 'terminal-2'],
       ['Searched registerCodexToolTitlePresenter', 'search'],
       ['Opened in-app browser', 'lab-browser-tool-icon'],
       ['Claw synchronization complete', 'tool'],
