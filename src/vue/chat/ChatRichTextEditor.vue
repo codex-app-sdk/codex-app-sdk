@@ -424,6 +424,7 @@ defineExpose<CodexRichTextEditorExpose>({
   max-height: var(--chat-composer-input-max-height, 88px);
   padding: var(--space-4) 0;
   overflow-y: auto;
+  scrollbar-width: none;
   border: 0;
   outline: 0;
   background: transparent;
@@ -433,6 +434,10 @@ defineExpose<CodexRichTextEditorExpose>({
   line-height: var(--chat-composer-line-height, var(--line-height-24));
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.chat-rich-text-editor::-webkit-scrollbar {
+  display: none;
 }
 
 .chat-rich-text-editor:empty::before {

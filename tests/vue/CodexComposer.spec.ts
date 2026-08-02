@@ -315,6 +315,34 @@ describe('ChatComposer', () => {
     expect(wrapper.text()).toContain('GPT-5.1 Codex Max');
   });
 
+  it('keeps the editor above a split control row', () => {
+    const wrapper = mountComposer({
+      contextUsage: {
+        totalTokens: 50_000,
+        inputTokens: 40_000,
+        cachedInputTokens: 10_000,
+        outputTokens: 8_000,
+        reasoningOutputTokens: 2_000,
+        lastTotalTokens: 50_000,
+        modelContextWindow: 200_000,
+        usedPercent: 25,
+      },
+      models,
+      transcribeAudio: vi.fn(async () => ({ text: 'hello' })),
+    });
+
+    const inputRow = wrapper.get('.chat-composer__input-row');
+    const leading = wrapper.get('.chat-composer__meta-leading');
+    const trailing = wrapper.get('.chat-composer__meta-trailing');
+    expect(inputRow.find('.chat-rich-text-editor').exists()).toBe(true);
+    expect(leading.find('.chat-composer-action-menu__root').exists()).toBe(true);
+    expect(leading.find('.chat-context-usage').exists()).toBe(false);
+    expect(trailing.find('.chat-model-selector').exists()).toBe(true);
+    expect(trailing.find('.chat-context-usage').exists()).toBe(true);
+    expect(trailing.find('.chat-composer__voice').exists()).toBe(true);
+    expect(trailing.find('.chat-composer__send').exists()).toBe(true);
+  });
+
   it('shows context utilization when Codex reports token usage', () => {
     const wrapper = mountComposer({
       contextUsage: {

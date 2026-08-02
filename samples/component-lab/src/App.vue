@@ -60,6 +60,7 @@
           selected-reasoning-effort="medium"
           :skills="skills"
           :turn-git-diff="selected.turnGitDiff"
+          :transcribe-audio="transcribeAudio"
           @interrupt="activity = 'Interrupt requested'"
           @submit="submitPrompt"
         >
@@ -88,6 +89,7 @@ import {
   CodexConversationPane,
   provideCodexToolPresentation,
   type CodexChatMessage,
+  type CodexChatTranscription,
   type CodexContextUsage,
   type CodexModelOption,
   type CodexNativeAttachment,
@@ -143,6 +145,8 @@ const models: [CodexModelOption, ...CodexModelOption[]] = [{
   defaultServiceTier: null,
   isDefault: true,
 }];
+
+const transcribeAudio: CodexChatTranscription = async () => ({ text: 'Mock voice prompt' });
 
 const messageHeaders: Readonly<Record<string, string>> = {
   'conversation-steer': 'Message from codex-claw',

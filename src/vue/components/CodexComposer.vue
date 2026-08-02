@@ -32,91 +32,96 @@
       @select-skill="selectSlashSkill"
     />
 
-    <ChatComposerActionMenu
-      v-if="effectivePresentation.composer.actionMenu"
-      :attach-enabled="attachEnabled"
-      :disabled="disabled"
-      :items="menuItems"
-      :approval-preset="approvalPreset"
-      :approval-presets="effectiveCodexCapabilities.approvalPresets ?? []"
-      :plan-mode="planMode"
-      :show-approval-menu="effectiveCodexCapabilities.approvals && Boolean(approvalPreset) && (effectiveCodexCapabilities.approvalPresets?.length ?? 0) > 0"
-      :show-plan-mode="effectiveCodexCapabilities.planMode"
-      @attach="$emit('attach')"
-      @select="$emit('menuSelect', $event)"
-      @select-approval-preset="$emit('selectApprovalPreset', $event)"
-      @update:plan-mode="$emit('update:planMode', $event)"
-    >
-      <template v-if="$slots['menu-icon']" #icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
-      <template v-if="$slots['menu-item']" #item="scope"><slot name="menu-item" v-bind="scope" /></template>
-    </ChatComposerActionMenu>
-
-    <ChatComposerVoiceField
-      v-if="voiceVisible && (isRecording || isTranscribing)"
-      :recorder="recorder"
-      :recording="isRecording"
-    />
-    <ChatRichTextEditor
-      v-else
-      ref="editorEl"
-      v-model="prompt"
-      class="chat-composer__input"
-      :placeholder="placeholder"
-      :disabled="disabled && !isSending"
-      :files="files"
-      :plugins="plugins"
-      :skills="skills"
-      @blur="closeComposerMenusSoon"
-      @click="updateCaretPosition"
-      @caret-change="handleCaretChange"
-      @input="handleEditorInput"
-      @keydown="handleEditorKeydown"
-      @keyup="updateCaretPosition"
-      @paste="handleEditorPaste"
-    />
-    <slot name="after-input" />
+    <div class="chat-composer__input-row">
+      <ChatComposerVoiceField
+        v-if="voiceVisible && (isRecording || isTranscribing)"
+        :recorder="recorder"
+        :recording="isRecording"
+      />
+      <ChatRichTextEditor
+        v-else
+        ref="editorEl"
+        v-model="prompt"
+        class="chat-composer__input"
+        :placeholder="placeholder"
+        :disabled="disabled && !isSending"
+        :files="files"
+        :plugins="plugins"
+        :skills="skills"
+        @blur="closeComposerMenusSoon"
+        @click="updateCaretPosition"
+        @caret-change="handleCaretChange"
+        @input="handleEditorInput"
+        @keydown="handleEditorKeydown"
+        @keyup="updateCaretPosition"
+        @paste="handleEditorPaste"
+      />
+      <slot name="after-input" />
+    </div>
 
     <div class="chat-composer__meta">
-      <slot name="before-meta" />
-      <ChatComposerActiveModes
-        :plan-mode="effectiveCodexCapabilities.planMode && Boolean(planMode)"
-        @disable-plan-mode="$emit('update:planMode', false)"
-      />
-      <ChatContextUsageIndicator
-        v-if="effectivePresentation.composer.contextUsage"
-        :context-usage="contextUsage"
-      />
-      <ChatModelReasoningSelector
-        v-if="effectiveCodexCapabilities.models"
-        :disabled="disabled || isSending"
-        :models="models"
-        :model-catalog-status="modelCatalogStatus"
-        :model-id="selectedModelId"
-        :reasoning-effort="selectedReasoningEffort"
-        :service-tier="selectedServiceTier"
-        :show-service-tier="effectiveCodexCapabilities.serviceTier"
-        :show-reasoning="effectiveCodexCapabilities.reasoningEffort"
-        @update:model-id="$emit('update:modelId', $event)"
-        @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
-        @update:service-tier="$emit('update:serviceTier', $event)"
-      />
-      <ChatComposerVoiceButton
-        v-if="voiceVisible"
-        :disabled="voiceButtonDisabled"
-        :label="voiceButtonLabel"
-        :recording="isRecording"
-        :title="voiceButtonTitle"
-        @toggle="toggleRecording"
-      />
-      <CodexComposerSendButton
-        class="chat-composer__send"
-        :disabled="sendButtonDisabled"
-        :busy="sendButtonLoading"
-        :submit-label="sendButtonLabel"
-        interrupt-label="Codex is working"
-        @click="handleSendButtonClick"
-      />
-      <slot name="after" />
+      <div class="chat-composer__meta-leading">
+        <ChatComposerActionMenu
+          v-if="effectivePresentation.composer.actionMenu"
+          :attach-enabled="attachEnabled"
+          :disabled="disabled"
+          :items="menuItems"
+          :approval-preset="approvalPreset"
+          :approval-presets="effectiveCodexCapabilities.approvalPresets ?? []"
+          :plan-mode="planMode"
+          :show-approval-menu="effectiveCodexCapabilities.approvals && Boolean(approvalPreset) && (effectiveCodexCapabilities.approvalPresets?.length ?? 0) > 0"
+          :show-plan-mode="effectiveCodexCapabilities.planMode"
+          @attach="$emit('attach')"
+          @select="$emit('menuSelect', $event)"
+          @select-approval-preset="$emit('selectApprovalPreset', $event)"
+          @update:plan-mode="$emit('update:planMode', $event)"
+        >
+          <template v-if="$slots['menu-icon']" #icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
+          <template v-if="$slots['menu-item']" #item="scope"><slot name="menu-item" v-bind="scope" /></template>
+        </ChatComposerActionMenu>
+        <slot name="before-meta" />
+        <ChatComposerActiveModes
+          :plan-mode="effectiveCodexCapabilities.planMode && Boolean(planMode)"
+          @disable-plan-mode="$emit('update:planMode', false)"
+        />
+      </div>
+      <div class="chat-composer__meta-trailing">
+        <ChatContextUsageIndicator
+          v-if="effectivePresentation.composer.contextUsage"
+          :context-usage="contextUsage"
+        />
+        <ChatModelReasoningSelector
+          v-if="effectiveCodexCapabilities.models"
+          :disabled="disabled || isSending"
+          :models="models"
+          :model-catalog-status="modelCatalogStatus"
+          :model-id="selectedModelId"
+          :reasoning-effort="selectedReasoningEffort"
+          :service-tier="selectedServiceTier"
+          :show-service-tier="effectiveCodexCapabilities.serviceTier"
+          :show-reasoning="effectiveCodexCapabilities.reasoningEffort"
+          @update:model-id="$emit('update:modelId', $event)"
+          @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
+          @update:service-tier="$emit('update:serviceTier', $event)"
+        />
+        <ChatComposerVoiceButton
+          v-if="voiceVisible"
+          :disabled="voiceButtonDisabled"
+          :label="voiceButtonLabel"
+          :recording="isRecording"
+          :title="voiceButtonTitle"
+          @toggle="toggleRecording"
+        />
+        <CodexComposerSendButton
+          class="chat-composer__send"
+          :disabled="sendButtonDisabled"
+          :busy="sendButtonLoading"
+          :submit-label="sendButtonLabel"
+          interrupt-label="Codex is working"
+          @click="handleSendButtonClick"
+        />
+        <slot name="after" />
+      </div>
     </div>
   </form>
 </template>
@@ -475,6 +480,7 @@ defineExpose({ focus });
   --codex-composer-button-hover-background: var(--color-on-surface);
   --chat-composer-button-size: var(--chat-composer-control-size, 36px);
   --chat-composer-button-size-small: var(--chat-composer-compact-control-size, 28px);
+  --chat-composer-send-size: 28px;
   --chat-composer-input-max-height: calc(
     var(--chat-composer-line-height, var(--line-height-24))
     + var(--chat-composer-line-height, var(--line-height-24))
@@ -484,12 +490,13 @@ defineExpose({ focus });
   );
   position: relative;
   display: flex;
-  align-items: center;
-  gap: var(--space-6);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
   width: 100%;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-6) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-lowest);
   box-shadow: var(--shadow-lg);
   transition: border-color 120ms ease, box-shadow 120ms ease;
@@ -507,7 +514,8 @@ defineExpose({ focus });
   flex: 1 1 auto;
   min-width: 0;
   max-height: var(--chat-composer-input-max-height);
-  padding: var(--space-4) 0;
+  width: 100%;
+  padding: var(--space-2) var(--space-1) var(--space-4);
   border: 0;
   outline: 0;
   resize: none;
@@ -526,8 +534,33 @@ defineExpose({ focus });
 .chat-composer__meta {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  justify-content: space-between;
+  gap: var(--space-6);
+  width: 100%;
+  min-height: var(--chat-composer-button-size, 36px);
+}
+
+.chat-composer__input-row,
+.chat-composer__meta-leading,
+.chat-composer__meta-trailing {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.chat-composer__input-row {
+  width: 100%;
+  align-items: flex-start;
+}
+
+.chat-composer__meta-leading {
+  flex: 1 1 auto;
+  gap: var(--space-3);
+}
+
+.chat-composer__meta-trailing {
   flex: 0 0 auto;
+  gap: var(--space-3);
 }
 
 @media (max-width: 720px) {

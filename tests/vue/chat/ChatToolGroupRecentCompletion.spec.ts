@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
+import { defineComponent } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ChatToolGroup from '../../../src/vue/chat/ChatToolGroup.vue';
 import type { MessageToolCall } from '../../../src/vue/chat/types';
@@ -48,13 +49,19 @@ const newlyCompletedTool: MessageToolCall = {
   }),
 };
 
+const TransitionGroupStub = defineComponent({
+  emits: ['after-leave'],
+  template: '<div><slot /></div>',
+});
+
 describe('ChatToolGroup recent completions', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('keeps a newly completed tool below a collapsed header for 1.5 seconds', async () => {
+  it('keeps a newly completed tool below a collapsed header for 3 seconds and finishes its leave transition', async () => {
     vi.useFakeTimers();
     const wrapper = mount(ChatToolGroup, {
       props: { toolCalls: [completedTool, runningTool] },
+      global: { stubs: { 'transition-group': TransitionGroupStub } },
     });
 
     expect(wrapper.get('.chat-tool-group__running').text()).toContain('Running git status');
@@ -64,11 +71,14 @@ describe('ChatToolGroup recent completions', () => {
     expect(wrapper.get('.chat-tool-group__title').text()).toBe('2 actions done');
     expect(wrapper.get('.chat-tool-group__running').text()).toContain('Ran git status');
 
-    await vi.advanceTimersByTimeAsync(1_499);
+    await vi.advanceTimersByTimeAsync(2_999);
     expect(wrapper.get('.chat-tool-group__running').text()).toContain('Ran git status');
 
     await vi.advanceTimersByTimeAsync(1);
-    await vi.advanceTimersByTimeAsync(320);
+    expect(wrapper.get('.chat-tool-group__running').text()).not.toContain('Ran git status');
+
+    wrapper.getComponent(TransitionGroupStub).vm.$emit('after-leave');
+    await wrapper.vm.$nextTick();
     expect(wrapper.find('.chat-tool-group__running').exists()).toBe(false);
   });
 

@@ -144,7 +144,10 @@ const thinkingPlaceholder: SurfaceMessage = {
 }
 const hasStreamingAssistant = computed(() => props.messages.some((message) => (
   message.role === 'assistant' && (
-    'content' in message ? message.streaming === true : message.status === 'streaming'
+    'content' in message
+      ? message.streaming === true
+        || (message.type === 'compaction' && message.compactionStatus === 'running')
+      : message.status === 'streaming'
   )
 )))
 const displayMessages = computed(() => (

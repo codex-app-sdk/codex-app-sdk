@@ -58,8 +58,8 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: var(--chat-composer-control-size, var(--codex-composer-button-size, 36px));
-  height: var(--chat-composer-control-size, var(--codex-composer-button-size, 36px));
+  width: var(--chat-composer-send-size, var(--chat-composer-control-size, var(--codex-composer-button-size, 32px)));
+  height: var(--chat-composer-send-size, var(--chat-composer-control-size, var(--codex-composer-button-size, 32px)));
   padding: 0;
   border: 0;
   border-radius: 999px;

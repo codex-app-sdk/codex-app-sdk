@@ -70,12 +70,13 @@
     </ChatFoldTransition>
 
     <TransitionGroup
-      v-if="statusToolCalls.length > 0"
+      v-if="statusContainerVisible"
       name="chat-tool-group-running"
       tag="div"
       class="chat-tool-group__running"
       :class="{ 'chat-tool-group__running--after-completed': expanded }"
       aria-live="polite"
+      @after-leave="hideEmptyStatusContainer"
     >
       <div
         v-for="toolCall in statusToolCalls"
@@ -128,7 +129,7 @@ const emit = defineEmits<{
 const expanded = ref(false)
 const recentlyCompletedIds = ref<ReadonlySet<string>>(new Set())
 const recentCompletionTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const recentCompletionRetentionMs = 1_500
+const recentCompletionRetentionMs = 3_000
 let previousActiveIds = new Set(props.toolCalls.filter(isActiveToolCall).map((toolCall) => toolCall.id))
 const providedToolDetails = useCodexToolCallDetails()
 const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
@@ -153,6 +154,7 @@ const statusToolCalls = computed(() => props.toolCalls.filter((toolCall) => (
     && headerToolCall.value?.id !== toolCall.id
   )
 )))
+const statusContainerVisible = ref(statusToolCalls.value.length > 0)
 const lineDiff = computed(() => getToolGroupLineDiff(props.toolCalls))
 const canExpand = computed(() => (
   props.toolCalls.length > 1
@@ -187,6 +189,18 @@ watch(
   { flush: 'sync' },
 )
 
+watch(
+  [() => statusToolCalls.value.length, expanded, () => headerToolCall.value?.id],
+  ([statusCount, isExpanded, headerId]) => {
+    if (statusCount > 0) {
+      statusContainerVisible.value = true
+    } else if (isExpanded || headerId) {
+      statusContainerVisible.value = false
+    }
+  },
+  { flush: 'sync' },
+)
+
 onBeforeUnmount(() => {
   for (const timer of recentCompletionTimers.values()) clearTimeout(timer)
   recentCompletionTimers.clear()
@@ -215,6 +229,10 @@ function clearRecentCompletion(id: string) {
   const next = new Set(recentlyCompletedIds.value)
   next.delete(id)
   recentlyCompletedIds.value = next
+}
+
+function hideEmptyStatusContainer() {
+  if (statusToolCalls.value.length === 0) statusContainerVisible.value = false
 }
 
 function isActiveToolCall(toolCall: MessageToolCall) {

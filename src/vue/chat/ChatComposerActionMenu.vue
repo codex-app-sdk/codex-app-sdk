@@ -171,8 +171,8 @@ function isComposerMenuAction(value: unknown): value is ComposerMenuAction {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--chat-composer-control-size, 36px);
-  height: var(--chat-composer-control-size, 36px);
+  width: var(--chat-composer-action-size, 32px);
+  height: var(--chat-composer-action-size, 32px);
   border: 0;
   border-radius: var(--radius-full);
   color: var(--color-text-muted);
@@ -192,6 +192,7 @@ function isComposerMenuAction(value: unknown): value is ComposerMenuAction {
 .chat-composer-action-menu__button svg {
   width: var(--icon-lg);
   height: var(--icon-lg);
+  stroke-width: 1.5;
 }
 
 :deep(.chat-composer-action-menu .codex-composer-menu-list__submenu-list) {

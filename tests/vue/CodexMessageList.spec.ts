@@ -51,6 +51,25 @@ describe('CodexMessageList', () => {
     expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
   });
 
+  it('keeps a running compaction marker visible instead of adding a thinking row', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        busy: true,
+        messages: [{
+          id: 'compaction-1',
+          role: 'assistant',
+          content: '',
+          type: 'compaction',
+          compactionStatus: 'running',
+        }],
+      },
+    });
+
+    expect(wrapper.get('.chat-message--compaction-running')).toBeTruthy();
+    expect(wrapper.text()).toContain('Compacting context');
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+  });
+
   it('renders user text, markdown, streaming assistant state, follow-ups, and tool groups', () => {
     const wrapper = mount(CodexMessageList, {
       props: {
