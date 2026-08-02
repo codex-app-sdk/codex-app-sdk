@@ -105,6 +105,13 @@ describe('ChatModelReasoningSelector', () => {
     expect(wrapper.get('[role="menuitemcheckbox"]').attributes('aria-checked')).toBe('true');
   });
 
+  it('keeps the divider only above Fast mode', async () => {
+    const wrapper = mountSelector({ modelId: 'codex-max', serviceTier: 'priority' });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+
+    expect(wrapper.findAll('.codex-composer-menu-list__separator')).toHaveLength(1);
+  });
+
   it('keeps disabled controls inert when the model catalog has not loaded', () => {
     const wrapper = mountSelector({
       models: [],

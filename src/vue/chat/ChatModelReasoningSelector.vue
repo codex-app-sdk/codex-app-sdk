@@ -124,7 +124,6 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
   }];
 
   if (showReasoning.value) {
-    items.push({ id: 'model-reasoning-separator', type: 'separator' });
     items.push({
       id: 'reasoning',
       label: 'Reasoning',
