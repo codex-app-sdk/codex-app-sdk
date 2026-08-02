@@ -41,6 +41,12 @@ const mocks = vi.hoisted(() => {
   }
 
   const surface = { close: vi.fn(async () => undefined) };
+  const readRelayState = vi.fn(async (_statePath: string) => relayOperationsSnapshot());
+  const backend = {
+    close: vi.fn(async () => undefined),
+    module: vi.fn(() => ({ readSnapshot: () => readRelayState('/tmp/relay-user-data/relay-operations.json') })),
+    surface,
+  };
   return {
     app: {
       getPath: vi.fn((name: string) => name === 'home' ? '/tmp/relay-home' : '/tmp/relay-user-data'),
@@ -52,7 +58,7 @@ const mocks = vi.hoisted(() => {
     appHandlers,
     BrowserWindow: MockBrowserWindow,
     clipboard: { write: vi.fn() },
-    createCodexSurface: vi.fn((_options?: unknown) => surface),
+    createCodexAppBackend: vi.fn((_options?: unknown) => backend),
     dialog: { showOpenDialog: vi.fn() },
     initializeRelayState: vi.fn(async () => relayOperationsSnapshot()),
     ipcHandlers,
@@ -61,7 +67,7 @@ const mocks = vi.hoisted(() => {
       removeHandler: vi.fn((channel: string) => ipcHandlers.delete(channel)),
     },
     mkdir: vi.fn(async () => undefined),
-    readRelayState: vi.fn(async () => relayOperationsSnapshot()),
+    readRelayState,
     registerCodexElectronMain: vi.fn(() => vi.fn()),
     reset() {
       appHandlers.clear();
@@ -70,6 +76,7 @@ const mocks = vi.hoisted(() => {
     },
     shell: { openExternal: vi.fn(async () => undefined) },
     surface,
+    backend,
     windows,
   };
 });
@@ -87,7 +94,7 @@ vi.mock('codex-app-sdk/electron', () => ({
   registerCodexElectronMain: mocks.registerCodexElectronMain,
 }));
 vi.mock('codex-app-sdk/node', () => ({
-  createCodexSurface: mocks.createCodexSurface,
+  createCodexAppBackend: mocks.createCodexAppBackend,
 }));
 vi.mock('../src/mcp/relay-store', () => ({
   initializeRelayState: mocks.initializeRelayState,
@@ -109,39 +116,45 @@ describe('Relay sample main lifecycle', () => {
 
     expect(mocks.app.setName).toHaveBeenCalledWith('Relay');
     expect(mocks.initializeRelayState).toHaveBeenCalledWith('/tmp/relay-user-data/relay-operations.json');
-    expect(mocks.createCodexSurface).toHaveBeenCalledWith(expect.objectContaining({
-      approvalPreset: 'ask-for-approval',
-      autoSelectFirstConversation: true,
-      clientInfo: { name: 'relay', title: 'Relay', version: '0.1.0' },
-      codexHome: '/tmp/relay-home/.codex-relay',
-      conversationLimit: 1,
-      cwd: '/tmp/relay-user-data/workspace',
-      permissionMode: 'read-only',
-      mcpServers: [expect.objectContaining({
-        name: 'relay',
-        required: true,
-        toolApprovalMode: 'writes',
-        enabledTools: [
-          'list_exceptions',
-          'get_shipment',
-          'find_recovery_options',
-          'draft_customer_update',
-          'rebook_shipment',
-        ],
-        transport: expect.objectContaining({
-          type: 'stdio',
-          command: process.execPath,
-          env: {
-            ELECTRON_RUN_AS_NODE: '1',
-            RELAY_STATE_PATH: '/tmp/relay-user-data/relay-operations.json',
-          },
-        }),
-      })],
+    expect(mocks.createCodexAppBackend).toHaveBeenCalledWith(expect.objectContaining({
+      surfaceOptions: expect.objectContaining({
+        approvalPreset: 'ask-for-approval',
+        autoSelectFirstConversation: true,
+        clientInfo: { name: 'relay', title: 'Relay', version: '0.1.0' },
+        codexHome: '/tmp/relay-home/.codex-relay',
+        conversationLimit: 1,
+        cwd: '/tmp/relay-user-data/workspace',
+        permissionMode: 'read-only',
+        mcpServers: [expect.objectContaining({
+          name: 'relay',
+          required: true,
+          toolApprovalMode: 'writes',
+          enabledTools: [
+            'list_exceptions',
+            'get_shipment',
+            'find_recovery_options',
+            'draft_customer_update',
+            'rebook_shipment',
+          ],
+          transport: expect.objectContaining({
+            type: 'stdio',
+            command: process.execPath,
+            env: {
+              ELECTRON_RUN_AS_NODE: '1',
+              RELAY_STATE_PATH: '/tmp/relay-user-data/relay-operations.json',
+            },
+          }),
+        })],
+      }),
+      modules: [expect.objectContaining({ id: 'relay.operations', create: expect.any(Function) })],
     }));
-    const options = mocks.createCodexSurface.mock.calls[0]![0] as {
-      extensions: Array<{ configureConversation(): { developerInstructions: string } }>;
+    expect(mocks.backend.module).toHaveBeenCalledWith('relay.operations');
+    const options = mocks.createCodexAppBackend.mock.calls[0]![0] as {
+      surfaceOptions: {
+        extensions: Array<{ configureConversation(): { developerInstructions: string } }>;
+      };
     };
-    expect(options.extensions[0]!.configureConversation().developerInstructions)
+    expect(options.surfaceOptions.extensions[0]!.configureConversation().developerInstructions)
       .toContain('Never call rebook_shipment until the user explicitly approves');
   });
 
@@ -161,12 +174,12 @@ describe('Relay sample main lifecycle', () => {
     mocks.windows[0]!.close();
     mocks.appHandlers.get('activate')?.();
     await vi.waitFor(() => expect(mocks.windows).toHaveLength(1));
-    expect(mocks.createCodexSurface).toHaveBeenCalledOnce();
+    expect(mocks.createCodexAppBackend).toHaveBeenCalledOnce();
 
     mocks.appHandlers.get('before-quit')?.();
     expect(mocks.registerCodexElectronMain.mock.results[0]?.value).toHaveBeenCalledOnce();
     expect(mocks.ipcMain.removeHandler).toHaveBeenCalledWith(RELAY_SNAPSHOT_CHANNEL);
-    expect(mocks.surface.close).toHaveBeenCalledOnce();
+    expect(mocks.backend.close).toHaveBeenCalledOnce();
   });
 
   it('opens only https links outside the sandboxed renderer', async () => {

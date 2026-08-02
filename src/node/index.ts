@@ -41,6 +41,21 @@ export {
   type ListCodexSkillsOptions,
 } from './codex-surface';
 export {
+  CodexAppBackend,
+  createCodexAppBackend,
+  type CodexAppBackendModule,
+  type CodexAppBackendModuleContext,
+  type CodexAppBackendOptions,
+} from './codex-app-backend';
+export {
+  CodexAppBackendTtlCache,
+  type CodexAppBackendTtlCacheEvictionContext,
+  type CodexAppBackendTtlCacheOptions,
+  type CodexAppBackendTtlCacheRecord,
+  type CodexAppBackendTtlCacheScheduler,
+  type CodexAppBackendTtlTimer,
+} from './codex-app-backend-cache';
+export {
   codexItemToMediaPart,
   codexItemToSurfaceMessage,
   codexItemToToolPart,

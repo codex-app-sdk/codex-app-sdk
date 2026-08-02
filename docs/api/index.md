@@ -5,7 +5,7 @@ narrowest entry point that owns the capability you need.
 
 | Entry point | Runtime | Main exports |
 | --- | --- | --- |
-| `codex-app-sdk/node` | Node / Electron main | `CodexSurface`, stdio transport, discovery, extensions, MCP, history and transcription adapters |
+| `codex-app-sdk/node` | Node / Electron main | `CodexSurface`, `CodexAppBackend`, `CodexAppBackendTtlCache`, stdio transport, discovery, extensions, MCP, history and transcription adapters |
 | `codex-app-sdk/electron` | Electron main + types | Complete bridge, native bridge, typed IPC composition |
 | `codex-app-sdk/electron/preload` | Electron preload | `exposeCodexElectronPreload` and preload-safe types |
 | `codex-app-sdk/vue` | Vue renderer | Controller, pane, composer, messages, tools, media, theme, utilities |

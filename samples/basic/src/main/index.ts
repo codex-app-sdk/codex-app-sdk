@@ -2,11 +2,11 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type WebContents
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerCodexElectronMain } from 'codex-app-sdk/electron';
-import { createCodexSurface, type CodexSurface } from 'codex-app-sdk/node';
+import { createCodexAppBackend, type CodexAppBackend } from 'codex-app-sdk/node';
 
 const bundleDirectory = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | null = null;
-let surface: CodexSurface | null = null;
+let backend: CodexAppBackend | null = null;
 let unregisterSdk: (() => void) | null = null;
 
 async function createWindow(): Promise<void> {
@@ -34,14 +34,14 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  const sdkSurface = createCodexSurface();
-  surface = sdkSurface;
+  const sdkBackend = createCodexAppBackend();
+  backend = sdkBackend;
   unregisterSdk = registerCodexElectronMain({
     clipboard,
     dialog,
     ipcMain,
     shell,
-    surface: sdkSurface,
+    surface: sdkBackend.surface,
     sender: { send: (channel, payload) => mainWindow?.webContents.send(channel, payload) },
   });
   await createWindow();
@@ -85,6 +85,6 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   unregisterSdk?.();
   unregisterSdk = null;
-  void surface?.close().catch(() => undefined);
-  surface = null;
+  void backend?.close().catch(() => undefined);
+  backend = null;
 });

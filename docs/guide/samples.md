@@ -17,6 +17,7 @@ It demonstrates:
   approvals, queues, message actions, and history;
 - native picking, ingestion, paste/drop, copy, and speech transcription;
 - almost no renderer-side SDK plumbing.
+- a trusted main-process `CodexAppBackend` that owns the shared surface.
 
 ```bash
 cd samples/basic
@@ -65,6 +66,8 @@ It demonstrates:
 - standard tool rendering and write confirmations;
 - semantic `tool.completed` events refreshing business state;
 - a narrow sample-owned read-only IPC endpoint;
+- `CodexAppBackend` composing the shared Codex surface with an app-owned
+  operations module;
 - no raw app-server or MCP configuration in the renderer.
 
 ```bash

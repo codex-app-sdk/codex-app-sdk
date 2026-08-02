@@ -21,7 +21,8 @@ The sample demonstrates a complete bidirectional product loop:
 
 The renderer contains no raw app-server, MCP configuration, filesystem, or
 Electron primitives. Trusted stdio MCP configuration remains in the main
-process through `createCodexSurface({ mcpServers })`.
+process through `CodexAppBackend`'s shared `CodexSurface`; the sample's
+read-only operations snapshot is a small app-owned backend module.
 
 Relay starts its own app-server process and gives that process the dedicated
 `~/.codex-relay` `CODEX_HOME`; it never connects to or modifies normal

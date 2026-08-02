@@ -14,10 +14,14 @@ This runnable Electron + Vue sample demonstrates the intended SDK boundary:
   switch between them independently of another conversation's active turn;
 - the custom sidebar confirms permanent deletion and calls the SDK's
   high-level conversation lifecycle API without raw app-server or IPC code.
+- the trusted main process composes the SDK surface through
+  `CodexAppBackend`, leaving room for app-owned modules without creating a
+  second app-server boundary.
 
 Those native capabilities require no callbacks or event plumbing in `App.vue`.
-The app only creates one reactive controller, renders its own conversation list,
-and mounts `<CodexConversationPane :surface="surface">`.
+The app creates one `CodexAppBackend`, renders its own conversation list, and
+mounts `<CodexConversationPane :surface="surface">` from the backend's shared
+surface.
 
 No sample file calls an app-server method or imports a generated protocol type.
 

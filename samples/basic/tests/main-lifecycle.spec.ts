@@ -62,9 +62,11 @@ const electron = vi.hoisted(() => {
 
 const sdk = vi.hoisted(() => {
   const surface = { close: vi.fn(async () => undefined) };
+  const backend = { close: vi.fn(async () => undefined), surface };
   return {
-    createCodexSurface: vi.fn(() => surface),
+    createCodexAppBackend: vi.fn(() => backend),
     registerCodexElectronMain: vi.fn(() => vi.fn()),
+    backend,
     surface,
   };
 });
@@ -81,7 +83,7 @@ vi.mock('codex-app-sdk/electron', () => ({
   registerCodexElectronMain: sdk.registerCodexElectronMain,
 }));
 vi.mock('codex-app-sdk/node', () => ({
-  createCodexSurface: sdk.createCodexSurface,
+  createCodexAppBackend: sdk.createCodexAppBackend,
 }));
 
 describe('basic sample main lifecycle', () => {
@@ -101,8 +103,8 @@ describe('basic sample main lifecycle', () => {
     electron.appHandlers.get('activate')?.();
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
 
-    expect(sdk.createCodexSurface).toHaveBeenCalledOnce();
-    expect(sdk.createCodexSurface).toHaveBeenCalledWith();
+    expect(sdk.createCodexAppBackend).toHaveBeenCalledOnce();
+    expect(sdk.createCodexAppBackend).toHaveBeenCalledWith();
     expect(sdk.registerCodexElectronMain).toHaveBeenCalledOnce();
     expect(sdk.registerCodexElectronMain).toHaveBeenCalledWith(expect.objectContaining({
       clipboard: electron.clipboard,
@@ -116,7 +118,7 @@ describe('basic sample main lifecycle', () => {
 
     electron.appHandlers.get('before-quit')?.();
     expect(sdk.registerCodexElectronMain.mock.results[0]?.value).toHaveBeenCalledOnce();
-    expect(sdk.surface.close).toHaveBeenCalledOnce();
+    expect(sdk.backend.close).toHaveBeenCalledOnce();
   });
 
   it('loads the Vite server during development', async () => {

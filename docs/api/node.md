@@ -2,7 +2,10 @@
 
 ```ts
 import {
+  CodexAppBackend,
+  CodexAppBackendTtlCache,
   CodexSurface,
+  createCodexAppBackend,
   createCodexSurface,
 } from 'codex-app-sdk/node';
 ```
@@ -56,6 +59,117 @@ const surface = createCodexSurface({
 When `socketPath` is omitted, the SDK derives it from `codexHome` (or
 `CODEX_HOME`, then `~/.codex`). This transport never starts, stops, or restarts
 the server it connects to.
+
+## `createCodexAppBackend(options?)`
+
+Creates an optional in-process application composition root around one shared
+`CodexSurface`. It is intended for trusted Node or Electron main code that
+needs to compose product services with the Codex runtime.
+
+```ts
+type CodexAppBackendModuleContext = {
+  surface: CodexSurface;
+  closeBackend(): Promise<void>;
+  createTtlCache<Value>(
+    options: CodexAppBackendTtlCacheOptions<Value>,
+  ): CodexAppBackendTtlCache<Value>;
+};
+
+type CodexAppBackendModule<Service = unknown> = {
+  id: string;
+  create(context: CodexAppBackendModuleContext): Service;
+};
+
+type CodexAppBackendOptions = {
+  modules?: readonly CodexAppBackendModule[];
+  surface?: CodexSurface;
+  surfaceOptions?: CodexSurfaceOptions;
+};
+```
+
+Pass either an existing `surface` or `surfaceOptions`, not both. Module IDs
+must be unique and non-empty after trimming.
+
+```ts
+const backend = createCodexAppBackend({
+  surfaceOptions: { permissionMode: 'read-only' },
+  modules: [{
+    id: 'agents',
+    create({ surface }) {
+      return createAgentService(surface);
+    },
+  }],
+});
+
+await backend.surface.connect();
+const agents = backend.module<AgentService>('agents');
+await backend.close();
+```
+
+`CodexAppBackend` exposes `surface`, `module<Service>(id)`,
+`createTtlCache(options)`, and an idempotent `close()`. It does not own product
+services or add a process/transport layer;
+the embedding host still decides where the backend runs and how the surface is
+bridged to a renderer. See the [application backend guide](/guide/backend) for
+composition and lifecycle guidance.
+
+### `CodexAppBackendTtlCache<Value>`
+
+Create an optional cache from `backend.createTtlCache(options)` or from a
+module's `createTtlCache` context helper:
+
+```ts
+type CodexAppBackendTtlCacheEvictionContext = {
+  readonly id: string;
+  readonly lastActivityAt: number;
+  readonly now: number;
+  readonly idleForMs: number;
+};
+
+type CodexAppBackendTtlCacheOptions<Value> = {
+  ttlMs: number;
+  sweepIntervalMs?: number | null;
+  identity: (value: Value) => string;
+  canEvict: (
+    value: Value,
+    context: CodexAppBackendTtlCacheEvictionContext,
+  ) => boolean | Promise<boolean>;
+  onEvict: (
+    value: Value,
+    context: CodexAppBackendTtlCacheEvictionContext,
+  ) => void | Promise<void>;
+  now?: () => number;
+  scheduler?: CodexAppBackendTtlCacheScheduler;
+  onEvictionError?: (
+    error: unknown,
+    value: Value,
+    context: CodexAppBackendTtlCacheEvictionContext,
+  ) => void | Promise<void>;
+};
+
+type CodexAppBackendTtlTimer = {
+  unref?: () => void;
+};
+
+type CodexAppBackendTtlCacheScheduler = {
+  set(callback: () => void, delayMs: number): CodexAppBackendTtlTimer;
+  clear(timer: CodexAppBackendTtlTimer): void;
+};
+```
+
+The cache exposes:
+
+- `set(value, activityAt?)` to add or replace a value;
+- `get(id)` and `getRecord(id)` to read the value and activity timestamp;
+- `touch(id, activityAt?)` to record selection or generation activity;
+- `delete(id)` and `size` for explicit host cleanup;
+- `sweep()` to run an eviction pass manually;
+- `close()` to stop its optional timer and await an in-flight pass.
+
+Activity timestamps are monotonic per identity: a later `set()` or `touch()`
+cannot be replaced by an older event timestamp. A periodic scheduler is never
+created unless `sweepIntervalMs` is supplied. The default timer and injected
+schedulers are unref'd when supported and are always cleared during close.
 
 ## `CodexSurface`
 
