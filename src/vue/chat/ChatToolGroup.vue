@@ -66,24 +66,32 @@
       </div>
     </ChatFoldTransition>
 
-    <div
+    <TransitionGroup
       v-if="statusToolCalls.length > 0"
+      name="chat-tool-group-running"
+      tag="div"
       class="chat-tool-group__running"
       :class="{ 'chat-tool-group__running--after-completed': expanded }"
       aria-live="polite"
     >
-      <ChatToolCall
+      <div
         v-for="toolCall in statusToolCalls"
         :key="toolCall.id"
-        class="chat-tool-group__active"
-        :summary-only="!toolDetailsEnabled"
-        :answered-client-request-ids="answeredClientRequestIds"
-        :show-tool-details="toolDetailsEnabled"
-        :tool-call="toolCall"
-        @cancel="emit('cancel')"
-        @client-response="emit('client-response', $event)"
-      />
-    </div>
+        class="chat-tool-group__running-item"
+      >
+        <div class="chat-tool-group__running-item-content">
+          <ChatToolCall
+            class="chat-tool-group__active"
+            :summary-only="!toolDetailsEnabled"
+            :answered-client-request-ids="answeredClientRequestIds"
+            :show-tool-details="toolDetailsEnabled"
+            :tool-call="toolCall"
+            @cancel="emit('cancel')"
+            @client-response="emit('client-response', $event)"
+          />
+        </div>
+      </div>
+    </TransitionGroup>
   </section>
 </template>
 
@@ -114,6 +122,7 @@ const emit = defineEmits<{
 const expanded = ref(false)
 const recentlyCompletedIds = ref<ReadonlySet<string>>(new Set())
 const recentCompletionTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const recentCompletionRetentionMs = 3_000
 let previousActiveIds = new Set(props.toolCalls.filter(isActiveToolCall).map((toolCall) => toolCall.id))
 const providedToolDetails = useCodexToolCallDetails()
 const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
@@ -189,7 +198,7 @@ function formatActions(count: number) {
 function retainCompletedTool(id: string) {
   clearRecentCompletion(id)
   recentlyCompletedIds.value = new Set(recentlyCompletedIds.value).add(id)
-  recentCompletionTimers.set(id, setTimeout(() => clearRecentCompletion(id), 1_500))
+  recentCompletionTimers.set(id, setTimeout(() => clearRecentCompletion(id), recentCompletionRetentionMs))
 }
 
 function clearRecentCompletion(id: string) {
@@ -275,6 +284,34 @@ function hasToolDetails(toolCall: MessageToolCall) {
   padding-top: var(--space-2);
 }
 
+.chat-tool-group__running-item {
+  height: var(--line-height-20);
+  overflow: hidden;
+}
+
+.chat-tool-group__running-item-content {
+  min-height: var(--line-height-20);
+}
+
+.chat-tool-group-running-leave-active {
+  transition:
+    height 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 320ms ease;
+}
+
+.chat-tool-group-running-leave-active > .chat-tool-group__running-item-content {
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-tool-group-running-leave-to {
+  height: 0;
+  opacity: 0.3;
+}
+
+.chat-tool-group-running-leave-to > .chat-tool-group__running-item-content {
+  transform: translateY(-100%);
+}
+
 .chat-tool-group__running--after-completed {
   padding-top: calc(var(--space-2) + (var(--space-1) * 2));
 }
@@ -305,6 +342,13 @@ function hasToolDetails(toolCall: MessageToolCall) {
 
 .chat-tool-group__body .chat-tool-call:only-of-type:deep() .chat-tool-call__body {
   padding-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-tool-group-running-leave-active,
+  .chat-tool-group-running-leave-active > .chat-tool-group__running-item-content {
+    transition: none;
+  }
 }
 
 @keyframes chat-tool-group-square-pulse {
