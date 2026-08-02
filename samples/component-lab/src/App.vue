@@ -62,7 +62,13 @@
           :turn-git-diff="selected.turnGitDiff"
           @interrupt="activity = 'Interrupt requested'"
           @submit="submitPrompt"
-        />
+        >
+          <template #message-header="{ message }">
+            <p v-if="messageHeaderFor(message)" class="lab-message-header">
+              {{ messageHeaderFor(message) }}
+            </p>
+          </template>
+        </CodexConversationPane>
       </div>
 
       <footer class="lab__footer">
@@ -81,6 +87,7 @@ import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue';
 import {
   CodexConversationPane,
   provideCodexToolPresentation,
+  type CodexChatMessage,
   type CodexContextUsage,
   type CodexModelOption,
   type CodexNativeAttachment,
@@ -134,6 +141,14 @@ const models: [CodexModelOption, ...CodexModelOption[]] = [{
   defaultReasoningEffort: 'medium',
   isDefault: true,
 }];
+
+const messageHeaders: Readonly<Record<string, string>> = {
+  'conversation-steer': 'Message from codex-claw',
+};
+
+function messageHeaderFor(message: CodexChatMessage): string | undefined {
+  return message.id ? messageHeaders[message.id] : undefined;
+}
 
 const InAppBrowserIcon = defineComponent({
   name: 'InAppBrowserIcon',

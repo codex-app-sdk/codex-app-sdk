@@ -23,8 +23,13 @@ describe('component lab', () => {
     expect(wrapper.find('.tabler-icon-eye').exists()).toBe(true);
     expect(wrapper.find('.tabler-icon-tool').exists()).toBe(true);
     const steer = wrapper.get('.chat-message:has(.chat-message--steer)');
+    const messageHeader = steer.get('.lab-message-header');
+    expect(messageHeader.text()).toBe('Message from codex-claw');
     expect(steer.text()).toContain('Steered conversation');
+    expect(steer.text()).toContain('Focus on the attachment renderer first.');
     expect(steer.find('.chat-message__actions').exists()).toBe(false);
+    expect(messageHeader.element.compareDocumentPosition(steer.get('.chat-message__stack').element))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('renders every tool action icon and label in the tool gallery', async () => {

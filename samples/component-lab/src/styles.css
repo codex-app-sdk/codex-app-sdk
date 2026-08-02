@@ -29,6 +29,7 @@ button, select { font: inherit; }
 .lab__header p:last-child { max-width: 720px; margin: 6px 0 0; }
 .lab__frame { min-height: 0; overflow: hidden; border: 1px solid var(--color-border, #ddd); border-radius: 18px; background: var(--color-shell-main, #fff); box-shadow: 0 18px 60px rgb(0 0 0 / 8%); }
 .lab__frame > * { height: 100%; }
+.lab-message-header { margin: 0 0 6px; color: var(--color-text-muted, #666); font-size: 12px; font-weight: 600; }
 .lab__footer { display: flex; align-items: center; gap: 18px; max-width: 1100px; width: 100%; margin: 0 auto; padding: 14px 2px 0; color: var(--color-text-muted, #666); font-size: 12px; }
 .lab__footer output { margin-left: auto; color: var(--color-primary, #1b4fb2); }
 kbd { padding: 2px 5px; border: 1px solid var(--color-border-strong, #bbb); border-radius: 5px; background: var(--color-surface-lowest, #fff); color: var(--color-text, #171717); font: inherit; box-shadow: 0 1px 0 var(--color-border, #ddd); }

@@ -70,7 +70,7 @@ surface controller. Or build a different layout from exported components:
 `CodexConversationPane` forwards scoped slots for:
 
 - `empty`
-- `message` and `message-block`
+- `message`, the additive `message-header`, and `message-block`
 - `message-text`, `message-attachment`, and `message-tool`
 - `message-thinking`, `message-status`, and `message-actions`
 - `approval`
@@ -80,6 +80,19 @@ surface controller. Or build a different layout from exported components:
 
 Use `message-block` for media-specific overrides, or mount
 `CodexMediaBlock` directly.
+
+Use `message-header` to add host-owned context above a message without replacing
+the SDK body, attachments, tools, or actions:
+
+```vue
+<CodexConversationPane :surface="surface">
+  <template #message-header="{ message }">
+    <p v-if="messageHeaders[message.id]">
+      {{ messageHeaders[message.id] }}
+    </p>
+  </template>
+</CodexConversationPane>
+```
 
 ## Catalog-driven controls
 
