@@ -31,7 +31,7 @@ export type CodexSurfaceTurnActionsHost = {
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
   getSnapshot(): CodexSurfaceSnapshot;
   getState(): CodexSurfaceSnapshot;
-  hydrateCompleteHistory(threadId: string): Promise<void>;
+  hydrateCompleteHistory(threadId: string, options?: { initialPageLoaded?: boolean; cursor?: string | null }): Promise<void>;
   patch(patch: Partial<CodexSurfaceSnapshot>): void;
   patchConversationStatus(threadId: string, status: 'active' | 'idle', origin: 'action'): void;
   patchConversationTurnCount(threadId: string, turnCount: number, origin: 'action'): void;

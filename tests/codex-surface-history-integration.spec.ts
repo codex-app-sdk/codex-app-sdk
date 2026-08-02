@@ -59,7 +59,7 @@ describe('CodexSurface', () => {
     });
   });
 
-  it('renders a bounded summary page before hydrating full history in the background', async () => {
+  it('renders a bounded full page before hydrating remaining history in the background', async () => {
     const firstTurn = turn('turn-first', 'completed', [
       { type: 'userMessage', id: 'user-first', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
       {
@@ -71,21 +71,26 @@ describe('CodexSurface', () => {
     ]);
     const secondTurn = turn('turn-second', 'completed', [
       { type: 'userMessage', id: 'user-second', clientId: null, content: [{ type: 'text', text: 'Second', text_elements: [] }] },
+      {
+        type: 'commandExecution', id: 'command-second', command: 'npm run build', cwd: '/tmp/project', processId: null,
+        source: 'unifiedExec', status: 'completed', commandActions: [], aggregatedOutput: 'passed', exitCode: 0,
+        durationMs: 20,
+      },
       { type: 'agentMessage', id: 'agent-second', text: 'Second reply', phase: null, memoryCitation: null },
     ]);
-    const firstFullPage = deferred<unknown>();
+    const remainingFullPage = deferred<unknown>();
     const transport = new FakeTransport({
       'thread/resume': (params) => ({
         ...resumeResponse(thread(String((params as { threadId: string }).threadId), false)),
-        initialTurnsPage: { data: [secondTurn], nextCursor: 'summary-page-2', backwardsCursor: null },
+        initialTurnsPage: { data: [secondTurn], nextCursor: 'remaining-page-2', backwardsCursor: null },
       }),
       'thread/turns/list': (params) => {
         const cursor = (params as { cursor: string | null }).cursor;
         expect(params).toMatchObject({
           threadId: 'thread-existing', limit: 5, sortDirection: 'desc', itemsView: 'full',
         });
-        return cursor === null
-          ? firstFullPage.promise
+        return cursor === 'remaining-page-2'
+          ? remainingFullPage.promise
           : { data: [firstTurn], nextCursor: null, backwardsCursor: null };
       },
     });
@@ -97,21 +102,23 @@ describe('CodexSurface', () => {
 
     const snapshot = await surface.connect();
 
-    expect(snapshot.messages.map((message) => message.parts[0])).toMatchObject([
-      { type: 'text', text: 'Second' },
-      { type: 'text', text: 'Second reply' },
-    ]);
-    firstFullPage.resolve({ data: [secondTurn], nextCursor: 'full-page-2', backwardsCursor: null });
-    await vi.waitFor(() => expect(surface.getSnapshot().messages.map((message) => message.parts[0])).toMatchObject([
-      { type: 'text', text: 'First' },
-      { type: 'tool', id: 'command-first', kind: 'command' },
-      { type: 'text', text: 'Second' },
-      { type: 'text', text: 'Second reply' },
+    expect(snapshot.messages.flatMap((message) => message.parts)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text', text: 'Second' }),
+      expect.objectContaining({ type: 'tool', id: 'command-second', kind: 'command' }),
+      expect.objectContaining({ type: 'text', text: 'Second reply' }),
     ]));
+    remainingFullPage.resolve({ data: [firstTurn], nextCursor: null, backwardsCursor: null });
+    await vi.waitFor(() => expect(surface.getSnapshot().messages.flatMap((message) => message.parts)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text', text: 'First' }),
+      expect.objectContaining({ type: 'tool', id: 'command-first', kind: 'command' }),
+      expect.objectContaining({ type: 'text', text: 'Second' }),
+      expect.objectContaining({ type: 'tool', id: 'command-second', kind: 'command' }),
+      expect.objectContaining({ type: 'text', text: 'Second reply' }),
+    ])));
     expect(surface.getSnapshot().conversations[0]).toMatchObject({ id: 'thread-existing', turnCount: 2 });
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/turns/list'
-    ))).toHaveLength(2);
+    ))).toHaveLength(1);
     expect(historyEvents.at(-1)).toMatchObject({
       type: 'conversation.historyReplaced',
       origin: 'lifecycle',
@@ -128,9 +135,15 @@ describe('CodexSurface', () => {
         const running = thread('thread-existing', false);
         running.status = { type: 'active', activeFlags: [] };
         running.turns = [runningTurn];
-        return resumeResponse(running);
+        return {
+          ...resumeResponse(running),
+          initialTurnsPage: { data: [runningTurn], nextCursor: 'stale-page-2', backwardsCursor: null },
+        };
       },
-      'thread/turns/list': () => staleFullPage.promise,
+      'thread/turns/list': (params) => {
+        expect(params).toMatchObject({ cursor: 'stale-page-2', itemsView: 'full' });
+        return staleFullPage.promise;
+      },
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     surface.onEvent((event) => {

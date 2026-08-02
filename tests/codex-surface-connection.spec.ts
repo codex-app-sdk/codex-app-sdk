@@ -101,7 +101,7 @@ describe('CodexSurface', () => {
     });
     expect(transport.sent.map((message) => 'method' in message ? message.method : null)).toStrictEqual([
       'initialize', 'initialized', 'account/read', 'model/list', 'skills/list', 'permissionProfile/list',
-      'account/rateLimits/read', 'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get', 'thread/turns/list',
+      'account/rateLimits/read', 'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get',
       'plugin/installed',
     ]);
     expect(lastRequest(transport, 'account/read')).toMatchObject({ params: { refreshToken: false } });
@@ -109,7 +109,7 @@ describe('CodexSurface', () => {
       params: {
         threadId: 'thread-existing',
         excludeTurns: true,
-        initialTurnsPage: { limit: 5, itemsView: 'summary', sortDirection: 'desc' },
+        initialTurnsPage: { limit: 5, itemsView: 'full', sortDirection: 'desc' },
       },
     });
     expect(listener).toHaveBeenCalled();

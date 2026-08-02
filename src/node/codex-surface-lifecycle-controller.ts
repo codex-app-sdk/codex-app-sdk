@@ -296,9 +296,9 @@ export class CodexSurfaceLifecycleController {
           threadId: conversationId,
           excludeTurns: true,
           initialTurnsPage: {
-            limit: CONVERSATION_HISTORY_PAGE_SIZE,
-            sortDirection: 'desc',
-            itemsView: 'summary',
+          limit: CONVERSATION_HISTORY_PAGE_SIZE,
+          sortDirection: 'desc',
+          itemsView: 'full',
           },
           ...(hostOptions.cwd ? { cwd: hostOptions.cwd } : {}),
           ...(extension.baseInstructions === undefined ? {} : { baseInstructions: extension.baseInstructions }),
@@ -319,7 +319,7 @@ export class CodexSurfaceLifecycleController {
         cursor: null,
         limit: CONVERSATION_HISTORY_PAGE_SIZE,
         sortDirection: 'desc',
-        itemsView: 'summary',
+        itemsView: 'full',
       });
       const turns = [...initialPage.data].reverse();
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
@@ -352,7 +352,10 @@ export class CodexSurfaceLifecycleController {
       this.host.emitSummaryUpserted(summary, 'resumed', 'action');
       this.host.emitHistoryReplaced(response.thread.id, historyReason, 'action');
       this.emitConversationState(response.thread.id);
-      void this.conversations.hydrateCompleteHistory(response.thread.id).catch(() => undefined);
+      void this.conversations.hydrateCompleteHistory(response.thread.id, {
+        cursor: initialPage.nextCursor,
+        initialPageLoaded: true,
+      }).catch(() => undefined);
       return this.host.getSnapshot();
     } catch (error) {
       this.host.patchRuntime(conversationId, { historyLoading: false, error: errorMessage(error) });

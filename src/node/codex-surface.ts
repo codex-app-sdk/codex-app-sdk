@@ -244,7 +244,7 @@ export class CodexSurface {
       ensureThreadReady: (threadId) => this.ensureThreadReady(threadId),
       getSnapshot: () => this.getSnapshot(),
       getState: () => this.state,
-      hydrateCompleteHistory: (threadId) => this.conversations.hydrateCompleteHistory(threadId),
+      hydrateCompleteHistory: (threadId, options) => this.conversations.hydrateCompleteHistory(threadId, options),
       patch: (patch) => this.patch(patch),
       patchConversationStatus: (threadId, status, origin) => this.patchConversationStatus(threadId, status, origin),
       patchConversationTurnCount: (threadId, count, origin) => this.patchConversationTurnCount(threadId, count, origin),

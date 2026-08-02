@@ -113,6 +113,7 @@ Stable Node handle for one conversation:
 ```ts
 type CodexConversation = {
   readonly id: string;
+  /** Loads five recent full-detail turns immediately and older full-detail turns in the background. */
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;

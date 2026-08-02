@@ -56,6 +56,12 @@ await Promise.all([
 Each handle exposes its own messages, active turn, turn IDs, approvals, queue,
 goal, model/settings selection, history-loading state, and errors.
 
+`load()` renders the five most recent turns with full item details first, then
+hydrates older turns in the background using full pages as well. This keeps
+conversation switching responsive without showing a second, less-detailed
+summary representation. Subscribe to `onStateChange` or the conversation
+history-replacement event if the UI needs to react when older turns arrive.
+
 ## Send rich input
 
 ```ts
@@ -79,9 +85,11 @@ native picker, paste, and drag/drop pipeline.
 const history = await build.readHistory();
 ```
 
-History and live notifications are projected through the same `SurfaceMessage`
-contract. Generated image results become media parts, technical calls become
-tool parts, and restored messages use the same renderer as new messages.
+`readHistory()` waits for a complete full-detail refresh of the turns currently
+available from app-server. History and live notifications are projected through
+the same `SurfaceMessage` contract. Generated image results become media parts,
+technical calls become tool parts, and restored messages use the same renderer
+as new messages.
 
 ## Settings and turn actions
 

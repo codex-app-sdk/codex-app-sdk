@@ -11,6 +11,11 @@ import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-run
 
 const HISTORY_PAGE_SIZE = 5;
 
+type HistoryHydrationOptions = {
+  initialPageLoaded?: boolean;
+  cursor?: string | null;
+};
+
 export type CodexSurfaceConversationsHost = {
   emitHistoryReplaced(threadId: string, reason: 'resync', origin: 'lifecycle'): void;
   emitSummaryUpserted(
@@ -95,15 +100,19 @@ export class CodexSurfaceConversationsController {
     return this.host.getSnapshot();
   }
 
-  hydrateCompleteHistory(threadId: string): Promise<void> {
+  hydrateCompleteHistory(threadId: string, options: HistoryHydrationOptions = {}): Promise<void> {
     const runtime = this.host.requireRuntime(threadId);
     if (runtime.fullHistoryHydrated) return Promise.resolve();
+    if (options.initialPageLoaded && options.cursor === null) {
+      this.host.patchRuntime(threadId, { fullHistoryHydrated: true });
+      return Promise.resolve();
+    }
     const existing = this.historyHydrations.get(threadId);
     if (existing) return existing;
     const hydration = (async () => {
       try {
         const requestedCursors = new Set<string>();
-        let cursor: string | null = null;
+        let cursor: string | null = options.cursor ?? null;
         do {
           if (cursor !== null) {
             if (requestedCursors.has(cursor)) {
