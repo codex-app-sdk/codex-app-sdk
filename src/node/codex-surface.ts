@@ -209,7 +209,7 @@ export class CodexSurface {
         emitEvent: (origin, input) => this.emitEvent(origin, input),
         getState: () => this.state,
         notifyConversationListeners: (threadId) => this.notifyConversationListeners(threadId),
-        patch: (patch) => this.patch(patch),
+        patch: (patch, conversationId) => this.patch(patch, conversationId),
         schedulePluginRefresh: () => this.catalog.schedulePluginRefresh(),
       },
     );
@@ -921,12 +921,18 @@ export class CodexSurface {
     for (const listener of this.eventListeners) listener(event);
   }
 
-  private patch(patch: Partial<CodexSurfaceSnapshot>): void {
+  private patch(patch: Partial<CodexSurfaceSnapshot>, conversationId?: string): void {
     this.state = { ...this.state, ...patch };
-    const snapshot = this.getSnapshot();
-    for (const listener of this.listeners) listener(snapshot);
-    for (const threadId of this.conversationListeners.keys()) {
-      this.notifyConversationListeners(threadId);
+    if (this.listeners.size > 0) {
+      const snapshot = this.getSnapshot();
+      for (const listener of this.listeners) listener(snapshot);
+    }
+    if (conversationId) {
+      this.notifyConversationListeners(conversationId);
+      return;
+    }
+    for (const subscribedConversationId of this.conversationListeners.keys()) {
+      this.notifyConversationListeners(subscribedConversationId);
     }
   }
 }

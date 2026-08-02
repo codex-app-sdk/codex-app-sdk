@@ -24,7 +24,7 @@ export interface CodexSurfaceRuntimeHost {
   emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void;
   getState(): CodexSurfaceSnapshot;
   notifyConversationListeners(threadId: string): void;
-  patch(patch: Partial<CodexSurfaceSnapshot>): void;
+  patch(patch: Partial<CodexSurfaceSnapshot>, conversationId?: string): void;
   schedulePluginRefresh(): void;
 }
 
@@ -100,7 +100,7 @@ export class CodexSurfaceRuntimeController {
     const runtime = this.require(threadId);
     Object.assign(runtime, patch);
     if (this.host.getState().activeConversationId === threadId) {
-      this.host.patch(this.projection(runtime));
+      this.host.patch(this.projection(runtime), threadId);
     } else {
       this.host.notifyConversationListeners(threadId);
     }

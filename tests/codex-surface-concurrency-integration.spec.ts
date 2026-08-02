@@ -194,6 +194,20 @@ describe('CodexSurface', () => {
     transport.emit({
       method: 'item/agentMessage/delta',
       params: {
+        threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: 'Foreground A',
+      },
+    });
+    await vi.waitFor(() => expect(a.getSnapshot().messages.flatMap((message) => message.parts)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text', text: 'Foreground A' }),
+    ])));
+    expect(aListener).toHaveBeenCalled();
+    expect(bListener).not.toHaveBeenCalled();
+
+    aListener.mockClear();
+    bListener.mockClear();
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
         threadId: 'thread-b', turnId: 'turn-thread-b', itemId: 'agent-b', delta: 'Background B',
       },
     });

@@ -6,55 +6,55 @@
     @scroll="updateStickiness"
   >
     <div class="codex-message-list__content">
-      <slot v-if="chatMessages.length === 0" name="empty">
+      <slot v-if="messages.length === 0" name="empty">
         <p class="codex-message-list__empty">{{ emptyLabel }}</p>
       </slot>
-      <template v-for="(message, index) in chatMessages" v-else :key="message.id ?? index">
-        <slot name="message" :message="message" :index="index">
-          <CodexMessage
-            :actions-disabled="actionsDisabled"
-            :answered-client-request-ids="answeredClientRequestIds"
-            :can-delete-message="canDeleteMessage"
-            :can-edit-message="canEditMessage"
-            :can-retry-message="canRetryMessage"
-            :follow-ups-disabled="followUpsDisabled"
-            :index="index"
-            :message="message"
-            :plugins="plugins"
-            :presentation="presentation"
-            :show-tool-details="showToolDetails"
-            :skills="skills"
-            @cancel="emit('cancel')"
-            @client-response="emit('client-response', $event)"
-            @copy-message="emit('copy-message', $event)"
-            @delete-message="emit('delete-message', $event)"
-            @edit-message="emit('edit-message', $event)"
-            @quote-message="emit('quote-message', $event)"
-            @retry-message="emit('retry-message', $event)"
-            @send-follow-up="emit('send-follow-up', $event)"
-          >
-            <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
-            <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
-            <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
-            <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
-            <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
-            <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
-            <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
-            <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
-          </CodexMessage>
-        </slot>
+      <template v-for="(message, index) in messages" v-else :key="message.id ?? index">
+        <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(message)" :index="index" />
+        <CodexMessage
+          v-else
+          :actions-disabled="actionsDisabled"
+          :answered-client-request-ids="answeredClientRequestIds"
+          :can-delete-message="canDeleteMessage"
+          :can-edit-message="canEditMessage"
+          :can-retry-message="canRetryMessage"
+          :follow-ups-disabled="followUpsDisabled"
+          :index="index"
+          :message="message"
+          :plugins="plugins"
+          :presentation="presentation"
+          :show-tool-details="showToolDetails"
+          :skills="skills"
+          @cancel="emit('cancel')"
+          @client-response="emit('client-response', $event)"
+          @copy-message="emit('copy-message', $event)"
+          @delete-message="emit('delete-message', $event)"
+          @edit-message="emit('edit-message', $event)"
+          @quote-message="emit('quote-message', $event)"
+          @retry-message="emit('retry-message', $event)"
+          @send-follow-up="emit('send-follow-up', $event)"
+        >
+          <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
+          <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
+          <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
+          <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
+          <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
+          <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
+          <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
+          <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
+        </CodexMessage>
       </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
 import type { ClientRequestResponse, CodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
-import { chatMessagesFromInputs } from '../chat/renderer-message-adapter'
+import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
 
 const props = withDefaults(defineProps<{
@@ -118,22 +118,38 @@ const emit = defineEmits<{
   'stickiness-change': [stuckToBottom: boolean]
 }>()
 
-const chatMessages = computed(() => chatMessagesFromInputs(props.messages))
 const element = ref<HTMLElement | null>(null)
 const stickToBottom = ref(true)
+let contentObserver: MutationObserver | null = null
+let contentResizeObserver: ResizeObserver | null = null
+let scrollFrame: number | ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   await nextTick()
   scrollToBottom()
+  const content = element.value?.querySelector('.codex-message-list__content')
+  if (content && typeof MutationObserver !== 'undefined') {
+    contentObserver = new MutationObserver(() => {
+      if (stickToBottom.value) queueScrollToBottom()
+    })
+    contentObserver.observe(content, { childList: true, characterData: true, subtree: true })
+  }
+  if (content && typeof ResizeObserver !== 'undefined') {
+    contentResizeObserver = new ResizeObserver(() => {
+      if (stickToBottom.value) queueScrollToBottom()
+    })
+    contentResizeObserver.observe(content)
+  }
+  queueScrollToBottom()
 })
 
-watch(() => props.messages, async () => {
+watch(() => props.messages.length, async () => {
   const shouldScroll = stickToBottom.value
   await nextTick()
   if (shouldScroll) {
     scrollToBottom()
   }
-}, { deep: true })
+})
 
 watch(() => props.resetKey, async () => {
   stickToBottom.value = true
@@ -163,6 +179,31 @@ function scrollToBottom(): void {
   }
 }
 
+function queueScrollToBottom(): void {
+  if (scrollFrame !== null) return
+  const callback = () => {
+    scrollFrame = null
+    scrollToBottom()
+  }
+  scrollFrame = typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame(callback)
+    : setTimeout(callback, 0)
+}
+
+onBeforeUnmount(() => {
+  contentObserver?.disconnect()
+  contentObserver = null
+  contentResizeObserver?.disconnect()
+  contentResizeObserver = null
+  if (scrollFrame !== null) {
+    if (typeof scrollFrame === 'number' && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(scrollFrame)
+    } else {
+      clearTimeout(scrollFrame)
+    }
+  }
+})
+
 defineExpose({ scrollToBottom })
 </script>
 
@@ -185,6 +226,12 @@ defineExpose({ scrollToBottom })
   margin: 0 auto;
   padding: var(--codex-message-list-content-padding, 0);
   box-sizing: border-box;
+}
+
+.codex-message-list__content :deep(.chat-message),
+.codex-message-list__content :deep(.chat-compaction-message) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
 }
 
 .codex-message-list__empty {

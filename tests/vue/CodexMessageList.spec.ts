@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { toRaw } from 'vue';
 import CodexMessageList from '../../src/vue/components/CodexMessageList.vue';
 import CodexMessage from '../../src/vue/components/CodexMessage.vue';
 import type { Message } from '../../src/vue/chat/types';
+import type { SurfaceMessage } from '../../src/surface/types';
 
 const messages: Message[] = [
   {
@@ -48,6 +50,19 @@ describe('CodexMessageList', () => {
     expect(wrapper.text()).toContain('npm test');
     expect(wrapper.text()).not.toContain('vitest started');
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
+  });
+
+  it('passes surface messages to keyed rows without eagerly projecting the full transcript', () => {
+    const surfaceMessage: SurfaceMessage = {
+      id: 'surface-user',
+      role: 'user',
+      status: 'complete',
+      parts: [{ type: 'text', text: 'Keep this object stable.' }],
+    };
+    const wrapper = mount(CodexMessageList, { props: { messages: [surfaceMessage] } });
+
+    expect(toRaw(wrapper.getComponent(CodexMessage).props('message'))).toBe(surfaceMessage);
+    expect(wrapper.text()).toContain('Keep this object stable.');
   });
 
   it('only exposes tool input and output when explicitly enabled', async () => {
@@ -169,6 +184,58 @@ describe('CodexMessageList', () => {
 
     expect(scrollEl.scrollTop).toBe(900);
     wrapper.unmount();
+  });
+
+  it('keeps the transcript stuck to the bottom when a streaming row changes', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { messages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    scrollEl.scrollTop = 0;
+
+    await wrapper.setProps({
+      messages: [messages[0]!, { ...messages[1]!, content: `${messages[1]!.content}\nStill working.` }],
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(scrollEl.scrollTop).toBe(900);
+    wrapper.unmount();
+  });
+
+  it('follows late transcript layout growth after the initial history render', async () => {
+    let notifyResize: () => void = () => undefined;
+    const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) {
+        notifyResize = () => callback([], this as unknown as ResizeObserver);
+      }
+
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void { disconnect(); }
+    });
+    const wrapper = mount(CodexMessageList, {
+      props: { messages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let scrollHeight = 300;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+
+    scrollHeight = 1_200;
+    notifyResize();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(scrollEl.scrollTop).toBe(1_200);
+    wrapper.unmount();
+    expect(disconnect).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
   });
 
   it('updates stickiness when the transcript scrolls', async () => {

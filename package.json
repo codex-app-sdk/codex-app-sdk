@@ -66,6 +66,7 @@
     "lint": "npm run typecheck",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "benchmark:conversation": "vitest bench tests/performance/conversation-streaming.bench.ts",
     "docs:dev": "vitepress dev docs --port 5175",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --port 4175",
