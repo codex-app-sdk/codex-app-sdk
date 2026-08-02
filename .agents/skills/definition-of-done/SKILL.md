@@ -5,7 +5,11 @@ description: Verify Codex App SDK changes before handoff, commit, push, or decla
 
 # Definition of Done
 
-Apply these gates proportionally to the change. Do not declare work complete while a relevant gate is failing or unexplained.
+Apply these gates proportionally to the change. Explicit user instructions about
+validation depth are authoritative. If the user asks for a focused or minimal
+validation loop, do not expand it into full-suite, lab, sample, or documentation
+checks unless the changed surface cannot be validated otherwise. Do not declare
+work complete while a check in the selected validation scope is failing or unexplained.
 
 ## 1. Confirm scope and boundaries
 
@@ -31,7 +35,9 @@ Apply these gates proportionally to the change. Do not declare work complete whi
 - Add or update focused tests for every behavior change.
 - Split large specs by concern instead of adding unrelated cases to an oversized file.
 - Use real-browser coverage for contenteditable selection, clipboard, layout, scrolling, or focus behavior that JSDOM cannot represent reliably.
-- Update the component lab when a visual state, interaction, or extension point benefits from deterministic human inspection.
+- Update the component lab when the task requests lab coverage or a deterministic
+  visual scenario is materially necessary. Do not update or run the lab merely
+  because a Vue component changed.
 - Keep test output free of actionable warnings.
 
 ## 4. Update documentation
@@ -48,7 +54,15 @@ Documentation-only internal refactors do not require unrelated product documenta
 
 ## 5. Run verification
 
-Run the smallest focused test while iterating, then the applicable repository gates before handoff:
+Choose the validation scope before running commands. Do not automatically run
+every available gate.
+
+- For a narrow implementation or visual change, run the smallest focused test.
+  Add `npm run typecheck` when TypeScript or Vue contracts changed.
+- Run `npm run build` when package output, exports, bundled assets, or linked
+  consumer `dist` output needs rebuilding.
+- Run the full repository gates for broad refactors, cross-cutting runtime work,
+  or when the user requests comprehensive validation:
 
 ```bash
 npm test
@@ -56,7 +70,8 @@ npm run typecheck
 npm run build
 ```
 
-Also run the affected sample or documentation gates:
+Run a sample, lab, or documentation gate only when that surface changed, the
+task explicitly requests it, or it is the selected validation surface:
 
 ```bash
 npm run lab:test
@@ -66,6 +81,10 @@ npm run sample:test
 npm run sample:build
 npm run docs:build
 ```
+
+When the user says not to overthink validation, prefer the focused test and
+typecheck only. Do not add full-suite, lab, sample, or docs checks by habit.
+Do not repeat a check that already passed after the final relevant code change.
 
 Use `npm run test:coverage` for coverage work or when a substantial refactor changes exercised branches. Run `git diff --check` for every change.
 
