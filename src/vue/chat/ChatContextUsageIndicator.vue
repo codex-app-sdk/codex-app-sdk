@@ -20,13 +20,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useCodexChatI18n } from './chat-i18n';
+import { useCodexChatTranslate } from './chat-i18n';
 import type { CodexContextUsage } from './contracts';
 
 const props = defineProps<{
   contextUsage?: CodexContextUsage | null;
 }>();
-const { t } = useCodexChatI18n();
+const t = useCodexChatTranslate();
 
 const usagePercent = computed(() => {
   const percent = props.contextUsage?.usedPercent;

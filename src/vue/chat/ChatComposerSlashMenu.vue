@@ -61,7 +61,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
-import { useCodexChatI18n } from './chat-i18n';
+import { useCodexChatTranslate } from './chat-i18n';
 import type { CodexCommandSummary, CodexSkillSummary } from './contracts';
 import { commandDescription } from './composer-commands';
 import { skillDescription } from './composer-skills';
@@ -78,7 +78,7 @@ defineEmits<{
   selectSkill: [skill: CodexSkillSummary];
 }>();
 
-const { t } = useCodexChatI18n();
+const t = useCodexChatTranslate();
 const menuEl = ref<HTMLElement | null>(null);
 
 watch(

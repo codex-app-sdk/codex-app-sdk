@@ -124,7 +124,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { useCodexChatI18n } from '../chat/chat-i18n'
+import { useCodexChatTranslate } from '../chat/chat-i18n'
 import type { ClientRequestResponse, CodexConversationPresentation } from '../chat/contracts'
 import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
@@ -191,7 +191,7 @@ const emit = defineEmits<{
   'send-follow-up': [prompt: string]
 }>()
 
-const { t } = useCodexChatI18n()
+const t = useCodexChatTranslate()
 const chatMessage = computed(() => chatMessageFromInput(props.message))
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
 const blocks = computed(() => computeMessageBlocks(chatMessage.value).filter((block) => (

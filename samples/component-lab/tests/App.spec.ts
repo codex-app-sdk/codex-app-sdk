@@ -39,7 +39,7 @@ describe('component lab', () => {
     expect(toolHeaders[0]?.text()).toContain('5 actions done');
     expect(toolHeaders[0]?.get('.chat-animated-diff-stat--added').text()).toBe('+12');
     expect(toolHeaders[0]?.get('.chat-animated-diff-stat--deleted').text()).toBe('-3');
-    expect(toolHeaders[1]?.text()).toContain('4 actions done');
+    expect(toolHeaders[1]?.text()).toContain('5 actions done');
     for (const toolHeader of toolHeaders) await toolHeader.trigger('click');
 
     const expected = [
@@ -52,6 +52,7 @@ describe('component lab', () => {
       ['Read README.md', 'file-text'],
       ['Ran npm test', 'terminal'],
       ['Searched registerCodexToolTitlePresenter', 'search'],
+      ['Opened in-app browser', 'lab-browser-tool-icon'],
       ['Claw synchronization complete', 'tool'],
     ] as const;
     const toolCalls = wrapper.findAll('.chat-tool-call');
@@ -61,7 +62,8 @@ describe('component lab', () => {
       expect(toolCall).toBeDefined();
       if (!toolCall) continue;
       expect(toolCall.text().replace(/\s/g, '')).toContain(label.replace(/\s/g, ''));
-      expect(toolCall.get('.chat-tool-call__title svg').classes()).toContain(`tabler-icon-${icon}`);
+      const iconClasses = toolCall.get('.chat-tool-call__title svg').classes();
+      expect(iconClasses).toContain(icon === 'lab-browser-tool-icon' ? icon : `tabler-icon-${icon}`);
     }
   });
 

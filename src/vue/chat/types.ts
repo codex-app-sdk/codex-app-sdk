@@ -12,6 +12,8 @@ export type MessageToolCall = {
   done?: boolean;
   function: string;
   id: string;
+  kind?: string;
+  metadata?: Readonly<Record<string, unknown>>;
   state: ToolExecutionState;
   status?: string;
   result: unknown;

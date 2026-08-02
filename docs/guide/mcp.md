@@ -98,6 +98,11 @@ MCP calls flow through the standard conversation model:
 - `tool.started`, progress, and `tool.completed` semantic events are emitted;
 - restored MCP history uses the same tool projection.
 
+MCP tool parts retain their server and tool identity as renderer-safe metadata.
+Use [`provideCodexToolPresentation`](/guide/vue-providers#tool-icons-and-titles)
+to give an app-owned server or individual tool a custom Vue icon and title
+without replacing the SDK tool renderer.
+
 The [Relay sample](/guide/samples#relay-business-ui-mcp) demonstrates a full
 business loop: UI intent → visible prompt → MCP read/write → user confirmation →
 tool event → business-state refresh.

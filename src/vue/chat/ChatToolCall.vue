@@ -87,7 +87,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useCodexChatI18n } from './chat-i18n'
+import { useCodexChatTranslate } from './chat-i18n'
+import { useCodexToolPresentation } from './tool-presentation'
 import {
   ChevronDown,
   ChevronUp,
@@ -126,13 +127,20 @@ const emit = defineEmits<{
   'client-response': [response: ClientRequestResponse]
 }>()
 
-const { t } = useCodexChatI18n()
+const t = useCodexChatTranslate()
+const resolveToolPresentation = useCodexToolPresentation()
 const isOpen = ref(false)
 const providedToolDetails = useCodexToolCallDetails()
 
 const toolCallArgs = computed(() => getMessageToolCallArgs(props.toolCall))
 const isRunning = computed(() => !props.toolCall.done && props.toolCall.state !== 'completed')
 const statusDescriptor = computed(() => parseToolStatusDescriptor(props.toolCall.status))
+const toolPresentation = computed(() => resolveToolPresentation({
+  descriptor: statusDescriptor.value,
+  ...(props.toolCall.kind ? { kind: props.toolCall.kind } : {}),
+  ...(props.toolCall.metadata ? { metadata: props.toolCall.metadata } : {}),
+  toolCall: props.toolCall,
+}))
 const confirmationParams = computed(() => (
   statusDescriptor.value?.params && typeof statusDescriptor.value.params === 'object'
     ? statusDescriptor.value.params
@@ -150,6 +158,9 @@ const isUserInputRequest = computed(() => (
   props.toolCall.state === 'running'
 ))
 const titleParts = computed(() => {
+  if (toolPresentation.value?.title !== undefined) {
+    return { title: toolPresentation.value.title }
+  }
   const descriptor = statusDescriptor.value
   if (props.toolCall.status && !['running', 'completed', 'failed'].includes(props.toolCall.status)) {
     return descriptor ? getToolDisplayTitleParts(props.toolCall, descriptor, t) : { title: props.toolCall.status }
@@ -157,6 +168,9 @@ const titleParts = computed(() => {
   return getToolDisplayTitleParts(props.toolCall, descriptor, t)
 })
 const titleIcon = computed(() => {
+  if (toolPresentation.value && 'icon' in toolPresentation.value) {
+    return toolPresentation.value.icon ?? undefined
+  }
   if (statusDescriptor.value?.source !== 'codex') {
     return ToolIcon
   }

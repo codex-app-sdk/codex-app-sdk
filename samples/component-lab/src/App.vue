@@ -77,9 +77,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue';
 import {
   CodexConversationPane,
+  provideCodexToolPresentation,
   type CodexContextUsage,
   type CodexModelOption,
   type CodexNativeAttachment,
@@ -134,6 +135,26 @@ const models: [CodexModelOption, ...CodexModelOption[]] = [{
   isDefault: true,
 }];
 
+const InAppBrowserIcon = defineComponent({
+  name: 'InAppBrowserIcon',
+  setup: () => () => h('svg', {
+    'aria-hidden': 'true',
+    class: 'lab-browser-tool-icon',
+    fill: 'none',
+    stroke: 'currentColor',
+    viewBox: '0 0 24 24',
+  }, [
+    h('rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }),
+    h('path', { d: 'M3 9h18M7 6.5h.01M10 6.5h.01' }),
+  ]),
+});
+
+provideCodexToolPresentation(({ kind, metadata }) => (
+  kind === 'mcp' && metadata?.server === 'codex_claw' && metadata.tool === 'browser_open'
+    ? { icon: InAppBrowserIcon, title: 'Opened in-app browser' }
+    : undefined
+));
+
 const scenarios: [Scenario, ...Scenario[]] = [
   {
     id: 'conversation',
@@ -179,7 +200,7 @@ const scenarios: [Scenario, ...Scenario[]] = [
   {
     id: 'tool-icons',
     name: 'Tool icon gallery',
-    summary: 'Every Codex action and the generic fallback',
+    summary: 'Codex actions, a host override, and the generic fallback',
     title: 'Tool call icons and descriptions',
     description: 'Expand the tool group to compare every supported action icon and its completed label.',
     messages: [
@@ -199,8 +220,9 @@ const scenarios: [Scenario, ...Scenario[]] = [
           { type: 'tool', id: 'tool-read', title: 'read file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'read', phase: 'completed', params: { target: 'README.md' } }) },
           { type: 'tool', id: 'tool-run', title: 'run command', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
           { type: 'tool', id: 'tool-search', title: 'search source', kind: 'search', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'search', phase: 'completed', params: { target: 'registerCodexToolTitlePresenter' } }) },
+          { type: 'tool', id: 'tool-browser', title: 'codex_claw.browser_open', kind: 'mcp', status: 'completed', statusText: 'completed', metadata: { server: 'codex_claw', tool: 'browser_open' } },
           { type: 'tool', id: 'tool-generic', title: 'Claw status sync', kind: 'generic', status: 'completed', statusText: 'Claw synchronization complete' },
-          { type: 'text', text: 'Every known Codex action uses a distinct icon; app-specific and unknown tools use the generic tool icon.' },
+          { type: 'text', text: 'Known Codex actions use SDK icons, the app-owned browser tool uses a provided icon, and unknown tools use the generic tool icon.' },
         ],
       },
     ],

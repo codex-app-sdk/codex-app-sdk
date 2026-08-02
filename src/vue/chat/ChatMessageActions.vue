@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import { CheckIcon, CopyIcon, PencilIcon, QuoteIcon, RotateClockwiseIcon, Trash2Icon } from '../icons/app-icons'
 import { computed } from 'vue'
-import { useCodexChatI18n } from './chat-i18n'
+import { useCodexChatTranslate } from './chat-i18n'
 import ChatIconButton from './ChatIconButton.vue'
 import { formatMessageSentAt, fullMessageSentAt } from './message-time'
 import type { CodexMessageActionsPresentation } from './contracts'
@@ -87,7 +87,7 @@ const emit = defineEmits<{
   quote: []
   retry: []
 }>()
-const { t } = useCodexChatI18n()
+const t = useCodexChatTranslate()
 const showCopy = computed(() => props.presentation?.copy !== false)
 const showDelete = computed(() => props.presentation?.delete !== false)
 const showEdit = computed(() => props.presentation?.edit !== false)

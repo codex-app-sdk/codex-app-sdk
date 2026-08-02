@@ -94,10 +94,11 @@ and drag/drop use the native capability bridge automatically when available.
 
 The package exports:
 
-- `provideCodexChatTranslate` and `defaultCodexChatTranslate`;
-- `registerCodexToolTitlePresenter` for domain-specific tool titles;
+- scoped providers for translation, raw tool-detail policy, and app-owned tool
+  presentation;
 - Markdown, KaTeX-powered LaTeX, code highlighting, mention parsing, and conversation-link helpers;
 - capabilities, presentation controls, and theme helpers.
 
-See [presentation and theming](/guide/presentation) and the
+See [Vue providers](/guide/vue-providers),
+[presentation and theming](/guide/presentation), and the
 [Vue API reference](/api/vue).

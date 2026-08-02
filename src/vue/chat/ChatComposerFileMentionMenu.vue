@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
-import { useCodexChatI18n } from './chat-i18n';
+import { useCodexChatTranslate } from './chat-i18n';
 import type { CodexFileSearchItem } from './contracts';
 import { FileTextIcon } from '../icons/app-icons';
 
@@ -55,7 +55,7 @@ defineEmits<{
   select: [file: CodexFileSearchItem];
 }>();
 
-const { t } = useCodexChatI18n();
+const t = useCodexChatTranslate();
 const menuEl = ref<HTMLElement | null>(null);
 
 watch(

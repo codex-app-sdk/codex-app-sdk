@@ -111,10 +111,18 @@ keeps `$skill`, `@plugin`, and `@path` as the canonical submitted prompt text. S
 
 ### Customization
 
-- `provideCodexChatTranslate`
+- `provideCodexChatTranslate` and `useCodexChatTranslate`
 - `provideCodexToolCallDetails` and `useCodexToolCallDetails`
+- `provideCodexToolPresentation` and `useCodexToolPresentation`
+- `CodexToolPresentation`, `CodexToolPresentationContext`, and
+  `CodexToolPresentationResolver`
 - `registerCodexToolTitlePresenter`
 - capability/presentation resolvers
 - composer command, plugin, skill, queue, and mention helpers
 
-See the [Vue guide](/guide/vue) and [presentation guide](/guide/presentation).
+`CodexMessageToolCall` preserves optional `kind` and `metadata` fields from the
+surface tool part. MCP metadata includes `server`, `tool`, `pluginId`, and MCP
+app resource identity when supplied by app-server.
+
+See the [Vue guide](/guide/vue), [Vue provider guide](/guide/vue-providers), and
+[presentation guide](/guide/presentation).

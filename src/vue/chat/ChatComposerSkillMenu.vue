@@ -39,7 +39,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
-import { useCodexChatI18n } from './chat-i18n';
+import { useCodexChatTranslate } from './chat-i18n';
 import type { CodexSkillSummary } from './contracts';
 import { skillDescription, skillDisplayName } from './composer-skills';
 import { SparklesIcon } from '../icons/app-icons';
@@ -53,7 +53,7 @@ defineEmits<{
   select: [skill: CodexSkillSummary];
 }>();
 
-const { t } = useCodexChatI18n();
+const t = useCodexChatTranslate();
 const menuEl = ref<HTMLElement | null>(null);
 
 watch(

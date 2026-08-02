@@ -40,6 +40,7 @@ describe('renderer message adapter', () => {
             done: true,
             function: 'npm test',
             id: 'tool-npm-test',
+            kind: 'command',
             result: '46 passed',
             state: 'completed',
             status: 'completed',
@@ -54,6 +55,7 @@ describe('renderer message adapter', () => {
           done: true,
           function: 'npm test',
           id: 'tool-npm-test',
+          kind: 'command',
           result: '46 passed',
           state: 'completed',
           status: 'completed',
@@ -139,6 +141,7 @@ describe('renderer message adapter', () => {
         done: true,
         function: 'git diff',
         id: 'tool-git-diff',
+        kind: 'command',
         result: undefined,
         state: 'error',
         status: 'failed',
@@ -185,6 +188,7 @@ describe('renderer message adapter', () => {
         done: true,
         function: 'team.set-status',
         id: 'tool-set-status',
+        kind: 'mcp',
         result: {
           agentId: 'agent-dina',
           status: 'Registered and idle',
@@ -225,6 +229,7 @@ describe('renderer message adapter', () => {
           done: true,
           function: 'cat docs/architecture.md',
           id: 'tool-read',
+          kind: 'command',
           result: 'architecture contents',
           state: 'completed',
           status: 'completed',
@@ -351,5 +356,29 @@ describe('renderer message adapter', () => {
     };
 
     expect(surfaceMessageToChatMessage(rendererMessage).toolCalls?.at(0)?.status).toBe(statusText);
+  });
+
+  it('preserves app-owned MCP identity for Vue presentation resolvers', () => {
+    const metadata = { server: 'codex_claw', tool: 'browser_open', durationMs: 12 };
+    const rendererMessage: SurfaceMessage = {
+      id: 'assistant-mcp-presentation',
+      parts: [{
+        type: 'tool',
+        id: 'browser-open',
+        kind: 'mcp',
+        title: 'codex_claw.browser_open',
+        status: 'completed',
+        metadata,
+      }],
+      role: 'assistant',
+      status: 'complete',
+    };
+
+    const toolCall = surfaceMessageToChatMessage(rendererMessage).toolCalls?.at(0);
+    expect(toolCall).toMatchObject({
+      kind: 'mcp',
+      metadata: { server: 'codex_claw', tool: 'browser_open', durationMs: 12 },
+    });
+    expect(toolCall?.metadata).not.toBe(metadata);
   });
 });

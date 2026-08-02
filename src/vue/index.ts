@@ -53,8 +53,14 @@ export {
   resolveCodexConversationPresentation,
 } from './chat/contracts';
 export { approvalPresetOptions, defaultApprovalPreset, isApprovalPreset } from './chat/approval-presets';
-export { defaultCodexChatTranslate, provideCodexChatTranslate } from './chat/chat-i18n';
+export { defaultCodexChatTranslate, provideCodexChatTranslate, useCodexChatTranslate } from './chat/chat-i18n';
 export { provideCodexToolCallDetails, useCodexToolCallDetails } from './chat/tool-call-details';
+export { provideCodexToolPresentation, useCodexToolPresentation } from './chat/tool-presentation';
+export type {
+  CodexToolPresentation,
+  CodexToolPresentationContext,
+  CodexToolPresentationResolver,
+} from './chat/tool-presentation';
 export {
   chatMessageFromInput as toCodexChatMessage,
   chatMessagesFromInputs as toCodexChatMessages,

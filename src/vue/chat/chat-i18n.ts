@@ -34,8 +34,9 @@ export function provideCodexChatTranslate(translate: CodexChatTranslate): void {
   provide(translateKey, translate);
 }
 
-export function useCodexChatI18n(): { t: CodexChatTranslate } {
-  return { t: inject(translateKey, defaultCodexChatTranslate) };
+/** Reads the nearest chat translation function for the current Vue tree. */
+export function useCodexChatTranslate(): CodexChatTranslate {
+  return inject(translateKey, defaultCodexChatTranslate);
 }
 
 export function defaultCodexChatTranslate(

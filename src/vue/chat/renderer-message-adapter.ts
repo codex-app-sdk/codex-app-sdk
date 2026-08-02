@@ -56,6 +56,8 @@ function rendererToolPartToToolCall(message: SurfaceMessage, part: Extract<Surfa
     done: part.status !== 'running',
     function: part.title,
     id: part.id || `${message.id}-tool-${index}`,
+    ...(part.kind ? { kind: part.kind } : {}),
+    ...(part.metadata ? { metadata: { ...part.metadata } } : {}),
     result: rendererToolPartResult(part),
     state: rendererToolStatusToState(part.status),
     status: part.statusText ?? part.status,

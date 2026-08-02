@@ -67,6 +67,7 @@ npm install --save-dev electron
 - [Quick start](https://nbonamy.github.io/codex-app-sdk/guide/quick-start)
 - [Architecture](https://nbonamy.github.io/codex-app-sdk/guide/architecture)
 - [Vue conversation kit](https://nbonamy.github.io/codex-app-sdk/guide/vue)
+- [Vue providers](https://nbonamy.github.io/codex-app-sdk/guide/vue-providers)
 - [API reference](https://nbonamy.github.io/codex-app-sdk/api/)
 
 ## Samples

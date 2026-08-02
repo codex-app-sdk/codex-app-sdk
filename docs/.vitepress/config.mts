@@ -52,6 +52,7 @@ export default defineConfig({
             { text: 'Authentication', link: '/guide/authentication' },
             { text: 'Electron integration', link: '/guide/electron' },
             { text: 'Vue conversation kit', link: '/guide/vue' },
+            { text: 'Vue providers', link: '/guide/vue-providers' },
             { text: 'Native capabilities', link: '/guide/native-capabilities' },
             { text: 'Presentation & theming', link: '/guide/presentation' },
             { text: 'Semantic events', link: '/guide/events' },
