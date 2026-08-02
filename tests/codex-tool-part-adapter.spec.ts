@@ -29,6 +29,12 @@ describe('tool-part-adapter', () => {
       kind: 'command',
       title: 'npm test',
       status: 'completed',
+      statusText: JSON.stringify({
+        action: 'run',
+        phase: 'completed',
+        params: { target: 'npm test' },
+        source: 'codex',
+      }),
       input: {
         command: 'npm test',
         cwd: '/Users/nbonamy/src/codex-app-sdk',
@@ -478,6 +484,7 @@ describe('tool-part-adapter', () => {
       });
       return part?.statusText ? JSON.parse(part.statusText) : null;
     };
+    expect(descriptor([])).toMatchObject({ action: 'run', params: { target: 'fallback' } });
     expect(descriptor([{ type: 'unknown' }])).toMatchObject({ action: 'run', params: { target: 'fallback' } });
     expect(descriptor([
       { type: 'listFiles', path: 'src' }, { type: 'listFiles', command: 'ls tests' },
@@ -488,7 +495,8 @@ describe('tool-part-adapter', () => {
     });
     expect(descriptor([{ type: 'search', query: 'needle' }, { type: 'search', path: 'src' }, { type: 'search' }]))
       .toMatchObject({ action: 'search', params: { targets: ['needle', 'src'] } });
-    expect(descriptor([null, { type: 42 }, { type: 'write' }])).toBeNull();
+    expect(descriptor([null, { type: 42 }, { type: 'write' }]))
+      .toMatchObject({ action: 'run', params: { target: 'fallback' } });
   });
 
   it('normalizes empty and multi-file changes and raw outputs', () => {

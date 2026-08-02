@@ -573,8 +573,11 @@ export class CodexSurface {
     return this.turnActions.startReview(options);
   }
 
-  async steerMessage(prompt: string): Promise<CodexSurfaceSnapshot> {
-    return this.messagesController.steer(prompt);
+  async steerMessage(
+    prompt: string,
+    options: SendCodexMessageOptions = {},
+  ): Promise<CodexSurfaceSnapshot> {
+    return this.messagesController.steer(prompt, options);
   }
 
   async interrupt(): Promise<CodexSurfaceSnapshot> {
@@ -643,7 +646,7 @@ export class CodexSurface {
       setGoal: (objective, tokenBudget) => this.conversationSettings.setGoalForThread(id, objective, tokenBudget),
       startRealtime: (options) => this.startRealtimeForThread(id, options),
       startReview: (options) => this.turnActions.startReviewForThread(id, options),
-      steerMessage: (prompt) => this.messagesController.steerForThread(id, prompt),
+      steerMessage: (prompt, options) => this.messagesController.steerForThread(id, prompt, options),
       steerQueuedPrompt: (promptId) => this.messagesController.steerQueuedPromptForThread(id, promptId),
       updateSettings: (settings) => this.conversationSettings.updateForThread(id, settings),
     });

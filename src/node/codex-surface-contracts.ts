@@ -114,7 +114,7 @@ export type CodexConversation = {
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   compact(): Promise<CodexConversationSnapshot>;
   startReview(options?: StartCodexReviewOptions): Promise<CodexConversationSnapshot>;
-  steerMessage(prompt: string): Promise<CodexConversationSnapshot>;
+  steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   interrupt(): Promise<CodexConversationSnapshot>;
   deleteMessage(index: number): Promise<CodexConversationSnapshot>;
   editMessage(index: number, content: string): Promise<CodexConversationSnapshot>;

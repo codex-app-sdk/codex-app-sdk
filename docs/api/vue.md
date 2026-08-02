@@ -19,6 +19,9 @@ Returned state and actions include:
 The composable subscribes immediately and disposes its listeners with the
 current Vue effect scope.
 
+`steerMessage(prompt, options?)` accepts `SendCodexMessageOptions`, including
+attachments, just like `sendMessage`.
+
 ## Primary components
 
 | Component | Purpose |
@@ -30,6 +33,22 @@ current Vue effect scope.
 | `CodexApprovalPrompt` | Command, file-change, and permission approval UI |
 | `CodexWorkbenchLayout` | Measured sticky header/content/footer layout |
 | `CodexConversationHistoryLoader` | Restored-history loading treatment |
+
+### Controlled attachments and steering
+
+`CodexConversationPane` accepts `attachments` and emits `attachmentsChange`
+for host-controlled attachment queues. Changing `conversationKey` restores the
+incoming `attachments` value and does not emit an intermediate empty queue.
+
+The pane's exact steering event is:
+
+```ts
+steer: [prompt: string, options?: SendCodexMessageOptions]
+```
+
+Template listeners use `@steer="(prompt, options) => ..."`. Selected
+attachments are included in `options.attachments` and intentionally cleared
+after the steer intent is emitted.
 
 ## Leaf components
 

@@ -415,7 +415,9 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:start-review', {
       target: { type: 'custom', instructions: '' },
     })).rejects.toThrow('Review instructions must be a non-empty string');
-    await expect(main.call('codex-surface:steer-message', 'More detail')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:steer-message', 'More detail', {
+      attachments: [{ type: 'file', path: '/tmp/notes.md' }],
+    })).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:steer-queued-prompt', 'queued-2')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:unarchive-conversation', 'thread-unarchive')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:unarchive-conversation', '   ')).rejects.toThrow(
@@ -506,7 +508,9 @@ describe('Codex surface Electron bridge', () => {
       ],
     });
     expect(surface.startReview).toHaveBeenCalledWith({ target: { type: 'baseBranch', branch: 'main' } });
-    expect(surface.steerMessage).toHaveBeenCalledWith('More detail');
+    expect(surface.steerMessage).toHaveBeenCalledWith('More detail', {
+      attachments: [{ type: 'file', path: '/tmp/notes.md' }],
+    });
     expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2');
     expect(surface.unarchiveConversation).toHaveBeenCalledWith('thread-unarchive');
     expect(surface.updateConversationSettings).toHaveBeenCalledWith({
@@ -555,7 +559,7 @@ describe('Codex surface Electron bridge', () => {
     await api.sendMessage('Build it', { model: 'gpt-5' });
     await api.startChatGptLogin();
     await api.startReview({ target: { type: 'uncommittedChanges' } });
-    await api.steerMessage('Keep going');
+    await api.steerMessage('Keep going', { attachments: [{ type: 'file', path: '/tmp/notes.md' }] });
     await api.steerQueuedPrompt('queued-2');
     await api.unarchiveConversation('thread-unarchive');
     await api.updateConversationSettings({ modelId: 'gpt-5', approvalPreset: 'ask-for-approval' });
@@ -593,7 +597,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:send-message', 'Build it', { model: 'gpt-5' }],
       ['codex-surface:start-chatgpt-login'],
       ['codex-surface:start-review', { target: { type: 'uncommittedChanges' } }],
-      ['codex-surface:steer-message', 'Keep going'],
+      ['codex-surface:steer-message', 'Keep going', { attachments: [{ type: 'file', path: '/tmp/notes.md' }] }],
       ['codex-surface:steer-queued-prompt', 'queued-2'],
       ['codex-surface:unarchive-conversation', 'thread-unarchive'],
       ['codex-surface:update-conversation-settings', { modelId: 'gpt-5', approvalPreset: 'ask-for-approval' }],

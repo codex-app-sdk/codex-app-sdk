@@ -41,6 +41,38 @@ describe('CodexSurface', () => {
     });
   });
 
+  it('includes attachments in steering input and the optimistic steer message', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    await surface.sendMessage('Begin');
+    await surface.steerMessage('Inspect these', {
+      attachments: [
+        { type: 'image', path: '/tmp/screenshot.png', detail: 'original' },
+        { type: 'file', path: '/tmp/notes.md', name: 'Notes' },
+      ],
+    });
+
+    expect(lastRequest(transport, 'turn/steer')).toMatchObject({
+      params: {
+        input: [
+          { type: 'text', text: 'Inspect these' },
+          { type: 'localImage', path: '/tmp/screenshot.png', detail: 'original' },
+          { type: 'mention', path: '/tmp/notes.md', name: 'Notes' },
+        ],
+      },
+    });
+    expect(surface.getSnapshot().messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'steer',
+        parts: expect.arrayContaining([
+          expect.objectContaining({ type: 'attachment', attachment: expect.objectContaining({ kind: 'image' }) }),
+          expect.objectContaining({ type: 'attachment', attachment: expect.objectContaining({ kind: 'file' }) }),
+        ]),
+        metadata: expect.objectContaining({ attachments: expect.any(Array) }),
+      }),
+    ]));
+  });
+
   it('handles completed start responses and running history', async () => {
     const transport = new FakeTransport({
       'thread/resume': (params) => {

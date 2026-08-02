@@ -55,11 +55,16 @@ describe('CodexSurface', () => {
     });
     const queuedPromptId = surface.getSnapshot().queuedPrompts[0]?.id;
     expect(queuedPromptId).toBeDefined();
-    await expect(surface.steerQueuedPrompt(queuedPromptId!)).rejects.toThrow(
-      'Queued prompts with attachments cannot be steered and remain queued',
-    );
-    expect(surface.getSnapshot().queuedPrompts).toHaveLength(1);
-    await surface.deleteQueuedPrompt(queuedPromptId!);
+    await surface.steerQueuedPrompt(queuedPromptId!);
+    expect(surface.getSnapshot().queuedPrompts).toHaveLength(0);
+    expect(lastRequest(transport, 'turn/steer')).toMatchObject({
+      params: {
+        input: [
+          { type: 'text', text: 'Queued with attachment' },
+          { type: 'mention', path: '/tmp/queued.txt', name: 'queued.txt' },
+        ],
+      },
+    });
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: {
         input: [

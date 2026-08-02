@@ -224,23 +224,36 @@ export class CodexSurfaceMessagesController {
     }
   }
 
-  async steer(prompt: string): Promise<CodexSurfaceSnapshot> {
+  async steer(
+    prompt: string,
+    options: SendCodexMessageOptions = {},
+  ): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.steerForThread(threadId, prompt);
+    await this.steerForThread(threadId, prompt, options);
     return this.host.getSnapshot();
   }
 
-  async steerForThread(threadId: string, prompt: string): Promise<void> {
+  async steerForThread(
+    threadId: string,
+    prompt: string,
+    options: SendCodexMessageOptions = {},
+  ): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     const text = prompt.trim();
     if (!text) throw new Error('Cannot steer with an empty message');
     if (!runtime.activeTurnId) throw new Error('There is no active turn to steer');
+    const attachments = validateAttachments(options.attachments ?? []);
     const messageId = createMessageId();
     const optimisticSteer: SurfaceMessage = {
       id: messageId, kind: 'steer', role: 'user', status: 'complete',
-      parts: [{ type: 'text', text }], createdAt: new Date().toISOString(),
+      parts: [{ type: 'text', text }, ...attachments.map(surfaceAttachmentPart)],
+      createdAt: new Date().toISOString(),
       turnId: runtime.activeTurnId,
-      metadata: { conversationId: threadId, turnId: runtime.activeTurnId },
+      metadata: {
+        conversationId: threadId,
+        turnId: runtime.activeTurnId,
+        ...(attachments.length > 0 ? { attachments } : {}),
+      },
     };
     this.host.patchRuntime(threadId, {
       error: null,
@@ -257,7 +270,10 @@ export class CodexSurfaceMessagesController {
         threadId,
         expectedTurnId: runtime.activeTurnId,
         clientUserMessageId: messageId,
-        input: [{ type: 'text', text, text_elements: [] }],
+        input: [
+          { type: 'text', text, text_elements: [] },
+          ...attachments.map(attachmentInput),
+        ],
       });
       const wasKnownTurn = runtime.turnIds.includes(response.turnId);
       runtime.activeTurnId = response.turnId;
@@ -306,13 +322,10 @@ export class CodexSurfaceMessagesController {
     const runtime = await this.host.ensureThreadReady(threadId);
     const prompt = runtime.queuedPrompts.find((candidate) => candidate.id === promptId);
     if (!prompt) throw new Error(`Unknown queued prompt '${promptId}'`);
-    if (runtime.busy && (prompt.options?.attachments?.length ?? 0) > 0) {
-      throw new Error('Queued prompts with attachments cannot be steered and remain queued');
-    }
     this.host.patchRuntime(runtime.threadId, {
       queuedPrompts: runtime.queuedPrompts.filter((candidate) => candidate.id !== promptId),
     });
-    if (runtime.busy) await this.steerForThread(threadId, prompt.text);
+    if (runtime.busy) await this.steerForThread(threadId, prompt.text, prompt.options);
     else await this.sendToThread(threadId, prompt.text, prompt.options);
   }
 

@@ -117,6 +117,35 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-tool');
   });
 
+  it('keeps the terminal icon for a run command when the provided resolver does not match', () => {
+    const toolCall: MessageToolCall = {
+      args: { command: '/bin/bash -lc npm test' },
+      done: true,
+      function: '/bin/bash -lc npm test',
+      id: 'run-command',
+      kind: 'command',
+      result: undefined,
+      state: 'completed',
+      status: JSON.stringify({
+        action: 'run',
+        phase: 'completed',
+        params: { target: '/bin/bash -lc npm test' },
+        source: 'codex',
+      }),
+    };
+    const Host = defineComponent({
+      setup() {
+        provideCodexToolPresentation(() => undefined);
+        return () => h(ChatToolCall, { summaryOnly: true, toolCall });
+      },
+    });
+
+    const wrapper = mount(Host);
+
+    expect(wrapper.get('.chat-tool-call__title').text()).toContain('Ran /bin/bash -lc npm test');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+  });
+
   it('allows a scoped resolver to suppress an icon explicitly', () => {
     const toolCall: MessageToolCall = {
       args: undefined,

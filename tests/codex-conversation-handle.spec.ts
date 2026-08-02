@@ -19,7 +19,9 @@ describe('createCodexConversationHandle', () => {
     await expect(conversation.sendMessage('Hello', { model: 'model-1' })).resolves.toBe(snapshot);
     await expect(conversation.compact()).resolves.toBe(snapshot);
     await expect(conversation.startReview({ target: { type: 'uncommittedChanges' } })).resolves.toBe(snapshot);
-    await expect(conversation.steerMessage('Follow up')).resolves.toBe(snapshot);
+    await expect(conversation.steerMessage('Follow up', {
+      attachments: [{ type: 'file', path: '/tmp/notes.md' }],
+    })).resolves.toBe(snapshot);
     await expect(conversation.interrupt()).resolves.toBe(snapshot);
     await expect(conversation.deleteMessage(2)).resolves.toBe(snapshot);
     await expect(conversation.editMessage(1, 'Edited')).resolves.toBe(snapshot);
@@ -35,6 +37,9 @@ describe('createCodexConversationHandle', () => {
 
     expect(operations.load).toHaveBeenCalledWith({ cwd: '/workspace' });
     expect(operations.sendMessage).toHaveBeenCalledWith('Hello', { model: 'model-1' });
+    expect(operations.steerMessage).toHaveBeenCalledWith('Follow up', {
+      attachments: [{ type: 'file', path: '/tmp/notes.md' }],
+    });
     expect(operations.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     expect(operations.setGoal).toHaveBeenCalledWith('Ship it', 500);
     expect(operations.getSnapshot).toHaveBeenCalledTimes(19);

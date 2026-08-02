@@ -247,10 +247,6 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
   source: 'codex';
 } | undefined {
   const actions = normalizedCommandActions(commandActions);
-  if (!actions.length) {
-    return undefined;
-  }
-
   const knownActions = actions.filter((action) => action.type !== 'unknown');
   const actionTypes = new Set(knownActions.map((action) => action.type));
   if (knownActions.length === 0) {

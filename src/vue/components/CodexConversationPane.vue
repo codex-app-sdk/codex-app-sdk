@@ -349,7 +349,7 @@ const emit = defineEmits<{
   selectApprovalPreset: [preset: ApprovalPreset];
   sendFollowUp: [prompt: string];
   submit: [prompt: string, options?: SendCodexMessageOptions];
-  steer: [prompt: string];
+  steer: [prompt: string, options?: SendCodexMessageOptions];
   steerQueuedPrompt: [promptId: string];
   'update:modelId': [modelId: string];
   'update:composerState': [state: CodexComposerState];
@@ -470,9 +470,8 @@ watch(effectiveConversationKey, () => {
   });
   localComposerState.value = incoming;
   localDraft.value = incoming.text;
-  selectedAttachments.value = [];
+  selectedAttachments.value = [...props.attachments];
   draftRevision.value += 1;
-  emit('attachmentsChange', []);
 });
 
 watch(() => [surfaceState.value?.status, surfaceState.value?.error] as const, ([status, error]) => {
@@ -687,8 +686,11 @@ function interrupt(): void {
 }
 
 function steer(prompt: string): void {
-  emit('steer', prompt);
-  if (props.surface) void runSurfaceAction(() => props.surface!.steerMessage(prompt));
+  const options = sendOptionsForAttachments(selectedAttachments.value);
+  if (options) emit('steer', prompt, options);
+  else emit('steer', prompt);
+  if (props.surface) void runSurfaceAction(() => props.surface!.steerMessage(prompt, options));
+  replaceAttachments([]);
 }
 
 function selectApprovalPreset(preset: ApprovalPreset): void {

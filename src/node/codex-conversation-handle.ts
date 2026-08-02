@@ -42,7 +42,7 @@ export type CodexConversationHandleOperations = {
   setGoal(objective: string, tokenBudget?: number | null): Promise<void>;
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   startReview(options?: StartCodexReviewOptions): Promise<void>;
-  steerMessage(prompt: string): Promise<void>;
+  steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<void>;
   steerQueuedPrompt(promptId: string): Promise<void>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<void>;
 };
@@ -66,7 +66,7 @@ export function createCodexConversationHandle(
     startRealtime: operations.startRealtime,
     compact: () => snapshotAfter(operations.compact),
     startReview: (options) => snapshotAfter(() => operations.startReview(options)),
-    steerMessage: (prompt) => snapshotAfter(() => operations.steerMessage(prompt)),
+    steerMessage: (prompt, options) => snapshotAfter(() => operations.steerMessage(prompt, options)),
     interrupt: () => snapshotAfter(operations.interrupt),
     deleteMessage: (index) => snapshotAfter(() => operations.deleteMessage(index)),
     editMessage: (index, content) => snapshotAfter(() => operations.editMessage(index, content)),

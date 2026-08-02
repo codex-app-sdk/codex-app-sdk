@@ -98,7 +98,10 @@ type SurfaceRequests = {
   [channels.sendMessage]: IpcRequest<[prompt: string, options?: SendCodexMessageOptions], CodexSurfaceSnapshot>;
   [channels.startReview]: IpcRequest<[options?: StartCodexReviewOptions], CodexSurfaceSnapshot>;
   [channels.startChatGptLogin]: IpcRequest<[], CodexSurfaceChatGptLogin>;
-  [channels.steerMessage]: IpcRequest<[prompt: string], CodexSurfaceSnapshot>;
+  [channels.steerMessage]: IpcRequest<[
+    prompt: string,
+    options?: SendCodexMessageOptions,
+  ], CodexSurfaceSnapshot>;
   [channels.steerQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
   [channels.unarchiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.updateConversationSettings]: IpcRequest<[settings: UpdateCodexConversationSettings], CodexSurfaceSnapshot>;
@@ -201,7 +204,10 @@ export function registerCodexSurfaceIpc(
     ),
     [channels.startReview]: (_event, options) => surface.startReview(rendererReviewOptions(options)),
     [channels.startChatGptLogin]: () => surface.startChatGptLogin(),
-    [channels.steerMessage]: (_event, prompt) => surface.steerMessage(nonEmptyString(prompt, 'Steer prompt')),
+    [channels.steerMessage]: (_event, prompt, options) => surface.steerMessage(
+      nonEmptyString(prompt, 'Steer prompt'),
+      rendererSendOptions(options),
+    ),
     [channels.steerQueuedPrompt]: (_event, promptId) => surface.steerQueuedPrompt(nonEmptyString(promptId, 'Queued prompt id')),
     [channels.unarchiveConversation]: (_event, conversationId) => (
       surface.unarchiveConversation(nonEmptyString(conversationId, 'Conversation id'))
@@ -601,7 +607,7 @@ const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, m
   [channels.sendMessage]: [1, 2],
   [channels.startReview]: [0, 1],
   [channels.startChatGptLogin]: [0, 0],
-  [channels.steerMessage]: [1, 1],
+  [channels.steerMessage]: [1, 2],
   [channels.steerQueuedPrompt]: [1, 1],
   [channels.unarchiveConversation]: [1, 1],
   [channels.updateConversationSettings]: [1, 1],
@@ -654,7 +660,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     sendMessage: (prompt, options) => renderer.invoke(channels.sendMessage, prompt, options),
     startReview: (options) => renderer.invoke(channels.startReview, options),
     startChatGptLogin: () => renderer.invoke(channels.startChatGptLogin),
-    steerMessage: (prompt) => renderer.invoke(channels.steerMessage, prompt),
+    steerMessage: (prompt, options) => renderer.invoke(channels.steerMessage, prompt, options),
     steerQueuedPrompt: (promptId) => renderer.invoke(channels.steerQueuedPrompt, promptId),
     unarchiveConversation: (conversationId) => renderer.invoke(channels.unarchiveConversation, conversationId),
     updateConversationSettings: (settings) => renderer.invoke(channels.updateConversationSettings, settings),

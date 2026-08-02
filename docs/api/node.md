@@ -97,7 +97,7 @@ the server it connects to.
 - `sendMessage(prompt, options?)`
 - `compactConversation()`
 - `startReview(options?)`
-- `steerMessage(prompt)`
+- `steerMessage(prompt, options?)`
 - `interrupt()`
 - `deleteMessage(index)`
 - `editMessage(index, content)`
@@ -121,7 +121,7 @@ type CodexConversation = {
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   compact(): Promise<CodexConversationSnapshot>;
   startReview(options?: StartCodexReviewOptions): Promise<CodexConversationSnapshot>;
-  steerMessage(prompt: string): Promise<CodexConversationSnapshot>;
+  steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   interrupt(): Promise<CodexConversationSnapshot>;
   rollbackToTurn(turnId: string): Promise<CodexConversationSnapshot>;
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
@@ -131,6 +131,10 @@ type CodexConversation = {
   // message, queue, approval, client request, and goal actions are also exposed
 };
 ```
+
+`sendMessage` and `steerMessage` accept the same attachment options. Steering
+maps attachments to app-server `UserInput` blocks and includes them in the
+optimistic user steer message.
 
 ### Realtime voice
 

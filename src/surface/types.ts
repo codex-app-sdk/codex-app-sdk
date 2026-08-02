@@ -782,7 +782,7 @@ export type CodexSurfaceApi = {
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
   compactConversation(): Promise<CodexSurfaceSnapshot>;
   startReview(options?: StartCodexReviewOptions): Promise<CodexSurfaceSnapshot>;
-  steerMessage(prompt: string): Promise<CodexSurfaceSnapshot>;
+  steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
   interrupt(): Promise<CodexSurfaceSnapshot>;
   deleteMessage(index: number): Promise<CodexSurfaceSnapshot>;
   editMessage(index: number, content: string): Promise<CodexSurfaceSnapshot>;

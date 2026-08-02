@@ -286,6 +286,43 @@ describe('CodexConversationPane', () => {
     }]);
   });
 
+  it('restores controlled attachments on conversation changes without emitting an empty state', async () => {
+    const first: CodexNativeAttachment = {
+      id: 'first', type: 'file', path: '/tmp/first.md', name: 'first.md', mimeType: 'text/markdown', size: 1,
+    };
+    const second: CodexNativeAttachment = {
+      id: 'second', type: 'file', path: '/tmp/second.md', name: 'second.md', mimeType: 'text/markdown', size: 1,
+    };
+    const wrapper = mount(CodexConversationPane, {
+      props: { attachments: [first], conversationKey: 'thread-1', messages, modelValue: '' },
+    });
+    expect(wrapper.text()).toContain('first.md');
+
+    await wrapper.setProps({ attachments: [second], conversationKey: 'thread-2' });
+
+    expect(wrapper.text()).toContain('second.md');
+    expect(wrapper.text()).not.toContain('first.md');
+    expect(wrapper.emitted('attachmentsChange') ?? []).not.toContainEqual([[]]);
+  });
+
+  it('emits attachment options when steering and clears the selected attachments', async () => {
+    const attachment: CodexNativeAttachment = {
+      id: 'notes', type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown', size: 1,
+    };
+    const wrapper = mount(CodexConversationPane, {
+      props: { attachments: [attachment], busy: true, messages, modelValue: '' },
+    });
+    await setComposerText(wrapper, 'Use these notes');
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steer')).toStrictEqual([[
+      'Use these notes',
+      { attachments: [{ type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' }] },
+    ]]);
+    expect(wrapper.emitted('attachmentsChange')).toContainEqual([[]]);
+    expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
+  });
+
   it('binds directly to a surface controller while preserving controlled mode overrides', async () => {
     const controller = fakeSurfaceController();
     const wrapper = mount(CodexConversationPane, { props: { surface: controller } });
