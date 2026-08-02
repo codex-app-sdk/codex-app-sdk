@@ -29,6 +29,7 @@ attachments, just like `sendMessage`.
 | `CodexConversationPane` | Complete bound or unbound conversation surface |
 | `CodexComposer` | Full composer with menus, attachments, voice, model/reasoning/Fast mode settings, and send/steer behavior |
 | `CodexMessageList` | Conversation message collection |
+| `CodexScrollToBottom` | Reusable circular control for returning to the latest messages |
 | `CodexMessage` | One message with blocks, status, thinking, and actions |
 | `CodexApprovalPrompt` | Command, file-change, and permission approval UI |
 | `CodexWorkbenchLayout` | Measured sticky header/content/footer layout |
@@ -80,6 +81,11 @@ after the steer intent is emitted.
 uses the same icon chain as stock tool rows: a host icon, a built-in Codex
 action icon, a stable kind fallback, then the generic tool icon. Only an
 explicit `presentation.icon` value of `null` suppresses the icon.
+
+`CodexScrollToBottom` is also rendered by `CodexMessageList` whenever the
+transcript is scrolled away from the bottom. It accepts an optional accessible
+`label` and emits `click`; use it directly when composing a custom message
+layout.
 
 Raw tool-call input and output are inaccessible by default: stock tool rows do
 not render a disclosure control or place those values in the DOM. Enable access

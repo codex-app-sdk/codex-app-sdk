@@ -257,6 +257,27 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it('shows a scroll-to-bottom control when the transcript is away from the bottom', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { messages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    scrollEl.scrollTop = 100;
+
+    await wrapper.get('.message-list').trigger('scroll');
+
+    const button = wrapper.get('.codex-message-list__scroll-to-bottom');
+    expect(button.attributes('aria-label')).toBe('Scroll to bottom');
+    await button.trigger('click');
+    expect(scrollEl.scrollTop).toBe(900);
+    expect(wrapper.find('.codex-message-list__scroll-to-bottom').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('resets scroll position when the conversation key changes', async () => {
     const wrapper = mount(CodexMessageList, {
       props: { messages, resetKey: 'thread-a' },

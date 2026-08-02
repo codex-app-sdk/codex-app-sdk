@@ -33,6 +33,7 @@
         :plugins="effectivePlugins"
         :presentation="effectivePresentation"
         :reset-key="effectiveConversationKey"
+        :scroll-to-bottom-label="scrollToBottomLabel"
         :show-tool-details="showToolDetails"
         :skills="effectiveSkills"
         @cancel="cancel"
@@ -271,6 +272,7 @@ const props = withDefaults(defineProps<{
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
   selectedServiceTier?: string | null;
+  scrollToBottomLabel?: string;
   showToolDetails?: boolean;
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skills?: readonly CodexSkillSummary[];
@@ -295,6 +297,7 @@ const props = withDefaults(defineProps<{
   placeholder: 'Ask Codex…',
   planMode: undefined,
   showToolDetails: undefined,
+  scrollToBottomLabel: 'Scroll to bottom',
 });
 
 defineSlots<{

@@ -34,6 +34,7 @@ surface controller. Or build a different layout from exported components:
 - `CodexWorkbenchLayout`
 - `CodexConversationHistoryLoader`
 - `CodexMessageList`
+- `CodexScrollToBottom`
 - `CodexMessage`
 - `CodexConversationPane`
 

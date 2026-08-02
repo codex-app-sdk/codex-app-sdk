@@ -45,6 +45,12 @@
         </CodexMessage>
       </template>
     </div>
+    <CodexScrollToBottom
+      v-if="!stickToBottom"
+      class="codex-message-list__scroll-to-bottom"
+      :label="scrollToBottomLabel"
+      @click="scrollToBottom"
+    />
   </div>
 </template>
 
@@ -56,6 +62,7 @@ import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
+import CodexScrollToBottom from './CodexScrollToBottom.vue'
 
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
@@ -71,6 +78,7 @@ const props = withDefaults(defineProps<{
   plugins?: readonly CodexSurfacePlugin[]
   presentation?: CodexConversationPresentation
   resetKey?: string | number | null
+  scrollToBottomLabel?: string
   showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]
 }>(), {
@@ -80,6 +88,7 @@ const props = withDefaults(defineProps<{
   canEditMessage: true,
   canRetryMessage: true,
   emptyLabel: 'No messages yet',
+  scrollToBottomLabel: 'Scroll to bottom',
   showToolDetails: undefined,
 })
 
@@ -209,6 +218,7 @@ defineExpose({ scrollToBottom })
 
 <style scoped>
 .codex-message-list {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
@@ -216,6 +226,18 @@ defineExpose({ scrollToBottom })
   overflow-y: auto;
   scrollbar-width: thin;
   box-sizing: border-box;
+}
+
+.codex-message-list__scroll-to-bottom {
+  position: absolute;
+  right: 50%;
+  bottom: var(--codex-scroll-to-bottom-offset, var(--space-8));
+  z-index: 1;
+  transform: translateX(50%);
+}
+
+.codex-message-list__scroll-to-bottom:active {
+  transform: translateX(50%) scale(0.96);
 }
 
 .codex-message-list__content {

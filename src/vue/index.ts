@@ -8,6 +8,7 @@ export { default as CodexComposerMenuList } from './components/CodexComposerMenu
 export { default as CodexComposerSendButton } from './components/CodexComposerSendButton.vue';
 export { default as CodexMessage } from './components/CodexMessage.vue';
 export { default as CodexMessageList } from './components/CodexMessageList.vue';
+export { default as CodexScrollToBottom } from './components/CodexScrollToBottom.vue';
 export { default as CodexWorkbenchLayout } from './components/CodexWorkbenchLayout.vue';
 export { default as CodexAttachmentBlock } from './chat/ChatAttachmentBlock.vue';
 export { default as CodexAnimatedDiffStat } from './chat/ChatAnimatedDiffStat.vue';
