@@ -8,6 +8,7 @@
   />
   <section v-else class="codex-chat-theme chat-tool-group">
     <component
+      v-if="props.toolCalls.length === 0 || headerToolCall || completedToolCalls.length > 0"
       :is="canExpand ? 'button' : 'div'"
       class="chat-tool-group__header"
       :class="{ 'chat-tool-group__header--static': !canExpand }"
@@ -50,10 +51,24 @@
       </template>
     </component>
 
+    <div v-if="activeToolCalls.length > 0" class="chat-tool-group__running" aria-live="polite">
+      <ChatToolCall
+        v-for="toolCall in activeToolCalls"
+        :key="toolCall.id"
+        class="chat-tool-group__active"
+        :summary-only="!toolDetailsEnabled"
+        :answered-client-request-ids="answeredClientRequestIds"
+        :show-tool-details="toolDetailsEnabled"
+        :tool-call="toolCall"
+        @cancel="emit('cancel')"
+        @client-response="emit('client-response', $event)"
+      />
+    </div>
+
     <ChatFoldTransition :open="expanded">
       <div class="chat-tool-group__body">
         <ChatToolCall
-          v-for="toolCall in toolCalls"
+          v-for="toolCall in completedToolCalls"
           :key="toolCall.id"
           :answered-client-request-ids="answeredClientRequestIds"
           :headerless="isSingleTool"
@@ -103,16 +118,19 @@ const singleConfirmationToolCall = computed(() => {
 
   return props.toolCalls[0]
 })
-const activeToolCall = computed(() => props.toolCalls.find(isActiveToolCall))
-const headerToolCall = computed(() => activeToolCall.value ?? (isSingleTool.value ? props.toolCalls[0] : undefined))
+const activeToolCalls = computed(() => props.toolCalls.filter(isActiveToolCall))
+const completedToolCalls = computed(() => props.toolCalls.filter((toolCall) => !isActiveToolCall(toolCall)))
+const headerToolCall = computed(() => (
+  isSingleTool.value && completedToolCalls.value.length === 1 ? props.toolCalls[0] : undefined
+))
 const lineDiff = computed(() => getToolGroupLineDiff(props.toolCalls))
 const canExpand = computed(() => (
   props.toolCalls.length > 1
   || (toolDetailsEnabled.value && props.toolCalls.some(hasToolDetails))
 ))
 const summary = computed(() => {
-  if (props.toolCalls.length > 0) {
-    return `${formatActions(props.toolCalls.length)} done`
+  if (completedToolCalls.value.length > 0) {
+    return `${formatActions(completedToolCalls.value.length)} done`
   }
 
   return 'No actions'
@@ -191,6 +209,13 @@ function hasToolDetails(toolCall: MessageToolCall) {
 
 .chat-tool-group__active {
   flex: 1 1 auto;
+}
+
+.chat-tool-group__running {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
 }
 
 .chat-tool-group__title {

@@ -99,11 +99,16 @@ describe('Codex surface message state', () => {
   });
 
   it('inserts and merges tool parts while preserving incremental fields', () => {
+    const runningStatus = JSON.stringify({
+      action: 'run',
+      phase: 'running',
+      source: 'codex',
+    });
     const first = upsertAssistantToolPart([], 'thread-1', 'turn-1', toolPart('tool-1', {
       body: 'body',
       input: { query: 'one' },
       output: { found: 1 },
-      statusText: 'working',
+      statusText: runningStatus,
       metadata: { server: 'drive' },
     }));
     const running = upsertAssistantToolPart(first, 'thread-1', 'turn-1', toolPart('tool-1', {
@@ -115,7 +120,7 @@ describe('Codex surface message state', () => {
       body: 'body',
       input: { query: 'one' },
       output: { found: 1 },
-      statusText: 'working',
+      statusText: runningStatus,
       metadata: { server: 'drive', tool: 'search' },
     }));
 
@@ -125,7 +130,7 @@ describe('Codex surface message state', () => {
     }));
     expect(completed[0]?.parts[0]).toMatchObject({
       status: 'completed',
-      statusText: undefined,
+      statusText: JSON.stringify({ action: 'run', phase: 'completed', source: 'codex' }),
       body: 'body',
     });
   });

@@ -71,10 +71,15 @@ after the steer intent is emitted.
 
 ### Tools and conversation state
 
-`CodexToolCall`, `CodexToolCallTitle`, `CodexToolGroup`,
+`CodexToolCall`, `CodexToolCallTitle`, `CodexToolIcon`, `CodexToolGroup`,
 `CodexToolConfirmation`, `CodexToolUserInputRequest`, `CodexGoal`,
 `CodexQueuedPrompt`, `CodexQueuedPrompts`, `CodexFollowUps`,
 `CodexTurnGitInfo`, and `CodexAnimatedDiffStat`.
+
+`CodexToolIcon` accepts a `toolCall` and optional resolved `presentation`. It
+uses the same icon chain as stock tool rows: a host icon, a built-in Codex
+action icon, a stable kind fallback, then the generic tool icon. Only an
+explicit `presentation.icon` value of `null` suppresses the icon.
 
 Raw tool-call input and output are inaccessible by default: stock tool rows do
 not render a disclosure control or place those values in the DOM. Enable access

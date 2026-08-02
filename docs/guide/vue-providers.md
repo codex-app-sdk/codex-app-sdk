@@ -86,12 +86,14 @@ and `tool` identity.
 
 Resolution order is:
 
-1. the nearest host resolver;
-2. the SDK's built-in Codex action presentation;
-3. the generic tool icon and fallback title.
+1. an icon returned by the nearest host resolver;
+2. the SDK's built-in Codex action icon;
+3. a stable tool-kind icon, such as the terminal for commands;
+4. the generic tool icon.
 
 Return `undefined` to keep SDK presentation. Return `{ icon: null }` to suppress
-the icon explicitly. A resolver can provide only an icon or only a title.
+the icon explicitly. An omitted or `undefined` `icon` also keeps the SDK
+fallback. A resolver can provide only an icon or only a title.
 
 `registerCodexToolTitlePresenter` remains available for compatibility, but Vue
 applications should prefer the scoped provider because it cannot leak between

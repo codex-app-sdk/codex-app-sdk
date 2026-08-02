@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
 import { describe, expect, it } from 'vitest';
 import ChatToolCall from '../../../src/vue/chat/ChatToolCall.vue';
+import ChatToolIcon from '../../../src/vue/chat/ChatToolIcon.vue';
 import { provideCodexToolPresentation } from '../../../src/vue/chat/tool-presentation';
 import type { MessageToolCall } from '../../../src/vue/chat/types';
 
@@ -20,6 +21,24 @@ const actions = [
 ] as const;
 
 describe('ChatToolCall action icons', () => {
+  it('directly renders the generic fallback icon', () => {
+    const wrapper = mount(ChatToolIcon, {
+      props: {
+        toolCall: {
+          args: undefined,
+          done: true,
+          function: 'custom_tool',
+          id: 'generic-tool-icon',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(wrapper.get('svg').classes()).toContain('tabler-icon-tool');
+  });
+
   it.each(actions)('renders an icon for the %s action', (action, iconName) => {
     const toolCall: MessageToolCall = {
       args: undefined,
@@ -117,6 +136,29 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-tool');
   });
 
+  it('keeps SDK fallback presentation when an app returns an undefined icon', () => {
+    const toolCall: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'other.tool',
+      id: 'other-tool-with-undefined-icon',
+      kind: 'mcp',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+    const Host = defineComponent({
+      setup() {
+        provideCodexToolPresentation(() => ({ icon: undefined }));
+        return () => h(ChatToolCall, { summaryOnly: true, toolCall });
+      },
+    });
+
+    const wrapper = mount(Host);
+
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-tool');
+  });
+
   it('keeps the terminal icon for a run command when the provided resolver does not match', () => {
     const toolCall: MessageToolCall = {
       args: { command: '/bin/bash -lc npm test' },
@@ -141,6 +183,24 @@ describe('ChatToolCall action icons', () => {
     });
 
     const wrapper = mount(Host);
+
+    expect(wrapper.get('.chat-tool-call__title').text()).toContain('Ran /bin/bash -lc npm test');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');
+  });
+
+  it('uses the command kind when a completed update has no structured descriptor', () => {
+    const toolCall: MessageToolCall = {
+      args: { command: '/bin/bash -lc npm test' },
+      done: true,
+      function: '/bin/bash -lc npm test',
+      id: 'completed-command',
+      kind: 'command',
+      result: undefined,
+      state: 'completed',
+      status: 'completed',
+    };
+
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
 
     expect(wrapper.get('.chat-tool-call__title').text()).toContain('Ran /bin/bash -lc npm test');
     expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-terminal');

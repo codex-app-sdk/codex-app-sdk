@@ -43,6 +43,7 @@ export { default as CodexToolCall } from './chat/ChatToolCall.vue';
 export { default as CodexToolCallTitle } from './chat/ChatToolCallTitle.vue';
 export { default as CodexToolConfirmation } from './chat/ChatToolConfirmation.vue';
 export { default as CodexToolGroup } from './chat/ChatToolGroup.vue';
+export { default as CodexToolIcon } from './chat/ChatToolIcon.vue';
 export { default as CodexToolUserInputRequest } from './chat/ChatToolUserInputRequest.vue';
 export { default as CodexTurnGitInfo } from './chat/ChatTurnGitInfo.vue';
 export { default as CodexUserText } from './chat/ChatUserText.vue';

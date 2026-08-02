@@ -16,12 +16,13 @@
   <section v-else class="codex-chat-theme chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
     <div v-if="summaryOnly" class="chat-tool-call__summary">
       <ChatToolCallTitle
-        :icon="titleIcon"
         :line-diff="lineDiff"
         :running="isRunning"
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
+        :tool-call="toolCall"
+        :tool-presentation="toolPresentation"
       />
       <component
         :is="isOpen ? ChevronUp : ChevronDown"
@@ -36,23 +37,25 @@
       class="chat-tool-call__header chat-tool-call__header--static"
     >
       <ChatToolCallTitle
-        :icon="titleIcon"
         :line-diff="lineDiff"
         :running="isRunning"
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
+        :tool-call="toolCall"
+        :tool-presentation="toolPresentation"
       />
     </div>
 
     <button v-else-if="!headerless" class="chat-tool-call__header" type="button" @click="toggleOpen">
       <ChatToolCallTitle
-        :icon="titleIcon"
         :line-diff="lineDiff"
         :running="isRunning"
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
+        :tool-call="toolCall"
+        :tool-presentation="toolPresentation"
       />
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-call__chevron" :size="15" />
     </button>
@@ -89,20 +92,7 @@
 import { computed, ref } from 'vue'
 import { useCodexChatTranslate } from './chat-i18n'
 import { useCodexToolPresentation } from './tool-presentation'
-import {
-  ChevronDown,
-  ChevronUp,
-  EyeIcon,
-  FileTextIcon,
-  FolderIcon,
-  ListDetailsIcon,
-  PencilIcon,
-  PlusCircleIcon,
-  SearchIcon,
-  TerminalIcon,
-  ToolIcon,
-  Trash2Icon,
-} from '../icons/app-icons'
+import { ChevronDown, ChevronUp } from '../icons/app-icons'
 import type { ClientRequestResponse } from './contracts'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolConfirmation from './ChatToolConfirmation.vue'
@@ -166,26 +156,6 @@ const titleParts = computed(() => {
     return descriptor ? getToolDisplayTitleParts(props.toolCall, descriptor, t) : { title: props.toolCall.status }
   }
   return getToolDisplayTitleParts(props.toolCall, descriptor, t)
-})
-const titleIcon = computed(() => {
-  if (toolPresentation.value && 'icon' in toolPresentation.value) {
-    return toolPresentation.value.icon ?? undefined
-  }
-  if (statusDescriptor.value?.source !== 'codex') {
-    return ToolIcon
-  }
-  switch (statusDescriptor.value.action) {
-    case 'create': return PlusCircleIcon
-    case 'delete': return Trash2Icon
-    case 'edit': return PencilIcon
-    case 'explore': return EyeIcon
-    case 'list': return FolderIcon
-    case 'plan': return ListDetailsIcon
-    case 'read': return FileTextIcon
-    case 'run': return TerminalIcon
-    case 'search': return SearchIcon
-    default: return ToolIcon
-  }
 })
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)

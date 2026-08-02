@@ -91,6 +91,62 @@ describe('ChatMessageBlock', () => {
     expect(group.text()).toContain('2 actions done');
   });
 
+  it('keeps the completed counter while showing every active tool below it', () => {
+    const completed = {
+      args: { command: 'npm test' },
+      done: true,
+      function: 'npm test',
+      id: 'completed-tool',
+      result: 'passed',
+      state: 'completed' as const,
+      status: 'completed',
+    };
+    const running = {
+      args: { path: 'src/main.ts' },
+      done: false,
+      function: 'read_file',
+      id: 'running-tool',
+      result: undefined,
+      state: 'running' as const,
+      status: JSON.stringify({ source: 'codex', action: 'read', phase: 'running', params: { target: 'src/main.ts' } }),
+    };
+    const secondRunning = {
+      ...running,
+      id: 'second-running-tool',
+      function: 'git status',
+      status: JSON.stringify({ source: 'codex', action: 'run', phase: 'running', params: { target: 'git status' } }),
+    };
+
+    const wrapper = mount(ChatMessageBlock, {
+      props: { block: { type: 'tool-group', toolCalls: [completed, running, secondRunning] } },
+    });
+
+    expect(wrapper.get('.chat-tool-group__title').text()).toBe('1 action done');
+    expect(wrapper.get('.chat-tool-group__running').text()).toContain('Reading src/main.ts');
+    expect(wrapper.get('.chat-tool-group__running').text()).toContain('Running git status');
+    expect(wrapper.get('.chat-tool-group__running').findAll('.chat-tool-call')).toHaveLength(2);
+    expect(wrapper.get('.chat-tool-group__body').findAll('.chat-tool-call')).toHaveLength(1);
+  });
+
+  it('does not render a zero-count header while every tool is running', () => {
+    const running = {
+      args: { path: 'src/main.ts' },
+      done: false,
+      function: 'read_file',
+      id: 'running-only-tool',
+      result: undefined,
+      state: 'running' as const,
+      status: JSON.stringify({ source: 'codex', action: 'read', phase: 'running', params: { target: 'src/main.ts' } }),
+    };
+
+    const wrapper = mount(ChatMessageBlock, {
+      props: { block: { type: 'tool-group', toolCalls: [running] } },
+    });
+
+    expect(wrapper.find('.chat-tool-group__header').exists()).toBe(false);
+    expect(wrapper.get('.chat-tool-group__running').text()).toContain('Reading src/main.ts');
+  });
+
   it('forwards tool cancellation and client response events', async () => {
     const tool = {
       args: { command: 'npm test' },

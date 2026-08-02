@@ -179,7 +179,7 @@ export function upsertAssistantToolPart(
       body: toolPart.body ?? existing.body,
       input: toolPart.input ?? existing.input,
       output: toolPart.output ?? existing.output,
-      statusText: toolPart.statusText ?? (toolPart.status === 'running' ? existing.statusText : undefined),
+      statusText: toolPart.statusText ?? transitionedToolStatusText(existing.statusText, toolPart.status),
       metadata: { ...(existing.metadata ?? {}), ...(toolPart.metadata ?? {}) },
     });
   } else {
@@ -325,7 +325,6 @@ export function finalizeTurnToolParts(
   turnStatus: v2.TurnStatus,
 ): SurfaceMessage[] {
   const toolStatus: SurfaceMessageToolPart['status'] = turnStatus === 'completed' ? 'completed' : 'failed';
-  const phase = turnStatus === 'completed' ? 'completed' : 'failed';
   return messages.map((message) => {
     if (message.metadata?.turnId !== turnId) return message;
     let changed = false;
@@ -335,14 +334,18 @@ export function finalizeTurnToolParts(
       return {
         ...part,
         status: toolStatus,
-        statusText: finalizedToolStatusText(part.statusText, phase),
+        statusText: transitionedToolStatusText(part.statusText, toolStatus),
       };
     });
     return changed ? { ...message, parts } : message;
   });
 }
 
-function finalizedToolStatusText(statusText: string | undefined, phase: 'completed' | 'failed'): string | undefined {
+function transitionedToolStatusText(
+  statusText: string | undefined,
+  phase: SurfaceMessageToolPart['status'],
+): string | undefined {
+  if (phase === 'running') return statusText;
   if (!statusText) return statusText;
   try {
     const parsed: unknown = JSON.parse(statusText);

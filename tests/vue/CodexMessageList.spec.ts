@@ -58,7 +58,7 @@ describe('CodexMessageList', () => {
       },
     });
 
-    await wrapper.get('.chat-tool-group__header').trigger('click');
+    await wrapper.get('.chat-tool-group__running .chat-tool-call__header').trigger('click');
 
     expect(wrapper.text()).toContain('vitest started');
   });

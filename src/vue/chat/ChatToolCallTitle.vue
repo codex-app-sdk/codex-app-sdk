@@ -5,6 +5,11 @@
     :data-label="title"
   >
     <component v-if="icon" :is="icon" />
+    <ChatToolIcon
+      v-else-if="toolCall"
+      :presentation="toolPresentation"
+      :tool-call="toolCall"
+    />
     <span v-if="titlePrefix && titleTarget" class="chat-tool-call__title-text">
       <span>{{ titlePrefix }}</span>
       <span class="chat-tool-call__title-target">{{ titleTarget }}</span>
@@ -31,7 +36,10 @@
 
 <script setup lang="ts">
 import ChatAnimatedDiffStat from './ChatAnimatedDiffStat.vue'
+import ChatToolIcon from './ChatToolIcon.vue'
 import type { ToolLineDiff } from './tool-status'
+import type { CodexToolPresentation } from './tool-presentation'
+import type { MessageToolCall } from './types'
 
 defineProps<{
   lineDiff?: ToolLineDiff
@@ -40,6 +48,8 @@ defineProps<{
   titlePrefix?: string
   titleTarget?: string
   icon?: any
+  toolCall?: MessageToolCall
+  toolPresentation?: CodexToolPresentation
 }>()
 </script>
 
