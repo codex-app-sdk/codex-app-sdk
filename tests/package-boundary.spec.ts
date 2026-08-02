@@ -68,6 +68,20 @@ describe('package boundary', () => {
     expect(missingMounts).toStrictEqual([]);
   });
 
+  it('names every Vue injection key with the SDK prefix', async () => {
+    const files = await sourceFiles(path.join(packageRoot, 'src/vue'));
+    const keys: Array<{ file: string; name: string }> = [];
+    for (const file of files) {
+      const content = await readFile(file, 'utf8');
+      for (const match of content.matchAll(/InjectionKey<[^;]+?>\s*=\s*Symbol\(\s*['"]([^'"]+)['"]/g)) {
+        keys.push({ file: path.relative(packageRoot, file), name: match[1]! });
+      }
+    }
+
+    expect(keys.length).toBeGreaterThan(0);
+    expect(keys.filter(({ name }) => !name.startsWith('codex-app-sdk-'))).toStrictEqual([]);
+  });
+
   it('ships the complete conversation theme without resetting the host application', async () => {
     const [entrypoint, base, theme, viteConfig, vueBuildEntry, packageManifest, bundleVerifier] = await Promise.all([
       readFile(path.join(packageRoot, 'src/vue/styles.css'), 'utf8'),

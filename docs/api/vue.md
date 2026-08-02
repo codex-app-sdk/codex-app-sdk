@@ -57,6 +57,20 @@ current Vue effect scope.
 `CodexQueuedPrompt`, `CodexQueuedPrompts`, `CodexFollowUps`,
 `CodexTurnGitInfo`, and `CodexAnimatedDiffStat`.
 
+Raw tool-call input and output are inaccessible by default: stock tool rows do
+not render a disclosure control or place those values in the DOM. Enable access
+for one component tree with the `show-tool-details` prop on
+`CodexConversationPane`, `CodexMessageList`, `CodexMessage`, `CodexToolGroup`,
+or `CodexToolCall`. Applications can set the policy once for a Vue subtree:
+
+```ts
+import { provideCodexToolCallDetails } from 'codex-app-sdk/vue';
+
+provideCodexToolCallDetails(true);
+```
+
+An explicit component prop takes precedence over the provided value.
+
 ## Configuration contracts
 
 - `CodexCapabilities`
@@ -98,6 +112,7 @@ keeps `$skill`, `@plugin`, and `@path` as the canonical submitted prompt text. S
 ### Customization
 
 - `provideCodexChatTranslate`
+- `provideCodexToolCallDetails` and `useCodexToolCallDetails`
 - `registerCodexToolTitlePresenter`
 - capability/presentation resolvers
 - composer command, plugin, skill, queue, and mention helpers

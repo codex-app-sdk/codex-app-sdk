@@ -3,7 +3,7 @@ import { defaultToolTranslate } from './tool-status';
 
 export type CodexChatTranslate = (key: string, params?: Record<string, unknown>) => string;
 
-const translateKey: InjectionKey<CodexChatTranslate> = Symbol('codex-chat-translate');
+const translateKey: InjectionKey<CodexChatTranslate> = Symbol('codex-app-sdk-chat-translate');
 
 const templates: Record<string, string> = {
   'chat.actions.cancel': 'Cancel',

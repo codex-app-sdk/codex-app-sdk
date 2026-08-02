@@ -7,12 +7,20 @@
     @client-response="emit('client-response', $event)"
   />
   <section v-else class="codex-chat-theme chat-tool-group">
-    <button class="chat-tool-group__header" type="button" @click="toggleExpanded">
+    <component
+      :is="canExpand ? 'button' : 'div'"
+      class="chat-tool-group__header"
+      :class="{ 'chat-tool-group__header--static': !canExpand }"
+      :type="canExpand ? 'button' : undefined"
+      @click="toggleExpanded"
+    >
       <ChatToolCall
         v-if="headerToolCall"
         class="chat-tool-group__active"
         summary-only
+        :expandable="canExpand"
         :answered-client-request-ids="answeredClientRequestIds"
+        :show-tool-details="toolDetailsEnabled"
         :tool-call="headerToolCall"
         @cancel="emit('cancel')"
         @client-response="emit('client-response', $event)"
@@ -38,9 +46,9 @@
             :value="lineDiff.removedLines"
           />
         </span>
-        <component :is="expanded ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
+        <component v-if="canExpand" :is="expanded ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
       </template>
-    </button>
+    </component>
 
     <ChatFoldTransition :open="expanded">
       <div class="chat-tool-group__body">
@@ -49,6 +57,7 @@
           :key="toolCall.id"
           :answered-client-request-ids="answeredClientRequestIds"
           :headerless="isSingleTool"
+          :show-tool-details="toolDetailsEnabled"
           :tool-call="toolCall"
           @cancel="emit('cancel')"
           @client-response="emit('client-response', $event)"
@@ -67,17 +76,24 @@ import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import { getToolGroupLineDiff, parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
+import { getMessageToolCallArgs } from './types'
+import { useCodexToolCallDetails } from './tool-call-details'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
+  showToolDetails?: boolean
   toolCalls: MessageToolCall[]
-}>()
+}>(), {
+  showToolDetails: undefined,
+})
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
 }>()
 
 const expanded = ref(false)
+const providedToolDetails = useCodexToolCallDetails()
+const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
 
 const isSingleTool = computed(() => props.toolCalls.length === 1)
 const singleConfirmationToolCall = computed(() => {
@@ -90,6 +106,10 @@ const singleConfirmationToolCall = computed(() => {
 const activeToolCall = computed(() => props.toolCalls.find(isActiveToolCall))
 const headerToolCall = computed(() => activeToolCall.value ?? (isSingleTool.value ? props.toolCalls[0] : undefined))
 const lineDiff = computed(() => getToolGroupLineDiff(props.toolCalls))
+const canExpand = computed(() => (
+  props.toolCalls.length > 1
+  || (toolDetailsEnabled.value && props.toolCalls.some(hasToolDetails))
+))
 const summary = computed(() => {
   if (props.toolCalls.length > 0) {
     return `${formatActions(props.toolCalls.length)} done`
@@ -99,6 +119,7 @@ const summary = computed(() => {
 })
 
 function toggleExpanded() {
+  if (!canExpand.value) return
   expanded.value = !expanded.value
 }
 
@@ -117,6 +138,11 @@ function isConfirmationTool(toolCall: MessageToolCall) {
     typeof descriptor.params?.requestId === 'string' &&
     toolCall.state === 'running'
   )
+}
+
+function hasToolDetails(toolCall: MessageToolCall) {
+  return getMessageToolCallArgs(toolCall) !== undefined
+    || (toolCall.result !== undefined && toolCall.result !== null)
 }
 </script>
 
@@ -140,6 +166,10 @@ function isConfirmationTool(toolCall: MessageToolCall) {
   font: inherit;
   cursor: pointer;
   text-align: left;
+}
+
+.chat-tool-group__header--static {
+  cursor: default;
 }
 
 .chat-tool-group__header:focus-visible {

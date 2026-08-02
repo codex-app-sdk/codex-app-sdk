@@ -22,6 +22,7 @@
             :message="message"
             :plugins="plugins"
             :presentation="presentation"
+            :show-tool-details="showToolDetails"
             :skills="skills"
             @cancel="emit('cancel')"
             @client-response="emit('client-response', $event)"
@@ -69,6 +70,7 @@ const props = withDefaults(defineProps<{
   plugins?: readonly CodexSurfacePlugin[]
   presentation?: CodexConversationPresentation
   resetKey?: string | number | null
+  showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]
 }>(), {
   ariaLabel: 'Conversation',
@@ -77,6 +79,7 @@ const props = withDefaults(defineProps<{
   canEditMessage: true,
   canRetryMessage: true,
   emptyLabel: 'No messages yet',
+  showToolDetails: undefined,
 })
 
 defineSlots<{

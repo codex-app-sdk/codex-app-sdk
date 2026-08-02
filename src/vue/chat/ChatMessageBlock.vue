@@ -30,6 +30,7 @@
   <slot v-else-if="block.type === 'tool'" name="tool" :block="block" :tool-call="block.toolCall">
     <ChatToolCall
       :answered-client-request-ids="answeredClientRequestIds"
+      :show-tool-details="showToolDetails"
       :tool-call="block.toolCall"
       @cancel="emit('cancel')"
       @client-response="emit('client-response', $event)"
@@ -38,6 +39,7 @@
   <slot v-else-if="block.type === 'tool-group'" name="tool" :block="block" :tool-calls="block.toolCalls">
     <ChatToolGroup
       :answered-client-request-ids="answeredClientRequestIds"
+      :show-tool-details="showToolDetails"
       :tool-calls="block.toolCalls"
       @cancel="emit('cancel')"
       @client-response="emit('client-response', $event)"
@@ -79,13 +81,16 @@ defineSlots<{
   }): unknown
 }>()
 
-defineProps<{
+withDefaults(defineProps<{
   block: MessageBlock
   answeredClientRequestIds?: ReadonlySet<string>
   followUpsDisabled?: boolean
   plugins?: readonly CodexSurfacePlugin[]
+  showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]
-}>()
+}>(), {
+  showToolDetails: undefined,
+})
 
 const emit = defineEmits<{
   cancel: []

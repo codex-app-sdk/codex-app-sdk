@@ -46,8 +46,21 @@ describe('CodexMessageList', () => {
     expect(wrapper.findAll('li')).toHaveLength(2);
     expect(wrapper.text()).toContain('Open the failing file');
     expect(wrapper.text()).toContain('npm test');
-    expect(wrapper.text()).toContain('vitest started');
+    expect(wrapper.text()).not.toContain('vitest started');
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
+  });
+
+  it('only exposes tool input and output when explicitly enabled', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages,
+        showToolDetails: true,
+      },
+    });
+
+    await wrapper.get('.chat-tool-group__header').trigger('click');
+
+    expect(wrapper.text()).toContain('vitest started');
   });
 
   it('renders steered conversation markers between messages', () => {

@@ -53,6 +53,7 @@ export {
 } from './chat/contracts';
 export { approvalPresetOptions, defaultApprovalPreset, isApprovalPreset } from './chat/approval-presets';
 export { defaultCodexChatTranslate, provideCodexChatTranslate } from './chat/chat-i18n';
+export { provideCodexToolCallDetails, useCodexToolCallDetails } from './chat/tool-call-details';
 export {
   chatMessageFromInput as toCodexChatMessage,
   chatMessagesFromInputs as toCodexChatMessages,

@@ -33,6 +33,7 @@
         :plugins="effectivePlugins"
         :presentation="effectivePresentation"
         :reset-key="effectiveConversationKey"
+        :show-tool-details="showToolDetails"
         :skills="effectiveSkills"
         @cancel="cancel"
         @client-response="respondToClientRequest"
@@ -260,6 +261,7 @@ const props = withDefaults(defineProps<{
   queuedPrompts?: readonly QueuedChatPrompt[];
   selectedModelId?: string | null;
   selectedReasoningEffort?: ReasoningEffort | null;
+  showToolDetails?: boolean;
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skills?: readonly CodexSkillSummary[];
   surface?: CodexSurfaceController;
@@ -282,6 +284,7 @@ const props = withDefaults(defineProps<{
   modelValue: '',
   placeholder: 'Ask Codex…',
   planMode: undefined,
+  showToolDetails: undefined,
 });
 
 defineSlots<{

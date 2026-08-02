@@ -23,11 +23,16 @@
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
       />
-      <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
+      <component
+        :is="isOpen ? ChevronUp : ChevronDown"
+        v-if="expandable !== false"
+        class="chat-tool-group__chevron"
+        :size="15"
+      />
     </div>
 
     <div
-      v-else-if="isStaticPlanProgress"
+      v-else-if="isStaticPlanProgress || !detailsAvailable"
       class="chat-tool-call__header chat-tool-call__header--static"
     >
       <ChatToolCallTitle
@@ -52,7 +57,7 @@
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-call__chevron" :size="15" />
     </button>
 
-    <div v-if="headerless" class="chat-tool-call__body">
+    <div v-if="headerless && toolDetailsEnabled" class="chat-tool-call__body">
       <div v-if="hasParams" class="chat-tool-call__section">
         <div class="chat-tool-call__section-title">Input</div>
         <pre class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
@@ -64,7 +69,7 @@
       </div>
     </div>
 
-    <ChatFoldTransition v-else-if="!isStaticPlanProgress" :open="isOpen">
+    <ChatFoldTransition v-else-if="detailsAvailable && !isStaticPlanProgress" :open="isOpen">
       <div class="chat-tool-call__body">
         <div v-if="hasParams" class="chat-tool-call__section">
           <div class="chat-tool-call__section-title">Input</div>
@@ -91,13 +96,18 @@ import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import ChatToolUserInputRequest from './ChatToolUserInputRequest.vue'
 import { getToolDisplayTitleParts, getToolLineDiff, parseToolStatusDescriptor } from './tool-status'
 import { getMessageToolCallArgs, type MessageToolCall } from './types'
+import { useCodexToolCallDetails } from './tool-call-details'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
+  expandable?: boolean
   headerless?: boolean
+  showToolDetails?: boolean
   summaryOnly?: boolean
   toolCall: MessageToolCall
-}>()
+}>(), {
+  showToolDetails: undefined,
+})
 const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
@@ -105,6 +115,7 @@ const emit = defineEmits<{
 
 const { t } = useCodexChatI18n()
 const isOpen = ref(false)
+const providedToolDetails = useCodexToolCallDetails()
 
 const toolCallArgs = computed(() => getMessageToolCallArgs(props.toolCall))
 const isRunning = computed(() => !props.toolCall.done && props.toolCall.state !== 'completed')
@@ -147,10 +158,13 @@ const titleIcon = computed(() => {
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)
 const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)
+const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
+const detailsAvailable = computed(() => toolDetailsEnabled.value && (hasParams.value || hasResult.value))
 const isPlanProgress = computed(() => statusDescriptor.value?.source === 'codex' && statusDescriptor.value.action === 'plan')
 const isStaticPlanProgress = computed(() => isPlanProgress.value && !hasParams.value && !hasResult.value && !props.headerless && !props.summaryOnly)
 
 function toggleOpen() {
+  if (!detailsAvailable.value) return
   isOpen.value = !isOpen.value
 }
 

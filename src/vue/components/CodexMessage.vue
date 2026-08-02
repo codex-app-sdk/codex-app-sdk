@@ -55,6 +55,7 @@
                 :block="block"
                 :follow-ups-disabled="followUpsDisabled"
                 :plugins="plugins"
+                :show-tool-details="showToolDetails"
                 :skills="skills"
                 @cancel="emit('cancel')"
                 @client-response="emit('client-response', $event)"
@@ -147,12 +148,14 @@ const props = withDefaults(defineProps<{
   message: Message | SurfaceMessage
   plugins?: readonly CodexSurfacePlugin[]
   presentation?: CodexConversationPresentation
+  showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]
 }>(), {
   canDeleteMessage: true,
   canEditMessage: true,
   canRetryMessage: true,
   index: 0,
+  showToolDetails: undefined,
 })
 
 defineSlots<{

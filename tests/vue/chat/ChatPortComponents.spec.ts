@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
+import { defineComponent, h } from 'vue';
 import { describe, expect, it } from 'vitest';
 import ChatComposerShelf from '../../../src/vue/chat/ChatComposerShelf.vue';
 import ChatQueuedPrompts from '../../../src/vue/chat/ChatQueuedPrompts.vue';
@@ -9,6 +10,7 @@ import ChatToolConfirmation from '../../../src/vue/chat/ChatToolConfirmation.vue
 import ChatToolUserInputRequest from '../../../src/vue/chat/ChatToolUserInputRequest.vue';
 import ChatToolCall from '../../../src/vue/chat/ChatToolCall.vue';
 import ChatToolGroup from '../../../src/vue/chat/ChatToolGroup.vue';
+import { provideCodexToolCallDetails } from '../../../src/vue/chat/tool-call-details';
 import type { MessageToolCall } from '../../../src/vue/chat/types';
 
 const completedTool: MessageToolCall = {
@@ -272,8 +274,18 @@ describe('ported id8 chat components', () => {
   });
 
   it('renders collapsible tool calls with params and result', async () => {
+    const hidden = mount(ChatToolCall, {
+      props: { toolCall: completedTool },
+    });
+    expect(hidden.text()).toContain('Ran npm test');
+    expect(hidden.text()).not.toContain('Input');
+    expect(hidden.text()).not.toContain('46 passed');
+    expect(hidden.get('.chat-tool-call__header').element.tagName).toBe('DIV');
+    expect(hidden.find('.chat-tool-call__chevron').exists()).toBe(false);
+
     const wrapper = mount(ChatToolCall, {
       props: {
+        showToolDetails: true,
         toolCall: completedTool,
       },
     });
@@ -286,6 +298,7 @@ describe('ported id8 chat components', () => {
 
     const structuredResult = mount(ChatToolCall, {
       props: {
+        showToolDetails: true,
         toolCall: {
           ...completedTool,
           function: 'team.set-status',
@@ -316,6 +329,31 @@ describe('ported id8 chat components', () => {
     expect(completedWorkItem.text()).toContain('Ran team.mark-work-item-completed');
   });
 
+  it('enables raw tool details once for a provided component subtree', async () => {
+    const host = defineComponent({
+      setup() {
+        provideCodexToolCallDetails(true);
+        return () => h(ChatToolCall, { toolCall: completedTool });
+      },
+    });
+    const wrapper = mount(host);
+
+    await wrapper.get('.chat-tool-call__header').trigger('click');
+
+    expect(wrapper.text()).toContain('Input');
+    expect(wrapper.text()).toContain('46 passed');
+
+    const overriddenHost = defineComponent({
+      setup() {
+        provideCodexToolCallDetails(true);
+        return () => h(ChatToolCall, { showToolDetails: false, toolCall: completedTool });
+      },
+    });
+    const overridden = mount(overriddenHost);
+    expect(overridden.text()).not.toContain('Input');
+    expect(overridden.get('.chat-tool-call__header').element.tagName).toBe('DIV');
+  });
+
   it('uses a generic fallback for host-specific MCP calls', () => {
     const wrapper = mount(ChatToolCall, {
       props: {
@@ -338,6 +376,7 @@ describe('ported id8 chat components', () => {
     const headerless = mount(ChatToolCall, {
       props: {
         headerless: true,
+        showToolDetails: true,
         toolCall: completedTool,
       },
     });
@@ -727,6 +766,7 @@ describe('ported id8 chat components', () => {
   it('summarizes completed tool groups and handles an empty group', async () => {
     const completed = mount(ChatToolGroup, {
       props: {
+        showToolDetails: true,
         toolCalls: [completedTool],
       },
     });
