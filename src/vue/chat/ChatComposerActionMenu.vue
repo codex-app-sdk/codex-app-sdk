@@ -58,6 +58,7 @@ const props = withDefaults(defineProps<{
   items: () => [],
   approvalPreset: null,
   approvalPresets: () => [],
+  planMode: false,
   showApprovalMenu: false,
   showPlanMode: true,
 });

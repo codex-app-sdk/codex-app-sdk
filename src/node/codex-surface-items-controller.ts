@@ -1,0 +1,353 @@
+import type { v2 } from '../codex/index';
+import type {
+  CodexConversationSummary,
+  CodexSurfaceEventOrigin,
+  CodexSurfaceSnapshot,
+  SurfaceMessage,
+  SurfaceMessageToolPartUpdate,
+} from '../surface/types';
+import {
+  codexItemToMediaPart,
+  codexItemToSurfaceMessage,
+  codexItemToToolPart,
+} from './codex-conversation-history';
+import { rawResponseItemToEvent } from './codex-raw-response-item-adapter';
+import type { SurfaceEventInput } from './codex-surface-events';
+import { surfaceTurnError, threadItemKey, timestampToIsoOrNull } from './codex-surface-events';
+import {
+  appendAssistantTextDelta,
+  appendCompactionMarker,
+  ensureAssistantTurnMessage,
+  finalizeTurnToolParts,
+  formatPlanMarkdown,
+  planProgressToolPart,
+  surfaceMediaPartsEqual,
+  updateAssistantToolPart,
+  upsertAssistantMediaPart,
+  upsertAssistantText,
+  upsertAssistantToolPart,
+} from './codex-surface-message-state';
+import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
+import {
+  shouldForwardCommandExecutionOutput,
+} from './codex-tool-part-adapter';
+
+export type CodexSurfaceItemsHost = {
+  assistantMessageForTurn(threadId: string, turnId: string): SurfaceMessage | null;
+  emitConversationActivity(threadId: string, origin: CodexSurfaceEventOrigin): void;
+  emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void;
+  emitSummaryUpserted(
+    summary: CodexConversationSummary,
+    reason: 'started' | 'listed' | 'resumed' | 'created' | 'updated',
+    origin: CodexSurfaceEventOrigin,
+  ): void;
+  getState(): CodexSurfaceSnapshot;
+  markRuntimeTurnActive(runtime: ThreadRuntimeState, turnId: string): void;
+  messageContainingTool(threadId: string, turnId: string, itemId: string): SurfaceMessage | null;
+  patch(patch: Partial<CodexSurfaceSnapshot>): void;
+  patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
+  requireRuntime(threadId: string): ThreadRuntimeState;
+  sendNextQueuedPrompt(threadId: string): void;
+};
+
+export class CodexSurfaceItemsController {
+  private readonly commandOutputForwardItemIds = new Set<string>();
+
+  constructor(private readonly host: CodexSurfaceItemsHost) {}
+
+  reset(): void {
+    this.commandOutputForwardItemIds.clear();
+  }
+
+  isForwardingCommandOutput(threadId: string, itemId: string): boolean {
+    return this.commandOutputForwardItemIds.has(threadItemKey(threadId, itemId));
+  }
+
+  applyAgentDelta(params: v2.AgentMessageDeltaNotification): void {
+    const runtime = this.host.requireRuntime(params.threadId);
+    this.host.markRuntimeTurnActive(runtime, params.turnId);
+    this.host.patchRuntime(params.threadId, {
+      messages: appendAssistantTextDelta(
+        runtime.messages, params.threadId, params.turnId, params.itemId, params.delta,
+      ),
+    });
+    const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+    if (message) {
+      this.host.emitEvent('notification', {
+        type: 'message.delta', conversationId: params.threadId, turnId: params.turnId,
+        payload: { messageId: message.id, itemId: params.itemId, delta: params.delta },
+      });
+    }
+  }
+
+  applyPlanDelta(params: v2.PlanDeltaNotification): void {
+    const runtime = this.host.requireRuntime(params.threadId);
+    this.host.markRuntimeTurnActive(runtime, params.turnId);
+    const markdown = `${runtime.planMarkdownByTurn.get(params.turnId) ?? ''}${params.delta}`;
+    runtime.planMarkdownByTurn.set(params.turnId, markdown);
+    this.host.patchRuntime(params.threadId, {
+      messages: upsertAssistantToolPart(
+        runtime.messages, params.threadId, params.turnId,
+        planProgressToolPart(params.turnId, markdown, 'running'),
+      ),
+    });
+    this.host.emitEvent('notification', {
+      type: 'plan.delta', conversationId: params.threadId, turnId: params.turnId,
+      payload: { itemId: params.itemId, delta: params.delta, markdown },
+    });
+  }
+
+  applyPlanUpdated(params: v2.TurnPlanUpdatedNotification): void {
+    const runtime = this.host.requireRuntime(params.threadId);
+    this.host.markRuntimeTurnActive(runtime, params.turnId);
+    const markdown = formatPlanMarkdown(params.explanation, params.plan);
+    runtime.planMarkdownByTurn.set(params.turnId, markdown);
+    this.host.patchRuntime(params.threadId, {
+      messages: upsertAssistantToolPart(
+        runtime.messages, params.threadId, params.turnId,
+        planProgressToolPart(params.turnId, markdown, 'completed'),
+      ),
+    });
+    this.host.emitEvent('notification', {
+      type: 'plan.updated', conversationId: params.threadId, turnId: params.turnId,
+      payload: {
+        explanation: params.explanation,
+        steps: structuredClone(params.plan),
+        markdown,
+        status: 'completed',
+      },
+    });
+  }
+
+  applyRawResponseItem(params: v2.RawResponseItemCompletedNotification): void {
+    const runtime = this.host.requireRuntime(params.threadId);
+    this.host.markRuntimeTurnActive(runtime, params.turnId);
+    const event = rawResponseItemToEvent(params.item);
+    if (!event) return;
+    if (event.type === 'item.updated') {
+      this.applyToolUpdate(params.threadId, params.turnId, event.payload);
+      return;
+    }
+    this.host.patchRuntime(params.threadId, {
+      messages: upsertAssistantToolPart(
+        runtime.messages, params.threadId, params.turnId, event.payload.toolPart,
+      ),
+    });
+    const message = this.host.messageContainingTool(
+      params.threadId, params.turnId, event.payload.toolPart.id,
+    );
+    if (message) {
+      this.host.emitEvent('notification', {
+        type: event.type === 'item.completed' ? 'tool.completed' : 'tool.started',
+        conversationId: params.threadId,
+        turnId: params.turnId,
+        payload: { messageId: message.id, toolPart: structuredClone(event.payload.toolPart) },
+      });
+    }
+  }
+
+  applyItem(params: v2.ItemStartedNotification | v2.ItemCompletedNotification, completed: boolean): void {
+    const runtime = this.host.requireRuntime(params.threadId);
+    if (!completed) this.host.markRuntimeTurnActive(runtime, params.turnId);
+    const turn = {
+      id: params.turnId,
+      status: completed ? 'completed' : 'inProgress',
+      startedAt: ('startedAtMs' in params ? params.startedAtMs : params.completedAtMs) / 1000,
+    } as const;
+
+    if (params.item.type === 'userMessage') {
+      const message = codexItemToSurfaceMessage(params.threadId, turn, params.item);
+      if (!message || runtime.messages.some((candidate) => candidate.id === message.id)) return;
+      const isSteer = runtime.messages.some((candidate) => (
+        candidate.role === 'assistant'
+        && candidate.metadata?.turnId === params.turnId
+        && candidate.parts.length > 0
+      ));
+      const appended = isSteer ? { ...message, kind: 'steer' as const } : message;
+      const messages = [...runtime.messages, appended];
+      this.host.patchRuntime(params.threadId, {
+        messages: isSteer
+          ? ensureAssistantTurnMessage(messages, params.threadId, params.turnId, { forceSegment: true })
+          : messages,
+      });
+      this.host.emitEvent('notification', {
+        type: 'message.appended', conversationId: params.threadId, turnId: params.turnId,
+        payload: { message: structuredClone(appended) },
+      });
+      return;
+    }
+
+    if (params.item.type === 'agentMessage' || params.item.type === 'exitedReviewMode') {
+      const text = params.item.type === 'agentMessage' ? params.item.text : params.item.review;
+      const phase = params.item.type === 'agentMessage' ? params.item.phase ?? undefined : undefined;
+      if (!text && params.item.type !== 'agentMessage') return;
+      const previousMessageIds = new Set(runtime.messages.map((message) => message.id));
+      const previousText = runtime.messages.flatMap((message) => message.parts)
+        .find((part): part is Extract<SurfaceMessage['parts'][number], { type: 'text' }> => (
+          part.type === 'text' && part.itemId === params.item.id
+        ))?.text ?? '';
+      this.host.patchRuntime(params.threadId, {
+        messages: upsertAssistantText(
+          runtime.messages, params.threadId, params.turnId, params.item.id, text, phase,
+        ),
+      });
+      if (!text) return;
+      const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+      if (message && !previousMessageIds.has(message.id)) {
+        this.host.emitEvent('notification', {
+          type: 'message.appended', conversationId: params.threadId, turnId: params.turnId,
+          payload: { message: structuredClone(message) },
+        });
+      } else if (message && text !== previousText) {
+        if (text.startsWith(previousText)) {
+          const delta = text.slice(previousText.length);
+          if (delta) this.host.emitEvent('notification', {
+            type: 'message.delta', conversationId: params.threadId, turnId: params.turnId,
+            payload: { messageId: message.id, itemId: params.item.id, delta },
+          });
+        } else {
+          this.host.emitEvent('notification', {
+            type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
+            payload: { message: structuredClone(message) },
+          });
+        }
+      }
+      return;
+    }
+
+    if (params.item.type === 'plan') {
+      if (!completed) return;
+      const markdown = params.item.text.trim() || runtime.planMarkdownByTurn.get(params.turnId) || '';
+      runtime.planMarkdownByTurn.set(params.turnId, markdown);
+      this.host.patchRuntime(params.threadId, {
+        messages: upsertAssistantToolPart(
+          runtime.messages, params.threadId, params.turnId,
+          planProgressToolPart(params.turnId, markdown, 'completed'),
+        ),
+      });
+      this.host.emitEvent('notification', {
+        type: 'plan.completed', conversationId: params.threadId, turnId: params.turnId,
+        payload: { itemId: params.item.id, markdown },
+      });
+      return;
+    }
+
+    if (params.item.type === 'contextCompaction') {
+      this.host.patchRuntime(params.threadId, {
+        messages: appendCompactionMarker(runtime.messages, params.threadId, params.turnId),
+      });
+      if (completed) {
+        const message = this.host.requireRuntime(params.threadId).messages.find((candidate) => (
+          candidate.kind === 'compaction' && candidate.metadata?.turnId === params.turnId
+        ));
+        if (message) this.host.emitEvent('notification', {
+          type: 'context.compactionCompleted', conversationId: params.threadId, turnId: params.turnId,
+          payload: { itemId: params.item.id, message: structuredClone(message) },
+        });
+      } else {
+        this.host.emitEvent('notification', {
+          type: 'context.compactionStarted', conversationId: params.threadId, turnId: params.turnId,
+          payload: { itemId: params.item.id },
+        });
+      }
+      return;
+    }
+
+    const includeCommandOutput = this.shouldForwardCommandOutput(params.threadId, completed, params.item);
+    const toolPart = codexItemToToolPart(params.item, { includeCommandOutput });
+    const mediaPart = codexItemToMediaPart(params.item);
+    if (!toolPart && !mediaPart) return;
+    const mediaChanged = mediaPart ? !runtime.messages.some((message) => (
+      message.parts.some((part) => part.type === 'media' && surfaceMediaPartsEqual(part, mediaPart))
+    )) : false;
+    let messages = toolPart
+      ? upsertAssistantToolPart(runtime.messages, params.threadId, params.turnId, toolPart)
+      : [...runtime.messages];
+    if (mediaPart) messages = upsertAssistantMediaPart(messages, params.threadId, params.turnId, mediaPart);
+    this.host.patchRuntime(params.threadId, { messages });
+    const message = toolPart
+      ? this.host.messageContainingTool(params.threadId, params.turnId, toolPart.id)
+      : this.host.assistantMessageForTurn(params.threadId, params.turnId);
+    if (message && toolPart) this.host.emitEvent('notification', {
+      type: completed ? 'tool.completed' : 'tool.started',
+      conversationId: params.threadId,
+      turnId: params.turnId,
+      payload: { messageId: message.id, toolPart: structuredClone(toolPart) },
+    });
+    if (message && mediaPart && mediaChanged) this.host.emitEvent('notification', {
+      type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
+      payload: { message: structuredClone(message) },
+    });
+  }
+
+  shouldForwardCommandOutput(threadId: string, completed: boolean, item: v2.ThreadItem): boolean {
+    const itemId = 'id' in item && typeof item.id === 'string' ? item.id : null;
+    if (!itemId) return false;
+    const key = threadItemKey(threadId, itemId);
+    if (!completed) {
+      const shouldForward = shouldForwardCommandExecutionOutput(item);
+      if (shouldForward) this.commandOutputForwardItemIds.add(key);
+      else this.commandOutputForwardItemIds.delete(key);
+      return shouldForward;
+    }
+    const shouldForward = this.commandOutputForwardItemIds.has(key)
+      || shouldForwardCommandExecutionOutput(item);
+    this.commandOutputForwardItemIds.delete(key);
+    return shouldForward;
+  }
+
+  applyToolUpdate(threadId: string, turnId: string, update: SurfaceMessageToolPartUpdate): void {
+    const runtime = this.host.requireRuntime(threadId);
+    this.host.markRuntimeTurnActive(runtime, turnId);
+    this.host.patchRuntime(threadId, {
+      messages: updateAssistantToolPart(runtime.messages, threadId, turnId, update),
+    });
+    const message = this.host.messageContainingTool(threadId, turnId, update.itemId);
+    if (message) this.host.emitEvent('notification', {
+      type: 'tool.updated', conversationId: threadId, turnId,
+      payload: { messageId: message.id, update: structuredClone(update) },
+    });
+  }
+
+  applyTurnCompleted(params: v2.TurnCompletedNotification): void {
+    const runtime = this.host.requireRuntime(params.threadId);
+    if (!runtime.turnIds.includes(params.turn.id)) runtime.turnIds.push(params.turn.id);
+    if (runtime.activeTurnId === params.turn.id) runtime.activeTurnId = null;
+    const status: SurfaceMessage['status'] = params.turn.status === 'failed' ? 'error' : 'complete';
+    const messages = finalizeTurnToolParts(runtime.messages, params.turn.id, params.turn.status)
+      .map((message) => message.metadata?.turnId === params.turn.id ? { ...message, status } : message)
+      .filter((message) => !(
+        message.role === 'assistant' && message.metadata?.turnId === params.turn.id
+        && message.kind === undefined && message.parts.length === 0
+      ));
+    this.host.patchRuntime(params.threadId, {
+      busy: false, turnStartPending: false, error: params.turn.error?.message ?? null, messages,
+    });
+    this.host.patch({
+      conversations: this.host.getState().conversations.map((conversation) => conversation.id === params.threadId
+        ? {
+          ...conversation,
+          status: params.turn.status === 'failed' ? 'error' : 'idle',
+          turnCount: runtime.turnIds.length,
+          updatedAt: new Date().toISOString(),
+        }
+        : conversation),
+    });
+    const summary = this.host.getState().conversations.find((conversation) => conversation.id === params.threadId);
+    if (summary) this.host.emitSummaryUpserted(summary, 'updated', 'notification');
+    this.host.emitEvent('notification', {
+      type: 'turn.completed', conversationId: params.threadId, turnId: params.turn.id,
+      payload: {
+        status: params.turn.status,
+        error: surfaceTurnError(params.turn.error),
+        willRetry: false,
+        startedAt: timestampToIsoOrNull(params.turn.startedAt),
+        completedAt: timestampToIsoOrNull(params.turn.completedAt),
+        durationMs: params.turn.durationMs ?? null,
+      },
+    });
+    this.host.emitConversationActivity(params.threadId, 'notification');
+    runtime.planMarkdownByTurn.delete(params.turn.id);
+    this.host.sendNextQueuedPrompt(params.threadId);
+  }
+}

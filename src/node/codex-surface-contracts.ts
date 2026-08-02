@@ -1,0 +1,174 @@
+import type { CodexAppServerClient, v2 } from '../codex/index';
+import type {
+  CodexConversationEvent,
+  CodexConversationHistory,
+  CodexConversationSnapshot,
+  CodexRealtimeEvent,
+  CodexRealtimeInputAudioChunk,
+  CodexSurfaceApprovalDecision,
+  CodexSurfaceApprovalMode,
+  CodexSurfaceApprovalPreset,
+  CodexSurfaceApprovalScope,
+  CodexSurfaceClientRequestResponse,
+  CodexSurfaceJsonValue,
+  CodexSurfacePermissionMode,
+  CreateCodexConversationOptions,
+  SendCodexMessageOptions,
+  StartCodexRealtimeOptions,
+  StartCodexReviewOptions,
+  UpdateCodexConversationSettings,
+} from '../surface/types';
+import type { CodexMcpServerDefinition } from './codex-surface-mcp';
+import type { CodexAppServerStdioTransportOptions } from './codex-stdio-transport';
+import type { CodexAppServerUnixSocketTransportOptions } from './codex-unix-socket-transport';
+
+export type CodexDynamicToolContent =
+  | { type: 'text'; text: string }
+  | { type: 'image'; imageUrl: string };
+
+export type CodexDynamicToolResult = string | {
+  content: readonly CodexDynamicToolContent[];
+  success?: boolean;
+};
+
+export type CodexDynamicToolCall = {
+  callId: string;
+  conversationId: string;
+  turnId: string;
+  arguments: CodexSurfaceJsonValue;
+  extensionContext?: unknown;
+};
+
+export type CodexDynamicTool = {
+  name: string;
+  description: string;
+  inputSchema: CodexSurfaceJsonValue;
+  deferLoading?: boolean;
+  execute(call: CodexDynamicToolCall): CodexDynamicToolResult | Promise<CodexDynamicToolResult>;
+};
+
+export type CodexThreadStartExtension = {
+  baseInstructions?: string;
+  config?: Readonly<Record<string, CodexSurfaceJsonValue>>;
+  developerInstructions?: string;
+};
+
+export type CodexConversationHostOptions = {
+  extensionContext?: unknown;
+  /** Replaces the surface MCP definitions for this conversation. Main-process only. */
+  mcpServers?: readonly CodexMcpServerDefinition[];
+};
+
+export type CodexConversationDefaults = Pick<
+  CreateCodexConversationOptions,
+  'model' | 'reasoningEffort'
+>;
+
+export type CodexConversationLoadOptions = CodexConversationHostOptions & {
+  cwd?: string;
+};
+
+export type ListCodexSkillsOptions = {
+  cwd?: string;
+  forceReload?: boolean;
+};
+
+/** State returned by the app-server remote-control connection. */
+export type CodexSurfaceRemoteControlStatus = v2.RemoteControlStatusReadResponse;
+
+/** One-time remote-control pairing details returned by the app-server. */
+export type CodexSurfaceRemoteControlPairing = v2.RemoteControlPairingStartResponse;
+
+/** Result of checking whether a remote-control pairing code was claimed. */
+export type CodexSurfaceRemoteControlPairingStatus = v2.RemoteControlPairingStatusResponse;
+
+/** A device currently paired with a remote-control environment. */
+export type CodexSurfaceRemoteControlClient = v2.RemoteControlClient;
+
+/** A page of devices paired with a remote-control environment. */
+export type CodexSurfaceRemoteControlClientPage = v2.RemoteControlClientsListResponse;
+
+/** Managed configuration requirements relevant to the host surface. */
+export type CodexSurfaceConfigRequirements = v2.ConfigRequirements;
+
+export type CodexSurfaceExtension = {
+  dynamicTools?: readonly CodexDynamicTool[];
+  configureConversation?: (context: {
+    operation: 'start' | 'resume';
+    conversationId: string | null;
+    cwd?: string;
+    createOptions?: Readonly<CreateCodexConversationOptions>;
+    extensionContext?: unknown;
+  }) => CodexThreadStartExtension | Promise<CodexThreadStartExtension>;
+};
+
+export type CodexConversation = {
+  readonly id: string;
+  load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
+  select(): Promise<CodexConversationSnapshot>;
+  readHistory(): Promise<CodexConversationHistory>;
+  rename(title: string): Promise<CodexConversationSnapshot>;
+  updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
+  sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
+  /** Starts an experimental app-server realtime voice session without exposing JSON-RPC. */
+  startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
+  compact(): Promise<CodexConversationSnapshot>;
+  startReview(options?: StartCodexReviewOptions): Promise<CodexConversationSnapshot>;
+  steerMessage(prompt: string): Promise<CodexConversationSnapshot>;
+  interrupt(): Promise<CodexConversationSnapshot>;
+  deleteMessage(index: number): Promise<CodexConversationSnapshot>;
+  editMessage(index: number, content: string): Promise<CodexConversationSnapshot>;
+  retryMessage(index: number): Promise<CodexConversationSnapshot>;
+  rollbackToTurn(turnId: string): Promise<CodexConversationSnapshot>;
+  deleteQueuedPrompt(promptId: string): Promise<CodexConversationSnapshot>;
+  steerQueuedPrompt(promptId: string): Promise<CodexConversationSnapshot>;
+  respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<CodexConversationSnapshot>;
+  resolveApproval(
+    approvalId: string,
+    decision: CodexSurfaceApprovalDecision,
+    scope?: CodexSurfaceApprovalScope,
+  ): Promise<CodexConversationSnapshot>;
+  setGoal(objective: string, tokenBudget?: number | null): Promise<CodexConversationSnapshot>;
+  clearGoal(): Promise<CodexConversationSnapshot>;
+  getSnapshot(): CodexConversationSnapshot;
+  onStateChange(listener: (snapshot: CodexConversationSnapshot) => void): () => void;
+  onEvent(listener: (event: CodexConversationEvent) => void): () => void;
+};
+
+export type CodexRealtimeSession = {
+  readonly conversationId: string;
+  readonly transport: 'websocket' | 'webrtc';
+  readonly remoteSdp: string | null;
+  appendAudio(audio: CodexRealtimeInputAudioChunk): Promise<void>;
+  appendText(text: string, role?: 'user' | 'developer' | 'assistant'): Promise<void>;
+  appendSpeech(text: string): Promise<void>;
+  stop(): Promise<void>;
+  onEvent(listener: (event: CodexRealtimeEvent) => void): () => void;
+};
+
+export type CodexAppServerTransportOptions =
+  | CodexAppServerStdioTransportOptions
+  | CodexAppServerUnixSocketTransportOptions;
+
+export type CodexSurfaceOptions = {
+  approvalPreset?: CodexSurfaceApprovalPreset;
+  approvalMode?: CodexSurfaceApprovalMode;
+  clientInfo?: { name: string; title?: string; version: string };
+  /** Host-owned defaults used by explicit and implicit conversation creation. */
+  conversationDefaults?: Readonly<CodexConversationDefaults>;
+  conversationLimit?: number;
+  /** Trusted main-process CODEX_HOME for the app-server. Never expose this through renderer IPC. */
+  codexHome?: string;
+  cwd?: string;
+  autoSelectFirstConversation?: boolean;
+  extensions?: readonly CodexSurfaceExtension[];
+  /** App-owned MCP servers applied to every started or resumed conversation. Main-process only. */
+  mcpServers?: readonly CodexMcpServerDefinition[];
+  /** Receives notifications added by a newer app-server than this SDK schema. */
+  onUnknownNotification?: (notification: { method: string; params?: unknown }) => void;
+  permissionMode?: CodexSurfacePermissionMode;
+  /** Defaults to a spawned stdio child; use `{ type: 'unixSocket' }` to reuse an existing local daemon. */
+  transport?: CodexAppServerTransportOptions;
+  /** Test and advanced embedding seam. Most apps should let the SDK create the client. */
+  client?: CodexAppServerClient;
+};

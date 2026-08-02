@@ -429,8 +429,9 @@ describe('CodexConversationPane', () => {
     ['C:\\repo\\src\\App.vue#L9', { href: 'C:\\repo\\src\\App.vue#L9', kind: 'file', path: 'C:\\repo\\src\\App.vue' }],
     ['https://example.com/docs', { href: 'https://example.com/docs', kind: 'external' }],
   ])('intercepts %s and delegates opening to the host', async (href, expected) => {
+    const openConversationLink = vi.fn();
     const wrapper = mount(CodexConversationPane, {
-      props: { messages, modelValue: '' },
+      props: { messages, modelValue: '', openConversationLink },
       slots: { message: () => h('a', { class: 'test-link', href }, 'Open') },
     });
 
@@ -440,6 +441,7 @@ describe('CodexConversationPane', () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(wrapper.emitted('openLink')).toStrictEqual([[expected]]);
+    expect(openConversationLink).toHaveBeenCalledWith(expected);
   });
 
   it.each(['javascript:alert(1)', 'data:text/html,boom', '\\\\server\\share\\file.ts'])('blocks unsupported link %s without delegating it', async (href) => {

@@ -1,0 +1,334 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createSurface, lastResponse, turn } from './helpers/codex-surface-fixture';
+
+describe('CodexSurface', () => {
+  it('reduces every streamed tool update and resolves cancellation and confirmation variants', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    transport.emit({
+      method: 'turn/started', params: { threadId: 'thread-existing', turn: turn('turn-stream', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-stream', startedAtMs: 1,
+        item: {
+          type: 'commandExecution', id: 'cmd-stream', command: 'printf data > output.txt',
+          cwd: '/tmp/project', processId: null, source: 'agent', status: 'inProgress',
+          commandActions: [], aggregatedOutput: null, exitCode: null, durationMs: null,
+        },
+      },
+    });
+    transport.emit({
+      method: 'item/commandExecution/outputDelta',
+      params: { threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'cmd-stream', delta: 'one' },
+    });
+    transport.emit({
+      method: 'item/commandExecution/outputDelta',
+      params: { threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'cmd-stream', delta: 'two' },
+    });
+    transport.emit({
+      method: 'item/fileChange/patchUpdated',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'patch-stream',
+        changes: [{ path: 'src/new.ts', kind: { type: 'add' }, diff: 'one\ntwo' }],
+      },
+    });
+    transport.emit({
+      method: 'item/mcpToolCall/progress',
+      params: { threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'mcp-stream', message: 'opening' },
+    });
+    transport.emit({
+      method: 'item/mcpToolCall/progress',
+      params: { threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'mcp-stream', message: 'done' },
+    });
+    transport.emit({
+      method: 'item/plan/delta',
+      params: { threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'plan', delta: 'First\n' },
+    });
+    transport.emit({
+      method: 'item/plan/delta',
+      params: { threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'plan', delta: 'Second\n' },
+    });
+    transport.emit({
+      method: 'turn/plan/updated',
+      params: { threadId: 'thread-existing', turnId: 'turn-stream', explanation: null, plan: [] },
+    });
+    transport.emit({
+      method: 'thread/compacted', params: { threadId: 'thread-existing', turnId: 'turn-stream' },
+    });
+    transport.emit({
+      method: 'thread/compacted', params: { threadId: 'thread-existing', turnId: 'turn-stream' },
+    });
+    const parts = surface.getSnapshot().messages.flatMap((message) => message.parts);
+    expect(parts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'cmd-stream', body: 'onetwo' }),
+      expect.objectContaining({ id: 'patch-stream', status: 'running' }),
+      expect.objectContaining({ id: 'mcp-stream', body: 'opening\ndone' }),
+    ]));
+    expect(surface.getSnapshot().messages.filter((message) => message.kind === 'compaction')).toHaveLength(1);
+
+    transport.emit({
+      id: 'ask-cancel', method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-stream', itemId: 'ask-cancel-item', autoResolutionMs: 60_000,
+        questions: [{ id: 'q', header: 'Q', question: 'Answer?', isOther: false, isSecret: true, options: null }],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().messages.some((message) => (
+      message.parts.some((part) => part.type === 'tool' && part.id === 'ask-cancel-item')
+    ))).toBe(true));
+    await surface.respondToClientRequest({ id: 'ask-cancel', payload: { cancelled: true } });
+    expect(lastResponse(transport, 'ask-cancel')).toMatchObject({ result: { answers: {} } });
+    await expect(surface.respondToClientRequest({ id: 'ask-cancel' })).rejects.toThrow('Unknown client request');
+
+    for (const [id, decision, persist] of [
+      ['mcp-once', 'allow', null],
+      ['mcp-always', 'always_allow', 'always'],
+      ['mcp-deny', 'deny', null],
+    ] as const) {
+      const itemId = `mcp-${id}`;
+      transport.emit({
+        method: 'item/started',
+        params: {
+          threadId: 'thread-existing', turnId: 'turn-stream', startedAtMs: 1,
+          item: {
+            type: 'mcpToolCall', id: itemId, server: 'tools', tool: 'Run', status: 'inProgress',
+            arguments: { path: 'README.md' }, appContext: null, pluginId: null, result: null,
+            error: null, durationMs: null,
+          },
+        },
+      });
+      transport.emit({
+        id, method: 'mcpServer/elicitation/request',
+        params: {
+          threadId: 'thread-existing', turnId: 'turn-stream', serverName: 'tools', mode: 'form',
+          message: '', requestedSchema: { type: 'object', properties: {} },
+          _meta: {
+            codex_approval_kind: 'mcp_tool_call', tool_title: 'Run', persist,
+            tool_params_display: [{ name: 'path', display_name: 'Path', value: { file: 'README.md' } }, null],
+          },
+        },
+      });
+      await vi.waitFor(() => expect(surface.getSnapshot().messages.some((message) => (
+        message.parts.some((part) => (
+          part.type === 'tool'
+          && part.id === itemId
+          && part.metadata?.confirmationRequestId === id
+        ))
+      ))).toBe(true));
+      await surface.respondToClientRequest({ id, payload: { decision } });
+      transport.emit({
+        method: 'item/completed',
+        params: {
+          threadId: 'thread-existing', turnId: 'turn-stream', completedAtMs: 2,
+          item: {
+            type: 'mcpToolCall', id: itemId, server: 'tools', tool: 'Run',
+            status: decision === 'deny' ? 'failed' : 'completed', arguments: { path: 'README.md' },
+            appContext: null, pluginId: null, result: null, error: null, durationMs: 1,
+          },
+        },
+      });
+    }
+    expect(lastResponse(transport, 'mcp-once')).toMatchObject({ result: { action: 'accept', _meta: null } });
+    expect(lastResponse(transport, 'mcp-always')).toMatchObject({ result: { _meta: { persist: 'always' } } });
+    expect(lastResponse(transport, 'mcp-deny')).toMatchObject({ result: { action: 'decline' } });
+  });
+
+  it('rejects invalid sends and ignores interrupts without an active turn', async () => {
+    const { surface } = createSurface();
+    await surface.connect();
+    await expect(surface.sendMessage('   ')).rejects.toThrow('empty message');
+    await expect(surface.interrupt()).resolves.toMatchObject({ busy: false });
+    await expect(surface.resolveApproval('missing', 'deny')).rejects.toThrow('Unknown approval');
+  });
+
+  it('adapts server approval requests and resolves them through one surface API', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+
+    transport.emit({
+      id: 90,
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-1', itemId: 'command-1', startedAtMs: 1,
+        command: 'npm test', cwd: '/tmp/project', reason: 'Run tests', environmentId: null,
+        networkApprovalContext: { host: 'registry.npmjs.org', protocol: 'https' },
+        additionalPermissions: {
+          network: { enabled: true },
+          fileSystem: {
+            read: null,
+            write: null,
+            entries: [{ path: { type: 'glob_pattern', pattern: '/tmp/results/**' }, access: 'write' }],
+          },
+        },
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    expect(surface.getSnapshot().busy).toBe(true);
+    expect(surface.getSnapshot().approvals[0]).toMatchObject({
+      id: '90', kind: 'command', title: 'Run command', command: 'npm test',
+      requestedPermissions: [
+        { kind: 'network', enabled: true, host: 'registry.npmjs.org', protocol: 'https' },
+        { kind: 'filesystem', access: 'write', path: '/tmp/results/**' },
+      ],
+    });
+    await surface.resolveApproval('90', 'approve', 'session');
+    expect(lastResponse(transport, 90)).toMatchObject({ result: { decision: 'acceptForSession' } });
+
+    transport.emit({
+      id: 'patch-1', method: 'item/fileChange/requestApproval',
+      params: { threadId: 'thread-existing', turnId: 'turn-1', itemId: 'patch-item', startedAtMs: 1, grantRoot: '/tmp/project' },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('patch-1', 'deny');
+    expect(lastResponse(transport, 'patch-1')).toMatchObject({ result: { decision: 'decline' } });
+
+    transport.emit({
+      id: 91, method: 'item/permissions/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-1', itemId: 'permissions-1', startedAtMs: 1,
+        environmentId: null, cwd: '/tmp/project', reason: null,
+        permissions: {
+          network: { enabled: null },
+          fileSystem: {
+            read: ['/tmp'],
+            write: ['/tmp'],
+            entries: [
+              { path: { type: 'path', path: '/var/log' }, access: 'read' },
+              { path: { type: 'special', value: { kind: 'root' } }, access: 'deny' },
+              { path: { type: 'special', value: { kind: 'minimal' } }, access: 'read' },
+              { path: { type: 'special', value: { kind: 'project_roots', subpath: 'src' } }, access: 'write' },
+              { path: { type: 'special', value: { kind: 'tmpdir' } }, access: 'write' },
+              { path: { type: 'special', value: { kind: 'slash_tmp' } }, access: 'write' },
+              { path: { type: 'special', value: { kind: 'unknown', path: '/private', subpath: 'cache' } }, access: 'write' },
+            ],
+          },
+        },
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    expect(surface.getSnapshot().approvals[0]?.requestedPermissions).toStrictEqual([
+      { kind: 'network', enabled: false },
+      { kind: 'filesystem', access: 'read', path: '/tmp' },
+      { kind: 'filesystem', access: 'write', path: '/tmp' },
+      { kind: 'filesystem', access: 'read', path: '/var/log' },
+      { kind: 'filesystem', access: 'deny', path: 'filesystem root' },
+      { kind: 'filesystem', access: 'read', path: 'minimal runtime paths' },
+      { kind: 'filesystem', access: 'write', path: 'project roots/src' },
+      { kind: 'filesystem', access: 'write', path: 'system temporary directory' },
+      { kind: 'filesystem', access: 'write', path: '/tmp' },
+      { kind: 'filesystem', access: 'write', path: '/private/cache' },
+    ]);
+    await surface.resolveApproval('91', 'approve');
+    expect(lastResponse(transport, 91)).toMatchObject({ result: { scope: 'turn' } });
+
+    transport.emit({
+      id: 92, method: 'item/permissions/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-1', itemId: 'permissions-2', startedAtMs: 1,
+        environmentId: null, cwd: '/tmp/project', reason: 'Use network',
+        permissions: { fileSystem: null, network: { enabled: true } },
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('92', 'deny', 'session');
+    expect(lastResponse(transport, 92)).toMatchObject({ result: { permissions: {}, scope: 'session' } });
+
+    transport.emit({
+      id: 'legacy-command', method: 'execCommandApproval',
+      params: {
+        conversationId: 'thread-existing', callId: 'legacy-command-item', approvalId: null,
+        command: ['npm', 'test'], cwd: '/tmp/project', reason: 'Verify', parsedCmd: [],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('legacy-command', 'approve');
+    expect(lastResponse(transport, 'legacy-command')).toMatchObject({ result: { decision: 'approved' } });
+
+    transport.emit({
+      id: 'legacy-patch', method: 'applyPatchApproval',
+      params: {
+        conversationId: 'thread-existing', callId: 'legacy-patch-item', fileChanges: {},
+        reason: null, grantRoot: '/tmp/project',
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    expect(surface.getSnapshot().approvals[0]?.description).toBe('Write under /tmp/project');
+    await surface.resolveApproval('legacy-patch', 'approve', 'session');
+    expect(lastResponse(transport, 'legacy-patch')).toMatchObject({ result: { decision: 'approved_for_session' } });
+
+    transport.emit({
+      id: 93, method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-1', itemId: 'command-2', startedAtMs: 1,
+        command: null, cwd: null, reason: null, environmentId: null,
+        availableDecisions: ['accept', 'cancel'],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    expect(surface.getSnapshot().approvals[0]).toMatchObject({ allowedScopes: ['once'], canDeny: true });
+    await expect(surface.resolveApproval('93', 'approve', 'session')).rejects.toThrow(
+      "Approval decision 'approve:session' is not available",
+    );
+    await surface.resolveApproval('93', 'deny');
+    expect(lastResponse(transport, 93)).toMatchObject({ result: { decision: 'cancel' } });
+
+    transport.emit({
+      id: 'patch-2', method: 'item/fileChange/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-1', itemId: 'patch-item-2', startedAtMs: 1,
+        reason: 'Update generated files', grantRoot: null,
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('patch-2', 'approve', 'session');
+    expect(lastResponse(transport, 'patch-2')).toMatchObject({ result: { decision: 'acceptForSession' } });
+
+    transport.emit({
+      id: 94, method: 'item/permissions/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-1', itemId: 'permissions-3', startedAtMs: 1,
+        environmentId: null, cwd: '/tmp/project', reason: 'Use network',
+        permissions: { fileSystem: null, network: { enabled: true } },
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('94', 'approve', 'session');
+    expect(lastResponse(transport, 94)).toMatchObject({ result: { scope: 'session' } });
+
+    transport.emit({
+      id: 'legacy-command-deny', method: 'execCommandApproval',
+      params: {
+        conversationId: 'thread-existing', callId: 'legacy-command-deny-item', approvalId: null,
+        command: ['false'], cwd: '/tmp/project', reason: null, parsedCmd: [],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('legacy-command-deny', 'deny');
+    expect(lastResponse(transport, 'legacy-command-deny')).toMatchObject({ result: { decision: 'denied' } });
+
+    transport.emit({
+      id: 'legacy-patch-deny', method: 'applyPatchApproval',
+      params: {
+        conversationId: 'thread-existing', callId: 'legacy-patch-deny-item', fileChanges: {},
+        reason: 'Review changes', grantRoot: null,
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('legacy-patch-deny', 'deny');
+    expect(lastResponse(transport, 'legacy-patch-deny')).toMatchObject({ result: { decision: 'denied' } });
+
+    transport.emit({
+      id: 'legacy-patch-once', method: 'applyPatchApproval',
+      params: {
+        conversationId: 'thread-existing', callId: 'legacy-patch-once-item', fileChanges: {},
+        reason: null, grantRoot: null,
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    await surface.resolveApproval('legacy-patch-once', 'approve');
+    expect(lastResponse(transport, 'legacy-patch-once')).toMatchObject({ result: { decision: 'approved' } });
+  });
+
+});

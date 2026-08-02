@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import ChatMentionChip from '../../../src/vue/chat/ChatMentionChip.vue';
 import ChatComposerAtMentionMenu from '../../../src/vue/chat/ChatComposerAtMentionMenu.vue';
 import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../../src/vue/chat/ChatRichTextEditor.vue';
@@ -103,6 +103,79 @@ describe('ChatRichTextEditor', () => {
     expect(element.scrollTop).toBe(96);
   });
 
+  it('scrolls an inserted line at a middle caret only when it leaves the viewport', () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      attachTo: document.body,
+      props: { modelValue: 'one\ntwo\nthree\nfour' },
+    });
+    const element = wrapper.get('[role="textbox"]').element as HTMLElement;
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+    const originalRangeRect = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect');
+    const editorRect = vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(domRect(20, 80));
+
+    try {
+      Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+        configurable: true,
+        value: vi.fn(() => domRect(100, 120)),
+      });
+      element.scrollTop = 5;
+      richEditor.setCaret('one\ntwo\n'.length);
+      richEditor.insertTextAtSelection('\n');
+      expect(element.scrollTop).toBe(45);
+
+      Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+        configurable: true,
+        value: vi.fn(() => domRect(0, 10)),
+      });
+      element.scrollTop = 30;
+      richEditor.setCaret('one'.length);
+      richEditor.insertTextAtSelection('\n');
+      expect(element.scrollTop).toBe(10);
+    } finally {
+      editorRect.mockRestore();
+      if (originalRangeRect) Object.defineProperty(Range.prototype, 'getBoundingClientRect', originalRangeRect);
+      else Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect');
+      wrapper.unmount();
+    }
+  });
+
+  it('keeps unmatched and code-wrapped mentions as text and prefers plugins over same-name files', () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      props: {
+        files: [{ name: 'shared', path: 'shared' }],
+        modelValue: '`@shared` @missing @shared $missing',
+        plugins: [{ id: 'shared@remote', name: 'shared', displayName: 'Shared plugin', enabled: true }],
+      },
+    });
+
+    expect(wrapper.findAll('[data-plugin-name="shared"]')).toHaveLength(1);
+    expect(wrapper.find('[data-file-mention="shared"]').exists()).toBe(false);
+    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText())
+      .toBe('`@shared` @missing @shared $missing');
+  });
+
+  it('supports disabled editors, focus-free text replacement, and invalid external selections', () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      props: { disabled: true, modelValue: 'initial', placeholder: 'Ask Codex' },
+    });
+    const element = wrapper.get('[role="textbox"]');
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+    const outside = document.createTextNode('outside');
+    document.body.append(outside);
+    const range = document.createRange();
+    range.setStart(outside, 0);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    expect(element.attributes('contenteditable')).toBe('false');
+    expect(element.attributes('data-placeholder')).toBe('Ask Codex');
+    expect(richEditor.getSelectionRange().valid).toBe(false);
+    richEditor.setText('replacement', 3, { focus: false });
+    expect(richEditor.readText()).toBe('replacement');
+    outside.remove();
+  });
+
   it('emits canonical text when a chip is deleted from the editable DOM', async () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: { modelValue: 'use $cp now', skills: [skill] },
@@ -113,3 +186,17 @@ describe('ChatRichTextEditor', () => {
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['use  now']);
   });
 });
+
+function domRect(top: number, bottom: number): DOMRect {
+  return {
+    bottom,
+    height: bottom - top,
+    left: 0,
+    right: 100,
+    top,
+    width: 100,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  };
+}

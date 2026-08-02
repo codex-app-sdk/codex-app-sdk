@@ -9,7 +9,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'src/**/*.vue'],
-      exclude: ['src/codex/generated/**', 'src/codex/method-map.ts', 'src/codex/schema-version.ts'],
+      exclude: ['src/codex/generated/**', 'src/codex/method-map.ts', 'src/codex/schema-version.ts', 'tests/**'],
       thresholds: {
         statements: 85,
         branches: 85,
