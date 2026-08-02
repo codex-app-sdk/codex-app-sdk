@@ -75,6 +75,7 @@ defineProps<{
 }
 
 .chat-tool-call__title svg {
+  flex-shrink: 0;
   width: 15px;
   height: 15px;
 }

@@ -22,8 +22,14 @@ describe('component lab', () => {
     expect(wrapper.text()).toContain('Explored src/vue');
     expect(wrapper.find('.tabler-icon-eye').exists()).toBe(true);
     expect(wrapper.find('.tabler-icon-tool').exists()).toBe(true);
-    const steer = wrapper.get('.chat-message:has(.chat-message--steer)');
-    const messageHeader = steer.get('.lab-message-header');
+    const steer = wrapper.findAll('.chat-message')
+      .find((message) => message.text().includes('Message from codex-claw'));
+    expect(steer).toBeDefined();
+    if (!steer) return;
+    const messageHeader = steer.findAll('.chat-message--steer')
+      .find((header) => header.text().includes('Message from codex-claw'));
+    expect(messageHeader).toBeDefined();
+    if (!messageHeader) return;
     expect(messageHeader.text()).toBe('Message from codex-claw');
     expect(steer.text()).toContain('Steered conversation');
     expect(steer.text()).toContain('Focus on the attachment renderer first.');
@@ -55,7 +61,7 @@ describe('component lab', () => {
       ['Listed src/vue/chat', 'folder'],
       ['Updated plan', 'list-details'],
       ['Read README.md', 'file-text'],
-      ['Ran npm test', 'terminal'],
+      ['Ran /bin/bash -lc "npm test && npm run typecheck && npm run build"', 'terminal'],
       ['Searched registerCodexToolTitlePresenter', 'search'],
       ['Opened in-app browser', 'lab-browser-tool-icon'],
       ['Claw synchronization complete', 'tool'],
