@@ -93,6 +93,31 @@ function autoResize(): void {
   element.style.height = `${Math.min(element.scrollHeight, props.maxHeight)}px`;
 }
 
+function scrollCaretIntoView(): void {
+  const element = editor.value;
+  if (!element) return;
+
+  // A collapsed range after a trailing BR does not consistently expose a box
+  // in Chromium. At the end of the draft, scrolling to the content bottom is
+  // both exact and avoids waiting for the next native input event.
+  if (caretPosition.value >= readText().length) {
+    element.scrollTop = element.scrollHeight;
+    return;
+  }
+
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  if (!element.contains(range.startContainer) || typeof range.getBoundingClientRect !== 'function') return;
+  const caretRect = range.getBoundingClientRect();
+  const editorRect = element.getBoundingClientRect();
+  if (caretRect.bottom > editorRect.bottom) {
+    element.scrollTop += caretRect.bottom - editorRect.bottom;
+  } else if (caretRect.top < editorRect.top) {
+    element.scrollTop -= editorRect.top - caretRect.top;
+  }
+}
+
 function readText(): string {
   return editor.value
     ? Array.from(editor.value.childNodes).map(canonicalNodeText).join('')
@@ -272,6 +297,7 @@ function renderText(value: string, caret = caretPosition.value, options: { focus
   element.replaceChildren(fragment);
   setCaret(Math.min(caret, value.length), { focus: shouldFocus });
   autoResize();
+  scrollCaretIntoView();
 }
 
 function appendTextNode(parent: Node, value: string): void {

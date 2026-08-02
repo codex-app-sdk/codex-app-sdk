@@ -85,6 +85,24 @@ describe('ChatRichTextEditor', () => {
     wrapper.unmount();
   });
 
+  it('scrolls a trailing inserted newline into view at max height', () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      props: {
+        modelValue: 'one\ntwo\nthree',
+        maxHeight: 48,
+      },
+    });
+    const element = wrapper.get('[role="textbox"]').element as HTMLElement;
+    Object.defineProperty(element, 'scrollHeight', { configurable: true, value: 96 });
+    element.scrollTop = 0;
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+
+    richEditor.setCaret('one\ntwo\nthree'.length);
+    richEditor.insertTextAtSelection('\n');
+
+    expect(element.scrollTop).toBe(96);
+  });
+
   it('emits canonical text when a chip is deleted from the editable DOM', async () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: { modelValue: 'use $cp now', skills: [skill] },
