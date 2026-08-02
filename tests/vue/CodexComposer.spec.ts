@@ -9,12 +9,14 @@ import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../src/vu
 import { codexCommands } from '../../src/vue/chat/codex-commands';
 import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../../src/vue/chat/contracts';
 import type { CodexSurfacePlugin } from '../../src/surface';
+import type { CodexComposerState } from '../../src/vue/composer-state';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),
 }));
 
 type ChatComposerProps = {
+  composerState?: CodexComposerState;
   disabled: boolean;
   draft?: string;
   draftRevision?: number;
@@ -103,6 +105,34 @@ describe('ChatComposer', () => {
     await nextTick();
 
     expect(editorValue(wrapper)).toBe('quoted prompt');
+  });
+
+  it('emits controlled text and caret state for rich-editor input', async () => {
+    const wrapper = mountComposer();
+
+    await setEditorValue(wrapper, 'hello');
+
+    expect(wrapper.emitted('update:composerState')?.at(-1)).toStrictEqual([{
+      text: 'hello', selectionStart: 5, selectionEnd: 5,
+    }]);
+  });
+
+  it('emits selection-only changes and state after programmatic insertion', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'hello world');
+    const richEditor = richEditorVm(wrapper);
+
+    richEditor.setSelection(0, 5);
+    expect(wrapper.emitted('update:composerState')?.at(-1)).toStrictEqual([{
+      text: 'hello world', selectionStart: 0, selectionEnd: 5,
+    }]);
+
+    richEditor.setCaret(5);
+    richEditor.insertTextAtSelection('!');
+    await nextTick();
+    expect(wrapper.emitted('update:composerState')?.at(-1)).toStrictEqual([{
+      text: 'hello! world', selectionStart: 6, selectionEnd: 6,
+    }]);
   });
 
   it('caps the growing editor at three composer lines', async () => {

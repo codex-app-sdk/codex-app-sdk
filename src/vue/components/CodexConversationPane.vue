@@ -48,6 +48,7 @@
         <template v-if="$slots['message-actions']" #actions="scope"><slot name="message-actions" v-bind="scope" /></template>
         <template v-if="$slots['message-attachment']" #attachment="scope"><slot name="message-attachment" v-bind="scope" /></template>
         <template v-if="$slots['message-block']" #block="scope"><slot name="message-block" v-bind="scope" /></template>
+        <template v-if="$slots['message-header']" #header="scope"><slot name="message-header" v-bind="scope" /></template>
         <template v-if="$slots['message-status']" #status="scope"><slot name="message-status" v-bind="scope" /></template>
         <template v-if="$slots['message-text']" #text="scope"><slot name="message-text" v-bind="scope" /></template>
         <template v-if="$slots['message-thinking']" #thinking="scope"><slot name="message-thinking" v-bind="scope" /></template>
@@ -125,6 +126,7 @@
             :attach-enabled="effectiveAttachEnabled"
             :capabilities="effectiveCapabilities"
             :commands="effectiveCommands"
+            :composer-state="localComposerState"
             :context-usage="effectiveContextUsage"
             :disabled="effectiveDisabled"
             :draft="localDraft"
@@ -152,6 +154,7 @@
             @send="submit"
             @steer="steer"
             @update:model-id="updateModelId"
+            @update:composer-state="updateComposerState"
             @update:plan-mode="updatePlanMode"
             @update:reasoning-effort="updateReasoningEffort"
           >
@@ -213,6 +216,8 @@ import {
   type CodexAttachmentPicker,
 } from '../native-capabilities';
 import type { CodexSurfaceController } from '../use-codex-surface';
+import type { CodexComposerState } from '../composer-state';
+import { normalizeCodexComposerState } from '../composer-state';
 import ChatComposerShelf from '../chat/ChatComposerShelf.vue';
 import CodexComposer from './CodexComposer.vue';
 import CodexApprovalPrompt from './CodexApprovalPrompt.vue';
@@ -235,6 +240,7 @@ const props = withDefaults(defineProps<{
   canEditMessage?: boolean;
   canRetryMessage?: boolean;
   commands?: readonly CodexCommandSummary[];
+  composerState?: CodexComposerState;
   contextUsage?: CodexContextUsage | null;
   conversationKey?: string | number | null;
   disabled?: boolean;
@@ -305,6 +311,7 @@ defineSlots<{
     message: Message;
   }): unknown;
   'message-block'(props: { block: MessageBlock; blockIndex: number; index: number; message: Message }): unknown;
+  'message-header'(props: { index: number; message: Message }): unknown;
   'message-status'(props: { index: number; message: Message; status: 'streaming' }): unknown;
   'message-text'(props: { block: Extract<MessageBlock, { type: 'text' | 'user-text' }>; content: string; index: number; message: Message; user: boolean }): unknown;
   'message-thinking'(props: { index: number; message: Message }): unknown;
@@ -345,13 +352,20 @@ const emit = defineEmits<{
   steer: [prompt: string];
   steerQueuedPrompt: [promptId: string];
   'update:modelId': [modelId: string];
+  'update:composerState': [state: CodexComposerState];
   'update:modelValue': [value: string];
   'update:planMode': [enabled: boolean];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
 }>();
 
 const draftRevision = ref(0);
-const localDraft = ref(props.modelValue);
+const initialComposerState = normalizeCodexComposerState(props.composerState ?? {
+  text: props.modelValue,
+  selectionStart: props.modelValue.length,
+  selectionEnd: props.modelValue.length,
+});
+const localComposerState = ref<CodexComposerState>(initialComposerState);
+const localDraft = ref(initialComposerState.text);
 const localError = ref<string | null>(null);
 const selectedAttachments = ref<CodexNativeAttachment[]>([...props.attachments]);
 const surfaceState = computed(() => props.surface?.state);
@@ -421,9 +435,23 @@ const started = computed(() => (
 ));
 
 watch(() => props.modelValue, () => {
+  if (props.composerState) return;
   localDraft.value = props.modelValue;
+  localComposerState.value = {
+    text: props.modelValue,
+    selectionStart: props.modelValue.length,
+    selectionEnd: props.modelValue.length,
+  };
   draftRevision.value += 1;
 }, { immediate: true });
+
+watch(() => props.composerState, (state) => {
+  if (!state) return;
+  const normalized = normalizeCodexComposerState(state);
+  localComposerState.value = normalized;
+  localDraft.value = normalized.text;
+  draftRevision.value += 1;
+}, { deep: true, immediate: true });
 
 watch(() => props.attachments, (attachments) => {
   selectedAttachments.value = [...attachments];
@@ -435,10 +463,15 @@ watch(effectiveAttachEnabled, (enabled) => {
 
 watch(effectiveConversationKey, () => {
   localError.value = null;
-  localDraft.value = '';
+  const incoming = normalizeCodexComposerState(props.composerState ?? {
+    text: props.modelValue,
+    selectionStart: props.modelValue.length,
+    selectionEnd: props.modelValue.length,
+  });
+  localComposerState.value = incoming;
+  localDraft.value = incoming.text;
   selectedAttachments.value = [];
   draftRevision.value += 1;
-  emit('update:modelValue', '');
   emit('attachmentsChange', []);
 });
 
@@ -591,9 +624,16 @@ function sendOptionsForAttachments(
 }
 
 function updateDraft(value: string): void {
-  localDraft.value = value;
-  emit('update:modelValue', value);
+  updateComposerState({ text: value, selectionStart: value.length, selectionEnd: value.length });
   draftRevision.value += 1;
+}
+
+function updateComposerState(state: CodexComposerState): void {
+  const normalized = normalizeCodexComposerState(state);
+  localComposerState.value = normalized;
+  localDraft.value = normalized.text;
+  emit('update:modelValue', normalized.text);
+  emit('update:composerState', normalized);
 }
 
 function cancel(): void {

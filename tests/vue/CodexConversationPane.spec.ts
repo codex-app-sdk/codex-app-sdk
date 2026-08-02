@@ -5,6 +5,8 @@ import { h, nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CodexConversationPane,
+  CodexRichTextEditor,
+  type CodexRichTextEditorExpose,
   type CodexComposerMenuItem,
   type CodexNativeAttachment,
   type CodexSurfaceController,
@@ -257,15 +259,31 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('attachmentsChange')).toContainEqual([[]]);
   });
 
-  it('resets the composer draft and attachment queue when conversations change', async () => {
+  it('restores controlled composer text and selection without emitting an empty intermediate state', async () => {
     const wrapper = mount(CodexConversationPane, {
-      props: { conversationKey: 'thread-1', messages, modelValue: '' },
+      props: {
+        composerState: { text: 'thread one draft', selectionStart: 7, selectionEnd: 10 },
+        conversationKey: 'thread-1',
+        messages,
+        modelValue: 'ignored text-only draft',
+      },
     });
-    await setComposerText(wrapper, 'thread one draft');
-    await wrapper.setProps({ conversationKey: 'thread-2' });
+    await nextTick();
+    expect(composerEditor(wrapper).text()).toBe('thread one draft');
 
-    expect(composerEditor(wrapper).text()).toBe('');
-    expect(wrapper.emitted('update:modelValue')).toContainEqual(['']);
+    await wrapper.setProps({
+      composerState: { text: 'thread two draft', selectionStart: 3, selectionEnd: 3 },
+      conversationKey: 'thread-2',
+    });
+    await nextTick();
+
+    expect(composerEditor(wrapper).text()).toBe('thread two draft');
+    expect((wrapper.getComponent(CodexRichTextEditor).vm as unknown as CodexRichTextEditorExpose)
+      .getSelectionRange()).toMatchObject({ start: 3, end: 3 });
+    expect(wrapper.emitted('update:modelValue') ?? []).not.toContainEqual(['']);
+    expect(wrapper.emitted('update:composerState') ?? []).not.toContainEqual([{
+      text: '', selectionStart: 0, selectionEnd: 0,
+    }]);
   });
 
   it('binds directly to a surface controller while preserving controlled mode overrides', async () => {
@@ -536,6 +554,21 @@ describe('CodexConversationPane', () => {
 
     expect(wrapper.get('.custom-tool').text()).toBe('shell');
     expect(wrapper.get('.custom-message-action').text()).toBe('Action 0');
+  });
+
+  it('forwards the additive message-header slot without replacing SDK message rendering', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages, modelValue: '' },
+      slots: {
+        'message-header': ({ message, index }: { message: { id?: string }; index: number }) => (
+          h('div', { class: 'custom-message-header' }, `${message.id}:${index}`)
+        ),
+      },
+    });
+
+    expect(wrapper.get('.custom-message-header').text()).toBe('assistant-1:0');
+    expect(wrapper.text()).toContain('Ready to build');
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
   });
 });
 

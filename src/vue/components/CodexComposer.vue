@@ -140,6 +140,8 @@ import { useChatComposerSuggestions } from '../chat/use-chat-composer-suggestion
 import { useChatComposerVoice } from '../chat/use-chat-composer-voice';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import { getCodexNativeRendererApi } from '../native-capabilities';
+import type { CodexComposerState } from '../composer-state';
+import { normalizeCodexComposerState } from '../composer-state';
 
 const props = defineProps<{
   autofocus?: boolean;
@@ -152,6 +154,7 @@ const props = defineProps<{
   plugins?: readonly CodexSurfacePlugin[];
   capabilities?: CodexCapabilities;
   commands?: readonly CodexCommandSummary[];
+  composerState?: CodexComposerState;
   isSending: boolean;
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -175,6 +178,7 @@ const emit = defineEmits<{
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
   interrupt: [];
   'update:modelId': [modelId: string];
+  'update:composerState': [state: CodexComposerState];
   selectApprovalPreset: [preset: ApprovalPreset];
   'update:planMode': [enabled: boolean];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
@@ -183,6 +187,10 @@ const emit = defineEmits<{
 const prompt = ref('');
 const editorEl = ref<CodexRichTextEditorExpose | null>(null);
 const caretPosition = ref(0);
+const selectionStart = ref(0);
+const selectionEnd = ref(0);
+let restoringComposerState = false;
+let lastEmittedComposerState: CodexComposerState | null = null;
 const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCapabilities);
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
 const voiceVisible = computed(() => (
@@ -255,9 +263,15 @@ const {
   editor: editorEl,
 });
 
+watch(() => props.composerState, (state) => {
+  if (state) restoreComposerState(state);
+}, { deep: true, immediate: true });
+
 watch(() => props.draftRevision, () => {
-  setComposerText(props.draft ?? '');
+  if (!props.composerState) setComposerText(props.draft ?? '');
 }, { immediate: props.draftRevision !== undefined });
+
+watch(prompt, () => emitComposerState());
 
 onMounted(() => {
   if (props.autofocus) {
@@ -289,6 +303,9 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   }
 
   prompt.value = '';
+  selectionStart.value = 0;
+  selectionEnd.value = 0;
+  caretPosition.value = 0;
   closeComposerMenus();
   if (intent === 'send') {
     emit('send', trimmed);
@@ -315,6 +332,8 @@ function insertTranscript(text: string): void {
   const nextCaret = before.length + insertion.length;
   prompt.value = `${before}${insertion}${after}`;
   caretPosition.value = nextCaret;
+  selectionStart.value = nextCaret;
+  selectionEnd.value = nextCaret;
   closeComposerMenus();
   void nextTick(() => {
     editorEl.value?.setCaret(nextCaret);
@@ -323,14 +342,26 @@ function insertTranscript(text: string): void {
 }
 
 function setComposerText(value: string): void {
-  prompt.value = value;
-  const nextCaret = value.length;
-  caretPosition.value = nextCaret;
+  restoreComposerState({ text: value, selectionStart: value.length, selectionEnd: value.length });
+}
+
+function restoreComposerState(state: CodexComposerState): void {
+  const normalized = normalizeCodexComposerState(state);
+  restoringComposerState = true;
+  prompt.value = normalized.text;
+  selectionStart.value = normalized.selectionStart;
+  selectionEnd.value = normalized.selectionEnd;
+  caretPosition.value = normalized.selectionEnd;
   closeComposerMenus();
   void nextTick(() => {
-    if (prompt.value !== value) return;
-    editorEl.value?.setText(value, nextCaret, { focus: true });
+    if (prompt.value !== normalized.text) {
+      restoringComposerState = false;
+      return;
+    }
+    editorEl.value?.setText(normalized.text, normalized.selectionEnd, { focus: false });
+    editorEl.value?.setSelection(normalized.selectionStart, normalized.selectionEnd, { focus: false });
     resizeEditor();
+    restoringComposerState = false;
   });
 }
 
@@ -375,8 +406,26 @@ function handleEditorInput(): void {
   syncComposerMenus();
 }
 
-function handleCaretChange(range: { end: number }): void {
+function handleCaretChange(range: { end: number; start: number }): void {
+  selectionStart.value = range.start;
+  selectionEnd.value = range.end;
   updateCaretPosition(range);
+  emitComposerState();
+}
+
+function emitComposerState(): void {
+  if (restoringComposerState) return;
+  const state = normalizeCodexComposerState({
+    text: prompt.value,
+    selectionStart: selectionStart.value,
+    selectionEnd: selectionEnd.value,
+  });
+  if (lastEmittedComposerState
+    && lastEmittedComposerState.text === state.text
+    && lastEmittedComposerState.selectionStart === state.selectionStart
+    && lastEmittedComposerState.selectionEnd === state.selectionEnd) return;
+  lastEmittedComposerState = state;
+  emit('update:composerState', state);
 }
 
 function handleEditorPaste(event: ClipboardEvent): void {
@@ -390,6 +439,9 @@ function handleEditorPaste(event: ClipboardEvent): void {
 }
 
 function focusAt(caret: number): void {
+  selectionStart.value = caret;
+  selectionEnd.value = caret;
+  caretPosition.value = caret;
   void nextTick(() => {
     editorEl.value?.setCaret(caret);
     resizeEditor();

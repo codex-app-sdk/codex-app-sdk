@@ -19,6 +19,7 @@
     :class="[`chat-message--${chatMessage.role}`, { 'chat-message--editing': isEditing }]"
   >
     <div class="chat-message__body">
+      <slot name="header" :index="index" :message="chatMessage" />
       <div
         v-if="userAttachmentBlocks.length > 0"
         class="chat-message__attachments"
@@ -160,6 +161,7 @@ const props = withDefaults(defineProps<{
 
 defineSlots<{
   actions(props: { disabled: boolean; index: number; message: Message }): unknown
+  header(props: { index: number; message: Message }): unknown
   attachment(props: {
     attachment: Extract<MessageBlock, { type: 'attachment' }>['attachment']
     block: Extract<MessageBlock, { type: 'attachment' }>

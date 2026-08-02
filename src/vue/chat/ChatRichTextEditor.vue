@@ -26,6 +26,7 @@ export type CodexRichTextEditorExpose = {
   insertTextAtSelection: (value: string) => void;
   readText: () => string;
   setCaret: (position: number, options?: { focus?: boolean }) => void;
+  setSelection: (start: number, end: number, options?: { focus?: boolean }) => void;
   setText: (value: string, caret?: number, options?: { focus?: boolean }) => void;
 };
 
@@ -67,8 +68,21 @@ watch(() => [props.files, props.plugins, props.skills], () => {
   renderText(props.modelValue, Math.min(caretPosition.value, props.modelValue.length));
 }, { deep: true });
 
-onMounted(() => renderText(props.modelValue, props.modelValue.length, { focus: false }));
-onBeforeUnmount(unmountChipHosts);
+onMounted(() => {
+  renderText(props.modelValue, props.modelValue.length, { focus: false });
+  document.addEventListener('selectionchange', handleDocumentSelectionChange);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('selectionchange', handleDocumentSelectionChange);
+  unmountChipHosts();
+});
+
+function handleDocumentSelectionChange(): void {
+  const selection = getSelectionRange();
+  if (!selection.valid) return;
+  caretPosition.value = selection.end;
+  emit('caret-change', selection);
+}
 
 function onInput(): void {
   const selection = getSelectionRange();
@@ -223,18 +237,26 @@ function isChipHost(node: Node): node is HTMLElement {
 }
 
 function setCaret(position: number, options: { focus?: boolean } = {}): void {
+  setSelection(position, position, options);
+}
+
+function setSelection(start: number, end: number, options: { focus?: boolean } = {}): void {
   const element = editor.value;
   if (!element) return;
   if (options.focus !== false) element.focus();
-  const target = domPositionForCanonicalOffset(element, position);
+  const length = readText().length;
+  const nextStart = Math.max(0, Math.min(start, length));
+  const nextEnd = Math.max(nextStart, Math.min(end, length));
+  const startTarget = domPositionForCanonicalOffset(element, nextStart);
+  const endTarget = domPositionForCanonicalOffset(element, nextEnd);
   const range = document.createRange();
-  range.setStart(target.node, target.offset);
-  range.collapse(true);
+  range.setStart(startTarget.node, startTarget.offset);
+  range.setEnd(endTarget.node, endTarget.offset);
   const selection = window.getSelection();
   selection?.removeAllRanges();
   selection?.addRange(range);
-  caretPosition.value = position;
-  emit('caret-change', { end: position, start: position, valid: true });
+  caretPosition.value = nextEnd;
+  emit('caret-change', { end: nextEnd, start: nextStart, valid: true });
 }
 
 function setText(value: string, caret = value.length, options: { focus?: boolean } = {}): void {
@@ -377,6 +399,7 @@ defineExpose<CodexRichTextEditorExpose>({
   insertTextAtSelection,
   readText,
   setCaret,
+  setSelection,
   setText,
 });
 </script>

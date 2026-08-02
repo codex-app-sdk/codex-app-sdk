@@ -2,6 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { h } from 'vue';
 import ChatCompactionMessage from '../../src/vue/chat/ChatCompactionMessage.vue';
 import CodexMessage from '../../src/vue/components/CodexMessage.vue';
 import ChatMessageEditor from '../../src/vue/chat/ChatMessageEditor.vue';
@@ -29,6 +30,25 @@ function mountMessage(props: Record<string, unknown>) {
 }
 
 describe('CodexMessage', () => {
+  it('renders an additive header once above default content while preserving actions', async () => {
+    const wrapper = mount(CodexMessage, {
+      props: { index: 2, message: { id: 'user-header', role: 'user', content: 'Keep SDK rendering' } },
+      slots: {
+        header: ({ index }: { index: number }) => h('div', { class: 'test-message-header' }, `Header ${index}`),
+      },
+    });
+
+    expect(wrapper.findAll('.test-message-header')).toHaveLength(1);
+    expect(wrapper.get('.test-message-header').text()).toBe('Header 2');
+    expect(wrapper.get('.chat-message-block--text').text()).toContain('Keep SDK rendering');
+    expect(wrapper.get('.test-message-header').element.compareDocumentPosition(
+      wrapper.get('.chat-message__stack').element,
+    ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await wrapper.get('[aria-label="Quote"]').trigger('click');
+    expect(wrapper.emitted('quote-message')).toStrictEqual([[2]]);
+  });
+
   it('delegates compaction presentation to the dedicated component', () => {
     const wrapper = mountMessage({
       message: { role: 'assistant', content: '', compactionStatus: 'running', type: 'compaction' },
