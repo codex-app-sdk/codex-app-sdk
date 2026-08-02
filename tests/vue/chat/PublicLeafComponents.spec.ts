@@ -16,7 +16,7 @@ import ChatQueuedPrompt from '../../../src/vue/chat/ChatQueuedPrompt.vue';
 import ChatTurnGitInfo from '../../../src/vue/chat/ChatTurnGitInfo.vue';
 
 describe('public conversation leaf components', () => {
-  it('mounts attachment previews independently and falls back to a safe chip', async () => {
+  it('does not use blocked filesystem URLs as image previews', async () => {
     const wrapper = mount(ChatAttachmentBlock, {
       props: {
         attachment: {
@@ -29,8 +29,6 @@ describe('public conversation leaf components', () => {
       },
     });
 
-    expect(wrapper.get('img').attributes('alt')).toBe('diagram.png');
-    await wrapper.get('img').trigger('error');
     expect(wrapper.find('img').exists()).toBe(false);
     expect(wrapper.get('a').attributes('href')).toBe('/tmp/diagram.png');
     expect(wrapper.text()).toContain('diagram.png');

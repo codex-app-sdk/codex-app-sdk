@@ -4,7 +4,7 @@ import type {
   CodexSurfaceSnapshot,
   ListCodexConversationsOptions,
 } from '../surface/types';
-import { codexTurnToSurfaceMessages } from './codex-conversation-history';
+import { codexTurnToSurfaceMessages, preserveHistoricalAttachmentPreviews } from './codex-conversation-history';
 import { normalizedConversationId, errorMessage } from './codex-surface-prompts';
 import { threadToSummary, upsertConversation } from './codex-surface-data';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
@@ -196,7 +196,10 @@ export class CodexSurfaceConversationsController {
     const preservedMessages = current.messages.filter((message) => (
       message.turnId === undefined || !replaceableTurnIds.has(message.turnId)
     ));
-    const messages = historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn));
+    const messages = preserveHistoricalAttachmentPreviews(
+      current.messages,
+      historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn)),
+    );
     this.host.patchRuntime(threadId, {
       turnIds: [...historicalTurns.map((turn) => turn.id), ...preservedTurnIds],
       messages: [...messages, ...preservedMessages],

@@ -799,6 +799,8 @@ defineExpose({ focusComposer });
   min-height: 0;
   overflow: hidden;
   background: var(--color-shell-main);
+  --codex-scroll-to-bottom-offset: calc(var(--workbench-layout-footer-offset, 0px) - var(--space-12) + 4px);
+  --codex-scroll-to-bottom-size: 40px;
   --message-list-content-width: var(--codex-conversation-content-width);
   --message-list-content-padding-top: var(--space-12);
   --message-list-content-padding-bottom: calc(var(--workbench-layout-footer-offset) + var(--space-12));

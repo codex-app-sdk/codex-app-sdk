@@ -61,6 +61,7 @@ export {
   codexItemToToolPart,
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
+  preserveHistoricalAttachmentPreviews,
 } from './codex-conversation-history';
 export {
   resolveAppleSpeechAnalyzerPath,

@@ -4,6 +4,7 @@ import {
   codexItemToSurfaceMessage,
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
+  preserveHistoricalAttachmentPreviews,
 } from '../src/node/codex-conversation-history';
 import type { v2 } from '../src/codex';
 
@@ -56,7 +57,7 @@ describe('codexThreadToSurfaceMessages', () => {
         {
           type: 'attachment',
           attachment: {
-            kind: 'image', name: 'image.png', path: '/tmp/image.png', url: 'file:///tmp/image.png', mimeType: 'image/png',
+            kind: 'image', name: 'image.png', path: '/tmp/image.png', mimeType: 'image/png',
           },
         },
       ],
@@ -91,7 +92,6 @@ describe('codexThreadToSurfaceMessages', () => {
           kind: 'image',
           name: 'resumed.png',
           path: '/tmp/resumed.png',
-          url: 'file:///tmp/resumed.png',
           mimeType: 'image/png',
         },
       }],
@@ -104,6 +104,34 @@ describe('codexThreadToSurfaceMessages', () => {
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'enteredReviewMode', id: 'entered', review: 'changes',
     })).toBeNull();
+  });
+
+  it('preserves bounded data previews while rematerializing local image history', () => {
+    const turn = {
+      id: 'turn', status: 'completed', startedAt: 1, completedAt: 2,
+      items: [{
+        type: 'userMessage', id: 'user', clientId: 'client-user',
+        content: [{ type: 'localImage', path: '/tmp/resumed.png' }],
+      }],
+    } as unknown as v2.Turn;
+    const previous = codexTurnToSurfaceMessages('thread', turn).map((message) => ({
+      ...message,
+      parts: message.parts.map((part) => part.type === 'attachment'
+        ? { ...part, attachment: { ...part.attachment, url: 'data:image/png;base64,cG5n' } }
+        : part),
+    }));
+    const history = codexTurnToSurfaceMessages('thread', turn);
+
+    expect(preserveHistoricalAttachmentPreviews(previous, history)[0]?.parts).toContainEqual({
+      type: 'attachment',
+      attachment: {
+        kind: 'image',
+        name: 'resumed.png',
+        path: '/tmp/resumed.png',
+        mimeType: 'image/png',
+        url: 'data:image/png;base64,cG5n',
+      },
+    });
   });
 
   it('projects completed generated images as first-class media for restored history', () => {

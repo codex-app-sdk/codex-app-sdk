@@ -27,6 +27,42 @@ export function codexThreadToSurfaceMessages(thread: Thread): SurfaceMessage[] {
   return turns.flatMap((turn) => codexTurnToSurfaceMessages(thread.id, turn));
 }
 
+/**
+ * Keep bounded data previews from optimistic messages when app-server history
+ * rematerializes the same user attachment from its local filesystem path.
+ * Filesystem URLs are not renderer-safe in Electron and are intentionally not
+ * used as image sources.
+ */
+export function preserveHistoricalAttachmentPreviews(
+  previousMessages: readonly SurfaceMessage[],
+  historyMessages: readonly SurfaceMessage[],
+): SurfaceMessage[] {
+  const previewsByPath = new Map<string, string>();
+  for (const message of previousMessages) {
+    for (const part of message.parts) {
+      if (part.type !== 'attachment' || part.attachment.kind !== 'image' || !part.attachment.path) continue;
+      if (isRendererSafeImagePreview(part.attachment.url)) {
+        previewsByPath.set(part.attachment.path, part.attachment.url);
+      }
+    }
+  }
+  if (previewsByPath.size === 0) return [...historyMessages];
+
+  return historyMessages.map((message) => {
+    let changed = false;
+    const parts = message.parts.map((part) => {
+      if (part.type !== 'attachment' || part.attachment.kind !== 'image' || !part.attachment.path) {
+        return part;
+      }
+      const previewUrl = previewsByPath.get(part.attachment.path);
+      if (!previewUrl || part.attachment.url === previewUrl) return part;
+      changed = true;
+      return { ...part, attachment: { ...part.attachment, url: previewUrl } };
+    });
+    return changed ? { ...message, parts } : message;
+  });
+}
+
 export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): SurfaceMessage[] {
   const messages: SurfaceMessage[] = [];
   const assistantParts: SurfaceMessagePart[] = [];
@@ -258,7 +294,6 @@ function userInputAttachment(input: unknown): SurfaceMessageAttachment | null {
       kind: 'image',
       name: attachmentName(input.path, 'Image'),
       path: input.path,
-      ...(isAbsolute(input.path) ? { url: pathToFileURL(input.path).href } : {}),
       ...(mimeType ? { mimeType } : {}),
     };
   }
@@ -317,6 +352,14 @@ function imageDataUrl(result: string): { url: string; mimeType: string } | null 
   const mimeType = generatedImageMimeType(bytes);
   if (!mimeType) return null;
   return { url: `data:${mimeType};base64,${compact}`, mimeType };
+}
+
+function isRendererSafeImagePreview(value: string | undefined): value is string {
+  return Boolean(
+    value
+    && value.length <= 16 * 1024 * 1024
+    && /^data:image\/(?:avif|bmp|gif|heic|heif|jpe?g|png|webp);base64,[a-z\d+/]+={0,2}$/i.test(value),
+  );
 }
 
 function generatedImageMimeType(bytes: Uint8Array): string | null {

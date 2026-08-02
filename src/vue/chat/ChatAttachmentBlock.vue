@@ -50,7 +50,7 @@ watch(previewSource, () => {
 function isSafeImageSource(value: string | undefined): value is string {
   if (!value) return false
   if (/^(?:\.\.?\/|\/(?!\/))/.test(value)) return true
-  return /^(?:https?:|file:|blob:)/i.test(value)
+  return /^(?:https?:|blob:)/i.test(value)
     || /^data:image\/(?:avif|bmp|gif|heic|heif|jpe?g|png|webp);base64,/i.test(value)
 }
 
