@@ -65,12 +65,14 @@ describe('ChatModelReasoningSelector', () => {
   it('emits model and reasoning changes from dropdown commands', async () => {
     const wrapper = mountSelector();
     await wrapper.get('.chat-model-selector__button').trigger('click');
-    const choices = wrapper.findAll('[role="menuitemradio"]');
+    await wrapper.get('[data-submenu-id="model"] > button').trigger('click');
+    const modelChoices = wrapper.findAll('[data-submenu-id="model"] [role="menuitemradio"]');
 
-    expect(choices).toHaveLength(5);
-    await choices[0]!.trigger('click');
+    expect(modelChoices).toHaveLength(2);
+    await modelChoices[0]!.trigger('click');
     await wrapper.get('.chat-model-selector__button').trigger('click');
-    await wrapper.findAll('[role="menuitemradio"]')[2]!.trigger('click');
+    await wrapper.get('[data-submenu-id="reasoning"] > button').trigger('click');
+    await wrapper.findAll('[data-submenu-id="reasoning"] [role="menuitemradio"]')[0]!.trigger('click');
 
     expect(wrapper.emitted('update:modelId')).toStrictEqual([['codex-fast']]);
     expect(wrapper.emitted('update:reasoningEffort')).toStrictEqual([['medium']]);
@@ -94,6 +96,15 @@ describe('ChatModelReasoningSelector', () => {
     expect(wrapper.find('.chat-model-selector__leading-icon').exists()).toBe(true);
   });
 
+  it('shows the current model, reasoning effort, and Fast mode state at the menu root', async () => {
+    const wrapper = mountSelector({ modelId: 'codex-max', reasoningEffort: 'xhigh', serviceTier: 'priority' });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+
+    expect(wrapper.get('[data-submenu-id="model"] > button').text()).toContain('5.1 Codex Max');
+    expect(wrapper.get('[data-submenu-id="reasoning"] > button').text()).toContain('Extra High');
+    expect(wrapper.get('[role="menuitemcheckbox"]').attributes('aria-checked')).toBe('true');
+  });
+
   it('keeps disabled controls inert when the model catalog has not loaded', () => {
     const wrapper = mountSelector({
       models: [],
@@ -115,15 +126,16 @@ describe('ChatModelReasoningSelector', () => {
     expect(wrapper.text()).not.toContain('Fast implementation work');
   });
 
-  it('groups model choices above reasoning choices in one menu', async () => {
+  it('organizes model and reasoning choices into hierarchical menus', async () => {
     const wrapper = mountSelector();
     await wrapper.get('.chat-model-selector__button').trigger('click');
 
-    expect(wrapper.findAll('.codex-composer-menu-list__heading').map((heading) => heading.text())).toStrictEqual([
-      'Model',
-      'Reasoning',
-      'Speed',
-    ]);
+    expect(wrapper.findAll('[data-submenu-id]')).toHaveLength(2);
+    expect(wrapper.get('[data-submenu-id="model"] > button').attributes('aria-expanded')).toBe('false');
+    expect(wrapper.get('[data-submenu-id="reasoning"] > button').attributes('aria-expanded')).toBe('false');
+    await wrapper.get('[data-submenu-id="model"] > button').trigger('click');
+    expect(wrapper.get('[data-submenu-id="model"] > button').attributes('aria-expanded')).toBe('true');
+    expect(wrapper.findAll('[data-submenu-id="model"] [role="menuitemradio"]')).toHaveLength(2);
     expect(wrapper.findAll('.codex-composer-menu-list__description')).toHaveLength(1);
     expect(wrapper.findAll('.chat-model-selector__menu')).toHaveLength(1);
   });

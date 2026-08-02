@@ -108,29 +108,38 @@ const controlDisabled = computed(() => props.disabled);
 
 const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
   const items: CodexComposerMenuItem<SelectorCommand>[] = [{
-    id: 'model-heading',
-    type: 'heading',
+    id: 'model',
     label: 'Model',
-  }, ...props.models.map((model): CodexComposerMenuItem<SelectorCommand> => ({
-    checked: model.id === selectedModel.value?.id,
-    closeOnSelect: true,
-    id: `model:${model.id}`,
-    label: model.displayName,
-    payload: { kind: 'model' as const, value: model.id },
-    type: 'radio',
-  }))];
+    type: 'submenu',
+    value: selectedModel.value ? compactModelLabel(selectedModel.value.displayName) : undefined,
+    submenuWidth: 'wide',
+    items: props.models.map((model) => ({
+      checked: model.id === selectedModel.value?.id,
+      closeOnSelect: true,
+      id: `model:${model.id}`,
+      label: model.displayName,
+      payload: { kind: 'model' as const, value: model.id },
+      type: 'radio' as const,
+    })),
+  }];
 
   if (showReasoning.value) {
     items.push({ id: 'model-reasoning-separator', type: 'separator' });
-    items.push({ id: 'reasoning-heading', type: 'heading', label: 'Reasoning' });
-    items.push(...reasoningEfforts.value.map((effort): CodexComposerMenuItem<SelectorCommand> => ({
-      checked: effort.reasoningEffort === effectiveReasoningEffort.value,
-      closeOnSelect: true,
-      id: `reasoning:${effort.reasoningEffort}`,
-      label: effortLabel(effort.reasoningEffort),
-      payload: { kind: 'reasoning' as const, value: effort.reasoningEffort },
-      type: 'radio' as const,
-    })));
+    items.push({
+      id: 'reasoning',
+      label: 'Reasoning',
+      type: 'submenu',
+      value: effectiveReasoningEffort.value ? effortLabel(effectiveReasoningEffort.value) : undefined,
+      submenuWidth: 'wide',
+      items: reasoningEfforts.value.map((effort) => ({
+        checked: effort.reasoningEffort === effectiveReasoningEffort.value,
+        closeOnSelect: true,
+        id: `reasoning:${effort.reasoningEffort}`,
+        label: effortLabel(effort.reasoningEffort),
+        payload: { kind: 'reasoning' as const, value: effort.reasoningEffort },
+        type: 'radio' as const,
+      })),
+    });
   }
 
   if (showServiceTier.value && fastServiceTier.value) {
