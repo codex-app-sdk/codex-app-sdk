@@ -10,7 +10,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
 import {
-  EyeIcon,
   FileTextIcon,
   FolderIcon,
   ListDetailsIcon,
@@ -39,7 +38,7 @@ const resolvedIcon = computed<Component | undefined>(() => {
       case 'create': return PencilIcon
       case 'delete': return Trash2Icon
       case 'edit': return PencilIcon
-      case 'explore': return EyeIcon
+      case 'explore': return FolderIcon
       case 'list': return FolderIcon
       case 'plan': return ListDetailsIcon
       case 'read': return FileTextIcon

@@ -12,7 +12,7 @@ const actions = [
   ['create', 'pencil'],
   ['delete', 'trash'],
   ['edit', 'pencil'],
-  ['explore', 'eye'],
+  ['explore', 'folder'],
   ['list', 'folder'],
   ['plan', 'list-details'],
   ['read', 'file-text'],
