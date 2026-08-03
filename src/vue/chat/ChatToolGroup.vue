@@ -281,8 +281,7 @@ function hasToolDetails(toolCall: MessageToolCall) {
 }
 
 .chat-tool-group__header:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: var(--space-1);
+  outline: none;
 }
 
 .chat-tool-group__icon,
