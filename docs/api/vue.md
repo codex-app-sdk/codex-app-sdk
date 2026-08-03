@@ -64,6 +64,13 @@ after the steer intent is emitted.
 `CodexContextUsageIndicator`, and
 `CodexModelReasoningSelector`.
 
+`useCodexComposerVoice(options)` exposes the same recording and transcription
+controller used by `CodexComposer` for custom layouts. Options are
+`isDisabled`, `isSending`, `onTranscript`, and optional `transcribeAudio`.
+The controller provides `buttonDisabled`, `buttonLabel`, `buttonTitle`,
+`error`, `isRecording`, `isTranscribing`, `recorder`, `toggle()`, and
+`dispose()`.
+
 ### Messages and media
 
 `CodexMessageBlock`, `CodexUserText`, `CodexAttachmentBlock`, `CodexMediaBlock`,

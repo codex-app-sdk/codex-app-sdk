@@ -1,4 +1,4 @@
-import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue'
 import type { CodexSpeechTranscriptionResult, CodexChatTranscription } from './contracts'
 import {
   BrowserAudioRecorder,
@@ -8,11 +8,28 @@ import {
 import { transcribeRecordedAudio } from '../audio/apple-speech-transcription'
 import { getCodexNativeRendererApi } from '../native-capabilities'
 
-type ChatComposerVoiceOptions = {
+export type CodexComposerVoiceOptions = {
   isDisabled: () => boolean
   isSending: () => boolean
   onTranscript: (text: string) => void
   transcribeAudio?: CodexChatTranscription
+}
+
+export type CodexComposerVoiceRecorder = {
+  getAnalyser(): AnalyserNode | null
+  getBufferLength(): number
+}
+
+export type CodexComposerVoiceController = {
+  buttonDisabled: ComputedRef<boolean>
+  buttonLabel: ComputedRef<string>
+  buttonTitle: ComputedRef<string>
+  error: Ref<string | null>
+  isRecording: Ref<boolean>
+  isTranscribing: Ref<boolean>
+  recorder: ComputedRef<CodexComposerVoiceRecorder | null>
+  toggle: () => Promise<void>
+  dispose: () => void
 }
 
 type ChatComposerVoiceDependencies = {
@@ -36,7 +53,7 @@ const defaultDependencies: ChatComposerVoiceDependencies = {
 }
 
 export function useChatComposerVoice(
-  options: ChatComposerVoiceOptions,
+  options: CodexComposerVoiceOptions,
   dependencyOverrides: Partial<ChatComposerVoiceDependencies> = {},
 ) {
   const providedTranscription = options.transcribeAudio
@@ -52,6 +69,7 @@ export function useChatComposerVoice(
   const isRecording = ref(false)
   const isTranscribing = ref(false)
   const error = ref<string | null>(null)
+  const exposedRecorder = computed<CodexComposerVoiceRecorder | null>(() => recorder.value)
   const recordingSupported = computed(() => dependencies.isRecordingSupported())
   const transcriptionAvailable = computed(() => dependencies.canTranscribe())
   const buttonDisabled = computed(() => (
@@ -144,9 +162,20 @@ export function useChatComposerVoice(
     error,
     isRecording,
     isTranscribing,
-    recorder,
+    recorder: exposedRecorder,
     toggle,
+    dispose,
   }
+}
+
+/**
+ * Public voice controller for composing the SDK's voice button and waveform
+ * without depending on the full CodexComposer component.
+ */
+export function useCodexComposerVoice(
+  options: CodexComposerVoiceOptions,
+): CodexComposerVoiceController {
+  return useChatComposerVoice(options)
 }
 
 function errorMessage(error: unknown): string {

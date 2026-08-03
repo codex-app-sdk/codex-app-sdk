@@ -4,6 +4,7 @@ import { effectScope } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexNativeRendererApi } from '../../../src/native/types';
 import type { BrowserAudioRecorder, RecordedAudio } from '../../../src/vue/audio/browser-audio-recorder';
+import { useCodexComposerVoice } from '../../../src/vue';
 import { useChatComposerVoice } from '../../../src/vue/chat/use-chat-composer-voice';
 
 const recording: RecordedAudio = {
@@ -23,6 +24,20 @@ function fakeRecorder(overrides: Partial<BrowserAudioRecorder> = {}) {
 describe('useChatComposerVoice', () => {
   afterEach(() => {
     delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
+  });
+
+  it('exposes the product-neutral public controller', () => {
+    const voice = useCodexComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript: vi.fn(),
+    });
+
+    expect(voice.buttonDisabled.value).toBe(true);
+    expect(voice.recorder.value).toBeNull();
+    expect(voice.buttonLabel.value).toBe('Record voice prompt');
+    expect(typeof voice.dispose).toBe('function');
+    voice.dispose();
   });
 
   it('owns the recording and transcription lifecycle', async () => {

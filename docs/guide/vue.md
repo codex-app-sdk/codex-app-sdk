@@ -47,6 +47,10 @@ surface controller. Or build a different layout from exported components:
 - voice button, field, waveform, send button, active modes, context usage, and
   composer shelf
 
+For a custom composer layout, use `useCodexComposerVoice` with the exported
+`CodexComposerVoiceButton` and `CodexComposerVoiceField`; it owns the recorder,
+transcription lifecycle, state, and cleanup used by the stock composer.
+
 ### Message content
 
 - `CodexMessageBlock`
