@@ -12,10 +12,16 @@ export type MessageToolCall = {
   done?: boolean;
   function: string;
   id: string;
+  /** Assistant message that contains this tool call, when adapted from a surface message. */
+  messageId?: string;
   kind?: string;
   metadata?: Readonly<Record<string, unknown>>;
+  /** App-server item id for this tool call, when available. */
+  itemId?: string;
   state: ToolExecutionState;
   status?: string;
+  /** Turn that produced this tool call, when adapted from a surface message. */
+  turnId?: string;
   result: unknown;
 };
 

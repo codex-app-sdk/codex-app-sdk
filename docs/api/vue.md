@@ -108,6 +108,9 @@ openLink: [link: {
   path: string;
   filepath?: string;
   action?: 'read' | 'edit' | 'create';
+  turnId?: string;
+  messageId?: string;
+  itemId?: string;
   line?: number;
   column?: number;
 }]

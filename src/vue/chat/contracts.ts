@@ -84,6 +84,12 @@ export type CodexConversationLink =
     filepath?: string;
     /** Present for file-operation tool targets; absent for ordinary markdown links. */
     action?: CodexConversationFileAction;
+    /** Conversation turn that produced the tool target, when available. */
+    turnId?: string;
+    /** Assistant message that contains the tool target, when available. */
+    messageId?: string;
+    /** App-server item that produced the tool target, when available. */
+    itemId?: string;
     line?: number;
     column?: number;
   };

@@ -51,17 +51,26 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
 }
 
 function rendererToolPartToToolCall(message: SurfaceMessage, part: Extract<SurfaceMessagePart, { type: 'tool' }>, index: number): MessageToolCall {
+  const turnId = message.turnId ?? stringMetadata(message.metadata, 'turnId');
   return {
     args: part.input ?? (part.body ? { output: part.body } : undefined),
     done: part.status !== 'running',
     function: part.title,
     id: part.id || `${message.id}-tool-${index}`,
     ...(part.kind ? { kind: part.kind } : {}),
+    itemId: part.id || `${message.id}-tool-${index}`,
+    messageId: message.id,
     ...(part.metadata ? { metadata: { ...part.metadata } } : {}),
     result: rendererToolPartResult(part),
     state: rendererToolStatusToState(part.status),
     status: part.statusText ?? part.status,
+    ...(turnId ? { turnId } : {}),
   };
+}
+
+function stringMetadata(metadata: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = metadata?.[key];
+  return typeof value === 'string' && value ? value : undefined;
 }
 
 function rendererToolPartResult(part: Extract<SurfaceMessagePart, { type: 'tool' }>): unknown {

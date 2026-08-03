@@ -520,6 +520,7 @@ describe('CodexConversationPane', () => {
           id: 'assistant-file-tool',
           role: 'assistant',
           status: 'complete',
+          turnId: 'turn-file-tool',
           parts: [{
             type: 'tool',
             id: 'read-file',
@@ -549,8 +550,11 @@ describe('CodexConversationPane', () => {
       action: 'read',
       filepath: '/workspace/project/tests/app-state.spec.ts',
       href: '/workspace/project/tests/app-state.spec.ts',
+      itemId: 'read-file',
       kind: 'file',
+      messageId: 'assistant-file-tool',
       path: '/workspace/project/tests/app-state.spec.ts',
+      turnId: 'turn-file-tool',
     };
     expect(wrapper.emitted('openLink')).toStrictEqual([[expected]]);
     expect(openConversationLink).toHaveBeenCalledWith(expected);

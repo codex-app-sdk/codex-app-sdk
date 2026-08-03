@@ -87,9 +87,11 @@ Use `message-block` for media-specific overrides, or mount
 
 Read, edit, and create tool titles expose an interactive file target when the
 SDK can resolve an absolute path. Clicking the target emits the pane's
-`openLink` event with a file link containing `filepath` and `action`; it does
-not expand or collapse the tool details. Hosts can use this event to reveal
-the file in a sidebar or editor.
+`openLink` event with a file link containing `filepath` and `action`. When the
+tool came from a surface message, the link also carries optional `turnId`,
+`messageId`, and `itemId` context so hosts can open a turn-specific diff or
+editor view. It does not expand or collapse the tool details. Hosts can use
+this event to reveal the file in a sidebar or editor.
 
 Use `message-header` to add host-owned context above a message without replacing
 the SDK body, attachments, tools, or actions:

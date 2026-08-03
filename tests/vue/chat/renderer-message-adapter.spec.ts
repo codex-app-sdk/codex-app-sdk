@@ -40,7 +40,9 @@ describe('renderer message adapter', () => {
             done: true,
             function: 'npm test',
             id: 'tool-npm-test',
+            itemId: 'tool-npm-test',
             kind: 'command',
+            messageId: 'assistant-turn-1',
             result: '46 passed',
             state: 'completed',
             status: 'completed',
@@ -55,7 +57,9 @@ describe('renderer message adapter', () => {
           done: true,
           function: 'npm test',
           id: 'tool-npm-test',
+          itemId: 'tool-npm-test',
           kind: 'command',
+          messageId: 'assistant-turn-1',
           result: '46 passed',
           state: 'completed',
           status: 'completed',
@@ -76,6 +80,29 @@ describe('renderer message adapter', () => {
 
     expect(surfaceMessageToChatMessage(rendererMessage).role).toBe('assistant');
     expect(surfaceMessageToChatMessage(rendererMessage).content).toBe('Codex app-server error');
+  });
+
+  it('propagates message, turn, and item context to adapted tool calls', () => {
+    const rendererMessage: SurfaceMessage = {
+      id: 'assistant-turn-context',
+      metadata: { conversationId: 'thread-1' },
+      parts: [{
+        type: 'tool',
+        id: 'item-read',
+        kind: 'command',
+        title: 'cat app-state.spec.ts',
+        status: 'completed',
+      }],
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'turn-context',
+    };
+
+    expect(surfaceMessageToChatMessage(rendererMessage).toolCalls?.[0]).toMatchObject({
+      itemId: 'item-read',
+      messageId: 'assistant-turn-context',
+      turnId: 'turn-context',
+    });
   });
 
   it('marks steered user messages for timeline rendering', () => {
@@ -138,11 +165,13 @@ describe('renderer message adapter', () => {
     expect(surfaceMessageToChatMessage(rendererMessage).toolCalls).toStrictEqual([
       {
         args: undefined,
-        done: true,
-        function: 'git diff',
-        id: 'tool-git-diff',
-        kind: 'command',
-        result: undefined,
+      done: true,
+      function: 'git diff',
+      id: 'tool-git-diff',
+      itemId: 'tool-git-diff',
+      kind: 'command',
+      messageId: 'assistant-turn-2',
+      result: undefined,
         state: 'error',
         status: 'failed',
       },
@@ -188,7 +217,9 @@ describe('renderer message adapter', () => {
         done: true,
         function: 'team.set-status',
         id: 'tool-set-status',
+        itemId: 'tool-set-status',
         kind: 'mcp',
+        messageId: 'assistant-turn-structured',
         result: {
           agentId: 'agent-dina',
           status: 'Registered and idle',
@@ -229,7 +260,9 @@ describe('renderer message adapter', () => {
           done: true,
           function: 'cat docs/architecture.md',
           id: 'tool-read',
+          itemId: 'tool-read',
           kind: 'command',
+          messageId: 'assistant-turn-ordered',
           result: 'architecture contents',
           state: 'completed',
           status: 'completed',

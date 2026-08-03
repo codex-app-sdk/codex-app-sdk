@@ -170,6 +170,44 @@ describe('ChatToolCall action icons', () => {
     ]]);
   });
 
+  it('includes tool context in a clicked file link', async () => {
+    const toolCall: MessageToolCall = {
+      args: {
+        commandActions: [{ type: 'read', name: 'app-state.spec.ts', path: 'tests/app-state.spec.ts' }],
+        cwd: '/workspace/project',
+      },
+      done: true,
+      function: 'cat app-state.spec.ts',
+      id: 'item-read',
+      itemId: 'item-read',
+      messageId: 'assistant-turn-context',
+      result: undefined,
+      state: 'completed',
+      status: JSON.stringify({
+        action: 'read',
+        phase: 'completed',
+        source: 'codex',
+        params: { target: 'app-state.spec.ts' },
+      }),
+      turnId: 'turn-context',
+    };
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    await wrapper.get('.chat-tool-call__title-target--link').trigger('click');
+    expect(wrapper.emitted('open-link')).toEqual([[
+      {
+        action: 'read',
+        filepath: '/workspace/project/tests/app-state.spec.ts',
+        href: '/workspace/project/tests/app-state.spec.ts',
+        itemId: 'item-read',
+        kind: 'file',
+        messageId: 'assistant-turn-context',
+        path: '/workspace/project/tests/app-state.spec.ts',
+        turnId: 'turn-context',
+      },
+    ]]);
+  });
+
   it('renders each changed filename as an individually clickable target', async () => {
     const toolCall: MessageToolCall = {
       args: {
