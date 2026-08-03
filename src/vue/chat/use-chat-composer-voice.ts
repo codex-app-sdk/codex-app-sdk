@@ -11,7 +11,7 @@ import { getCodexNativeRendererApi } from '../native-capabilities'
 export type CodexComposerVoiceOptions = {
   isDisabled: () => boolean
   isSending: () => boolean
-  onTranscript: (text: string) => void
+  onTranscript: (text: string) => void | Promise<void>
   transcribeAudio?: CodexChatTranscription
 }
 
@@ -28,6 +28,7 @@ export type CodexComposerVoiceController = {
   isRecording: Ref<boolean>
   isTranscribing: Ref<boolean>
   recorder: ComputedRef<CodexComposerVoiceRecorder | null>
+  stop: () => Promise<boolean>
   toggle: () => Promise<void>
   dispose: () => void
 }
@@ -120,10 +121,10 @@ export function useChatComposerVoice(
     }
   }
 
-  async function stop(): Promise<void> {
+  async function stop(): Promise<boolean> {
     const activeRecorder = recorder.value
     if (!activeRecorder) {
-      return
+      return false
     }
 
     isRecording.value = false
@@ -135,11 +136,13 @@ export function useChatComposerVoice(
       const result = await dependencies.transcribe(recording)
       if (result.error) {
         error.value = result.error
-        return
+        return false
       }
-      options.onTranscript(result.text)
+      await options.onTranscript(result.text)
+      return true
     } catch (stopError) {
       error.value = errorMessage(stopError)
+      return false
     } finally {
       isTranscribing.value = false
     }
@@ -163,6 +166,7 @@ export function useChatComposerVoice(
     isRecording,
     isTranscribing,
     recorder: exposedRecorder,
+    stop,
     toggle,
     dispose,
   }

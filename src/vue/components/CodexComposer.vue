@@ -210,9 +210,21 @@ const voiceVisible = computed(() => (
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
-const canInterrupt = computed(() => Boolean(props.isSending && !hasPrompt.value && !props.disabled));
+const transcribeAndSendPending = ref(false);
+const canInterrupt = computed(() => Boolean(
+  props.isSending
+  && !hasPrompt.value
+  && !props.disabled
+  && !isRecording.value
+  && !isTranscribing.value
+  && !transcribeAndSendPending.value,
+));
 const sendButtonLoading = computed(() => canInterrupt.value);
-const sendButtonDisabled = computed(() => !canSend.value && !canInterrupt.value);
+const sendButtonDisabled = computed(() => {
+  if (transcribeAndSendPending.value || isTranscribing.value) return true;
+  if (isRecording.value && !props.disabled) return false;
+  return !canSend.value && !canInterrupt.value;
+});
 const sendButtonLabel = computed(() => (props.isSending ? 'Queue prompt' : 'Send prompt'));
 const {
   buttonDisabled: voiceButtonDisabled,
@@ -222,6 +234,7 @@ const {
   isRecording,
   isTranscribing,
   recorder,
+  stop: stopRecording,
   toggle: toggleRecording,
 } = useChatComposerVoice({
   isDisabled: () => props.disabled,
@@ -293,7 +306,19 @@ function submitPrompt(): void {
   submitWithIntent('send');
 }
 
-function handleSendButtonClick(): void {
+async function handleSendButtonClick(): Promise<void> {
+  if (transcribeAndSendPending.value) return;
+  if (isRecording.value) {
+    transcribeAndSendPending.value = true;
+    try {
+      if (await stopRecording()) {
+        submitPrompt();
+      }
+    } finally {
+      transcribeAndSendPending.value = false;
+    }
+    return;
+  }
   if (canInterrupt.value) {
     emit('interrupt');
     return;
@@ -325,7 +350,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   void nextTick(resizeEditor);
 }
 
-function insertTranscript(text: string): void {
+async function insertTranscript(text: string): Promise<void> {
   const transcript = text.trim();
   if (!transcript) {
     return;
@@ -345,7 +370,7 @@ function insertTranscript(text: string): void {
   selectionStart.value = nextCaret;
   selectionEnd.value = nextCaret;
   closeComposerMenus();
-  void nextTick(() => {
+  await nextTick(() => {
     editorEl.value?.setCaret(nextCaret);
     resizeEditor();
   });

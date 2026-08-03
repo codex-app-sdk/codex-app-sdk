@@ -68,8 +68,9 @@ after the steer intent is emitted.
 controller used by `CodexComposer` for custom layouts. Options are
 `isDisabled`, `isSending`, `onTranscript`, and optional `transcribeAudio`.
 The controller provides `buttonDisabled`, `buttonLabel`, `buttonTitle`,
-`error`, `isRecording`, `isTranscribing`, `recorder`, `toggle()`, and
-`dispose()`.
+`error`, `isRecording`, `isTranscribing`, `recorder`, `stop()`, `toggle()`, and
+`dispose()`. `stop()` resolves to `true` after a recording is transcribed and
+delivered to `onTranscript`, or `false` when recording/transcription fails.
 
 ### Messages and media
 

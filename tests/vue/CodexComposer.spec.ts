@@ -610,6 +610,53 @@ describe('ChatComposer', () => {
     });
   });
 
+  it('keeps send enabled while recording and submits the completed transcript once', async () => {
+    installAudioRecordingMocks();
+    const transcribeAppleSpeech = vi.fn(async () => ({ text: 'dictated change' }));
+    const wrapper = mountComposer({ transcribeAudio: transcribeAppleSpeech });
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    expect(wrapper.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
+
+    await wrapper.get('.chat-composer__send').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.emitted('send')).toStrictEqual([['dictated change']]);
+    });
+
+    expect(wrapper.emitted('send')).toHaveLength(1);
+    expect(transcribeAppleSpeech).toHaveBeenCalledOnce();
+    expect(editorValue(wrapper)).toBe('');
+  });
+
+  it('prevents duplicate sends while transcribe-and-send is pending', async () => {
+    installAudioRecordingMocks();
+    let resolveTranscription!: (value: { text: string }) => void;
+    const transcribeAppleSpeech = vi.fn(() => new Promise<{ text: string }>((resolve) => {
+      resolveTranscription = resolve;
+    }));
+    const wrapper = mountComposer({ transcribeAudio: transcribeAppleSpeech });
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+
+    const send = wrapper.get('.chat-composer__send');
+    await send.trigger('click');
+    expect(send.attributes()).toHaveProperty('disabled');
+    await send.trigger('click');
+    await vi.waitFor(() => expect(transcribeAppleSpeech).toHaveBeenCalledOnce());
+
+    resolveTranscription({ text: 'queued voice prompt' });
+    await vi.waitFor(() => {
+      expect(wrapper.emitted('send')).toStrictEqual([['queued voice prompt']]);
+    });
+    expect(wrapper.emitted('send')).toHaveLength(1);
+  });
+
   it('emits transcription failures and clears them when recording is retried', async () => {
     installAudioRecordingMocks();
     const transcribeAppleSpeech = vi.fn(async () => ({
