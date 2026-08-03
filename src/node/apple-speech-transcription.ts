@@ -49,12 +49,12 @@ export async function transcribeWithAppleSpeechAnalyzer(
   const fs = deps.fs ?? nodeFs;
   const spawn = deps.spawn ?? nodeSpawn;
   const tmpdir = deps.tmpdir ?? os.tmpdir;
-  const bundledCliPath = resolveAppleSpeechAnalyzerPath(deps.assetsPath);
   const tempDir = await fs.mkdtemp(path.join(tmpdir(), 'codex-app-sdk-apple-stt-'));
   const inputPath = path.join(tempDir, 'input.wav');
   const outputPath = path.join(tempDir, 'output.txt');
 
   try {
+    const bundledCliPath = resolveAppleSpeechAnalyzerPath(deps.assetsPath);
     const cliPath = await executableAppleSpeechPath(bundledCliPath, tempDir, fs);
     await fs.writeFile(inputPath, audioData);
     await runAppleSpeechCli(spawn, cliPath, buildAppleSpeechArgs(inputPath, outputPath, options));
@@ -147,17 +147,31 @@ function defaultAssetsPath(): string {
     if (match) return match;
   }
 
-  try {
-    const packageNodeEntry = fileURLToPath(import.meta.resolve('codex-app-sdk/node'));
-    const packageAssetsPath = path.resolve(path.dirname(packageNodeEntry), '../assets');
-    if (existsSync(path.join(packageAssetsPath, 'apple-speechanalyzer-cli'))) {
-      return packageAssetsPath;
+  const packageResolver = typeof import.meta.resolve === 'function' ? import.meta.resolve : undefined;
+  if (packageResolver) {
+    try {
+      const packageNodeEntry = fileURLToPath(packageResolver('codex-app-sdk/node'));
+      const packageAssetsPath = path.resolve(path.dirname(packageNodeEntry), '../assets');
+      if (existsSync(path.join(packageAssetsPath, 'apple-speechanalyzer-cli'))) {
+        return packageAssetsPath;
+      }
+    } catch {
+      // Source checkouts fall through to module-relative candidates.
     }
-  } catch {
-    // Source checkouts fall through to module-relative candidates.
   }
 
-  const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+  const cwdCandidates = [
+    path.resolve(process.cwd(), 'node_modules/codex-app-sdk/assets'),
+    path.resolve(process.cwd(), '../node_modules/codex-app-sdk/assets'),
+    path.resolve(process.cwd(), '../codex-app-sdk/assets'),
+  ];
+  const cwdMatch = cwdCandidates.find((candidate) => (
+    existsSync(path.join(candidate, 'apple-speechanalyzer-cli'))
+  ));
+  if (cwdMatch) return cwdMatch;
+
+  const moduleUrl = typeof import.meta.url === 'string' ? import.meta.url : undefined;
+  const moduleDirectory = moduleUrl ? path.dirname(fileURLToPath(moduleUrl)) : process.cwd();
   const moduleCandidates = [
     path.resolve(moduleDirectory, '../assets'),
     path.resolve(moduleDirectory, '../../assets'),

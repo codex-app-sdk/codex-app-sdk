@@ -1,11 +1,18 @@
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { transcribeWithAppleSpeechAnalyzer } from '../src/node/apple-speech-transcription';
+import {
+  resolveAppleSpeechAnalyzerPath,
+  transcribeWithAppleSpeechAnalyzer,
+} from '../src/node/apple-speech-transcription';
 
 describe('transcribeWithAppleSpeechAnalyzer', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it('resolves the default helper path without relying on a URL value', () => {
+    expect(resolveAppleSpeechAnalyzerPath()).toMatch(/apple-speechanalyzer-cli$/);
   });
 
   it('writes audio, invokes the Apple speech CLI, reads text, and cleans up', async () => {
