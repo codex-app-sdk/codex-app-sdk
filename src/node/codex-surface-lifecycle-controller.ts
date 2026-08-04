@@ -10,6 +10,7 @@ import type {
 import {
   codexThreadToSurfaceMessages,
   preserveHistoricalAttachmentPreviews,
+  preserveReviewPromptMessages,
 } from './codex-conversation-history';
 import type {
   CodexConversationHostOptions,
@@ -342,9 +343,12 @@ export class CodexSurfaceLifecycleController {
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
       const catalogs = await this.catalog.loadConversationCatalogs(cwd);
       const runningTurnId = activeTurnId(turns);
-      const historyMessages = preserveHistoricalAttachmentPreviews(
+      const historyMessages = preserveReviewPromptMessages(
         loadingRuntime.messages,
-        codexThreadToSurfaceMessages({ ...response.thread, turns }),
+        preserveHistoricalAttachmentPreviews(
+          loadingRuntime.messages,
+          codexThreadToSurfaceMessages({ ...response.thread, turns }),
+        ),
       );
       const messages = runningTurnId
         ? ensureAssistantTurnMessage(historyMessages, response.thread.id, runningTurnId)

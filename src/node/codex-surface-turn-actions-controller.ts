@@ -4,6 +4,7 @@ import type {
   CodexSurfaceSnapshot,
   SendCodexMessageOptions,
   StartCodexReviewOptions,
+  SurfaceMessage,
 } from '../surface/types';
 import { codexThreadToSurfaceMessages } from './codex-conversation-history';
 import {
@@ -16,8 +17,8 @@ import {
   upsertConversation,
 } from './codex-surface-data';
 import type { SurfaceEventInput } from './codex-surface-events';
-import { timestampToIso } from './codex-surface-events';
-import { normalizeReviewTarget } from './codex-surface-prompts';
+import { createMessageId, timestampToIso } from './codex-surface-events';
+import { errorMessage, normalizeReviewTarget } from './codex-surface-prompts';
 import { ensureAssistantTurnMessage } from './codex-surface-message-state';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
 
@@ -33,7 +34,7 @@ export type CodexSurfaceTurnActionsHost = {
   getState(): CodexSurfaceSnapshot;
   hydrateCompleteHistory(threadId: string, options?: { initialPageLoaded?: boolean; cursor?: string | null }): Promise<void>;
   patch(patch: Partial<CodexSurfaceSnapshot>): void;
-  patchConversationStatus(threadId: string, status: 'active' | 'idle', origin: 'action'): void;
+  patchConversationStatus(threadId: string, status: CodexConversationSummary['status'], origin: 'action'): void;
   patchConversationTurnCount(threadId: string, turnCount: number, origin: 'action'): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
   sendMessageToThread(threadId: string, prompt: string, options?: SendCodexMessageOptions): Promise<void>;
@@ -64,46 +65,86 @@ export class CodexSurfaceTurnActionsController {
     }
   }
 
-  async startReview(options: StartCodexReviewOptions = {}): Promise<CodexSurfaceSnapshot> {
+  async startReview(options: StartCodexReviewOptions = {}, prompt?: string): Promise<CodexSurfaceSnapshot> {
     await this.host.ensureConnected();
     if (!this.host.getState().activeConversationId) await this.host.createConversation();
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation');
-    await this.startReviewForThread(threadId, options);
+    await this.startReviewForThread(threadId, options, prompt);
     return this.host.getSnapshot();
   }
 
-  async startReviewForThread(threadId: string, options: StartCodexReviewOptions = {}): Promise<void> {
+  async startReviewForThread(
+    threadId: string,
+    options: StartCodexReviewOptions = {},
+    prompt?: string,
+  ): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     if (runtime.busy) throw new Error('The conversation is already responding');
-    const response = await this.client.request('review/start', {
-      threadId,
-      target: normalizeReviewTarget(options.target ?? { type: 'uncommittedChanges' }),
-      delivery: 'inline',
-    });
-    if (response.reviewThreadId !== threadId) {
-      throw new Error(
-        `Codex review/start returned unexpected review thread '${response.reviewThreadId}' for inline review on thread '${threadId}'`,
-      );
-    }
-    const wasKnownTurn = runtime.turnIds.includes(response.turn.id);
-    runtime.activeTurnId = response.turn.status === 'inProgress' ? response.turn.id : null;
-    if (!runtime.turnIds.includes(response.turn.id)) runtime.turnIds.push(response.turn.id);
-    this.host.patchConversationTurnCount(threadId, runtime.turnIds.length, 'action');
-    this.host.patchRuntime(threadId, {
-      busy: runtime.activeTurnId !== null,
-      messages: runtime.activeTurnId
-        ? ensureAssistantTurnMessage(runtime.messages, threadId, response.turn.id)
-        : runtime.messages,
-    });
-    this.host.patchConversationStatus(threadId, runtime.activeTurnId ? 'active' : 'idle', 'action');
-    if (runtime.activeTurnId && !wasKnownTurn) {
+    const reviewPrompt = prompt?.trim() || null;
+    const promptMessageId = reviewPrompt ? createMessageId() : null;
+    if (reviewPrompt && promptMessageId) {
+      const optimisticMessage: SurfaceMessage = {
+        id: promptMessageId,
+        role: 'user',
+        status: 'complete',
+        parts: [{ type: 'text', text: reviewPrompt }],
+        createdAt: new Date().toISOString(),
+        metadata: {
+          conversationId: threadId,
+          reviewPrompt: true,
+        },
+      };
+      this.host.patchRuntime(threadId, { messages: [...runtime.messages, optimisticMessage] });
       this.host.emitEvent('action', {
-        type: 'turn.started', conversationId: threadId, turnId: response.turn.id,
-        payload: { startedAt: timestampToIso(response.turn.startedAt) },
+        type: 'message.appended', conversationId: threadId,
+        payload: { message: structuredClone(optimisticMessage) },
       });
     }
+    this.host.patchRuntime(threadId, { busy: true, turnStartPending: true, error: null });
+    this.host.patchConversationStatus(threadId, 'active', 'action');
     this.host.emitConversationActivity(threadId, 'action');
+    try {
+      const response = await this.client.request('review/start', {
+        threadId,
+        target: normalizeReviewTarget(options.target ?? { type: 'uncommittedChanges' }),
+        delivery: 'inline',
+      });
+      if (response.reviewThreadId !== threadId) {
+        throw new Error(
+          `Codex review/start returned unexpected review thread '${response.reviewThreadId}' for inline review on thread '${threadId}'`,
+        );
+      }
+      const wasKnownTurn = runtime.turnIds.includes(response.turn.id);
+      runtime.activeTurnId = response.turn.status === 'inProgress' ? response.turn.id : null;
+      if (!runtime.turnIds.includes(response.turn.id)) runtime.turnIds.push(response.turn.id);
+      this.host.patchConversationTurnCount(threadId, runtime.turnIds.length, 'action');
+      const messages = promptMessageId
+        ? runtime.messages.map((message) => message.id === promptMessageId
+          ? { ...message, turnId: response.turn.id, metadata: { ...message.metadata, turnId: response.turn.id } }
+          : message)
+        : runtime.messages;
+      this.host.patchRuntime(threadId, {
+        busy: runtime.activeTurnId !== null,
+        turnStartPending: false,
+        messages: runtime.activeTurnId
+          ? ensureAssistantTurnMessage(messages, threadId, response.turn.id)
+          : messages,
+      });
+      this.host.patchConversationStatus(threadId, runtime.activeTurnId ? 'active' : 'idle', 'action');
+      if (runtime.activeTurnId && !wasKnownTurn) {
+        this.host.emitEvent('action', {
+          type: 'turn.started', conversationId: threadId, turnId: response.turn.id,
+          payload: { startedAt: timestampToIso(response.turn.startedAt) },
+        });
+      }
+      this.host.emitConversationActivity(threadId, 'action');
+    } catch (error) {
+      this.host.patchRuntime(threadId, { busy: false, turnStartPending: false, error: errorMessage(error) });
+      this.host.patchConversationStatus(threadId, 'error', 'action');
+      this.host.emitConversationActivity(threadId, 'action');
+      throw error;
+    }
   }
 
   async interrupt(): Promise<CodexSurfaceSnapshot> {

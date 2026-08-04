@@ -49,8 +49,8 @@ export type CodexSurfaceMessagesHost = {
   setGoal(objective: string): Promise<CodexSurfaceSnapshot>;
   setGoalForThread(threadId: string, objective: string): Promise<void>;
   snapshotForRuntime(runtime: ThreadRuntimeState): CodexSurfaceSnapshot;
-  startReview(options: StartCodexReviewOptions): Promise<CodexSurfaceSnapshot>;
-  startReviewForThread(threadId: string, options: StartCodexReviewOptions): Promise<void>;
+  startReview(options: StartCodexReviewOptions, prompt?: string): Promise<CodexSurfaceSnapshot>;
+  startReviewForThread(threadId: string, options: StartCodexReviewOptions, prompt?: string): Promise<void>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexSurfaceSnapshot>;
   updateSettingsForThread(threadId: string, settings: UpdateCodexConversationSettings): Promise<void>;
 };
@@ -86,7 +86,7 @@ export class CodexSurfaceMessagesController {
       const reviewCommand = parseReviewSlashCommand(text);
       if (reviewCommand) {
         await this.host.createConversation();
-        return this.host.startReview({ target: reviewCommand });
+        return this.host.startReview({ target: reviewCommand }, text);
       }
       await this.host.createConversation();
     }
@@ -122,7 +122,7 @@ export class CodexSurfaceMessagesController {
     }
     if (text === '/compact') return this.host.compactForThread(threadId);
     const reviewCommand = parseReviewSlashCommand(text);
-    if (reviewCommand) return this.host.startReviewForThread(threadId, { target: reviewCommand });
+    if (reviewCommand) return this.host.startReviewForThread(threadId, { target: reviewCommand }, text);
     options = {
       ...validatedSendOptions(this.host.snapshotForRuntime(runtime), options),
       ...(options.skills ? { skills: validateSkillInputs(options.skills, runtime.skills) } : {}),

@@ -55,12 +55,17 @@ export type CodexSurfaceItemsHost = {
 export class CodexSurfaceItemsController {
   private readonly commandOutputForwardItemIds = new Set<string>();
   private readonly fileActivityKeys = new Set<string>();
+  // app-server emits exitedReviewMode first, followed by a final agentMessage
+  // rendered from the same ReviewOutputEvent. Full history retains only the
+  // review-mode item, so it is the canonical surface representation.
+  private readonly reviewOutputByTurn = new Map<string, string>();
 
   constructor(private readonly host: CodexSurfaceItemsHost) {}
 
   reset(): void {
     this.commandOutputForwardItemIds.clear();
     this.fileActivityKeys.clear();
+    this.reviewOutputByTurn.clear();
   }
 
   forget(threadId: string): void {
@@ -70,6 +75,9 @@ export class CodexSurfaceItemsController {
     }
     for (const key of this.fileActivityKeys) {
       if (key.startsWith(prefix)) this.fileActivityKeys.delete(key);
+    }
+    for (const key of this.reviewOutputByTurn.keys()) {
+      if (key.startsWith(prefix)) this.reviewOutputByTurn.delete(key);
     }
   }
 
@@ -203,6 +211,14 @@ export class CodexSurfaceItemsController {
       const text = params.item.type === 'agentMessage' ? params.item.text : params.item.review;
       const phase = params.item.type === 'agentMessage' ? params.item.phase ?? undefined : undefined;
       if (!text && params.item.type !== 'agentMessage') return;
+      const reviewTurnKey = threadItemKey(params.threadId, params.turnId);
+      if (
+        params.item.type === 'agentMessage'
+        && this.reviewOutputByTurn.get(reviewTurnKey) === text
+      ) return;
+      if (params.item.type === 'exitedReviewMode') {
+        this.reviewOutputByTurn.set(reviewTurnKey, text);
+      }
       const previousMessageIds = new Set(runtime.messages.map((message) => message.id));
       const previousText = runtime.messages.flatMap((message) => message.parts)
         .find((part): part is Extract<SurfaceMessage['parts'][number], { type: 'text' }> => (

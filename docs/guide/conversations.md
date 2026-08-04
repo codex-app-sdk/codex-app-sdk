@@ -125,6 +125,13 @@ await build.rollbackToTurn(turnId);
 Handles also expose edit, retry, delete-message, steering, reviews, goals,
 queued-prompt actions, approval resolution, and app-server question responses.
 
+When a review is submitted through `sendMessage('/review')` (or a custom
+`/review ...` command), the surface records that slash command as a normal user
+message before starting the review turn. Calling `startReview()` directly
+remains an action-only API and does not add a user prompt. Review output that
+arrives as the canonical `exitedReviewMode` item is rendered once; the surface
+ignores app-server's derived final `agentMessage` containing the same text.
+
 ## Archive and delete
 
 ```ts

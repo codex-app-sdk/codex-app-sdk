@@ -269,8 +269,8 @@ export class CodexSurface {
       setGoal: (objective) => this.conversationSettings.setGoal(objective),
       setGoalForThread: (threadId, objective) => this.conversationSettings.setGoalForThread(threadId, objective),
       snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
-      startReview: (options) => this.turnActions.startReview(options),
-      startReviewForThread: (threadId, options) => this.turnActions.startReviewForThread(threadId, options),
+      startReview: (options, prompt) => this.turnActions.startReview(options, prompt),
+      startReviewForThread: (threadId, options, prompt) => this.turnActions.startReviewForThread(threadId, options, prompt),
       updateSettings: (settings) => this.conversationSettings.update(settings),
       updateSettingsForThread: (threadId, settings) => this.conversationSettings.updateForThread(threadId, settings),
     });

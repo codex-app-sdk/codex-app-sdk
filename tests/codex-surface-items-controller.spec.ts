@@ -44,6 +44,30 @@ describe('CodexSurfaceItemsController', () => {
     }));
   });
 
+  it('renders exitedReviewMode once and ignores its derived final agentMessage', () => {
+    const setup = itemController();
+    const review = 'The review found one issue.';
+    setup.controller.applyItem(item('exitedReviewMode', {
+      id: 'review-1', review,
+    }), false);
+    setup.controller.applyItem(item('exitedReviewMode', {
+      id: 'review-1', review,
+    }), true);
+    setup.controller.applyItem(item('agentMessage', {
+      id: 'agent-review', text: review, phase: null,
+    }), false);
+    setup.controller.applyItem(item('agentMessage', {
+      id: 'agent-review', text: review, phase: null,
+    }), true);
+
+    const assistant = setup.runtime.messages.find((message) => message.role === 'assistant');
+    expect(assistant?.parts).toStrictEqual([{ type: 'text', text: review, itemId: 'review-1' }]);
+    expect(setup.host.emitEvent).toHaveBeenCalledTimes(1);
+    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', expect.objectContaining({
+      type: 'message.appended',
+    }));
+  });
+
   it('emits both phases of context compaction', () => {
     const setup = itemController();
     setup.controller.applyItem(item('contextCompaction', { id: 'compact-1' }), false);

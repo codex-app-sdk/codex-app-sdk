@@ -5,6 +5,7 @@ import {
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
   preserveHistoricalAttachmentPreviews,
+  preserveReviewPromptMessages,
 } from '../src/node/codex-conversation-history';
 import type { v2 } from '../src/codex';
 
@@ -505,5 +506,49 @@ describe('codexThreadToSurfaceMessages', () => {
         parts: [{ type: 'text', text: 'Found one issue.', itemId: 'review-1' }],
       },
     ]);
+  });
+
+  it('materializes the canonical review-mode items returned by app-server history', () => {
+    const text = 'The review found one issue.';
+    const messages = codexTurnToSurfaceMessages('thread-review', {
+      id: 'turn-review',
+      status: 'completed',
+      startedAt: 1_780_000_000,
+      completedAt: 1_780_000_010,
+      items: [
+        { type: 'enteredReviewMode', id: 'review-start', review: 'current changes' },
+        { type: 'exitedReviewMode', id: 'review-1', review: text },
+      ],
+    } as unknown as v2.Turn);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.parts).toStrictEqual([
+      { type: 'text', text, itemId: 'review-1' },
+    ]);
+  });
+
+  it('preserves a slash-review prompt when history has no user item for its turn', () => {
+    const prompt = {
+      id: 'review-prompt',
+      role: 'user' as const,
+      status: 'complete' as const,
+      turnId: 'turn-review',
+      parts: [{ type: 'text' as const, text: '/review focus on regressions' }],
+      metadata: { conversationId: 'thread-review', turnId: 'turn-review', reviewPrompt: true },
+    };
+    const assistant = {
+      id: 'assistant-turn-review',
+      role: 'assistant' as const,
+      status: 'complete' as const,
+      turnId: 'turn-review',
+      parts: [{ type: 'text' as const, text: 'Found one issue.' }],
+    };
+
+    expect(preserveReviewPromptMessages([], [assistant])).toStrictEqual([assistant]);
+    expect(preserveReviewPromptMessages([prompt], [assistant])).toStrictEqual([prompt, assistant]);
+    expect(preserveReviewPromptMessages([prompt], [
+      { ...prompt, id: 'server-user', metadata: undefined },
+      assistant,
+    ])).toHaveLength(2);
   });
 });

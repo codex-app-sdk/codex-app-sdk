@@ -291,6 +291,8 @@ describe('CodexSurface', () => {
       conversationDefaults: { model: 'gpt-5', reasoningEffort: 'medium' },
     });
     await reviewSurface.connect();
+    const reviewEvents: unknown[] = [];
+    reviewSurface.onEvent((event) => reviewEvents.push(event));
     await reviewSurface.sendMessage('/review focus on regressions');
     expect(lastRequest(reviewTransport, 'thread/start')).toMatchObject({ params: { model: 'gpt-5' } });
     expect(lastRequest(reviewTransport, 'review/start')).toMatchObject({
@@ -300,6 +302,24 @@ describe('CodexSurface', () => {
       },
     });
     expect(lastRequest(reviewTransport, 'turn/start')).toBeUndefined();
+    expect(reviewSurface.getSnapshot().messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        role: 'user',
+        parts: [{ type: 'text', text: '/review focus on regressions' }],
+      }),
+    ]));
+    expect(reviewEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'message.appended',
+        origin: 'action',
+        payload: expect.objectContaining({
+          message: expect.objectContaining({
+            role: 'user',
+            parts: [{ type: 'text', text: '/review focus on regressions' }],
+          }),
+        }),
+      }),
+    ]));
   });
 
   it('inherits zero-thread UI selections when the first normal prompt creates a conversation', async () => {
