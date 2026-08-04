@@ -5,7 +5,6 @@ import {
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
   preserveHistoricalAttachmentPreviews,
-  preserveReviewPromptMessages,
 } from '../src/node/codex-conversation-history';
 import type { v2 } from '../src/codex';
 
@@ -527,28 +526,21 @@ describe('codexThreadToSurfaceMessages', () => {
     ]);
   });
 
-  it('preserves a slash-review prompt when history has no user item for its turn', () => {
-    const prompt = {
-      id: 'review-prompt',
-      role: 'user' as const,
-      status: 'complete' as const,
-      turnId: 'turn-review',
-      parts: [{ type: 'text' as const, text: '/review focus on regressions' }],
-      metadata: { conversationId: 'thread-review', turnId: 'turn-review', reviewPrompt: true },
-    };
-    const assistant = {
-      id: 'assistant-turn-review',
-      role: 'assistant' as const,
-      status: 'complete' as const,
-      turnId: 'turn-review',
-      parts: [{ type: 'text' as const, text: 'Found one issue.' }],
-    };
+  it('collapses duplicated initial user items materialized by an app-server review turn', () => {
+    const prompt = 'Review the current code changes and provide prioritized findings.';
+    const messages = codexTurnToSurfaceMessages('thread-review', {
+      id: 'turn-review-worker',
+      status: 'completed',
+      startedAt: 1_780_000_000,
+      completedAt: 1_780_000_010,
+      items: [
+        { type: 'userMessage', id: 'user-1', clientId: null, content: [{ type: 'text', text: prompt }] },
+        { type: 'userMessage', id: 'user-2', clientId: null, content: [{ type: 'text', text: prompt }] },
+        { type: 'agentMessage', id: 'result', text: 'No findings.', phase: null },
+      ],
+    } as unknown as v2.Turn);
 
-    expect(preserveReviewPromptMessages([], [assistant])).toStrictEqual([assistant]);
-    expect(preserveReviewPromptMessages([prompt], [assistant])).toStrictEqual([prompt, assistant]);
-    expect(preserveReviewPromptMessages([prompt], [
-      { ...prompt, id: 'server-user', metadata: undefined },
-      assistant,
-    ])).toHaveLength(2);
+    expect(messages.filter((message) => message.role === 'user')).toHaveLength(1);
+    expect(messages[0]?.parts).toStrictEqual([{ type: 'text', text: prompt }]);
   });
 });

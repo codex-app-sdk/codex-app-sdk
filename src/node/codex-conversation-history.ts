@@ -63,47 +63,13 @@ export function preserveHistoricalAttachmentPreviews(
   });
 }
 
-/**
- * Review slash prompts are client-side because review/start has no prompt
- * field. Keep them across history replacement when app-server did not return
- * any user item for that turn.
- */
-export function preserveReviewPromptMessages(
-  previousMessages: readonly SurfaceMessage[],
-  historyMessages: readonly SurfaceMessage[],
-): SurfaceMessage[] {
-  const next = [...historyMessages];
-  for (const prompt of previousMessages) {
-    if (prompt.role !== 'user' || prompt.metadata?.reviewPrompt !== true) continue;
-    const promptText = messageText(prompt);
-    const equivalentUserIndex = next.findIndex((candidate) => (
-      candidate.role === 'user'
-      && ((prompt.turnId && candidate.turnId === prompt.turnId) || messageText(candidate) === promptText)
-    ));
-    if (equivalentUserIndex >= 0) continue;
-    const sameTurnIndex = prompt.turnId
-      ? next.findIndex((candidate) => candidate.turnId === prompt.turnId)
-      : -1;
-    if (sameTurnIndex >= 0) next.splice(sameTurnIndex, 0, prompt);
-    else next.push(prompt);
-  }
-  return next;
-}
-
-function messageText(message: SurfaceMessage): string {
-  return message.parts
-    .filter((part): part is Extract<SurfaceMessagePart, { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .join('\n')
-    .trim();
-}
-
 export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): SurfaceMessage[] {
   const messages: SurfaceMessage[] = [];
   const assistantParts: SurfaceMessagePart[] = [];
   const createdAt = timestampToIso(turn.startedAt ?? turn.completedAt);
   let assistantSegmentIndex = 0;
   let sawAssistantActivity = false;
+  const initialUserMessageKeys = new Set<string>();
 
   const flushAssistantMessage = () => {
     if (assistantParts.length === 0) {
@@ -129,6 +95,9 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       const parts = userMessageParts(item);
       if (parts.length > 0) {
         const isSteerMessage = sawAssistantActivity;
+        const initialMessageKey = isSteerMessage ? null : JSON.stringify(parts);
+        if (initialMessageKey && initialUserMessageKeys.has(initialMessageKey)) continue;
+        if (initialMessageKey) initialUserMessageKeys.add(initialMessageKey);
         flushAssistantMessage();
         messages.push({
           id: item.clientId ?? `user-${threadId}-${turn.id}-${item.id ?? messages.length}`,

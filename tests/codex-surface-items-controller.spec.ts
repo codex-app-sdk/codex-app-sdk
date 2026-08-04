@@ -68,6 +68,22 @@ describe('CodexSurfaceItemsController', () => {
     }));
   });
 
+  it('collapses duplicated initial user items from an app-server review turn', () => {
+    const setup = itemController();
+    const prompt = 'Review the current code changes and provide prioritized findings.';
+
+    setup.controller.applyItem(item('userMessage', {
+      id: 'review-user-1', clientId: null, content: [{ type: 'text', text: prompt }],
+    }), true);
+    setup.controller.applyItem(item('userMessage', {
+      id: 'review-user-2', clientId: null, content: [{ type: 'text', text: prompt }],
+    }), true);
+
+    expect(setup.runtime.messages).toHaveLength(1);
+    expect(setup.runtime.messages[0]?.parts).toStrictEqual([{ type: 'text', text: prompt }]);
+    expect(setup.host.emitEvent).toHaveBeenCalledTimes(1);
+  });
+
   it('emits both phases of context compaction', () => {
     const setup = itemController();
     setup.controller.applyItem(item('contextCompaction', { id: 'compact-1' }), false);

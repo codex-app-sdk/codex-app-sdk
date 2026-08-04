@@ -302,23 +302,11 @@ describe('CodexSurface', () => {
       },
     });
     expect(lastRequest(reviewTransport, 'turn/start')).toBeUndefined();
-    expect(reviewSurface.getSnapshot().messages).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        role: 'user',
-        parts: [{ type: 'text', text: '/review focus on regressions' }],
-      }),
+    expect(reviewSurface.getSnapshot().messages).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'user' }),
     ]));
-    expect(reviewEvents).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'message.appended',
-        origin: 'action',
-        payload: expect.objectContaining({
-          message: expect.objectContaining({
-            role: 'user',
-            parts: [{ type: 'text', text: '/review focus on regressions' }],
-          }),
-        }),
-      }),
+    expect(reviewEvents).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'message.appended', origin: 'action' }),
     ]));
   });
 

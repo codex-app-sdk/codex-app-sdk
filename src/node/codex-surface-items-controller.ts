@@ -193,6 +193,13 @@ export class CodexSurfaceItemsController {
         && candidate.metadata?.turnId === params.turnId
         && candidate.parts.length > 0
       ));
+      const duplicateInitialMessage = !isSteer && runtime.messages.some((candidate) => (
+        candidate.role === 'user'
+        && candidate.turnId === params.turnId
+        && candidate.kind !== 'steer'
+        && JSON.stringify(candidate.parts) === JSON.stringify(message.parts)
+      ));
+      if (duplicateInitialMessage) return;
       const appended = isSteer ? { ...message, kind: 'steer' as const } : message;
       const messages = [...runtime.messages, appended];
       this.host.patchRuntime(params.threadId, {

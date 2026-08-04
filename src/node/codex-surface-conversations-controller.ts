@@ -8,7 +8,6 @@ import type {
 import {
   codexTurnToSurfaceMessages,
   preserveHistoricalAttachmentPreviews,
-  preserveReviewPromptMessages,
 } from './codex-conversation-history';
 import { normalizedConversationId, errorMessage } from './codex-surface-prompts';
 import { threadToSummary, upsertConversation } from './codex-surface-data';
@@ -305,10 +304,9 @@ export class CodexSurfaceConversationsController {
       current.messages,
       historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn)),
     );
-    const messages = preserveReviewPromptMessages(current.messages, historyMessages);
     this.host.patchRuntime(threadId, {
       turnIds: [...historicalTurns.map((turn) => turn.id), ...preservedTurnIds],
-      messages: [...messages, ...preservedMessages],
+      messages: [...historyMessages, ...preservedMessages],
     });
     const turnCount = this.host.requireRuntime(threadId).turnIds.length;
     const state = this.host.getState();
