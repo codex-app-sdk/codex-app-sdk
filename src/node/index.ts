@@ -40,6 +40,11 @@ export {
   type CodexThreadStartExtension,
   type ListCodexSkillsOptions,
 } from './codex-surface';
+export type {
+  CodexConversationHistoryPage,
+  CodexConversationLoadingStrategy,
+  CodexConversationRenderStrategy,
+} from '../surface/types';
 export {
   CodexAppBackend,
   createCodexAppBackend,

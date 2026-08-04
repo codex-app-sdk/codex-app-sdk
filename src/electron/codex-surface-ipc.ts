@@ -45,6 +45,7 @@ const channels = {
   listModels: 'codex-surface:list-models',
   logout: 'codex-surface:logout',
   readConversationHistory: 'codex-surface:read-conversation-history',
+  loadOlderConversationHistory: 'codex-surface:load-older-conversation-history',
   refreshAccount: 'codex-surface:refresh-account',
   refreshConversations: 'codex-surface:refresh-conversations',
   renameConversation: 'codex-surface:rename-conversation',
@@ -83,6 +84,7 @@ type SurfaceRequests = {
   [channels.listModels]: IpcRequest<[options?: ListCodexModelsOptions], CodexSurfaceModel[]>;
   [channels.logout]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.readConversationHistory]: IpcRequest<[conversationId?: string], CodexConversationHistory>;
+  [channels.loadOlderConversationHistory]: IpcRequest<[conversationId?: string], import('../surface/types').CodexConversationHistoryPage>;
   [channels.refreshAccount]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.refreshConversations]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.renameConversation]: IpcRequest<[title: string], CodexSurfaceSnapshot>;
@@ -150,7 +152,7 @@ export function registerCodexSurfaceIpc(
     | 'steerMessage'
     | 'steerQueuedPrompt'
     | 'unarchiveConversation'
-    | 'updateConversationSettings'>,
+    | 'updateConversationSettings'> & Partial<Pick<CodexSurface, 'loadOlderConversationHistory'>>,
 ): () => void {
   const unregisterHandlers = registerIpcMainHandlers<SurfaceRequests>(strictArityPort(port), {
     [channels.archiveConversation]: (_event, conversationId) => (
@@ -179,9 +181,13 @@ export function registerCodexSurfaceIpc(
     ),
     [channels.listModels]: (_event, options) => surface.listModels(rendererListModelsOptions(options)),
     [channels.logout]: () => surface.logout(),
-    [channels.readConversationHistory]: (_event, conversationId) => (
+  [channels.readConversationHistory]: (_event, conversationId) => (
       surface.readConversationHistory(optionalNonEmptyString(conversationId, 'Conversation id'))
-    ),
+  ),
+  [channels.loadOlderConversationHistory]: (_event, conversationId) => (
+      surface.loadOlderConversationHistory?.(optionalNonEmptyString(conversationId, 'Conversation id'))
+        ?? Promise.reject(new Error('Conversation history paging is not available.'))
+  ),
     [channels.refreshAccount]: () => surface.refreshAccount(),
     [channels.refreshConversations]: () => surface.refreshConversations(),
     [channels.renameConversation]: (_event, title) => surface.renameConversation(nonEmptyString(title, 'Conversation title')),
@@ -596,6 +602,7 @@ const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, m
   [channels.listModels]: [0, 1],
   [channels.logout]: [0, 0],
   [channels.readConversationHistory]: [0, 1],
+  [channels.loadOlderConversationHistory]: [0, 1],
   [channels.refreshAccount]: [0, 0],
   [channels.refreshConversations]: [0, 0],
   [channels.renameConversation]: [1, 1],
@@ -649,6 +656,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     onEvent: (listener) => renderer.on(channels.event, listener),
     onStateChange: (listener) => renderer.on(channels.stateChanged, listener),
     readConversationHistory: (conversationId) => renderer.invoke(channels.readConversationHistory, conversationId),
+    loadOlderConversationHistory: (conversationId) => renderer.invoke(channels.loadOlderConversationHistory, conversationId),
     refreshAccount: () => renderer.invoke(channels.refreshAccount),
     refreshConversations: () => renderer.invoke(channels.refreshConversations),
     renameConversation: (title) => renderer.invoke(channels.renameConversation, title),

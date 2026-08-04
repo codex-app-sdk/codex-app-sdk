@@ -27,6 +27,8 @@ type CodexSurfaceOptions = {
     serviceTier?: string | null;
   };
   conversationLimit?: number;
+  /** `lazy` keeps older pages behind loadOlderHistory; `eager` hydrates all pages progressively. */
+  loadingStrategy?: 'eager' | 'lazy';
   codexHome?: string;
   cwd?: string;
   autoSelectFirstConversation?: boolean;
@@ -229,10 +231,12 @@ Stable Node handle for one conversation:
 ```ts
 type CodexConversation = {
   readonly id: string;
-  /** Loads five recent full-detail turns immediately and older full-detail turns in the background. */
+  /** Loads 50 recent full-detail turns immediately; older pages follow the configured loading strategy. */
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;
+  /** Loads the next older page and reports whether another page remains. */
+  loadOlderHistory(): Promise<CodexConversationHistoryPage>;
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;

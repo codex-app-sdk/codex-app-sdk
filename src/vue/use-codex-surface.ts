@@ -117,6 +117,11 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     readConversationHistory: (conversationId?: string): Promise<CodexConversationHistory> => (
       api.readConversationHistory(conversationId)
     ),
+    loadOlderConversationHistory: (conversationId?: string) => (
+      api.loadOlderConversationHistory
+        ? api.loadOlderConversationHistory(conversationId)
+        : Promise.reject(new Error('Conversation history paging is not available.'))
+    ),
     refreshAccount: () => run(() => api.refreshAccount()),
     refreshConversations: () => run(() => api.refreshConversations()),
     renameConversation: (title: string) => run(() => api.renameConversation(title)),

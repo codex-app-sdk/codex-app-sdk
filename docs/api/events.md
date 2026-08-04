@@ -34,6 +34,10 @@ or prepend that batch into a rendered history without replacing the current
 snapshot. `readConversationHistory()` / `readHistory()` still waits for all
 pages and returns the authoritative complete history.
 
+For demand-paged hosts, `CodexConversationSnapshot.historyState` reports the
+selected `loadingStrategy`, `hasOlder`, `loadingOlder`, and `fullyLoaded` state while
+`CodexConversation.loadOlderHistory()` advances one opaque server cursor.
+
 Event families cover:
 
 - `surface.*`

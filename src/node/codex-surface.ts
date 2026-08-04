@@ -6,6 +6,7 @@ import type {
   CodexConversationSummary,
   CodexConversationEvent,
   CodexConversationHistory,
+  CodexConversationHistoryPage,
   CodexConversationSnapshot,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
@@ -566,12 +567,24 @@ export class CodexSurface {
       queuedPrompts: [],
       busy: false,
       historyLoading: false,
+      historyState: {
+        loadingStrategy: 'lazy',
+        hasOlder: false,
+        loadingOlder: false,
+        fullyLoaded: false,
+      },
       error: null,
     });
   }
 
   async readConversationHistory(conversationId = this.state.activeConversationId ?? ''): Promise<CodexConversationHistory> {
     return this.lifecycle.readHistory(conversationId);
+  }
+
+  async loadOlderConversationHistory(
+    conversationId = this.state.activeConversationId ?? '',
+  ): Promise<CodexConversationHistoryPage> {
+    return this.conversations.loadOlderHistory(normalizedConversationId(conversationId));
   }
 
   async renameConversation(title: string): Promise<CodexSurfaceSnapshot> {
@@ -663,6 +676,7 @@ export class CodexSurface {
       getSnapshot: () => this.getConversationSnapshot(id),
       interrupt: () => this.turnActions.interruptThread(id),
       load: async (options) => { await this.ensureThreadReady(id, options); },
+      loadOlderHistory: () => this.loadOlderConversationHistory(id),
       onEvent: (listener) => this.onConversationEvent(id, listener),
       onStateChange: (listener) => this.onConversationStateChange(id, listener),
       readHistory: () => this.readConversationHistory(id),

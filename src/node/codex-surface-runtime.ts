@@ -3,6 +3,7 @@ import type {
   CodexSurfaceAuthentication,
   CodexSurfaceClientRequest,
   CodexSurfaceSnapshot,
+  CodexConversationLoadingStrategy,
   CodexSurfaceSkill,
   CodexSurfaceThreadStatus,
   SurfaceMessage,
@@ -33,6 +34,10 @@ export type ThreadRuntimeState = {
   busy: boolean;
   turnStartPending: boolean;
   historyLoading: boolean;
+  loadingStrategy: CodexConversationLoadingStrategy;
+  historyCursor: string | null;
+  historyHasOlder: boolean;
+  historyLoadingOlder: boolean;
   fullHistoryHydrated: boolean;
   error: string | null;
   planMarkdownByTurn: Map<string, string>;
@@ -76,6 +81,12 @@ export function initialSurfaceSnapshot(authentication: CodexSurfaceAuthenticatio
     queuedPrompts: [],
     busy: false,
     historyLoading: false,
+    historyState: {
+      loadingStrategy: 'lazy',
+      hasOlder: false,
+      loadingOlder: false,
+      fullyLoaded: false,
+    },
     error: null,
   };
 }
@@ -110,6 +121,10 @@ export function createThreadRuntime(
     busy: false,
     turnStartPending: false,
     historyLoading: false,
+    loadingStrategy: state.historyState?.loadingStrategy ?? 'lazy',
+    historyCursor: null,
+    historyHasOlder: false,
+    historyLoadingOlder: false,
     fullHistoryHydrated: false,
     error: null,
     planMarkdownByTurn: new Map(),
@@ -133,6 +148,7 @@ export function runtimeProjection(
   | 'error'
   | 'goal'
   | 'historyLoading'
+  | 'historyState'
   | 'messages'
   | 'permissionProfiles'
   | 'planMode'
@@ -156,6 +172,12 @@ export function runtimeProjection(
     error: runtime.error,
     goal: runtime.goal,
     historyLoading: runtime.historyLoading,
+    historyState: {
+      loadingStrategy: runtime.loadingStrategy,
+      hasOlder: runtime.historyHasOlder,
+      loadingOlder: runtime.historyLoadingOlder,
+      fullyLoaded: runtime.fullHistoryHydrated,
+    },
     messages: runtime.messages,
     permissionProfiles: runtime.permissionProfiles,
     planMode: runtime.planMode,

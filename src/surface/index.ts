@@ -1,5 +1,9 @@
 export type {
   CodexConversationHistory,
+  CodexConversationHistoryPage,
+  CodexConversationHistoryState,
+  CodexConversationLoadingStrategy,
+  CodexConversationRenderStrategy,
   CodexConversationEvent,
   CodexConversationSnapshot,
   CodexConversationSummary,

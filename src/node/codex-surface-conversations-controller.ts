@@ -10,12 +10,14 @@ import { normalizedConversationId, errorMessage } from './codex-surface-prompts'
 import { threadToSummary, upsertConversation } from './codex-surface-data';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
 
-const HISTORY_PAGE_SIZE = 5;
-const HISTORY_MESSAGE_BATCH_SIZE = 20;
+const HISTORY_INITIAL_PAGE_SIZE = 50;
+const HISTORY_PAGE_SIZE = 25;
+const HISTORY_MESSAGE_BATCH_SIZE = 25;
 
 type HistoryHydrationOptions = {
   initialPageLoaded?: boolean;
   cursor?: string | null;
+  restart?: boolean;
 };
 
 export type CodexSurfaceConversationsHost = {
@@ -38,6 +40,11 @@ export type CodexSurfaceConversationsHost = {
 
 export class CodexSurfaceConversationsController {
   private readonly historyHydrations = new Map<string, Promise<void>>();
+  private readonly historyLoads = new Map<string, Promise<{
+    conversationId: string;
+    messages: SurfaceMessage[];
+    hasOlder: boolean;
+  }>>();
 
   constructor(
     private readonly client: CodexAppServerClient,
@@ -47,10 +54,12 @@ export class CodexSurfaceConversationsController {
 
   reset(): void {
     this.historyHydrations.clear();
+    this.historyLoads.clear();
   }
 
   forget(threadId: string): void {
     this.historyHydrations.delete(threadId);
+    this.historyLoads.delete(threadId);
   }
 
   async refresh(): Promise<CodexSurfaceSnapshot> {
@@ -104,51 +113,48 @@ export class CodexSurfaceConversationsController {
 
   hydrateCompleteHistory(threadId: string, options: HistoryHydrationOptions = {}): Promise<void> {
     const runtime = this.host.requireRuntime(threadId);
-    if (runtime.fullHistoryHydrated) return Promise.resolve();
+    if (runtime.fullHistoryHydrated && !options.restart) return Promise.resolve();
     if (options.initialPageLoaded && options.cursor === null) {
-      this.host.patchRuntime(threadId, { fullHistoryHydrated: true });
+      this.host.patchRuntime(threadId, {
+        historyCursor: null,
+        historyHasOlder: false,
+        fullHistoryHydrated: true,
+      });
       return Promise.resolve();
     }
     const existing = this.historyHydrations.get(threadId);
     if (existing) return existing;
     const hydration = (async () => {
       try {
-        const requestedCursors = new Set<string>();
-        const materializedTurnIds = new Set(this.host.requireRuntime(threadId).turnIds);
-        let cursor: string | null = options.cursor ?? null;
-        do {
-          if (cursor !== null) {
-            if (requestedCursors.has(cursor)) {
-              throw new Error(`Codex app-server repeated a thread history cursor for '${threadId}'`);
-            }
-            requestedCursors.add(cursor);
-          }
+        if (options.restart) {
           const response: v2.ThreadTurnsListResponse = await this.client.request('thread/turns/list', {
-            threadId, cursor, limit: HISTORY_PAGE_SIZE, sortDirection: 'desc', itemsView: 'full',
+            threadId,
+            cursor: null,
+            limit: HISTORY_INITIAL_PAGE_SIZE,
+            sortDirection: 'desc',
+            itemsView: 'full',
           });
-          const turns = [...response.data].reverse();
-          const newTurnIds = new Set(turns
-            .map((turn) => turn.id)
-            .filter((turnId) => !materializedTurnIds.has(turnId)));
-          for (const turn of turns) materializedTurnIds.add(turn.id);
-          const newMessages = this.mergeHistoryPage(threadId, turns, newTurnIds);
-          // The host prepends each event to the currently visible history. Emit
-          // the nearest-older chunk first so repeated prepends preserve the
-          // chronological order of the complete transcript.
-          for (let index = newMessages.length; index > 0;) {
-            const start = Math.max(0, index - HISTORY_MESSAGE_BATCH_SIZE);
-            this.host.emitHistoryPrepended(
-              threadId,
-              newMessages.slice(start, index),
-              'lifecycle',
-            );
-            await yieldToRenderer();
-            index = start;
-          }
-          cursor = response.nextCursor;
-        } while (cursor !== null);
+          this.mergeHistoryPage(threadId, [...response.data].reverse(), new Set());
+          this.host.patchRuntime(threadId, {
+            historyCursor: response.nextCursor,
+            historyHasOlder: response.nextCursor !== null,
+            fullHistoryHydrated: response.nextCursor === null,
+          });
+        }
+        if (options.cursor !== undefined) {
+          this.host.patchRuntime(threadId, {
+            historyCursor: options.cursor,
+            historyHasOlder: options.cursor !== null,
+          });
+        }
+        while (this.host.runtime(threadId)?.historyCursor !== null) {
+          await this.loadOlderHistory(threadId);
+        }
         if (!this.host.runtime(threadId)) return;
-        this.host.patchRuntime(threadId, { fullHistoryHydrated: true });
+        this.host.patchRuntime(threadId, {
+          fullHistoryHydrated: true,
+          historyHasOlder: false,
+        });
       } catch (error) {
         if (this.host.runtime(threadId)) {
           this.host.patchRuntime(threadId, {
@@ -165,11 +171,82 @@ export class CodexSurfaceConversationsController {
     return hydration;
   }
 
+  loadOlderHistory(threadId: string): Promise<{
+    conversationId: string;
+    messages: SurfaceMessage[];
+    hasOlder: boolean;
+  }> {
+    const runtime = this.host.requireRuntime(threadId);
+    const existing = this.historyLoads.get(threadId);
+    if (existing) return existing;
+    if (runtime.fullHistoryHydrated || runtime.historyCursor === null) {
+      return Promise.resolve({ conversationId: threadId, messages: [], hasOlder: false });
+    }
+    const load = (async () => {
+      this.host.patchRuntime(threadId, { historyLoadingOlder: true, error: null });
+      try {
+        let cursor = this.host.requireRuntime(threadId).historyCursor;
+        let messages: SurfaceMessage[] = [];
+        const requestedCursors = new Set<string>();
+        while (cursor !== null && messages.length === 0) {
+          if (requestedCursors.has(cursor)) {
+            throw new Error(`Codex app-server repeated a thread history cursor for '${threadId}'`);
+          }
+          requestedCursors.add(cursor);
+          const materializedTurnIds = new Set(this.host.requireRuntime(threadId).turnIds);
+          const response: v2.ThreadTurnsListResponse = await this.client.request('thread/turns/list', {
+            threadId, cursor, limit: HISTORY_PAGE_SIZE, sortDirection: 'desc', itemsView: 'full',
+          });
+          const turns = [...response.data].reverse();
+          const newTurnIds = new Set(turns
+            .map((turn) => turn.id)
+            .filter((turnId) => !materializedTurnIds.has(turnId)));
+          messages = this.mergeHistoryPage(threadId, turns, newTurnIds);
+          cursor = response.nextCursor;
+          this.host.patchRuntime(threadId, {
+            historyCursor: cursor,
+            historyHasOlder: cursor !== null,
+            fullHistoryHydrated: cursor === null,
+          });
+          await this.emitHistoryChunks(threadId, messages);
+        }
+        return {
+          conversationId: threadId,
+          messages,
+          hasOlder: this.host.requireRuntime(threadId).historyHasOlder,
+        };
+      } catch (error) {
+        if (this.host.runtime(threadId)) this.host.patchRuntime(threadId, { error: errorMessage(error) });
+        throw error;
+      } finally {
+        if (this.host.runtime(threadId)) this.host.patchRuntime(threadId, { historyLoadingOlder: false });
+      }
+    })();
+    this.historyLoads.set(threadId, load);
+    void load.finally(() => {
+      if (this.historyLoads.get(threadId) === load) this.historyLoads.delete(threadId);
+    }).catch(() => undefined);
+    return load;
+  }
+
+  private async emitHistoryChunks(threadId: string, messages: readonly SurfaceMessage[]): Promise<void> {
+    for (let index = messages.length; index > 0;) {
+      const start = Math.max(0, index - HISTORY_MESSAGE_BATCH_SIZE);
+      this.host.emitHistoryPrepended(threadId, messages.slice(start, index), 'lifecycle');
+      await yieldToRenderer();
+      index = start;
+    }
+  }
+
   async refreshCompleteHistory(threadId: string): Promise<void> {
     const existing = this.historyHydrations.get(threadId);
     if (existing) await existing.catch(() => undefined);
-    this.host.requireRuntime(threadId).fullHistoryHydrated = false;
-    await this.hydrateCompleteHistory(threadId);
+    this.host.patchRuntime(threadId, {
+      fullHistoryHydrated: false,
+      historyCursor: null,
+      historyHasOlder: true,
+    });
+    await this.hydrateCompleteHistory(threadId, { restart: true });
   }
 
   private async requestConversations(

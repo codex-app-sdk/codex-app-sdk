@@ -2,6 +2,8 @@ import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationEvent,
   CodexConversationHistory,
+  CodexConversationHistoryPage,
+  CodexConversationLoadingStrategy,
   CodexConversationSnapshot,
   CodexRealtimeEvent,
   CodexRealtimeInputAudioChunk,
@@ -66,6 +68,7 @@ export type CodexConversationDefaults = Pick<
 
 export type CodexConversationLoadOptions = CodexConversationHostOptions & {
   cwd?: string;
+  loadingStrategy?: CodexConversationLoadingStrategy;
 };
 
 export type ListCodexSkillsOptions = {
@@ -107,6 +110,7 @@ export type CodexConversation = {
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;
+  loadOlderHistory(): Promise<CodexConversationHistoryPage>;
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
@@ -157,6 +161,8 @@ export type CodexSurfaceOptions = {
   /** Host-owned defaults used by explicit and implicit conversation creation. */
   conversationDefaults?: Readonly<CodexConversationDefaults>;
   conversationLimit?: number;
+  /** Default history loading strategy for resumed conversations. */
+  loadingStrategy?: CodexConversationLoadingStrategy;
   /** Trusted main-process CODEX_HOME for the app-server. Never expose this through renderer IPC. */
   codexHome?: string;
   cwd?: string;

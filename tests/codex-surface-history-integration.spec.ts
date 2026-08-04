@@ -98,14 +98,14 @@ describe('CodexSurface', () => {
       'thread/turns/list': (params) => {
         const cursor = (params as { cursor: string | null }).cursor;
         expect(params).toMatchObject({
-          threadId: 'thread-existing', limit: 5, sortDirection: 'desc', itemsView: 'full',
+          threadId: 'thread-existing', limit: 25, sortDirection: 'desc', itemsView: 'full',
         });
         return cursor === 'remaining-page-2'
           ? remainingFullPage.promise
           : { data: [firstTurn], nextCursor: null, backwardsCursor: null };
       },
     });
-    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), loadingStrategy: 'eager' });
     const historyEvents: CodexSurfaceEvent[] = [];
     const historyPrependedEvents: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => {
@@ -164,11 +164,11 @@ describe('CodexSurface', () => {
         initialTurnsPage: { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null },
       }),
       'thread/turns/list': (params) => {
-        expect(params).toMatchObject({ threadId: 'thread-existing', cursor: 'older-page', limit: 5 });
+        expect(params).toMatchObject({ threadId: 'thread-existing', cursor: 'older-page', limit: 25 });
         return remainingPage.promise;
       },
     });
-    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), loadingStrategy: 'eager' });
     const prepended: Extract<CodexSurfaceEvent, { type: 'conversation.historyPrepended' }>[] = [];
     const replaced: Extract<CodexSurfaceEvent, { type: 'conversation.historyReplaced' }>[] = [];
     surface.onEvent((event) => {
@@ -187,7 +187,7 @@ describe('CodexSurface', () => {
     });
     await vi.waitFor(() => expect(prepended).toHaveLength(2));
 
-    expect(prepended.map((event) => event.payload.messages.length)).toEqual([20, 10]);
+    expect(prepended.map((event) => event.payload.messages.length)).toEqual([25, 5]);
     expect(prepended.every((event) => {
       const turnIndexes = event.payload.messages.map((message) => {
         const turnId = message.metadata?.turnId;
@@ -205,6 +205,47 @@ describe('CodexSurface', () => {
     expect(replaced).toHaveLength(1);
     expect(replaced[0]?.origin).toBe('action');
     expect(surface.getSnapshot().messages).toHaveLength(32);
+  });
+
+  it('keeps older history demand-paged by default', async () => {
+    const initialTurn = turn('turn-initial', 'completed', [
+      { type: 'userMessage', id: 'user-initial', clientId: null, content: [{ type: 'text', text: 'Initial', text_elements: [] }] },
+      { type: 'agentMessage', id: 'agent-initial', text: 'Initial reply', phase: null, memoryCitation: null },
+    ]);
+    const olderTurn = historyTurn('turn-older', 1);
+    const transport = new FakeTransport({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null },
+      }),
+      'thread/read': () => ({ thread: thread('thread-existing', false) }),
+      'thread/turns/list': (params) => {
+        expect(params).toMatchObject({
+          threadId: 'thread-existing',
+          limit: (params as { cursor: string | null }).cursor === null ? 50 : 25,
+        });
+        return (params as { cursor: string | null }).cursor === null
+          ? { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null }
+          : { data: [olderTurn], nextCursor: null, backwardsCursor: null };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    const initial = await surface.connect();
+    expect(initial.historyState).toMatchObject({ loadingStrategy: 'lazy', hasOlder: true, fullyLoaded: false });
+    expect(transport.sent.filter((message) => 'method' in message && message.method === 'thread/turns/list')).toHaveLength(0);
+
+    const page = await surface.loadOlderConversationHistory('thread-existing');
+    expect(page).toMatchObject({ conversationId: 'thread-existing', hasOlder: false });
+    expect(page.messages).toHaveLength(6);
+    expect(surface.getSnapshot().historyState).toMatchObject({ hasOlder: false, fullyLoaded: true });
+
+    const history = await surface.readConversationHistory('thread-existing');
+    expect(history.messages).toHaveLength(8);
+    expect(surface.getSnapshot().historyState).toMatchObject({ hasOlder: false, fullyLoaded: true });
+    expect(transport.sent.filter((message) => 'method' in message && message.method === 'thread/turns/list')
+      .map((message) => ('params' in message ? (message.params as { cursor: string | null }).cursor : undefined)))
+      .toEqual(['older-page', null, 'older-page']);
   });
 
   it('does not resurrect a completed turn from a stale background history page', async () => {

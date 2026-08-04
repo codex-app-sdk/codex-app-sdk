@@ -48,8 +48,9 @@ describe('CodexConversationPane', () => {
     await flushPromises();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(messageList.props('lazyMessages')).toBe(true);
-    expect(messageList.props('messageBatchSize')).toBe(50);
+    expect(messageList.props('renderStrategy')).toBe('lazy');
+    expect(messageList.props('initialMessageBatchSize')).toBe(50);
+    expect(messageList.props('messageBatchSize')).toBe(25);
     expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(5);
     transformMessage.mockClear();
 
@@ -82,7 +83,8 @@ describe('CodexConversationPane', () => {
     const transformMessage = vi.fn((message: SurfaceMessage | Message) => message);
     const wrapper = mount(CodexConversationPane, {
       props: {
-        lazyMessages: true,
+        renderStrategy: 'eager',
+        initialMessageBatchSize: 30,
         messageBatchSize: 12,
         messages,
         modelValue: '',
@@ -91,7 +93,8 @@ describe('CodexConversationPane', () => {
     });
 
     const messageList = wrapper.findComponent(CodexMessageList);
-    expect(messageList.props('lazyMessages')).toBe(true);
+    expect(messageList.props('renderStrategy')).toBe('eager');
+    expect(messageList.props('initialMessageBatchSize')).toBe(30);
     expect(messageList.props('messageBatchSize')).toBe(12);
     expect(messageList.props('transformMessage')).toBe(transformMessage);
   });

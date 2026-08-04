@@ -30,7 +30,10 @@
         :can-retry-message="canRetryMessage"
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
-        :lazy-messages="lazyMessages"
+        :has-older-messages="effectiveHasOlderHistory"
+        :render-strategy="effectiveRenderStrategy"
+        :loading-older-messages="effectiveLoadingOlderHistory"
+        :initial-message-batch-size="initialMessageBatchSize"
         :message-batch-size="messageBatchSize"
         :messages="effectiveMessages"
         :plugins="effectivePlugins"
@@ -45,6 +48,7 @@
         @copy-message="emit('copyMessage', $event)"
         @delete-message="deleteMessage"
         @edit-message="editMessage"
+        @load-older-messages="loadOlderHistory"
         @open-link="handleConversationLink"
         @quote-message="quoteMessage"
         @retry-message="retryMessage"
@@ -185,6 +189,7 @@
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, onMounted, ref, watch } from 'vue';
 import type {
+  CodexConversationRenderStrategy,
   CodexSurfaceAttachment,
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
@@ -262,8 +267,13 @@ const props = withDefaults(defineProps<{
   files?: readonly CodexFileSearchItem[];
   followUpsDisabled?: boolean;
   goal?: ThreadGoal | null;
+  hasOlderHistory?: boolean;
   historyLoading?: boolean;
+  renderStrategy?: CodexConversationRenderStrategy;
+  /** @deprecated Use renderStrategy instead. */
   lazyMessages?: boolean;
+  initialMessageBatchSize?: number;
+  loadingOlderHistory?: boolean;
   messageBatchSize?: number;
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   messages?: readonly (Message | SurfaceMessage)[];
@@ -303,8 +313,9 @@ const props = withDefaults(defineProps<{
   emptyDescription: '',
   emptyTitle: 'Start a conversation with Codex',
   historyLoading: undefined,
-  lazyMessages: true,
-  messageBatchSize: 50,
+  lazyMessages: undefined,
+  initialMessageBatchSize: 50,
+  messageBatchSize: 25,
   menuItems: () => [],
   modelValue: '',
   placeholder: 'Ask Codex…',
@@ -355,6 +366,7 @@ const emit = defineEmits<{
   deleteQueuedPrompt: [promptId: string];
   editGoal: [];
   editMessage: [payload: { content: string; index: number }];
+  loadOlderHistory: [];
   error: [message: string | null];
   interrupt: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
@@ -412,6 +424,15 @@ const effectiveGoal = computed(() => (
 ));
 const effectiveHistoryLoading = computed(() => (
   props.historyLoading ?? surfaceState.value?.historyLoading ?? false
+));
+const effectiveRenderStrategy = computed<CodexConversationRenderStrategy>(() => (
+  props.renderStrategy ?? (props.lazyMessages === false ? 'eager' : 'lazy')
+));
+const effectiveHasOlderHistory = computed(() => (
+  props.hasOlderHistory ?? surfaceState.value?.historyState?.hasOlder ?? false
+));
+const effectiveLoadingOlderHistory = computed(() => (
+  props.loadingOlderHistory ?? surfaceState.value?.historyState?.loadingOlder ?? false
 ));
 const effectiveModelCatalogStatus = computed(() => (
   props.modelCatalogStatus ?? surfaceState.value?.modelCatalogStatus
@@ -520,6 +541,14 @@ function submit(prompt: string): void {
     void runSurfaceAction(() => props.surface!.sendMessage(prompt, options));
   }
   replaceAttachments([]);
+}
+
+function loadOlderHistory(): void {
+  if (props.surface && effectiveConversationKey.value) {
+    void runSurfaceAction(() => props.surface!.loadOlderConversationHistory(String(effectiveConversationKey.value)));
+    return;
+  }
+  emit('loadOlderHistory');
 }
 
 function quoteMessage(index: number): void {

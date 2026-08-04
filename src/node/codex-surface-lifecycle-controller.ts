@@ -39,7 +39,7 @@ import {
   validateReasoningEffort,
 } from './codex-surface-settings';
 
-const CONVERSATION_HISTORY_PAGE_SIZE = 5;
+const CONVERSATION_HISTORY_PAGE_SIZE = 50;
 
 type HistoryReason = Extract<
   CodexSurfaceEvent,
@@ -77,7 +77,7 @@ export class CodexSurfaceLifecycleController {
 
   constructor(
     private readonly client: CodexAppServerClient,
-    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd'>,
+    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd' | 'loadingStrategy'>,
     private readonly catalog: CodexSurfaceCatalogController,
     private readonly extensions: CodexSurfaceExtensionsController,
     private readonly settings: CodexSurfaceConversationSettingsController,
@@ -261,6 +261,11 @@ export class CodexSurfaceLifecycleController {
         activeTurnId: hydratedRuntime.activeTurnId,
         turnIds: hydratedRuntime.turnIds,
         messages: hydratedRuntime.messages,
+        loadingStrategy: hydratedRuntime.loadingStrategy,
+        historyCursor: null,
+        historyHasOlder: false,
+        historyLoadingOlder: false,
+        fullHistoryHydrated: true,
         busy: Boolean(hydratedRuntime.activeTurnId),
         threadStatus: surfaceThreadStatus(response.thread.status),
       });
@@ -346,7 +351,11 @@ export class CodexSurfaceLifecycleController {
         : historyMessages;
       const runtime = this.host.createRuntime(response.thread.id, {
         hydrated: true,
-        fullHistoryHydrated: false,
+        loadingStrategy: hostOptions.loadingStrategy ?? this.options.loadingStrategy ?? 'lazy',
+        historyCursor: initialPage.nextCursor,
+        historyHasOlder: initialPage.nextCursor !== null,
+        historyLoadingOlder: false,
+        fullHistoryHydrated: initialPage.nextCursor === null,
         cwd: cwd ?? null,
         historyLoading: false,
         activeTurnId: runningTurnId,
@@ -367,10 +376,12 @@ export class CodexSurfaceLifecycleController {
       this.host.emitSummaryUpserted(summary, 'resumed', 'action');
       this.host.emitHistoryReplaced(response.thread.id, historyReason, 'action');
       this.emitConversationState(response.thread.id);
-      void this.conversations.hydrateCompleteHistory(response.thread.id, {
-        cursor: initialPage.nextCursor,
-        initialPageLoaded: true,
-      }).catch(() => undefined);
+      if (runtime.loadingStrategy === 'eager' && initialPage.nextCursor !== null) {
+        void this.conversations.hydrateCompleteHistory(response.thread.id, {
+          cursor: initialPage.nextCursor,
+          initialPageLoaded: true,
+        }).catch(() => undefined);
+      }
       return this.host.getSnapshot();
     } catch (error) {
       this.host.patchRuntime(conversationId, { historyLoading: false, error: errorMessage(error) });

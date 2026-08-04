@@ -337,6 +337,19 @@ export type CodexSurfaceRateLimits = {
 
 export type CodexSurfaceStatus = 'idle' | 'connecting' | 'ready' | 'error';
 
+/** Controls whether a conversation loads its complete history up front. */
+export type CodexConversationLoadingStrategy = 'eager' | 'lazy';
+
+/** Controls whether the conversation view mounts all supplied messages. */
+export type CodexConversationRenderStrategy = 'eager' | 'lazy';
+
+export type CodexConversationHistoryState = {
+  loadingStrategy: CodexConversationLoadingStrategy;
+  hasOlder: boolean;
+  loadingOlder: boolean;
+  fullyLoaded: boolean;
+};
+
 export type CodexSurfaceAccount =
   | { type: 'apiKey' }
   | { type: 'chatgpt'; email: string | null; planType: string }
@@ -406,6 +419,7 @@ export type CodexSurfaceSnapshot = {
   queuedPrompts: CodexSurfaceQueuedPrompt[];
   busy: boolean;
   historyLoading: boolean;
+  historyState?: CodexConversationHistoryState;
   error: string | null;
 };
 
@@ -419,6 +433,12 @@ export type CodexConversationHistory = {
   conversationId: string;
   messages: SurfaceMessage[];
   threadStatus: CodexSurfaceThreadStatus | null;
+};
+
+export type CodexConversationHistoryPage = {
+  conversationId: string;
+  messages: SurfaceMessage[];
+  hasOlder: boolean;
 };
 
 export type CodexSurfaceEventOrigin = 'action' | 'notification' | 'lifecycle';
@@ -803,6 +823,7 @@ export type CodexSurfaceApi = {
   unarchiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   selectConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   readConversationHistory(conversationId?: string): Promise<CodexConversationHistory>;
+  loadOlderConversationHistory?(conversationId?: string): Promise<CodexConversationHistoryPage>;
   renameConversation(title: string): Promise<CodexSurfaceSnapshot>;
   updateConversationSettings(settings: UpdateCodexConversationSettings): Promise<CodexSurfaceSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;

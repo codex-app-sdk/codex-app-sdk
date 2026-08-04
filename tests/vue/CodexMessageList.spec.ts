@@ -210,6 +210,29 @@ describe('CodexMessageList', () => {
     expect(lazyWrapper.text()).toContain('Message 74');
   });
 
+  it('mounts 50 messages initially and reveals 25 more per upward batch by default', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { messages: makeMessages(80) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+
+    expect(wrapper.findAll('.chat-message')).toHaveLength(50);
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAll('.chat-message')).toHaveLength(75);
+    expect(wrapper.findAllComponents(CodexMessage)[0]?.props('index')).toBe(5);
+    expect(wrapper.findAllComponents(CodexMessage).at(-1)?.props('index')).toBe(79);
+    wrapper.unmount();
+  });
+
   it('transforms only the mounted lazy batch and preserves absolute indexes', () => {
     const allMessages = makeMessages(75);
     const transformMessage = vi.fn((message: Message | SurfaceMessage, index: number) => ({

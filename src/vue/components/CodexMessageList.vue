@@ -62,7 +62,12 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
+import type {
+  CodexConversationRenderStrategy,
+  CodexSurfacePlugin,
+  CodexSurfaceSkill,
+  SurfaceMessage,
+} from '../../surface/types'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
@@ -81,7 +86,12 @@ const props = withDefaults(defineProps<{
   canRetryMessage?: boolean
   emptyLabel?: string
   followUpsDisabled?: boolean
+  hasOlderMessages?: boolean
+  renderStrategy?: CodexConversationRenderStrategy
+  /** @deprecated Use renderStrategy instead. */
   lazyMessages?: boolean
+  initialMessageBatchSize?: number
+  loadingOlderMessages?: boolean
   messageBatchSize?: number
   messages: readonly (Message | SurfaceMessage)[]
   transformMessage?: (message: Message | SurfaceMessage, index: number) => Message | SurfaceMessage
@@ -99,8 +109,9 @@ const props = withDefaults(defineProps<{
   canEditMessage: true,
   canRetryMessage: true,
   emptyLabel: 'No messages yet',
-  lazyMessages: true,
-  messageBatchSize: 50,
+  hasOlderMessages: false,
+  lazyMessages: undefined,
+  loadingOlderMessages: false,
   scrollToBottomLabel: 'Scroll to bottom',
   showToolDetails: undefined,
 })
@@ -134,6 +145,7 @@ const emit = defineEmits<{
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]
+  'load-older-messages': []
   'open-link': [link: CodexConversationLink]
   'quote-message': [index: number]
   'retry-message': [index: number]
@@ -147,7 +159,18 @@ const thinkingPlaceholder: SurfaceMessage = {
   status: 'streaming',
   parts: [],
 }
-const renderStartIndex = ref(initialRenderStart(props.messages, props.messageBatchSize, props.lazyMessages))
+const effectiveRenderStrategy = computed<CodexConversationRenderStrategy>(() => (
+  props.renderStrategy ?? (props.lazyMessages === false ? 'eager' : 'lazy')
+))
+const effectiveInitialMessageBatchSize = computed(() => (
+  props.initialMessageBatchSize ?? props.messageBatchSize ?? 50
+))
+const effectiveMessageBatchSize = computed(() => props.messageBatchSize ?? 25)
+const renderStartIndex = ref(initialRenderStart(
+  props.messages,
+  effectiveInitialMessageBatchSize.value,
+  effectiveRenderStrategy.value === 'lazy',
+))
 type MessageIdentity = string | object | null
 let renderedAnchor = messageIdentityAt(props.messages, renderStartIndex.value)
 let observedMessagesLength = props.messages.length
@@ -162,17 +185,17 @@ const hasStreamingAssistant = computed(() => props.messages.some((message) => (
       : message.status === 'streaming'
   )
 )))
-const visibleMessages = computed(() => props.lazyMessages
+const visibleMessages = computed(() => effectiveRenderStrategy.value === 'lazy'
   ? props.messages.slice(renderStartIndex.value)
   : props.messages)
 const displayEntries = computed(() => {
   const entries = visibleMessages.value.map((message, offset) => ({
-    index: props.lazyMessages ? renderStartIndex.value + offset : offset,
+    index: effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset,
     message: props.transformMessage?.(
       message,
-      props.lazyMessages ? renderStartIndex.value + offset : offset,
+      effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset,
     ) ?? message,
-    key: message.id ?? (props.lazyMessages ? renderStartIndex.value + offset : offset),
+    key: message.id ?? (effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset),
   }))
   if (props.busy && !hasStreamingAssistant.value) {
     entries.push({ index: props.messages.length, message: thinkingPlaceholder, key: thinkingPlaceholder.id })
@@ -219,7 +242,7 @@ onMounted(async () => {
 watch(() => props.messages.length, async (nextLength) => {
   const previousLength = observedMessagesLength
   observedMessagesLength = nextLength
-  if (props.lazyMessages) {
+  if (effectiveRenderStrategy.value === 'lazy') {
     reconcileMessageWindow(nextLength, previousLength)
   }
   observeMessageBounds()
@@ -231,8 +254,8 @@ watch(() => props.messages.length, async (nextLength) => {
 }, { flush: 'sync' })
 
 watch(() => props.resetKey, async () => {
-  if (props.lazyMessages) {
-    setRenderStartIndex(initialRenderStart(props.messages, props.messageBatchSize, true))
+  if (effectiveRenderStrategy.value === 'lazy') {
+    setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value, true))
     loadingOlderMessages.value = false
   }
   observeMessageBounds()
@@ -241,14 +264,14 @@ watch(() => props.resetKey, async () => {
   scrollToBottom()
 })
 
-watch(() => [props.lazyMessages, props.messageBatchSize] as const, async () => {
-  if (!props.lazyMessages) {
+watch(() => [effectiveRenderStrategy.value, effectiveInitialMessageBatchSize.value, effectiveMessageBatchSize.value] as const, async () => {
+  if (effectiveRenderStrategy.value !== 'lazy') {
     setRenderStartIndex(0)
     observeMessageBounds()
     loadingOlderMessages.value = false
     return
   }
-  setRenderStartIndex(initialRenderStart(props.messages, props.messageBatchSize, true))
+  setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value, true))
   observeMessageBounds()
   loadingOlderMessages.value = false
   await nextTick()
@@ -257,7 +280,9 @@ watch(() => [props.lazyMessages, props.messageBatchSize] as const, async () => {
 
 function handleScroll(): void {
   updateStickiness()
-  if (props.lazyMessages && isNearTop()) {
+  if (effectiveRenderStrategy.value === 'lazy' && isNearTop() && renderStartIndex.value <= 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
+    emit('load-older-messages')
+  } else if (effectiveRenderStrategy.value === 'lazy' && isNearTop()) {
     void loadOlderMessages()
   }
 }
@@ -272,7 +297,7 @@ async function loadOlderMessages(): Promise<void> {
   const previousHeight = target?.scrollHeight ?? 0
   const previousTop = target?.scrollTop ?? 0
   loadingOlderMessages.value = true
-  setRenderStartIndex(Math.max(0, renderStartIndex.value - normalizedBatchSize(props.messageBatchSize)))
+  setRenderStartIndex(Math.max(0, renderStartIndex.value - normalizedBatchSize(effectiveMessageBatchSize.value)))
   await nextTick()
   if (target) {
     target.scrollTop = previousTop + target.scrollHeight - previousHeight
@@ -281,11 +306,11 @@ async function loadOlderMessages(): Promise<void> {
 }
 
 function reconcileMessageWindow(nextLength: number, previousLength: number): void {
-  const batchSize = normalizedBatchSize(props.messageBatchSize)
+  const batchSize = normalizedBatchSize(effectiveInitialMessageBatchSize.value)
   const previousTailStart = Math.max(0, previousLength - batchSize)
   const wasTailWindow = renderStartIndex.value === previousTailStart
   if (nextLength < previousLength) {
-    setRenderStartIndex(initialRenderStart(props.messages, props.messageBatchSize, true))
+    setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value, true))
     return
   }
   if (nextLength <= previousLength) return
@@ -342,7 +367,7 @@ function findMessageIndex(messages: readonly (Message | SurfaceMessage)[], ident
 }
 
 function normalizedBatchSize(value: number | undefined): number {
-  return Math.max(1, Math.floor(value ?? 50))
+  return Math.max(1, Math.floor(value ?? 25))
 }
 
 function initialRenderStart(
@@ -359,6 +384,9 @@ function tailRenderStart(messages: readonly (Message | SurfaceMessage)[], batchS
 
 function updateStickiness(): void {
   const next = isAtBottom()
+  if (next && effectiveRenderStrategy.value === 'lazy' && renderStartIndex.value > tailRenderStart(props.messages, normalizedBatchSize(effectiveInitialMessageBatchSize.value))) {
+    setRenderStartIndex(tailRenderStart(props.messages, normalizedBatchSize(effectiveInitialMessageBatchSize.value)))
+  }
   if (stickToBottom.value !== next) {
     stickToBottom.value = next
     emit('stickiness-change', next)
