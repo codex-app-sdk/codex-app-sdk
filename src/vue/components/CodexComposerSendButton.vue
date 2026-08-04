@@ -7,9 +7,7 @@
     :aria-label="busy ? interruptLabel : submitLabel"
     @click="emit('click')"
   >
-    <svg v-if="!busy" aria-hidden="true" width="16" height="16" viewBox="0 0 16 16">
-      <path d="M14 8 2 2l2.5 6L2 14l12-6Z" fill="currentColor" />
-    </svg>
+    <PlayerPlayFilledIcon v-if="!busy" aria-hidden="true" :size="16" />
     <svg
       v-else
       class="codex-composer-send-button__spinner"
@@ -34,6 +32,8 @@
 </template>
 
 <script setup lang="ts">
+import { PlayerPlayFilledIcon } from '../icons/app-icons';
+
 withDefaults(defineProps<{
   busy?: boolean;
   disabled?: boolean;

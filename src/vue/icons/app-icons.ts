@@ -36,6 +36,7 @@ export {
   IconPencil as PencilIcon,
   IconPlugConnected as PlugIcon,
   IconPlayerPlay as PlayerPlayIcon,
+  IconPlayerPlayFilled as PlayerPlayFilledIcon,
   IconPhoto as PhotoIcon,
   IconPlus as PlusIcon,
   IconCirclePlus as PlusCircleIcon,
