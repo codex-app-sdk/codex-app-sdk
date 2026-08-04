@@ -45,7 +45,6 @@ export {
   IconRefresh as RefreshIcon,
   IconSearch as SearchIcon,
   IconRotateClockwise as RotateClockwiseIcon,
-  IconSend as SendIcon,
   IconSettings as SettingsIcon,
   IconShieldCheck as ShieldCheckIcon,
   IconSparkleHighlight as SparklesIcon,
