@@ -28,6 +28,23 @@ await surface.createConversation({
 await surface.selectConversation(existingId);
 ```
 
+## Release inactive local state
+
+Hosts that keep many conversations available can release an idle conversation's
+in-memory runtime without archiving or deleting its app-server thread:
+
+```ts
+surface.forgetConversation(conversationId);
+const conversation = surface.conversation(conversationId);
+await conversation.load();
+```
+
+`forgetConversation()` keeps the conversation summary, removes the cached
+runtime and handle, and clears the active projection only when that conversation
+was selected. It performs no remote app-server action. `load()` or
+`readHistory()` recreates the local runtime when the conversation is needed
+again.
+
 If there is no active conversation, `sendMessage`, `setGoal`, and `startReview`
 create one automatically using host defaults.
 

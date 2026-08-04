@@ -551,6 +551,9 @@ export type CodexSurfaceEvent =
     messages: readonly SurfaceMessage[];
     threadStatus: CodexSurfaceThreadStatus | null;
   }>
+  | CodexConversationEventEnvelope<'conversation.historyPrepended', {
+    messages: readonly SurfaceMessage[];
+  }>
   | CodexConversationEventEnvelope<'conversation.activityChanged', {
     threadStatus: CodexSurfaceThreadStatus | null;
     busy: boolean;

@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
-import type { CodexSurfaceEvent } from '../src/surface';
+import type { CodexSurfaceEvent, SurfaceMessage } from '../src/surface';
 import { FakeTransport, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
+
+function historyTurn(id: string, index: number): Record<string, unknown> {
+  return turn(id, 'completed', [
+    { type: 'userMessage', id: `${id}-user-1`, clientId: null, content: [{ type: 'text', text: `Older ${index} request`, text_elements: [] }] },
+    { type: 'agentMessage', id: `${id}-agent-1`, text: `Older ${index} first reply`, phase: null, memoryCitation: null },
+    { type: 'userMessage', id: `${id}-user-2`, clientId: null, content: [{ type: 'text', text: `Older ${index} follow-up`, text_elements: [] }] },
+    { type: 'agentMessage', id: `${id}-agent-2`, text: `Older ${index} second reply`, phase: null, memoryCitation: null },
+    { type: 'userMessage', id: `${id}-user-3`, clientId: null, content: [{ type: 'text', text: `Older ${index} last request`, text_elements: [] }] },
+    { type: 'agentMessage', id: `${id}-agent-3`, text: `Older ${index} last reply`, phase: null, memoryCitation: null },
+  ]);
+}
 
 describe('CodexSurface', () => {
   it('loads history, sends a message, and reduces streaming events into surface state', async () => {
@@ -96,8 +107,10 @@ describe('CodexSurface', () => {
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     const historyEvents: CodexSurfaceEvent[] = [];
+    const historyPrependedEvents: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => {
       if (event.type === 'conversation.historyReplaced') historyEvents.push(event);
+      if (event.type === 'conversation.historyPrepended') historyPrependedEvents.push(event);
     });
 
     const snapshot = await surface.connect();
@@ -119,16 +132,83 @@ describe('CodexSurface', () => {
     expect(transport.sent.filter((message) => (
       'method' in message && message.method === 'thread/turns/list'
     ))).toHaveLength(1);
-    expect(historyEvents.at(-1)).toMatchObject({
+    expect(historyEvents).toHaveLength(1);
+    expect(historyEvents[0]).toMatchObject({
       type: 'conversation.historyReplaced',
-      origin: 'lifecycle',
-      payload: { reason: 'resync' },
+      origin: 'action',
+      payload: { reason: 'resume' },
     });
+    expect(historyPrependedEvents).toHaveLength(1);
+    expect(historyPrependedEvents[0]).toMatchObject({
+      type: 'conversation.historyPrepended',
+      origin: 'lifecycle',
+      payload: {
+        messages: [
+          expect.objectContaining({ id: 'user-thread-existing-turn-first-user-first' }),
+          expect.objectContaining({ id: 'assistant-turn-first' }),
+        ],
+      },
+    });
+  });
+
+  it('emits chronological non-cumulative batches during background hydration', async () => {
+    const initialTurn = turn('turn-initial', 'completed', [
+      { type: 'userMessage', id: 'user-initial', clientId: null, content: [{ type: 'text', text: 'Initial', text_elements: [] }] },
+      { type: 'agentMessage', id: 'agent-initial', text: 'Initial reply', phase: null, memoryCitation: null },
+    ]);
+    const olderTurns = Array.from({ length: 5 }, (_, index) => historyTurn(`turn-older-${index}`, index));
+    const remainingPage = deferred<unknown>();
+    const transport = new FakeTransport({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null },
+      }),
+      'thread/turns/list': (params) => {
+        expect(params).toMatchObject({ threadId: 'thread-existing', cursor: 'older-page', limit: 5 });
+        return remainingPage.promise;
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const prepended: Extract<CodexSurfaceEvent, { type: 'conversation.historyPrepended' }>[] = [];
+    const replaced: Extract<CodexSurfaceEvent, { type: 'conversation.historyReplaced' }>[] = [];
+    surface.onEvent((event) => {
+      if (event.type === 'conversation.historyPrepended') prepended.push(event);
+      if (event.type === 'conversation.historyReplaced') replaced.push(event);
+    });
+
+    const initialSnapshot = await surface.connect();
+    expect(initialSnapshot.messages).toHaveLength(2);
+    expect(prepended).toHaveLength(0);
+
+    remainingPage.resolve({
+      data: [...olderTurns].reverse(),
+      nextCursor: null,
+      backwardsCursor: null,
+    });
+    await vi.waitFor(() => expect(prepended).toHaveLength(2));
+
+    expect(prepended.map((event) => event.payload.messages.length)).toEqual([20, 10]);
+    expect(prepended.every((event) => {
+      const turnIndexes = event.payload.messages.map((message) => {
+        const turnId = message.metadata?.turnId;
+        return Number(typeof turnId === 'string' ? turnId.split('-').at(-1) : NaN);
+      });
+      return turnIndexes.every((index, offset, values) => offset === 0 || index >= values[offset - 1]!);
+    })).toBe(true);
+    const consumerMessages = prepended.reduce<SurfaceMessage[]>(
+      (messages, event) => [...event.payload.messages, ...messages],
+      [],
+    );
+    expect(consumerMessages.map((message) => message.metadata?.turnId)).toEqual(
+      olderTurns.flatMap((olderTurn) => Array.from({ length: 6 }, () => olderTurn.id)),
+    );
+    expect(replaced).toHaveLength(1);
+    expect(replaced[0]?.origin).toBe('action');
+    expect(surface.getSnapshot().messages).toHaveLength(32);
   });
 
   it('does not resurrect a completed turn from a stale background history page', async () => {
     const staleFullPage = deferred<unknown>();
-    const historyHydrated = deferred<void>();
     const runningTurn = turn('turn-running', 'inProgress', []);
     const transport = new FakeTransport({
       'thread/resume': () => {
@@ -146,11 +226,6 @@ describe('CodexSurface', () => {
       },
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
-    surface.onEvent((event) => {
-      if (event.type === 'conversation.historyReplaced' && event.payload.reason === 'resync') {
-        historyHydrated.resolve();
-      }
-    });
     await surface.connect();
     expect(surface.getSnapshot().busy).toBe(true);
 
@@ -160,7 +235,7 @@ describe('CodexSurface', () => {
     });
     expect(surface.getSnapshot().busy).toBe(false);
     staleFullPage.resolve({ data: [runningTurn], nextCursor: null, backwardsCursor: null });
-    await historyHydrated.promise;
+    await vi.waitFor(() => expect(surface.conversation('thread-existing').getSnapshot().activeTurnId).toBeNull());
 
     expect(surface.getSnapshot().busy).toBe(false);
     expect(surface.conversation('thread-existing').getSnapshot().activeTurnId).toBeNull();

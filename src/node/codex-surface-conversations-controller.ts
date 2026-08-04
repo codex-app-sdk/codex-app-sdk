@@ -3,6 +3,7 @@ import type {
   CodexConversationSummary,
   CodexSurfaceSnapshot,
   ListCodexConversationsOptions,
+  SurfaceMessage,
 } from '../surface/types';
 import { codexTurnToSurfaceMessages, preserveHistoricalAttachmentPreviews } from './codex-conversation-history';
 import { normalizedConversationId, errorMessage } from './codex-surface-prompts';
@@ -10,6 +11,7 @@ import { threadToSummary, upsertConversation } from './codex-surface-data';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
 
 const HISTORY_PAGE_SIZE = 5;
+const HISTORY_MESSAGE_BATCH_SIZE = 20;
 
 type HistoryHydrationOptions = {
   initialPageLoaded?: boolean;
@@ -17,7 +19,7 @@ type HistoryHydrationOptions = {
 };
 
 export type CodexSurfaceConversationsHost = {
-  emitHistoryReplaced(threadId: string, reason: 'resync', origin: 'lifecycle'): void;
+  emitHistoryPrepended(threadId: string, messages: readonly SurfaceMessage[], origin: 'lifecycle'): void;
   emitSummaryUpserted(
     summary: CodexConversationSummary,
     reason: 'listed' | 'updated',
@@ -112,6 +114,7 @@ export class CodexSurfaceConversationsController {
     const hydration = (async () => {
       try {
         const requestedCursors = new Set<string>();
+        const materializedTurnIds = new Set(this.host.requireRuntime(threadId).turnIds);
         let cursor: string | null = options.cursor ?? null;
         do {
           if (cursor !== null) {
@@ -123,12 +126,29 @@ export class CodexSurfaceConversationsController {
           const response: v2.ThreadTurnsListResponse = await this.client.request('thread/turns/list', {
             threadId, cursor, limit: HISTORY_PAGE_SIZE, sortDirection: 'desc', itemsView: 'full',
           });
-          this.mergeHistoryPage(threadId, [...response.data].reverse());
+          const turns = [...response.data].reverse();
+          const newTurnIds = new Set(turns
+            .map((turn) => turn.id)
+            .filter((turnId) => !materializedTurnIds.has(turnId)));
+          for (const turn of turns) materializedTurnIds.add(turn.id);
+          const newMessages = this.mergeHistoryPage(threadId, turns, newTurnIds);
+          // The host prepends each event to the currently visible history. Emit
+          // the nearest-older chunk first so repeated prepends preserve the
+          // chronological order of the complete transcript.
+          for (let index = newMessages.length; index > 0;) {
+            const start = Math.max(0, index - HISTORY_MESSAGE_BATCH_SIZE);
+            this.host.emitHistoryPrepended(
+              threadId,
+              newMessages.slice(start, index),
+              'lifecycle',
+            );
+            await yieldToRenderer();
+            index = start;
+          }
           cursor = response.nextCursor;
         } while (cursor !== null);
         if (!this.host.runtime(threadId)) return;
         this.host.patchRuntime(threadId, { fullHistoryHydrated: true });
-        this.host.emitHistoryReplaced(threadId, 'resync', 'lifecycle');
       } catch (error) {
         if (this.host.runtime(threadId)) {
           this.host.patchRuntime(threadId, {
@@ -180,9 +200,13 @@ export class CodexSurfaceConversationsController {
     return conversations;
   }
 
-  private mergeHistoryPage(threadId: string, turns: readonly v2.Turn[]): void {
+  private mergeHistoryPage(
+    threadId: string,
+    turns: readonly v2.Turn[],
+    newTurnIds: ReadonlySet<string>,
+  ): SurfaceMessage[] {
     const current = this.host.runtime(threadId);
-    if (!current) return;
+    if (!current) return [];
     const protectedTurnIds = new Set<string>();
     if (current.activeTurnId) protectedTurnIds.add(current.activeTurnId);
     for (const turn of turns) {
@@ -196,10 +220,11 @@ export class CodexSurfaceConversationsController {
     const preservedMessages = current.messages.filter((message) => (
       message.turnId === undefined || !replaceableTurnIds.has(message.turnId)
     ));
-    const messages = preserveHistoricalAttachmentPreviews(
+    const historyMessages = preserveHistoricalAttachmentPreviews(
       current.messages,
       historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn)),
     );
+    const messages = historyMessages;
     this.host.patchRuntime(threadId, {
       turnIds: [...historicalTurns.map((turn) => turn.id), ...preservedTurnIds],
       messages: [...messages, ...preservedMessages],
@@ -213,6 +238,7 @@ export class CodexSurfaceConversationsController {
     });
     const summary = this.host.getState().conversations.find((conversation) => conversation.id === threadId);
     if (summary) this.host.emitSummaryUpserted(summary, 'updated', 'action');
+    return historyMessages.filter((message) => message.turnId !== undefined && newTurnIds.has(message.turnId));
   }
 
   private summaryWithKnownTurnCount(thread: v2.Thread): CodexConversationSummary {
@@ -222,4 +248,8 @@ export class CodexSurfaceConversationsController {
     const existing = this.host.getState().conversations.find((conversation) => conversation.id === thread.id);
     return existing ? { ...summary, turnCount: existing.turnCount } : summary;
   }
+}
+
+function yieldToRenderer(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }

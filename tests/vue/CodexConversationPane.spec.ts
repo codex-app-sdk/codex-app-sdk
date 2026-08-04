@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
-import { mount, type VueWrapper } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { h, nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CodexConversationPane,
+  CodexMessage,
+  CodexMessageList,
   CodexRichTextEditor,
   type CodexRichTextEditorExpose,
   type CodexComposerMenuItem,
@@ -13,6 +15,7 @@ import {
   type SurfaceMessage,
 } from '../../src/vue';
 import type { CodexSurfaceSnapshot } from '../../src/surface';
+import type { Message } from '../../src/vue/chat/types';
 
 const messages: SurfaceMessage[] = [{
   id: 'assistant-1',
@@ -22,6 +25,77 @@ const messages: SurfaceMessage[] = [{
 }];
 
 describe('CodexConversationPane', () => {
+  it('keeps the lazy window bounded across progressive prepends from a host', async () => {
+    const makeMessages = (start: number, count: number): SurfaceMessage[] => Array.from({ length: count }, (_, offset) => ({
+      id: `surface-${start + offset}`,
+      role: 'assistant',
+      status: 'complete',
+      parts: [{ type: 'text', text: `Message ${start + offset}` }],
+    }));
+    let currentMessages = makeMessages(95, 5);
+    const transformMessage = vi.fn((message: SurfaceMessage | Message) => message);
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages: currentMessages, transformMessage },
+      attachTo: document.body,
+    });
+    const messageList = wrapper.findComponent(CodexMessageList);
+    const scrollEl = messageList.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAllComponents(CodexMessage).length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(messageList.props('lazyMessages')).toBe(true);
+    expect(messageList.props('messageBatchSize')).toBe(50);
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(5);
+    transformMessage.mockClear();
+
+    const olderBatches = Array.from({ length: 15 }, (_, index) => makeMessages(75 - index * 20, 20));
+    for (const olderBatch of olderBatches) {
+      scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight - 100;
+      await wrapper.get('.message-list').trigger('scroll');
+      scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight;
+      currentMessages = [...olderBatch, ...currentMessages];
+      await wrapper.setProps({ messages: currentMessages });
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const visibleIds = new Set(currentMessages.slice(-50).map((message) => message.id));
+      const transformedIds = transformMessage.mock.calls
+        .map(([message]) => message.id)
+        .filter((id): id is string => typeof id === 'string');
+      expect(wrapper.findAllComponents(CodexMessage).length).toBeLessThanOrEqual(50);
+      expect(transformedIds.every((id) => visibleIds.has(id))).toBe(true);
+      transformMessage.mockClear();
+      scrollEl.dispatchEvent(new Event('scroll'));
+      await flushPromises();
+    }
+
+    expect(wrapper.findAllComponents(CodexMessage).length).toBe(50);
+    wrapper.unmount();
+  }, 15000);
+
+  it('forwards the opt-in lazy message window settings', () => {
+    const transformMessage = vi.fn((message: SurfaceMessage | Message) => message);
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        lazyMessages: true,
+        messageBatchSize: 12,
+        messages,
+        modelValue: '',
+        transformMessage,
+      },
+    });
+
+    const messageList = wrapper.findComponent(CodexMessageList);
+    expect(messageList.props('lazyMessages')).toBe(true);
+    expect(messageList.props('messageBatchSize')).toBe(12);
+    expect(messageList.props('transformMessage')).toBe(transformMessage);
+  });
+
   it('exposes an application-level composer focus action', async () => {
     const wrapper = mount(CodexConversationPane, {
       attachTo: document.body,

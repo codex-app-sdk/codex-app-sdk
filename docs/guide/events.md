@@ -30,7 +30,7 @@ The matching snapshot mutation is applied before the event is emitted.
 | Surface | connection, ready/error, bootstrap, close |
 | Authentication | account state, login progress/completion, logout |
 | Catalogs | conversations, models, skills, plugins, permissions |
-| Conversation | selection, settings, rename, archive/delete, history replacement |
+| Conversation | selection, settings, rename, archive/delete, history replacement and incremental prepends |
 | Messages | add/update/complete/delete, generated media |
 | Turns | start/complete/error, interruption, context compaction |
 | Tools | start/progress/complete, confirmations, user input |
@@ -68,6 +68,8 @@ Vue scope disposal automatically unregisters the underlying renderer listeners.
 ## When to use which
 
 - Render from snapshots.
+- Use `conversation.historyPrepended` for progressive background hydration;
+  each event contains only the newly materialized chronological batch.
 - Trigger business refreshes or analytics from semantic events.
 - Use `file.activity` to reveal or focus the full path in an app-owned sidebar;
   the SDK reports the operation but does not own file navigation.

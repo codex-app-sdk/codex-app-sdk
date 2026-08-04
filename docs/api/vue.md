@@ -95,6 +95,44 @@ transcript is scrolled away from the bottom. It accepts an optional accessible
 `label` and emits `click`; use it directly when composing a custom message
 layout.
 
+Message rendering is incremental by default: `CodexMessageList` and
+`CodexConversationPane` initially mount only the newest batch. Opt out with
+`lazyMessages="false"` when a host needs eager rendering of every supplied
+message:
+
+```vue
+<CodexConversationPane
+  :lazy-messages="true"
+  :message-batch-size="50"
+  :conversation-key="conversationId"
+  :surface="surface"
+/>
+```
+
+`messageBatchSize` defaults to `50`, and `lazyMessages` defaults to `true`.
+Lazy mode initially mounts the newest batch, prepends one batch when the user
+scrolls upward to the top, preserves the visible scroll anchor, and keeps bottom-follow
+behavior for new messages. The current tail, including an active streaming
+assistant row, is always included; stale historical streaming markers do not
+expand the window. Changing `conversationKey` resets the window to the newest
+batch.
+The host still supplies the complete message array; no pagination or backend
+contract is required.
+
+Both components also accept an optional typed `transformMessage` callback:
+
+```ts
+type CodexMessageTransform = (
+  message: Message | SurfaceMessage,
+  index: number,
+) => Message | SurfaceMessage;
+```
+
+The callback runs only after lazy slicing and only for mounted messages. It is
+invoked for every message when `lazyMessages` is `false`. The `index` is always
+the original absolute message index, and the original message id remains the
+rendering key. The default behavior is identity.
+
 Pass `busy` to `CodexMessageList` (the conversation pane wires this from its
 surface state) to keep a `Thinking` shimmer visible while a turn is accepted
 but the app-server has not yet materialized its first assistant row.

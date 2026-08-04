@@ -64,6 +64,40 @@ transcription lifecycle, state, and cleanup used by the stock composer.
 The latest completed assistant message keeps its actions visible for quick
 follow-up. Older messages reveal actions on hover or focus as usual.
 
+For long conversations, opt into incremental message rendering on either
+`CodexMessageList` or `CodexConversationPane`:
+
+```vue
+<CodexConversationPane
+  :conversation-key="conversationId"
+  :lazy-messages="true"
+  :message-batch-size="50"
+  :surface="surface"
+/>
+```
+
+Lazy mode mounts the newest 50 messages, adds older batches as the user scrolls
+upward to the top, and preserves the scroll anchor while doing so. It keeps the current
+tail, including an active streaming assistant row, mounted and follows new
+messages at the bottom. Lazy rendering is enabled by default; set
+`:lazy-messages="false"` to render the complete array eagerly. Hosts still
+provide the complete message array.
+
+Use `transformMessage` when a host needs to remove or adapt an envelope before
+SDK rendering. In lazy mode it runs only for the visible batch, so a full
+history does not need to be eagerly transformed:
+
+```vue
+<CodexConversationPane
+  :surface="surface"
+  :transform-message="presentMessage"
+/>
+```
+
+The callback receives the original message and absolute index, and returns a
+`Message | SurfaceMessage`. The SDK keeps the original message id as the row
+key and preserves the index for actions and slots.
+
 ### Tools and state
 
 - `CodexToolCall`, `CodexToolGroup`, and `CodexToolCallTitle`

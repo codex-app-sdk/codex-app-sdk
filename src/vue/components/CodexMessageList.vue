@@ -6,25 +6,25 @@
     <div
       ref="scrollElement"
       class="codex-message-list__viewport message-list"
-      @scroll="updateStickiness"
+      @scroll="handleScroll"
     >
       <div class="codex-message-list__content">
-        <slot v-if="displayMessages.length === 0" name="empty">
+        <slot v-if="displayEntries.length === 0" name="empty">
           <p class="codex-message-list__empty">{{ emptyLabel }}</p>
         </slot>
-        <template v-for="(message, index) in displayMessages" v-else :key="message.id ?? index">
-          <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(message)" :index="index" />
+        <template v-for="entry in displayEntries" v-else :key="entry.key">
+          <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(entry.message)" :index="entry.index" />
           <CodexMessage
             v-else
             :actions-disabled="actionsDisabled"
-            :actions-always-visible="shouldKeepAssistantActionsVisible(message, index)"
+            :actions-always-visible="shouldKeepAssistantActionsVisible(entry.message, entry.index)"
             :answered-client-request-ids="answeredClientRequestIds"
             :can-delete-message="canDeleteMessage"
             :can-edit-message="canEditMessage"
             :can-retry-message="canRetryMessage"
             :follow-ups-disabled="followUpsDisabled"
-            :index="index"
-            :message="message"
+            :index="entry.index"
+            :message="entry.message"
             :plugins="plugins"
             :presentation="presentation"
             :show-tool-details="showToolDetails"
@@ -81,7 +81,10 @@ const props = withDefaults(defineProps<{
   canRetryMessage?: boolean
   emptyLabel?: string
   followUpsDisabled?: boolean
+  lazyMessages?: boolean
+  messageBatchSize?: number
   messages: readonly (Message | SurfaceMessage)[]
+  transformMessage?: (message: Message | SurfaceMessage, index: number) => Message | SurfaceMessage
   plugins?: readonly CodexSurfacePlugin[]
   presentation?: CodexConversationPresentation
   resetKey?: string | number | null
@@ -96,6 +99,8 @@ const props = withDefaults(defineProps<{
   canEditMessage: true,
   canRetryMessage: true,
   emptyLabel: 'No messages yet',
+  lazyMessages: true,
+  messageBatchSize: 50,
   scrollToBottomLabel: 'Scroll to bottom',
   showToolDetails: undefined,
 })
@@ -142,6 +147,13 @@ const thinkingPlaceholder: SurfaceMessage = {
   status: 'streaming',
   parts: [],
 }
+const renderStartIndex = ref(initialRenderStart(props.messages, props.messageBatchSize, props.lazyMessages))
+type MessageIdentity = string | object | null
+let renderedAnchor = messageIdentityAt(props.messages, renderStartIndex.value)
+let observedMessagesLength = props.messages.length
+let observedFirstMessage = messageIdentityAt(props.messages, 0)
+let observedLastMessage = messageIdentityAt(props.messages, props.messages.length - 1)
+const loadingOlderMessages = ref(false)
 const hasStreamingAssistant = computed(() => props.messages.some((message) => (
   message.role === 'assistant' && (
     'content' in message
@@ -150,14 +162,26 @@ const hasStreamingAssistant = computed(() => props.messages.some((message) => (
       : message.status === 'streaming'
   )
 )))
-const displayMessages = computed(() => (
-  props.busy && !hasStreamingAssistant.value
-    ? [...props.messages, thinkingPlaceholder]
-    : props.messages
-))
+const visibleMessages = computed(() => props.lazyMessages
+  ? props.messages.slice(renderStartIndex.value)
+  : props.messages)
+const displayEntries = computed(() => {
+  const entries = visibleMessages.value.map((message, offset) => ({
+    index: props.lazyMessages ? renderStartIndex.value + offset : offset,
+    message: props.transformMessage?.(
+      message,
+      props.lazyMessages ? renderStartIndex.value + offset : offset,
+    ) ?? message,
+    key: message.id ?? (props.lazyMessages ? renderStartIndex.value + offset : offset),
+  }))
+  if (props.busy && !hasStreamingAssistant.value) {
+    entries.push({ index: props.messages.length, message: thinkingPlaceholder, key: thinkingPlaceholder.id })
+  }
+  return entries
+})
 const latestAssistantIndex = computed(() => {
-  for (let index = displayMessages.value.length - 1; index >= 0; index -= 1) {
-    if (displayMessages.value[index]?.role === 'assistant') return index;
+  for (let index = displayEntries.value.length - 1; index >= 0; index -= 1) {
+    if (displayEntries.value[index]?.message.role === 'assistant') return displayEntries.value[index]!.index
   }
   return -1;
 });
@@ -192,29 +216,160 @@ onMounted(async () => {
   queueScrollToBottom()
 })
 
-watch(() => props.messages.length, async () => {
-  const shouldScroll = stickToBottom.value
+watch(() => props.messages.length, async (nextLength) => {
+  const previousLength = observedMessagesLength
+  observedMessagesLength = nextLength
+  if (props.lazyMessages) {
+    reconcileMessageWindow(nextLength, previousLength)
+  }
+  observeMessageBounds()
+  const shouldScroll = isAtBottom()
   await nextTick()
   if (shouldScroll) {
     scrollToBottom()
   }
-})
+}, { flush: 'sync' })
 
 watch(() => props.resetKey, async () => {
+  if (props.lazyMessages) {
+    setRenderStartIndex(initialRenderStart(props.messages, props.messageBatchSize, true))
+    loadingOlderMessages.value = false
+  }
+  observeMessageBounds()
   stickToBottom.value = true
   await nextTick()
   scrollToBottom()
 })
 
-function updateStickiness(): void {
+watch(() => [props.lazyMessages, props.messageBatchSize] as const, async () => {
+  if (!props.lazyMessages) {
+    setRenderStartIndex(0)
+    observeMessageBounds()
+    loadingOlderMessages.value = false
+    return
+  }
+  setRenderStartIndex(initialRenderStart(props.messages, props.messageBatchSize, true))
+  observeMessageBounds()
+  loadingOlderMessages.value = false
+  await nextTick()
+  if (stickToBottom.value) scrollToBottom()
+})
+
+function handleScroll(): void {
+  updateStickiness()
+  if (props.lazyMessages && isNearTop()) {
+    void loadOlderMessages()
+  }
+}
+
+function isNearTop(): boolean {
+  return (scrollElement.value?.scrollTop ?? 0) <= props.bottomThreshold
+}
+
+async function loadOlderMessages(): Promise<void> {
+  if (loadingOlderMessages.value || renderStartIndex.value <= 0) return
   const target = scrollElement.value
-  const next = target
-    ? target.scrollHeight - target.scrollTop - target.clientHeight <= props.bottomThreshold
-    : true
+  const previousHeight = target?.scrollHeight ?? 0
+  const previousTop = target?.scrollTop ?? 0
+  loadingOlderMessages.value = true
+  setRenderStartIndex(Math.max(0, renderStartIndex.value - normalizedBatchSize(props.messageBatchSize)))
+  await nextTick()
+  if (target) {
+    target.scrollTop = previousTop + target.scrollHeight - previousHeight
+  }
+  loadingOlderMessages.value = false
+}
+
+function reconcileMessageWindow(nextLength: number, previousLength: number): void {
+  const batchSize = normalizedBatchSize(props.messageBatchSize)
+  const previousTailStart = Math.max(0, previousLength - batchSize)
+  const wasTailWindow = renderStartIndex.value === previousTailStart
+  if (nextLength < previousLength) {
+    setRenderStartIndex(initialRenderStart(props.messages, props.messageBatchSize, true))
+    return
+  }
+  if (nextLength <= previousLength) return
+  if (nextLength <= batchSize) {
+    setRenderStartIndex(0)
+    return
+  }
+
+  const anchorIndex = findMessageIndex(props.messages, renderedAnchor)
+  const hasPrependedMessages = anchorIndex >= 0 && !sameMessageIdentity(
+    messageIdentityAt(props.messages, 0),
+    observedFirstMessage,
+  );
+  if (hasPrependedMessages) {
+    setRenderStartIndex(isAtBottom() ? Math.max(0, nextLength - batchSize) : anchorIndex)
+    return
+  }
+
+  const hasAppendedMessages = sameMessageIdentity(
+    messageIdentityAt(props.messages, 0),
+    observedFirstMessage,
+  ) && !sameMessageIdentity(
+    messageIdentityAt(props.messages, nextLength - 1),
+    observedLastMessage,
+  );
+  if (hasAppendedMessages && isAtBottom() && wasTailWindow) {
+    setRenderStartIndex(Math.max(0, nextLength - batchSize))
+  }
+}
+
+function setRenderStartIndex(nextIndex: number): void {
+  renderStartIndex.value = nextIndex
+  renderedAnchor = messageIdentityAt(props.messages, nextIndex)
+}
+
+function observeMessageBounds(): void {
+  observedMessagesLength = props.messages.length
+  observedFirstMessage = messageIdentityAt(props.messages, 0)
+  observedLastMessage = messageIdentityAt(props.messages, props.messages.length - 1)
+}
+
+function messageIdentityAt(messages: readonly (Message | SurfaceMessage)[], index: number): MessageIdentity {
+  const message = messages[index]
+  return message ? message.id ?? message : null
+}
+
+function sameMessageIdentity(left: MessageIdentity, right: MessageIdentity): boolean {
+  return left === right
+}
+
+function findMessageIndex(messages: readonly (Message | SurfaceMessage)[], identity: MessageIdentity): number {
+  if (identity === null) return -1
+  return messages.findIndex((message) => sameMessageIdentity(message.id ?? message, identity))
+}
+
+function normalizedBatchSize(value: number | undefined): number {
+  return Math.max(1, Math.floor(value ?? 50))
+}
+
+function initialRenderStart(
+  messages: readonly (Message | SurfaceMessage)[],
+  batchSize: number | undefined,
+  lazy: boolean | undefined,
+): number {
+  return lazy ? tailRenderStart(messages, normalizedBatchSize(batchSize)) : 0
+}
+
+function tailRenderStart(messages: readonly (Message | SurfaceMessage)[], batchSize: number): number {
+  return Math.max(0, messages.length - batchSize)
+}
+
+function updateStickiness(): void {
+  const next = isAtBottom()
   if (stickToBottom.value !== next) {
     stickToBottom.value = next
     emit('stickiness-change', next)
   }
+}
+
+function isAtBottom(): boolean {
+  const target = scrollElement.value
+  return target
+    ? target.scrollHeight - target.scrollTop - target.clientHeight <= props.bottomThreshold
+    : stickToBottom.value
 }
 
 function scrollToBottom(): void {

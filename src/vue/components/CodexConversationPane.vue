@@ -30,6 +30,8 @@
         :can-retry-message="canRetryMessage"
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
+        :lazy-messages="lazyMessages"
+        :message-batch-size="messageBatchSize"
         :messages="effectiveMessages"
         :plugins="effectivePlugins"
         :presentation="effectivePresentation"
@@ -37,6 +39,7 @@
         :scroll-to-bottom-label="scrollToBottomLabel"
         :show-tool-details="showToolDetails"
         :skills="effectiveSkills"
+        :transform-message="transformMessage"
         @cancel="cancel"
         @client-response="respondToClientRequest"
         @copy-message="emit('copyMessage', $event)"
@@ -257,6 +260,8 @@ const props = withDefaults(defineProps<{
   followUpsDisabled?: boolean;
   goal?: ThreadGoal | null;
   historyLoading?: boolean;
+  lazyMessages?: boolean;
+  messageBatchSize?: number;
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   messages?: readonly (Message | SurfaceMessage)[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -279,6 +284,7 @@ const props = withDefaults(defineProps<{
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skills?: readonly CodexSkillSummary[];
   surface?: CodexSurfaceController;
+  transformMessage?: (message: Message | SurfaceMessage, index: number) => Message | SurfaceMessage;
   transcribeAudio?: CodexChatTranscription;
   turnGitDiff?: TurnGitDiff | null;
 }>(), {
@@ -294,6 +300,8 @@ const props = withDefaults(defineProps<{
   emptyDescription: '',
   emptyTitle: 'Start a conversation with Codex',
   historyLoading: undefined,
+  lazyMessages: true,
+  messageBatchSize: 50,
   menuItems: () => [],
   modelValue: '',
   placeholder: 'Ask Codex…',

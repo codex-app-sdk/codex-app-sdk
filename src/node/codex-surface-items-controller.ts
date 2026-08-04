@@ -63,6 +63,16 @@ export class CodexSurfaceItemsController {
     this.fileActivityKeys.clear();
   }
 
+  forget(threadId: string): void {
+    const prefix = `${threadId}\u0000`;
+    for (const key of this.commandOutputForwardItemIds) {
+      if (key.startsWith(prefix)) this.commandOutputForwardItemIds.delete(key);
+    }
+    for (const key of this.fileActivityKeys) {
+      if (key.startsWith(prefix)) this.fileActivityKeys.delete(key);
+    }
+  }
+
   isForwardingCommandOutput(threadId: string, itemId: string): boolean {
     return this.commandOutputForwardItemIds.has(threadItemKey(threadId, itemId));
   }

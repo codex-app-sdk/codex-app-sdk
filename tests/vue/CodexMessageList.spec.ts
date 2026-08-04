@@ -35,6 +35,15 @@ const messages: Message[] = [
   },
 ];
 
+function makeMessages(count: number, offset = 0): Message[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `message-${offset + index}`,
+    role: 'user' as const,
+    content: `Message ${offset + index}`,
+    createdAt: `2026-06-05T00:00:${String(index).padStart(2, '0')}.000Z`,
+  }));
+}
+
 describe('CodexMessageList', () => {
   it('keeps the thinking shimmer visible while a busy turn has no assistant row yet', async () => {
     const wrapper = mount(CodexMessageList, {
@@ -188,6 +197,258 @@ describe('CodexMessageList', () => {
     expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
   });
 
+  it('opts out of lazy rendering with an explicit false value', () => {
+    const allMessages = makeMessages(75);
+    const defaultWrapper = mount(CodexMessageList, { props: { lazyMessages: false, messages: allMessages } });
+    const lazyWrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 20, messages: allMessages },
+    });
+
+    expect(defaultWrapper.findAll('.chat-message')).toHaveLength(75);
+    expect(lazyWrapper.findAll('.chat-message')).toHaveLength(20);
+    expect(lazyWrapper.text()).not.toContain('Message 0');
+    expect(lazyWrapper.text()).toContain('Message 74');
+  });
+
+  it('transforms only the mounted lazy batch and preserves absolute indexes', () => {
+    const allMessages = makeMessages(75);
+    const transformMessage = vi.fn((message: Message | SurfaceMessage, index: number) => ({
+      ...message,
+      content: `Transformed ${index}`,
+    }));
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 20, messages: allMessages, transformMessage },
+    });
+
+    expect(transformMessage).toHaveBeenCalledTimes(20);
+    expect(transformMessage.mock.calls.map(([, index]) => index)).toEqual(
+      Array.from({ length: 20 }, (_, index) => index + 55),
+    );
+    const renderedRows = wrapper.findAllComponents(CodexMessage);
+    expect(renderedRows[0]?.props('index')).toBe(55);
+    expect(renderedRows.at(-1)?.props('index')).toBe(74);
+    expect(wrapper.text()).toContain('Transformed 74');
+  });
+
+  it('transforms a prepended lazy batch when it becomes visible', async () => {
+    const allMessages = makeMessages(25);
+    const transformMessage = vi.fn((message: Message | SurfaceMessage, index: number) => ({
+      ...message,
+      content: `Transformed ${index}`,
+    }));
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 10, messages: allMessages, transformMessage },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    transformMessage.mockClear();
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(wrapper.findAllComponents(CodexMessage)[0]?.props('index')).toBe(5);
+    expect(transformMessage).toHaveBeenCalled();
+    expect(transformMessage.mock.calls.map(([, index]) => index)).toEqual(
+      expect.arrayContaining(Array.from({ length: 10 }, (_, index) => index + 5)),
+    );
+    expect(transformMessage.mock.calls.every(([, index]) => index >= 5 && index < 25)).toBe(true);
+    expect(wrapper.text()).toContain('Transformed 5');
+    wrapper.unmount();
+  });
+
+  it('keeps prepended history outside the lazy window until the user scrolls up', async () => {
+    const currentMessages = makeMessages(10);
+    const firstOlderMessages = makeMessages(10, -10);
+    const secondOlderMessages = makeMessages(10, -20);
+    const olderMessages = [...secondOlderMessages, ...firstOlderMessages];
+    const transformMessage = vi.fn((message: Message | SurfaceMessage) => message);
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 10, messages: currentMessages, transformMessage },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    transformMessage.mockClear();
+
+    await wrapper.setProps({ messages: [...firstOlderMessages, ...currentMessages] });
+
+    const prependedIds = new Set(olderMessages.map((message) => message.id));
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toEqual(
+      currentMessages.map((message) => message.id),
+    );
+    expect(transformMessage.mock.calls.every(([message]) => !prependedIds.has(message.id))).toBe(true);
+
+    await wrapper.setProps({ messages: [...secondOlderMessages, ...firstOlderMessages, ...currentMessages] });
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toEqual(
+      currentMessages.map((message) => message.id),
+    );
+    expect(transformMessage.mock.calls.every(([message]) => !prependedIds.has(message.id))).toBe(true);
+
+    scrollEl.scrollTop = 500;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)[0]?.props('message').id).toBe(firstOlderMessages[0]!.id);
+    expect(transformMessage.mock.calls.some(([message]) => firstOlderMessages.some((older) => older.id === message.id))).toBe(true);
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)[0]?.props('message').id).toBe(secondOlderMessages[0]!.id);
+    expect(transformMessage.mock.calls.some(([message]) => secondOlderMessages.some((older) => older.id === message.id))).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('does not let a stale historical streaming row expand the lazy window', () => {
+    const allMessages = makeMessages(75);
+    allMessages[0] = { ...allMessages[0]!, role: 'assistant', streaming: true };
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 20, messages: allMessages },
+    });
+
+    expect(wrapper.text()).not.toContain('Message 0');
+    expect(wrapper.findAll('.chat-message')).toHaveLength(20);
+  });
+
+  it('keeps a current tail streaming message mounted in a lazy window', () => {
+    const allMessages = makeMessages(75);
+    allMessages[74] = { ...allMessages[74]!, role: 'assistant', streaming: true };
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 20, messages: allMessages },
+    });
+
+    expect(wrapper.text()).toContain('Message 74');
+    expect(wrapper.findAll('.chat-message')).toHaveLength(20);
+  });
+
+  it('prepends older lazy batches while preserving the visible scroll anchor', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 10, messages: makeMessages(25) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAll('.chat-message')).toHaveLength(20);
+    expect(wrapper.text()).toContain('Message 5');
+    expect(wrapper.text()).not.toContain('Message 4');
+    expect(scrollEl.scrollTop).toBe(1_000);
+    wrapper.unmount();
+  });
+
+  it('keeps a lazy transcript at the bottom when appending at the bottom', async () => {
+    const allMessages = makeMessages(15);
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 5, messages: allMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await wrapper.setProps({ messages: [...allMessages, makeMessages(1, 15)[0]!] });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Message 15');
+    expect(wrapper.text()).not.toContain('Message 10');
+    expect(scrollEl.scrollTop).toBe(900);
+    wrapper.unmount();
+  });
+
+  it('uses viewport geometry when stickiness is stale during a prepend', async () => {
+    const currentMessages = makeMessages(50);
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 50, messages: currentMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100 + 300,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight - 100;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('stickiness-change')).toContainEqual([false]);
+
+    scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight;
+    await wrapper.setProps({ messages: [...makeMessages(10, -10), ...currentMessages] });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(50);
+    expect(wrapper.findAllComponents(CodexMessage)[0]?.props('message').id).toBe(currentMessages[0]!.id);
+    wrapper.unmount();
+  });
+
+  it('does not jump to the bottom when appending while scrolled away', async () => {
+    const allMessages = makeMessages(15);
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 5, messages: allMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 100;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('stickiness-change')).toContainEqual([false]);
+
+    await wrapper.setProps({ messages: [...allMessages, makeMessages(1, 15)[0]!] });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Message 15');
+    expect(scrollEl.scrollTop).toBe(100);
+    wrapper.unmount();
+  });
+
+  it('resets the lazy window when the conversation key changes', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messageBatchSize: 5, messages: makeMessages(15), resetKey: 'thread-a' },
+    });
+
+    await wrapper.setProps({ messages: makeMessages(8, 100), resetKey: 'thread-b' });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Message 107');
+    expect(wrapper.text()).not.toContain('Message 100');
+  });
+
   it('forwards message action events from chat messages', async () => {
     const wrapper = mount(CodexMessageList, {
       props: {
@@ -299,6 +560,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     scrollEl.scrollTop = 100;
 
     await wrapper.get('.message-list').trigger('scroll');

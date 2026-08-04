@@ -290,7 +290,7 @@ export class CodexSurface {
       this.client,
       options.conversationLimit,
       {
-        emitHistoryReplaced: (threadId, reason, origin) => this.emitHistoryReplaced(threadId, reason, origin),
+        emitHistoryPrepended: (threadId, messages, origin) => this.emitHistoryPrepended(threadId, messages, origin),
         emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
         ensureConnected: () => this.ensureConnected(),
         getSnapshot: () => this.getSnapshot(),
@@ -536,6 +536,38 @@ export class CodexSurface {
 
   async selectConversation(conversationId: string): Promise<CodexSurfaceSnapshot> {
     return this.lifecycle.select(conversationId);
+  }
+
+  /**
+   * Releases one conversation from this surface's in-memory state without
+   * changing the corresponding app-server thread. The summary remains in the
+   * conversation catalog; `conversation(id).load()` or `readHistory()` can
+   * hydrate it again later.
+   */
+  forgetConversation(conversationId: string): void {
+    const threadId = normalizedConversationId(conversationId);
+    const wasActive = this.state.activeConversationId === threadId;
+    this.runtimeState.forget(threadId);
+    this.lifecycle.forget(threadId);
+    this.conversations.forget(threadId);
+    this.items.forget(threadId);
+    this.conversationHandles.delete(threadId);
+    this.conversationListeners.delete(threadId);
+    if (!wasActive) return;
+    this.patch({
+      activeConversationId: null,
+      messages: [],
+      answeredClientRequestIds: [],
+      approvals: [],
+      contextUsage: null,
+      goal: null,
+      turnGitDiff: null,
+      threadStatus: null,
+      queuedPrompts: [],
+      busy: false,
+      historyLoading: false,
+      error: null,
+    });
   }
 
   async readConversationHistory(conversationId = this.state.activeConversationId ?? ''): Promise<CodexConversationHistory> {
@@ -803,6 +835,14 @@ export class CodexSurface {
     origin: CodexSurfaceEventOrigin,
   ): void {
     this.runtimeState.emitHistoryReplaced(threadId, reason, origin);
+  }
+
+  private emitHistoryPrepended(
+    threadId: string,
+    messages: readonly SurfaceMessage[],
+    origin: CodexSurfaceEventOrigin,
+  ): void {
+    this.runtimeState.emitHistoryPrepended(threadId, messages, origin);
   }
 
   private messageContainingTool(threadId: string, turnId: string, itemId: string): SurfaceMessage | null {

@@ -4,6 +4,51 @@ import { CodexSurface } from '../src/node';
 import { FakeTransport, lastRequest, lastResponse, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('forgets local conversation state without deleting the thread and recreates it on load', async () => {
+    const transport = new FakeTransport({
+      'thread/read': (params) => ({ thread: thread(String((params as { threadId: string }).threadId), false) }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    const oldHandle = surface.conversation('thread-existing');
+    const sentCount = transport.sent.length;
+    const events: string[] = [];
+    surface.onEvent((event) => {
+      if (event.type === 'conversation.summaryRemoved') events.push(event.type);
+    });
+
+    surface.forgetConversation('thread-existing');
+
+    expect(transport.sent).toHaveLength(sentCount);
+    expect(events).toStrictEqual([]);
+    expect(surface.getSnapshot()).toMatchObject({
+      activeConversationId: null,
+      messages: [],
+      conversations: [expect.objectContaining({ id: 'thread-existing' })],
+    });
+
+    const newHandle = surface.conversation('thread-existing');
+    expect(newHandle).not.toBe(oldHandle);
+    await newHandle.load();
+    expect(newHandle.getSnapshot()).toMatchObject({
+      activeConversationId: 'thread-existing',
+      messages: [
+        expect.objectContaining({ id: 'user-thread-existing-turn-history-user-history' }),
+        expect.objectContaining({ id: 'assistant-turn-history' }),
+      ],
+    });
+    expect(transport.sent.filter((message) => 'method' in message && message.method === 'thread/resume')).toHaveLength(2);
+
+    surface.forgetConversation('thread-existing');
+    const historyHandle = surface.conversation('thread-existing');
+    await expect(historyHandle.readHistory()).resolves.toMatchObject({
+      conversationId: 'thread-existing',
+      messages: expect.arrayContaining([
+        expect.objectContaining({ id: 'user-thread-existing-turn-history-user-history' }),
+      ]),
+    });
+  });
+
   it('keeps live runtime, approvals, client requests, and queued drains isolated per thread', async () => {
     let turnNumber = 0;
     const transport = new FakeTransport({

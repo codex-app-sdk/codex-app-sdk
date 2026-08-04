@@ -10,6 +10,9 @@ surface.onEvent((event) => {
     case 'conversation.historyReplaced':
       console.log(event.conversationId, event.payload.messages);
       break;
+    case 'conversation.historyPrepended':
+      console.log(event.conversationId, event.payload.messages);
+      break;
     case 'tool.completed':
       console.log(event.conversationId, event.payload.toolPart);
       break;
@@ -23,6 +26,13 @@ surface.onEvent((event) => {
 
 Every variant carries `seq`, `occurredAt`, `origin`, `type`, and `payload`.
 Conversation/turn variants additionally carry their identity.
+
+`conversation.historyPrepended` is emitted during background history
+hydration. Its payload contains only the newly materialized messages in
+chronological order; it is never a cumulative transcript. Consumers can append
+or prepend that batch into a rendered history without replacing the current
+snapshot. `readConversationHistory()` / `readHistory()` still waits for all
+pages and returns the authoritative complete history.
 
 Event families cover:
 

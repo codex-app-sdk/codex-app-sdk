@@ -199,6 +199,7 @@ schedulers are unref'd when supported and are always cleared during close.
 
 - `createConversation(options?, hostOptions?)`
 - `selectConversation(id)`
+- `forgetConversation(id)` — releases local runtime state without changing the app-server thread; the summary remains available and the conversation can be loaded again later.
 - `archiveConversation(id)`
 - `unarchiveConversation(id)`
 - `deleteConversation(id)`

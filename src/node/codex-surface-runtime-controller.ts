@@ -217,6 +217,19 @@ export class CodexSurfaceRuntimeController {
     });
   }
 
+  emitHistoryPrepended(
+    threadId: string,
+    messages: readonly SurfaceMessage[],
+    origin: CodexSurfaceEventOrigin,
+  ): void {
+    if (messages.length === 0) return;
+    this.host.emitEvent(origin, {
+      type: 'conversation.historyPrepended',
+      conversationId: threadId,
+      payload: { messages: structuredClone(messages) },
+    });
+  }
+
   messageContainingTool(threadId: string, turnId: string, itemId: string): SurfaceMessage | null {
     return this.require(threadId).messages.find((message) => (
       message.metadata?.turnId === turnId
