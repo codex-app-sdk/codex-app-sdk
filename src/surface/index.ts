@@ -51,6 +51,7 @@ export type {
   CodexSurfaceRateLimits,
   CodexSurfaceRateLimitWindow,
   CodexSurfaceRendererApi,
+  CodexSurfaceRemoteControlStatus,
   CodexSurfaceRequestedPermission,
   CodexSurfaceReviewTarget,
   CodexSurfaceSnapshot,

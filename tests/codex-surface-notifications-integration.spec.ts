@@ -375,7 +375,6 @@ describe('CodexSurface', () => {
       'mcpServer/oauthLogin/completed',
       'mcpServer/startupStatus/updated',
       'app/list/updated',
-      'remoteControl/status/changed',
       'externalAgentConfig/import/progress',
       'externalAgentConfig/import/completed',
       'fs/changed',
@@ -393,6 +392,36 @@ describe('CodexSurface', () => {
     ];
     for (const method of ignoredMethods) transport.emit({ method, params: {} });
     expect(surface.getSnapshot()).toStrictEqual(before);
+  });
+
+  it('projects remote-control status changes as a host event', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+
+    transport.emit({
+      method: 'remoteControl/status/changed',
+      params: {
+        status: 'connected',
+        serverName: 'Codex remote control',
+        installationId: 'installation-1',
+        environmentId: 'environment-1',
+      },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'remoteControl.statusChanged',
+      origin: 'notification',
+      payload: {
+        status: {
+          status: 'connected',
+          serverName: 'Codex remote control',
+          installationId: 'installation-1',
+          environmentId: 'environment-1',
+        },
+      },
+    }));
   });
 
   it('ignores and reports notifications added by a newer app-server schema', async () => {

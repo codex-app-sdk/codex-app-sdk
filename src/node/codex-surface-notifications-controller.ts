@@ -451,7 +451,6 @@ export class CodexSurfaceNotificationsController {
       case 'mcpServer/oauthLogin/completed':
       case 'mcpServer/startupStatus/updated':
       case 'app/list/updated':
-      case 'remoteControl/status/changed':
       case 'externalAgentConfig/import/progress':
       case 'externalAgentConfig/import/completed':
       case 'fs/changed':
@@ -470,6 +469,19 @@ export class CodexSurfaceNotificationsController {
       case 'fuzzyFileSearch/sessionCompleted':
       case 'windows/worldWritableWarning':
       case 'windowsSandbox/setupCompleted':
+        return;
+      case 'remoteControl/status/changed':
+        this.host.emitEvent('notification', {
+          type: 'remoteControl.statusChanged',
+          payload: {
+            status: {
+              status: notification.params.status,
+              serverName: notification.params.serverName,
+              installationId: notification.params.installationId,
+              environmentId: notification.params.environmentId,
+            },
+          },
+        });
         return;
       default:
         return this.host.unknownNotification(notification);

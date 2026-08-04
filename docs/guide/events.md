@@ -73,6 +73,8 @@ Vue scope disposal automatically unregisters the underlying renderer listeners.
 - Trigger business refreshes or analytics from semantic events.
 - Use `file.activity` to reveal or focus the full path in an app-owned sidebar;
   the SDK reports the operation but does not own file navigation.
+- Use `remoteControl.statusChanged` when app-owned native behavior depends on
+  whether Codex remote control is disabled, connecting, connected, or errored.
 - Never rebuild full conversation state by replaying events.
 - Use `readConversationHistory` after a history-replacement event when an
   integration needs the full historical payload.

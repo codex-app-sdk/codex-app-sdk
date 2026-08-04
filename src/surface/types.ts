@@ -216,6 +216,14 @@ export type CodexSurfaceModel = {
   providerMetadata?: Record<string, unknown>;
 };
 
+/** Current connection from app-server to Codex remote control. */
+export type CodexSurfaceRemoteControlStatus = {
+  status: 'disabled' | 'connecting' | 'connected' | 'errored';
+  serverName: string;
+  installationId: string;
+  environmentId: string | null;
+};
+
 export type CodexSurfaceSkill = {
   name: string;
   description?: string;
@@ -555,6 +563,9 @@ export type CodexSurfaceEvent =
   }>
   | CodexSurfaceEventEnvelope<'rateLimits.changed', {
     rateLimits: CodexSurfaceRateLimits | null;
+  }>
+  | CodexSurfaceEventEnvelope<'remoteControl.statusChanged', {
+    status: CodexSurfaceRemoteControlStatus;
   }>
   | CodexSurfaceEventEnvelope<'conversation.selected', {
     conversationId: string | null;

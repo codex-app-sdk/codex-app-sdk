@@ -20,6 +20,9 @@ surface.onEvent((event) => {
       // The host can reveal or focus the file in its own sidebar.
       console.log(event.payload.action, event.payload.path);
       break;
+    case 'remoteControl.statusChanged':
+      console.log(event.payload.status.status);
+      break;
   }
 });
 ```
@@ -44,6 +47,7 @@ Event families cover:
 - `authentication.*`
 - `catalog.*`
 - `rateLimits.*`
+- `remoteControl.statusChanged`
 - `conversation.*`
 - `message.*`
 - `turn.*`
@@ -51,6 +55,11 @@ Event families cover:
 - `file.activity`
 - `approval.*`
 - `clientRequest.*`
+
+`remoteControl.statusChanged` projects app-server remote-control connection
+notifications into the surface event stream. Its payload contains the current
+typed status so hosts can update native behavior such as sleep prevention
+without polling or depending on app-server protocol types.
 
 ## File activity
 
