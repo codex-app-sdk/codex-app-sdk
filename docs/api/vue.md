@@ -22,6 +22,64 @@ current Vue effect scope.
 `steerMessage(prompt, options?)` accepts `SendCodexMessageOptions`, including
 attachments, just like `sendMessage`.
 
+### Controlled pane controller
+
+`createCodexConversationPaneController()` creates a thin adapter for hosts that
+own conversation state outside `CodexSurface`:
+
+```ts
+type CodexConversationPaneController<Payload = unknown> = {
+  state: CodexConversationPaneValueSource<CodexConversationPaneState>;
+  actions: CodexConversationPaneValueSource<CodexConversationPaneActions<Payload>>;
+};
+
+const paneState = computed(() => ({
+    identity: { conversationKey, messages, busy, disabled, error },
+    history: { hasOlder, loading, loadingOlder },
+    thread: { approvals, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
+    composer: { state, attachments, placeholder, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
+    catalogs: { files, models, commands, skills, plugins, modelCatalogStatus, skillCatalogStatus },
+    capabilities,
+    policy: { actionsDisabled, attachEnabled, canDeleteMessage, canEditMessage, canRetryMessage, followUpsDisabled },
+}));
+
+const controller = createCodexConversationPaneController({
+  state: paneState,
+  actions: {
+    submit(prompt, options) { /* host transport */ },
+    steer(prompt, options) { /* host transport */ },
+    onMessageCopied(index) { /* optional analytics/UI notification */ },
+    updateComposerState(next) { /* persist draft */ },
+    updateAttachments(next) { /* persist attachments */ },
+    updateSettings(settings) { /* apply settings */ },
+  },
+});
+```
+
+`CodexConversationPaneValueSource<T>` is deliberately structural: provide a
+plain value, a zero-argument getter, or a ref-like `{ readonly value: T }`.
+This avoids Vue `ComputedRef` type conflicts when the host and SDK resolve
+different copies of Vue. Prefer a stable controller with getters or refs for
+individual state leaves rather than allocating a new monolithic state object
+for every keystroke.
+
+Use it with `<CodexConversationPane :controller="controller" />`. The complete
+state groups are `identity`, `history`, `thread`, `composer`, `catalogs`,
+`capabilities`, and `policy`. Actions cover submit/steer, composer updates,
+settings, history, message actions, approvals, goals, queue operations, and
+client responses. Every action may return `void` or `Promise<void>`; rejected
+promises are surfaced through the pane error UI.
+
+`onMessageCopied(index)` is a post-action notification: the SDK always performs
+the clipboard write and copied-state feedback first. Omitting this hook does not
+disable copying.
+
+The adapter does not load conversations, clone messages, wrap reactive sources,
+or own a backend. Keep
+the controller object stable and update reactive leaves in place. When supplied,
+controller state and actions take precedence over legacy pane props/events, and
+one gesture is dispatched exactly once.
+
 ## Primary components
 
 | Component | Purpose |

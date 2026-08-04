@@ -2,6 +2,22 @@ export { default as CodexComposer } from './components/CodexComposer.vue';
 export type { CodexComposerState } from './composer-state';
 export { default as CodexApprovalPrompt } from './components/CodexApprovalPrompt.vue';
 export { default as CodexConversationPane } from './components/CodexConversationPane.vue';
+export {
+  createCodexConversationPaneController,
+  type CodexConversationPaneActions,
+  type CodexConversationPaneCatalogState,
+  type CodexConversationPaneComposerState,
+  type CodexConversationPaneController,
+  type CodexConversationPaneControllerOptions,
+  type CodexConversationPaneControllerSource,
+  type CodexConversationPaneHistoryState,
+  type CodexConversationPaneIdentityState,
+  type CodexConversationPanePolicy,
+  type CodexConversationPaneState,
+  type CodexConversationPaneThreadState,
+  type CodexConversationPaneValueSource,
+  resolveCodexConversationPaneValue,
+} from './conversation-pane-controller';
 export { default as CodexConversationHistoryLoader } from './components/CodexConversationHistoryLoader.vue';
 export { default as CodexComposerMenu } from './components/CodexComposerMenu.vue';
 export { default as CodexComposerMenuList } from './components/CodexComposerMenuList.vue';

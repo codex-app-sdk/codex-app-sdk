@@ -5,12 +5,14 @@ import { h, nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CodexConversationPane,
+  createCodexConversationPaneController,
   CodexMessage,
   CodexMessageList,
   CodexRichTextEditor,
   type CodexRichTextEditorExpose,
   type CodexComposerMenuItem,
   type CodexNativeAttachment,
+  type CodexConversationPaneState,
   type CodexSurfaceController,
   type SurfaceMessage,
 } from '../../src/vue';
@@ -460,6 +462,126 @@ describe('CodexConversationPane', () => {
     });
     expect(wrapper.text()).toContain('Controlled override');
     expect(wrapper.text()).not.toContain('Bound controller message');
+  });
+
+  it('uses the pane controller as the single state and action source', async () => {
+    const controlledMessage: SurfaceMessage = {
+      id: 'controller-message',
+      role: 'assistant',
+      status: 'complete',
+      parts: [{ type: 'text', text: 'Controller-owned message' }],
+    };
+    const submit = vi.fn();
+    const onMessageCopied = vi.fn();
+    const updateComposerState = vi.fn();
+    const paneState: CodexConversationPaneState = {
+      identity: {
+        conversationKey: 'controller-thread',
+        messages: [controlledMessage],
+      },
+      composer: {
+        state: { text: '', selectionStart: 0, selectionEnd: 0 },
+      },
+    };
+    const controller = createCodexConversationPaneController({
+      state: paneState,
+      actions: { submit, onMessageCopied, updateComposerState },
+    });
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        controller,
+        messages,
+        modelValue: 'legacy draft',
+      },
+    });
+
+    expect(wrapper.text()).toContain('Controller-owned message');
+    expect(wrapper.text()).not.toContain('Ready to build');
+
+    await setComposerText(wrapper, 'Submit through controller');
+    await wrapper.get('form').trigger('submit');
+
+    expect(submit).toHaveBeenCalledOnce();
+    expect(submit).toHaveBeenCalledWith('Submit through controller', undefined);
+    expect(updateComposerState).toHaveBeenCalled();
+    expect(wrapper.emitted('submit')).toBeUndefined();
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+
+    wrapper.findComponent(CodexMessageList).vm.$emit('copy-message', 0);
+    expect(onMessageCopied).toHaveBeenCalledOnce();
+    expect(onMessageCopied).toHaveBeenCalledWith(0);
+    expect(wrapper.emitted('copyMessage')).toBeUndefined();
+  });
+
+  it('does not fall back to legacy values when a controller supplies explicit empty values', async () => {
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: 'controller-thread',
+          messages: [],
+          busy: false,
+          disabled: false,
+          error: null,
+        },
+        composer: {
+          state: { text: '', selectionStart: 0, selectionEnd: 0 },
+          approvalPreset: null,
+          planMode: false,
+          selectedModelId: null,
+          selectedReasoningEffort: null,
+          selectedServiceTier: null,
+        },
+        history: { hasOlder: false, loading: false, loadingOlder: false },
+        thread: { approvals: [], queuedPrompts: [], goal: null, contextUsage: null },
+        catalogs: { files: [], models: [], commands: [], skills: [], plugins: [] },
+        policy: {
+          actionsDisabled: false,
+          attachEnabled: false,
+          canDeleteMessage: false,
+          canEditMessage: false,
+          canRetryMessage: false,
+          followUpsDisabled: false,
+        },
+      },
+      actions: {},
+    });
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        controller,
+        busy: true,
+        disabled: true,
+        error: 'legacy error',
+        messages,
+        modelValue: 'legacy draft',
+        planMode: true,
+        selectedModelId: 'legacy-model',
+      },
+    });
+
+    expect(wrapper.get('.codex-conversation-pane').attributes('aria-busy')).toBe('false');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Start a conversation with Codex');
+    expect(wrapper.text()).not.toContain('legacy draft');
+    expect(composerEditor(wrapper).attributes('aria-disabled')).toBe('false');
+  });
+
+  it('surfaces rejected controller actions through the pane error UI', async () => {
+    const submit = vi.fn(async () => {
+      throw new Error('Controller rejected submission');
+    });
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: { conversationKey: 'controller-thread', messages },
+        composer: { state: { text: 'Try again', selectionStart: 8, selectionEnd: 8 } },
+      },
+      actions: { submit },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('Controller rejected submission');
   });
 
   it('follows bound surface booleans when their controlled props are omitted', async () => {

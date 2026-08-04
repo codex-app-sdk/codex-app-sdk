@@ -25,9 +25,9 @@
         :answered-client-request-ids="effectiveAnsweredClientRequestIds"
         :aria-label="ariaLabel"
         :busy="effectiveBusy"
-        :can-delete-message="canDeleteMessage"
-        :can-edit-message="canEditMessage"
-        :can-retry-message="canRetryMessage"
+        :can-delete-message="effectiveCanDeleteMessage"
+        :can-edit-message="effectiveCanEditMessage"
+        :can-retry-message="effectiveCanRetryMessage"
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
         :has-older-messages="effectiveHasOlderHistory"
@@ -45,7 +45,7 @@
         :transform-message="transformMessage"
         @cancel="cancel"
         @client-response="respondToClientRequest"
-        @copy-message="emit('copyMessage', $event)"
+        @copy-message="copyMessage"
         @delete-message="deleteMessage"
         @edit-message="editMessage"
         @load-older-messages="loadOlderHistory"
@@ -142,15 +142,15 @@
             :disabled="effectiveDisabled"
             :draft="localDraft"
             :draft-revision="draftRevision"
-            :files="files"
+            :files="effectiveFiles"
             :has-attachments="selectedAttachments.length > 0"
             :plugins="effectivePlugins"
             :queued-prompt-id="effectiveQueuedPrompts[0]?.id ?? null"
             :is-sending="effectiveBusy"
-            :menu-items="menuItems"
+            :menu-items="effectiveMenuItems"
             :model-catalog-status="effectiveModelCatalogStatus"
             :models="effectiveModels"
-            :placeholder="placeholder"
+            :placeholder="effectivePlaceholder"
             :approval-preset="effectiveApprovalPreset"
             :plan-mode="effectivePlanMode"
             :presentation="effectivePresentation"
@@ -163,7 +163,7 @@
             @error="handleComposerError"
             @attach="selectAttachments"
             @interrupt="interrupt"
-            @menu-select="emit('menuSelect', $event)"
+            @menu-select="menuSelect"
             @select-approval-preset="selectApprovalPreset"
             @send="submit"
             @steer="steer"
@@ -200,6 +200,12 @@ import type {
 } from '../../surface/types';
 import type { CodexNativeAttachment } from '../../native/types';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
+import type {
+  CodexConversationPaneActions,
+  CodexConversationPaneControllerSource,
+  CodexConversationPaneState,
+} from '../conversation-pane-controller';
+import { resolveCodexConversationPaneValue } from '../conversation-pane-controller';
 import type { Message } from '../chat/types';
 import type { MessageBlock } from '../chat/message-blocks';
 import { stripMessageContext } from '../chat/message-blocks';
@@ -252,6 +258,8 @@ const props = withDefaults(defineProps<{
   attachments?: readonly CodexNativeAttachment[];
   autofocus?: boolean;
   capabilities?: CodexCapabilities;
+  /** Controlled state/actions adapter. When supplied, it takes precedence over legacy props and surface state. */
+  controller?: CodexConversationPaneControllerSource<Payload>;
   busy?: boolean;
   canDeleteMessage?: boolean;
   canEditMessage?: boolean;
@@ -393,97 +401,208 @@ const emit = defineEmits<{
 
 const draftRevision = ref(0);
 const composer = ref<{ focus(): void } | null>(null);
-const initialComposerState = normalizeCodexComposerState(props.composerState ?? {
-  text: props.modelValue,
-  selectionStart: props.modelValue.length,
-  selectionEnd: props.modelValue.length,
+const effectiveController = computed(() => resolveCodexConversationPaneValue(props.controller));
+const effectiveControllerState = computed<CodexConversationPaneState | undefined>(() => {
+  const controller = effectiveController.value;
+  return controller ? resolveCodexConversationPaneValue(controller.state) : undefined;
 });
+const effectiveControllerActions = computed<CodexConversationPaneActions<Payload> | undefined>(() => {
+  const controller = effectiveController.value;
+  return controller ? resolveCodexConversationPaneValue(controller.actions) : undefined;
+});
+const surfaceState = computed(() => props.surface?.state);
+function controlledValue<T>(read: (state: CodexConversationPaneState) => T, fallback: () => T): T {
+  const state = effectiveControllerState.value;
+  return state ? read(state) : fallback();
+}
+
+const effectiveComposerState = computed(() => controlledValue(
+  (state) => state.composer?.state,
+  () => props.composerState,
+));
+const effectiveAttachments = computed(() => controlledValue(
+  (state) => state.composer?.attachments ?? [],
+  () => props.attachments,
+));
+const initialComposerState = normalizeCodexComposerState(effectiveComposerState.value ?? (
+  effectiveControllerState.value
+    ? { text: '', selectionStart: 0, selectionEnd: 0 }
+    : {
+      text: props.modelValue,
+      selectionStart: props.modelValue.length,
+      selectionEnd: props.modelValue.length,
+    }
+));
 const localComposerState = ref<CodexComposerState>(initialComposerState);
 const localDraft = ref(initialComposerState.text);
 const localError = ref<string | null>(null);
-const selectedAttachments = ref<CodexNativeAttachment[]>([...props.attachments]);
-const surfaceState = computed(() => props.surface?.state);
-const effectiveMessages = computed(() => props.messages ?? surfaceState.value?.messages ?? []);
-const effectiveAnsweredClientRequestIds = computed(() => (
-  props.answeredClientRequestIds ?? props.surface?.answeredClientRequestIds
+const selectedAttachments = ref<CodexNativeAttachment[]>([...effectiveAttachments.value]);
+const effectiveMessages = computed(() => controlledValue(
+  (state) => state.identity.messages,
+  () => props.messages ?? surfaceState.value?.messages ?? [],
 ));
-const effectiveApprovals = computed(() => props.approvals ?? surfaceState.value?.approvals ?? []);
-const effectiveBusy = computed(() => props.busy ?? surfaceState.value?.busy ?? false);
-const effectiveConversationKey = computed(() => (
-  props.conversationKey !== undefined ? props.conversationKey : surfaceState.value?.activeConversationId
+const effectiveAnsweredClientRequestIds = computed(() => controlledValue(
+  (state) => state.thread?.answeredClientRequestIds,
+  () => props.answeredClientRequestIds ?? props.surface?.answeredClientRequestIds,
 ));
-const effectiveContextUsage = computed(() => (
-  props.contextUsage !== undefined ? props.contextUsage : surfaceState.value?.contextUsage
+const effectiveApprovals = computed(() => controlledValue(
+  (state) => state.thread?.approvals ?? [],
+  () => props.approvals ?? surfaceState.value?.approvals ?? [],
 ));
-const effectiveDisabled = computed(() => (
-  props.disabled ?? (surfaceState.value ? surfaceState.value.status !== 'ready' : false)
+const effectiveBusy = computed(() => controlledValue(
+  (state) => state.identity.busy ?? false,
+  () => props.busy ?? surfaceState.value?.busy ?? false,
 ));
-const effectiveError = computed(() => localError.value ?? props.error ?? surfaceState.value?.error ?? null);
-const effectiveGoal = computed(() => (
-  props.goal !== undefined ? props.goal : surfaceState.value?.goal ?? null
+const effectiveConversationKey = computed(() => controlledValue(
+  (state) => state.identity.conversationKey,
+  () => (props.conversationKey !== undefined ? props.conversationKey : surfaceState.value?.activeConversationId),
 ));
-const effectiveHistoryLoading = computed(() => (
-  props.historyLoading ?? surfaceState.value?.historyLoading ?? false
+const effectiveContextUsage = computed(() => controlledValue(
+  (state) => state.thread?.contextUsage,
+  () => (props.contextUsage !== undefined ? props.contextUsage : surfaceState.value?.contextUsage),
+));
+const effectiveDisabled = computed(() => controlledValue(
+  (state) => state.identity.disabled ?? false,
+  () => props.disabled ?? (surfaceState.value ? surfaceState.value.status !== 'ready' : false),
+));
+const effectiveError = computed(() => (
+  localError.value
+  ?? controlledValue(
+    (state) => state.identity.error,
+    () => props.error ?? surfaceState.value?.error ?? null,
+  )
+  ?? null
+));
+const effectiveGoal = computed(() => controlledValue(
+  (state) => state.thread?.goal ?? null,
+  () => (props.goal !== undefined ? props.goal : surfaceState.value?.goal ?? null),
+));
+const effectiveHistoryLoading = computed(() => controlledValue(
+  (state) => state.history?.loading ?? false,
+  () => props.historyLoading ?? surfaceState.value?.historyLoading ?? false,
 ));
 const effectiveRenderStrategy = computed<CodexConversationRenderStrategy>(() => (
   props.renderStrategy ?? (props.lazyMessages === false ? 'eager' : 'lazy')
 ));
-const effectiveHasOlderHistory = computed(() => (
-  props.hasOlderHistory ?? surfaceState.value?.historyState?.hasOlder ?? false
+const effectiveHasOlderHistory = computed(() => controlledValue(
+  (state) => state.history?.hasOlder ?? false,
+  () => props.hasOlderHistory ?? surfaceState.value?.historyState?.hasOlder ?? false,
 ));
-const effectiveLoadingOlderHistory = computed(() => (
-  props.loadingOlderHistory ?? surfaceState.value?.historyState?.loadingOlder ?? false
+const effectiveLoadingOlderHistory = computed(() => controlledValue(
+  (state) => state.history?.loadingOlder ?? false,
+  () => props.loadingOlderHistory ?? surfaceState.value?.historyState?.loadingOlder ?? false,
 ));
-const effectiveModelCatalogStatus = computed(() => (
-  props.modelCatalogStatus ?? surfaceState.value?.modelCatalogStatus
+const effectiveModelCatalogStatus = computed(() => controlledValue(
+  (state) => state.catalogs?.modelCatalogStatus,
+  () => props.modelCatalogStatus ?? surfaceState.value?.modelCatalogStatus,
 ));
-const effectiveModels = computed(() => props.models ?? surfaceState.value?.models);
-const effectiveApprovalPreset = computed(() => (
-  props.approvalPreset !== undefined ? props.approvalPreset : surfaceState.value?.approvalPreset
+const effectiveModels = computed(() => controlledValue(
+  (state) => state.catalogs?.models,
+  () => props.models ?? surfaceState.value?.models,
 ));
-const effectivePlanMode = computed(() => props.planMode ?? surfaceState.value?.planMode);
-const effectivePlugins = computed(() => props.plugins ?? surfaceState.value?.plugins);
+const effectiveApprovalPreset = computed(() => controlledValue(
+  (state) => state.composer?.approvalPreset,
+  () => (props.approvalPreset !== undefined ? props.approvalPreset : surfaceState.value?.approvalPreset),
+));
+const effectivePlanMode = computed(() => controlledValue(
+  (state) => state.composer?.planMode,
+  () => props.planMode ?? surfaceState.value?.planMode,
+));
+const effectivePlugins = computed(() => controlledValue(
+  (state) => state.catalogs?.plugins,
+  () => props.plugins ?? surfaceState.value?.plugins,
+));
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
-const effectiveQueuedPrompts = computed(() => props.queuedPrompts ?? surfaceState.value?.queuedPrompts ?? []);
-const effectiveSelectedModelId = computed(() => (
-  props.selectedModelId !== undefined ? props.selectedModelId : surfaceState.value?.selectedModelId
+const effectiveQueuedPrompts = computed(() => controlledValue(
+  (state) => state.thread?.queuedPrompts ?? [],
+  () => props.queuedPrompts ?? surfaceState.value?.queuedPrompts ?? [],
 ));
-const effectiveSelectedReasoningEffort = computed(() => (
-  props.selectedReasoningEffort !== undefined
+const effectiveSelectedModelId = computed(() => controlledValue(
+  (state) => state.composer?.selectedModelId,
+  () => (props.selectedModelId !== undefined ? props.selectedModelId : surfaceState.value?.selectedModelId),
+));
+const effectiveSelectedReasoningEffort = computed(() => controlledValue(
+  (state) => state.composer?.selectedReasoningEffort,
+  () => (props.selectedReasoningEffort !== undefined
     ? props.selectedReasoningEffort
-    : surfaceState.value?.selectedReasoningEffort
+    : surfaceState.value?.selectedReasoningEffort),
 ));
-const effectiveSelectedServiceTier = computed(() => (
-  props.selectedServiceTier !== undefined
+const effectiveSelectedServiceTier = computed(() => controlledValue(
+  (state) => state.composer?.selectedServiceTier,
+  () => (props.selectedServiceTier !== undefined
     ? props.selectedServiceTier
-    : surfaceState.value?.selectedServiceTier
+    : surfaceState.value?.selectedServiceTier),
 ));
-const effectiveSkillCatalogStatus = computed(() => (
-  props.skillCatalogStatus ?? surfaceState.value?.skillCatalogStatus
+const effectiveSkillCatalogStatus = computed(() => controlledValue(
+  (state) => state.catalogs?.skillCatalogStatus,
+  () => props.skillCatalogStatus ?? surfaceState.value?.skillCatalogStatus,
 ));
-const effectiveSkills = computed(() => props.skills ?? surfaceState.value?.skills);
-const effectiveTurnGitDiff = computed(() => (
-  props.turnGitDiff !== undefined ? props.turnGitDiff : surfaceState.value?.turnGitDiff
+const effectiveSkills = computed(() => controlledValue(
+  (state) => state.catalogs?.skills,
+  () => props.skills ?? surfaceState.value?.skills,
 ));
-const effectiveAttachEnabled = computed(() => props.attachEnabled !== false);
+const effectiveTurnGitDiff = computed(() => controlledValue(
+  (state) => state.thread?.turnGitDiff,
+  () => (props.turnGitDiff !== undefined ? props.turnGitDiff : surfaceState.value?.turnGitDiff),
+));
+const effectiveAttachEnabled = computed(() => controlledValue(
+  (state) => state.policy?.attachEnabled ?? true,
+  () => props.attachEnabled !== false,
+));
 const effectiveCapabilities = computed<CodexCapabilities>(() => ({
   ...codexCapabilities,
-  ...props.capabilities,
-  approvalPresets: props.approvalPresets
-    ?? surfaceState.value?.approvalPresets
-    ?? props.capabilities?.approvalPresets
+  ...(effectiveControllerState.value
+    ? effectiveControllerState.value.capabilities
+    : props.capabilities),
+  approvalPresets: effectiveControllerState.value?.capabilities?.approvalPresets
+    ?? (effectiveControllerState.value
+      ? codexCapabilities.approvalPresets
+      : props.approvalPresets ?? surfaceState.value?.approvalPresets ?? props.capabilities?.approvalPresets)
     ?? codexCapabilities.approvalPresets,
 }));
-const effectiveCommands = computed(() => props.commands ?? codexCommands);
-const effectiveActionsDisabled = computed(() => effectiveBusy.value || props.actionsDisabled);
-const effectiveFollowUpsDisabled = computed(() => effectiveBusy.value || props.followUpsDisabled);
+const effectiveCommands = computed(() => controlledValue(
+  (state) => state.catalogs?.commands ?? [],
+  () => props.commands ?? codexCommands,
+));
+const effectiveFiles = computed(() => controlledValue(
+  (state) => state.catalogs?.files ?? [],
+  () => props.files,
+));
+const effectiveMenuItems = computed(() => controlledValue(
+  (state) => state.composer?.menuItems ?? [],
+  () => props.menuItems,
+));
+const effectivePlaceholder = computed(() => controlledValue(
+  (state) => state.composer?.placeholder,
+  () => props.placeholder,
+) ?? 'Ask Codex…');
+const effectiveCanDeleteMessage = computed(() => controlledValue(
+  (state) => state.policy?.canDeleteMessage ?? true,
+  () => props.canDeleteMessage,
+));
+const effectiveCanEditMessage = computed(() => controlledValue(
+  (state) => state.policy?.canEditMessage ?? true,
+  () => props.canEditMessage,
+));
+const effectiveCanRetryMessage = computed(() => controlledValue(
+  (state) => state.policy?.canRetryMessage ?? true,
+  () => props.canRetryMessage,
+));
+const effectiveActionsDisabled = computed(() => (
+  effectiveBusy.value
+  || controlledValue((state) => state.policy?.actionsDisabled ?? false, () => props.actionsDisabled ?? false)
+));
+const effectiveFollowUpsDisabled = computed(() => (
+  effectiveBusy.value
+  || controlledValue((state) => state.policy?.followUpsDisabled ?? false, () => props.followUpsDisabled ?? false)
+));
 const showHistoryLoader = computed(() => effectiveHistoryLoading.value);
 const started = computed(() => (
   effectiveMessages.value.length > 0 || effectiveBusy.value || effectiveApprovals.value.length > 0
 ));
 
 watch(() => props.modelValue, () => {
-  if (props.composerState) return;
+  if (effectiveController.value || props.composerState) return;
   localDraft.value = props.modelValue;
   localComposerState.value = {
     text: props.modelValue,
@@ -493,7 +612,7 @@ watch(() => props.modelValue, () => {
   draftRevision.value += 1;
 }, { immediate: true });
 
-watch(() => props.composerState, (state) => {
+watch(effectiveComposerState, (state) => {
   if (!state) return;
   const normalized = normalizeCodexComposerState(state);
   localComposerState.value = normalized;
@@ -501,7 +620,7 @@ watch(() => props.composerState, (state) => {
   draftRevision.value += 1;
 }, { deep: true, immediate: true });
 
-watch(() => props.attachments, (attachments) => {
+watch(effectiveAttachments, (attachments) => {
   selectedAttachments.value = [...attachments];
 });
 
@@ -511,14 +630,18 @@ watch(effectiveAttachEnabled, (enabled) => {
 
 watch(effectiveConversationKey, () => {
   localError.value = null;
-  const incoming = normalizeCodexComposerState(props.composerState ?? {
-    text: props.modelValue,
-    selectionStart: props.modelValue.length,
-    selectionEnd: props.modelValue.length,
-  });
+  const incoming = normalizeCodexComposerState(effectiveComposerState.value ?? (
+    effectiveController.value
+      ? { text: '', selectionStart: 0, selectionEnd: 0 }
+      : {
+        text: props.modelValue,
+        selectionStart: props.modelValue.length,
+        selectionEnd: props.modelValue.length,
+      }
+  ));
   localComposerState.value = incoming;
   localDraft.value = incoming.text;
-  selectedAttachments.value = [...props.attachments];
+  selectedAttachments.value = [...effectiveAttachments.value];
   draftRevision.value += 1;
 });
 
@@ -535,6 +658,14 @@ onMounted(() => {
 function submit(prompt: string): void {
   updateDraft('');
   const options = sendOptionsForAttachments(selectedAttachments.value);
+  if (dispatchControllerAction('submit', prompt, options)) {
+    replaceAttachments([]);
+    return;
+  }
+  if (effectiveController.value) {
+    replaceAttachments([]);
+    return;
+  }
   if (options) emit('submit', prompt, options);
   else emit('submit', prompt);
   if (props.surface) {
@@ -544,6 +675,8 @@ function submit(prompt: string): void {
 }
 
 function loadOlderHistory(): void {
+  if (dispatchControllerAction('loadOlderHistory')) return;
+  if (effectiveController.value) return;
   if (props.surface && effectiveConversationKey.value) {
     void runSurfaceAction(() => props.surface!.loadOlderConversationHistory(String(effectiveConversationKey.value)));
     return;
@@ -558,12 +691,16 @@ function quoteMessage(index: number): void {
   const content = stripMessageContext(chatMessage.content);
   if (chatMessage.role !== 'user' || !content.trim()) return;
   updateDraft(content);
+  if (dispatchControllerAction('quoteMessage', index)) return;
+  if (effectiveController.value) return;
   emit('quoteMessage', index);
 }
 
 function editGoal(): void {
   if (!effectiveGoal.value?.objective.trim()) return;
   updateDraft(`/goal ${effectiveGoal.value.objective}`);
+  if (dispatchControllerAction('editGoal')) return;
+  if (effectiveController.value) return;
   emit('editGoal');
 }
 
@@ -582,6 +719,8 @@ function handleConversationClick(event: MouseEvent): void {
 }
 
 function handleConversationLink(link: CodexConversationLink): void {
+  if (dispatchControllerAction('openLink', link)) return;
+  if (effectiveController.value) return;
   emit('openLink', link);
   if (props.openConversationLink) {
     void Promise.resolve(props.openConversationLink(link)).catch(setLocalError);
@@ -595,7 +734,8 @@ function handleConversationLink(link: CodexConversationLink): void {
 }
 
 async function selectAttachments(): Promise<void> {
-  emit('attach');
+  if (dispatchControllerAction('attach')) return;
+  if (!effectiveController.value) emit('attach');
   if (!effectiveAttachEnabled.value) return;
   try {
     appendAttachments(await pickCodexAttachments(props.pickAttachments));
@@ -659,6 +799,8 @@ function removeAttachment(id: string): void {
 
 function replaceAttachments(attachments: CodexNativeAttachment[]): void {
   selectedAttachments.value = attachments;
+  if (dispatchControllerAction('updateAttachments', attachments)) return;
+  if (effectiveController.value) return;
   emit('attachmentsChange', attachments);
 }
 
@@ -691,62 +833,98 @@ function updateComposerState(state: CodexComposerState): void {
   const normalized = normalizeCodexComposerState(state);
   localComposerState.value = normalized;
   localDraft.value = normalized.text;
+  if (dispatchControllerAction('updateComposerState', normalized)) return;
+  if (effectiveController.value) return;
   emit('update:modelValue', normalized.text);
   emit('update:composerState', normalized);
 }
 
 function cancel(): void {
+  if (dispatchControllerAction('cancel')) return;
+  if (effectiveController.value) return;
   emit('cancel');
   if (props.surface) void runSurfaceAction(() => props.surface!.interrupt());
 }
 
 function respondToClientRequest(response: ClientRequestResponse): void {
+  if (dispatchControllerAction('clientResponse', response)) return;
+  if (effectiveController.value) return;
   emit('clientResponse', response);
   if (props.surface) void runSurfaceAction(() => props.surface!.respondToClientRequest(response));
 }
 
+function copyMessage(index: number): void {
+  if (dispatchControllerAction('onMessageCopied', index)) return;
+  if (effectiveController.value) return;
+  emit('copyMessage', index);
+}
+
 function deleteMessage(index: number): void {
+  if (dispatchControllerAction('deleteMessage', index)) return;
+  if (effectiveController.value) return;
   emit('deleteMessage', index);
   if (props.surface) void runSurfaceAction(() => props.surface!.deleteMessage(index));
 }
 
 function editMessage(payload: { content: string; index: number }): void {
+  if (dispatchControllerAction('editMessage', payload)) return;
+  if (effectiveController.value) return;
   emit('editMessage', payload);
   if (props.surface) void runSurfaceAction(() => props.surface!.editMessage(payload.index, payload.content));
 }
 
 function retryMessage(index: number): void {
+  if (dispatchControllerAction('retryMessage', index)) return;
+  if (effectiveController.value) return;
   emit('retryMessage', index);
   if (props.surface) void runSurfaceAction(() => props.surface!.retryMessage(index));
 }
 
 function sendFollowUp(prompt: string): void {
+  if (dispatchControllerAction('sendFollowUp', prompt)) return;
+  if (effectiveController.value) return;
   emit('sendFollowUp', prompt);
   if (props.surface) void runSurfaceAction(() => props.surface!.sendMessage(prompt));
 }
 
 function clearGoal(): void {
+  if (dispatchControllerAction('clearGoal')) return;
+  if (effectiveController.value) return;
   emit('clearGoal');
   if (props.surface) void runSurfaceAction(() => props.surface!.clearGoal());
 }
 
 function deleteQueuedPrompt(promptId: string): void {
+  if (dispatchControllerAction('deleteQueuedPrompt', promptId)) return;
+  if (effectiveController.value) return;
   emit('deleteQueuedPrompt', promptId);
   if (props.surface) void runSurfaceAction(() => props.surface!.deleteQueuedPrompt(promptId));
 }
 
 function steerQueuedPrompt(promptId: string): void {
+  if (dispatchControllerAction('steerQueuedPrompt', promptId)) return;
+  if (effectiveController.value) return;
   emit('steerQueuedPrompt', promptId);
   if (props.surface) void runSurfaceAction(() => props.surface!.steerQueuedPrompt(promptId));
 }
 
 function interrupt(): void {
+  if (dispatchControllerAction('interrupt')) return;
+  if (effectiveController.value) return;
   emit('interrupt');
   if (props.surface) void runSurfaceAction(() => props.surface!.interrupt());
 }
 
 function steer(prompt: string): void {
   const options = sendOptionsForAttachments(selectedAttachments.value);
+  if (dispatchControllerAction('steer', prompt, options)) {
+    replaceAttachments([]);
+    return;
+  }
+  if (effectiveController.value) {
+    replaceAttachments([]);
+    return;
+  }
   if (options) emit('steer', prompt, options);
   else emit('steer', prompt);
   if (props.surface) void runSurfaceAction(() => props.surface!.steerMessage(prompt, options));
@@ -754,6 +932,11 @@ function steer(prompt: string): void {
 }
 
 function selectApprovalPreset(preset: ApprovalPreset): void {
+  if (dispatchControllerAction('selectApprovalPreset', preset)) return;
+  if (effectiveController.value) {
+    void dispatchControllerAction('updateSettings', { approvalPreset: preset });
+    return;
+  }
   emit('selectApprovalPreset', preset);
   if (props.surface) void runSurfaceAction(() => props.surface!.updateConversationSettings({ approvalPreset: preset }));
 }
@@ -763,28 +946,56 @@ function resolveApproval(
   decision: CodexSurfaceApprovalDecision,
   scope: CodexSurfaceApprovalScope,
 ): void {
+  if (dispatchControllerAction('resolveApproval', approvalId, decision, scope)) return;
+  if (effectiveController.value) return;
   emit('resolveApproval', approvalId, decision, scope);
   if (props.surface) void runSurfaceAction(() => props.surface!.resolveApproval(approvalId, decision, scope));
 }
 
 function updateModelId(modelId: string): void {
+  if (dispatchControllerAction('updateSettings', { modelId })) return;
+  if (effectiveController.value) return;
   emit('update:modelId', modelId);
   if (props.surface) void runSurfaceAction(() => props.surface!.updateConversationSettings({ modelId }));
 }
 
 function updatePlanMode(planMode: boolean): void {
+  if (dispatchControllerAction('updateSettings', { planMode })) return;
+  if (effectiveController.value) return;
   emit('update:planMode', planMode);
   if (props.surface) void runSurfaceAction(() => props.surface!.updateConversationSettings({ planMode }));
 }
 
 function updateReasoningEffort(reasoningEffort: ReasoningEffort): void {
+  if (dispatchControllerAction('updateSettings', { reasoningEffort })) return;
+  if (effectiveController.value) return;
   emit('update:reasoningEffort', reasoningEffort);
   if (props.surface) void runSurfaceAction(() => props.surface!.updateConversationSettings({ reasoningEffort }));
 }
 
 function updateServiceTier(serviceTier: string | null): void {
+  if (dispatchControllerAction('updateSettings', { serviceTier })) return;
+  if (effectiveController.value) return;
   emit('update:serviceTier', serviceTier);
   if (props.surface) void runSurfaceAction(() => props.surface!.updateConversationSettings({ serviceTier }));
+}
+
+function menuSelect(item: CodexComposerMenuSelectableItem<unknown>): void {
+  if (dispatchControllerAction('menuSelect', item)) return;
+  if (effectiveController.value) return;
+  emit('menuSelect', item as CodexComposerMenuSelectableItem<Payload>);
+}
+
+function dispatchControllerAction(
+  name: keyof CodexConversationPaneActions<Payload>,
+  ...args: unknown[]
+): boolean {
+  const action = effectiveControllerActions.value?.[name] as
+    | ((...actionArgs: never[]) => void | Promise<void>)
+    | undefined;
+  if (!action) return false;
+  void runSurfaceAction(() => Promise.resolve(action(...args as never[])));
+  return true;
 }
 
 async function runSurfaceAction(action: () => Promise<unknown>): Promise<void> {

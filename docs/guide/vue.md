@@ -24,6 +24,100 @@ the controller.
 The pane is deliberately headerless. The host decides whether a header exists
 and what product information it contains.
 
+## Controlled pane adapter
+
+Applications that own their conversation backend can use the same pane without
+forwarding every individual state field and event. Create one stable controller
+from grouped state and actions:
+
+```ts
+import { computed } from 'vue';
+import {
+  createCodexConversationPaneController,
+  type CodexConversationPaneState,
+} from 'codex-app-sdk/vue';
+
+const paneState = computed<CodexConversationPaneState>(() => ({
+  identity: {
+    conversationKey: activeConversationId.value,
+    messages: messages.value,
+    busy: isSending.value,
+    disabled: !agent.value,
+    error: error.value,
+  },
+  history: {
+    hasOlder: history.hasOlder,
+    loading: history.loading,
+    loadingOlder: history.loadingOlder,
+  },
+  thread: {
+    approvals: approvals.value,
+    goal: goal.value,
+    queuedPrompts: queuedPrompts.value,
+    contextUsage: contextUsage.value,
+  },
+  composer: {
+    state: composerState.value,
+    attachments: attachments.value,
+    placeholder: 'Ask for follow-up changes',
+    selectedModelId: selectedModelId.value,
+    selectedReasoningEffort: selectedReasoningEffort.value,
+    selectedServiceTier: selectedServiceTier.value,
+    planMode: planMode.value,
+  },
+  catalogs: {
+    files: files.value,
+    models: models.value,
+    commands: commands.value,
+    skills: skills.value,
+    plugins: plugins.value,
+  },
+  capabilities: capabilities.value,
+  policy: {
+    attachEnabled: true,
+    canDeleteMessage: true,
+    canEditMessage: true,
+    canRetryMessage: true,
+  },
+}));
+
+const paneController = createCodexConversationPaneController({
+  state: paneState,
+  actions: {
+    submit: (prompt, options) => sendPrompt(prompt, options),
+    steer: (prompt, options) => steerPrompt(prompt, options),
+    updateComposerState: (state) => updateComposerState(state),
+    updateAttachments: (next) => updateAttachments(next),
+    updateSettings: (settings) => updateSettings(settings),
+    interrupt: () => interruptConversation(),
+    // Add the remaining message, approval, goal, and queue actions as needed.
+  },
+});
+```
+
+```vue
+<CodexConversationPane
+  :controller="paneController"
+  :presentation="presentation"
+  :transform-message="transformMessage"
+>
+  <template #message-header="{ message }">
+    <MessageHeader :message="message" />
+  </template>
+</CodexConversationPane>
+```
+
+The controller is a thin view adapter. It does not load conversations, clone
+messages, or own a backend. Keep the controller object stable and update its
+reactive state leaves in place; high-frequency composer updates must not rebuild
+the entire message or catalog state. Controller state and actions take
+precedence over legacy pane props and events, so one gesture is never dispatched
+twice. The controller accepts plain values, zero-argument getters, and
+ref-like `{ readonly value }` sources, so it remains compatible with a host's
+Vue installation. Actions may return `void` or `Promise<void>`; rejected
+promises are shown through the pane error state. A supplied controller is
+authoritative: omitted actions do not fall back to legacy pane events.
+
 ## Unbound composition
 
 The pane can also receive messages and callbacks through props/events without a

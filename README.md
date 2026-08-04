@@ -27,6 +27,8 @@ business data, and integrations.
   transcription.
 - `CodexConversationPane` with composer, messages, tools, generated media,
   thinking, queues, context usage, and customization hooks.
+- A grouped controlled-pane adapter for hosts that own conversation state
+  outside the SDK surface.
 - Host extensions, dynamic tools, and trusted per-surface or per-conversation
   MCP servers.
 
