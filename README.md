@@ -71,6 +71,7 @@ npm install --save-dev electron
 - [Vue conversation kit](https://nbonamy.github.io/codex-app-sdk/guide/vue)
 - [Vue providers](https://nbonamy.github.io/codex-app-sdk/guide/vue-providers)
 - [API reference](https://nbonamy.github.io/codex-app-sdk/api/)
+- [JSON-RPC coverage inventory](https://nbonamy.github.io/codex-app-sdk/api/json-rpc)
 
 ## Samples
 

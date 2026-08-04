@@ -90,6 +90,7 @@ export default defineConfig({
             { text: 'Surface contracts', link: '/api/surface' },
             { text: 'Semantic events', link: '/api/events' },
             { text: 'Low-level client', link: '/api/codex' },
+            { text: 'JSON-RPC inventory', link: '/api/json-rpc' },
           ],
         },
       ],

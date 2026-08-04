@@ -55,9 +55,15 @@ After regeneration:
 
 1. inspect the schema diff;
 2. update method maps and surface projections where needed;
-3. add strict protocol and high-level behavior tests;
-4. run the full SDK and sample gates;
-5. update documentation for intentional public changes.
+3. regenerate the [JSON-RPC coverage inventory](../api/json-rpc) with
+   `npm run rpc:generate`;
+4. add strict protocol and high-level behavior tests;
+5. run the full SDK and sample gates;
+6. update documentation for intentional public changes.
+
+`npm run rpc:check` verifies that the committed inventory matches both the
+generated protocol maps and the high-level SDK handlers. The documentation build
+runs this check automatically.
 
 ## Package verification
 

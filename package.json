@@ -61,6 +61,8 @@
   },
   "scripts": {
     "schema:generate": "node scripts/generate-codex-schema.mjs",
+    "rpc:generate": "node scripts/generate-json-rpc-inventory.mjs",
+    "rpc:check": "node scripts/generate-json-rpc-inventory.mjs --check",
     "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/package-katex-assets.mjs && node scripts/verify-package-css.mjs && node scripts/verify-native-assets.mjs",
     "typecheck": "vue-tsc --noEmit",
     "lint": "npm run typecheck",
@@ -68,7 +70,7 @@
     "test:coverage": "vitest run --coverage",
     "benchmark:conversation": "vitest bench tests/performance/conversation-streaming.bench.ts",
     "docs:dev": "vitepress dev docs --port 5175",
-    "docs:build": "vitepress build docs",
+    "docs:build": "npm run rpc:check && vitepress build docs",
     "docs:preview": "vitepress preview docs --port 4175",
     "sample:build": "npm run build -w @codex-app-sdk/basic-sample",
     "sample:start": "npm run start -w @codex-app-sdk/basic-sample",

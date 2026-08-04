@@ -77,6 +77,9 @@ propagation, server-request response state, and transport cleanup.
 
 The current checked-in schema version is `codex-cli 0.144.1`.
 
+See the [JSON-RPC coverage inventory](./json-rpc) for every generated request,
+notification, and server request, including whether the high-level SDK projects it.
+
 ::: warning Keep protocol at the edge
 Adapt raw results into a framework-neutral product contract before crossing IPC.
 If ordinary renderer code needs generated types, add the capability to the

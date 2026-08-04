@@ -41,3 +41,6 @@ and may change when bindings are regenerated.
 
 Use raw generated types in trusted integration code only. Do not make ordinary
 renderer components depend on them.
+
+The [JSON-RPC coverage inventory](./json-rpc) tracks which generated app-server
+methods are projected by the high-level SDK and which remain low-level only.
