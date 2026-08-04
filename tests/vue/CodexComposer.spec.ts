@@ -21,7 +21,9 @@ type ChatComposerProps = {
   draft?: string;
   draftRevision?: number;
   isSending: boolean;
+  hasAttachments?: boolean;
   placeholder: string;
+  queuedPromptId?: string | null;
 };
 
 const models: CodexModelOption[] = [
@@ -95,6 +97,24 @@ describe('ChatComposer', () => {
     await wrapper.get('.chat-composer__send').trigger('click');
 
     expect(wrapper.emitted('send')).toStrictEqual([['ship it']]);
+  });
+
+  it('submits the attachment-only prompt sentinel', async () => {
+    const wrapper = mountComposer({ hasAttachments: true });
+
+    expect(wrapper.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('send')).toStrictEqual([['(no user instructions)']]);
+  });
+
+  it('steers the queued prompt from an empty Cmd Enter shortcut', async () => {
+    const wrapper = mountComposer({ queuedPromptId: 'queued-1' });
+
+    await editor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['queued-1']]);
+    expect(wrapper.emitted('steer')).toBeUndefined();
   });
 
   it('prefills and focuses the composer from a draft revision', async () => {

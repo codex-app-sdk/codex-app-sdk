@@ -410,6 +410,38 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
   });
 
+  it('submits attachment-only prompts with the no-instructions sentinel', async () => {
+    const attachment: CodexNativeAttachment = {
+      id: 'image', type: 'image', path: '/tmp/image.png', name: 'image.png', mimeType: 'image/png', size: 1,
+    };
+    const wrapper = mount(CodexConversationPane, {
+      props: { attachments: [attachment], messages, modelValue: '' },
+    });
+
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')).toStrictEqual([[
+      '(no user instructions)',
+      { attachments: [{ type: 'image', path: '/tmp/image.png', name: 'image.png', mimeType: 'image/png' }] },
+    ]]);
+  });
+
+  it('steers the first queued prompt from an empty Cmd Enter composer', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        busy: true,
+        messages,
+        modelValue: '',
+        queuedPrompts: [{ id: 'queued-1', text: 'Run the tests' }],
+      },
+    });
+
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['queued-1']]);
+    expect(wrapper.emitted('steer')).toBeUndefined();
+  });
+
   it('binds directly to a surface controller while preserving controlled mode overrides', async () => {
     const controller = fakeSurfaceController();
     const wrapper = mount(CodexConversationPane, { props: { surface: controller } });

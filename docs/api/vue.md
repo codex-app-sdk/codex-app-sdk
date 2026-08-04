@@ -51,6 +51,12 @@ Template listeners use `@steer="(prompt, options) => ..."`. Selected
 attachments are included in `options.attachments` and intentionally cleared
 after the steer intent is emitted.
 
+`CodexComposer` accepts `hasAttachments` when the host owns the attachment
+queue. This enables submit with an otherwise empty prompt and emits the
+canonical `'(no user instructions)'` prompt. It also accepts
+`queuedPromptId`; when the composer is empty, Cmd/Ctrl+Enter emits
+`steerQueuedPrompt` for that queued item instead of submitting an empty steer.
+
 ## Leaf components
 
 ### Composer and menus

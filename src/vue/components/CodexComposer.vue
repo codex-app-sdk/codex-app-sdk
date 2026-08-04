@@ -159,6 +159,7 @@ const props = defineProps<{
   draft?: string;
   draftRevision?: number;
   files?: readonly CodexFileSearchItem[];
+  hasAttachments?: boolean;
   plugins?: readonly CodexSurfacePlugin[];
   capabilities?: CodexCapabilities;
   commands?: readonly CodexCommandSummary[];
@@ -168,6 +169,7 @@ const props = defineProps<{
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
   placeholder: string;
+  queuedPromptId?: string | null;
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
   presentation?: CodexConversationPresentation;
@@ -183,6 +185,7 @@ const emit = defineEmits<{
   error: [message: string | null];
   send: [prompt: string];
   steer: [prompt: string];
+  steerQueuedPrompt: [promptId: string];
   attach: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
   interrupt: [];
@@ -209,11 +212,12 @@ const voiceVisible = computed(() => (
 ));
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
-const canSend = computed(() => Boolean(hasPrompt.value && !props.disabled));
+const canSend = computed(() => Boolean((hasPrompt.value || props.hasAttachments) && !props.disabled));
 const transcribeAndSendPending = ref(false);
 const canInterrupt = computed(() => Boolean(
   props.isSending
   && !hasPrompt.value
+  && !props.hasAttachments
   && !props.disabled
   && !isRecording.value
   && !isTranscribing.value
@@ -328,14 +332,19 @@ async function handleSendButtonClick(): Promise<void> {
 }
 
 function submitSteer(): void {
+  if (!prompt.value.trim() && props.queuedPromptId && !props.disabled) {
+    emit('steerQueuedPrompt', props.queuedPromptId);
+    return;
+  }
   submitWithIntent('steer');
 }
 
 function submitWithIntent(intent: 'send' | 'steer'): void {
   const trimmed = prompt.value.trim();
-  if (!canSend.value) {
+  if (!canSend.value || (intent === 'steer' && !trimmed)) {
     return;
   }
+  const submittedPrompt = trimmed || '(no user instructions)';
 
   prompt.value = '';
   selectionStart.value = 0;
@@ -343,9 +352,9 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   caretPosition.value = 0;
   closeComposerMenus();
   if (intent === 'send') {
-    emit('send', trimmed);
+    emit('send', submittedPrompt);
   } else {
-    emit('steer', trimmed);
+    emit('steer', submittedPrompt);
   }
   void nextTick(resizeEditor);
 }
