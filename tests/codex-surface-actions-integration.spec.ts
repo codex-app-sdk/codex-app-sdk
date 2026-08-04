@@ -283,7 +283,13 @@ describe('CodexSurface', () => {
 
     const reviewTransport = new FakeTransport({
       'thread/list': () => ({ data: [], nextCursor: null }),
-      'review/start': () => ({ turn: turn('review-turn', 'inProgress', []), reviewThreadId: 'thread-new' }),
+      'review/start': () => ({
+        turn: turn('review-turn', 'inProgress', [{
+          type: 'userMessage', id: 'review-turn', clientId: null,
+          content: [{ type: 'text', text: 'current changes', textElements: [] }],
+        }]),
+        reviewThreadId: 'thread-new',
+      }),
     });
     const reviewSurface = new CodexSurface({
       autoSelectFirstConversation: false,
@@ -293,20 +299,37 @@ describe('CodexSurface', () => {
     await reviewSurface.connect();
     const reviewEvents: unknown[] = [];
     reviewSurface.onEvent((event) => reviewEvents.push(event));
-    await reviewSurface.sendMessage('/review focus on regressions');
+    await reviewSurface.sendMessage('/review');
     expect(lastRequest(reviewTransport, 'thread/start')).toMatchObject({ params: { model: 'gpt-5' } });
     expect(lastRequest(reviewTransport, 'review/start')).toMatchObject({
       params: {
         threadId: 'thread-new', delivery: 'inline',
-        target: { type: 'custom', instructions: 'focus on regressions' },
+        target: { type: 'uncommittedChanges' },
       },
     });
     expect(lastRequest(reviewTransport, 'turn/start')).toBeUndefined();
-    expect(reviewSurface.getSnapshot().messages).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ role: 'user' }),
+    expect(reviewSurface.getSnapshot().messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        role: 'user',
+        parts: [{
+          type: 'text',
+          text: 'Review the current code changes (staged, unstaged, and untracked files) and provide prioritized findings.',
+        }],
+        metadata: expect.objectContaining({ reviewPrompt: true }),
+      }),
     ]));
-    expect(reviewEvents).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'message.appended', origin: 'action' }),
+    expect(reviewEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'message.appended', origin: 'action',
+        payload: expect.objectContaining({
+          message: expect.objectContaining({
+            parts: [{
+              type: 'text',
+              text: 'Review the current code changes (staged, unstaged, and untracked files) and provide prioritized findings.',
+            }],
+          }),
+        }),
+      }),
     ]));
   });
 

@@ -4,8 +4,9 @@ import type {
   CodexSurfaceSnapshot,
   SendCodexMessageOptions,
   StartCodexReviewOptions,
+  SurfaceMessage,
 } from '../surface/types';
-import { codexThreadToSurfaceMessages } from './codex-conversation-history';
+import { codexThreadToSurfaceMessages, codexTurnToSurfaceMessages } from './codex-conversation-history';
 import {
   messageAt,
   messageTurnId,
@@ -20,6 +21,8 @@ import { timestampToIso } from './codex-surface-events';
 import { errorMessage, normalizeReviewTarget } from './codex-surface-prompts';
 import { ensureAssistantTurnMessage } from './codex-surface-message-state';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
+
+const UNCOMMITTED_REVIEW_PROMPT = 'Review the current code changes (staged, unstaged, and untracked files) and provide prioritized findings.';
 
 export type CodexSurfaceTurnActionsHost = {
   createConversation(): Promise<void>;
@@ -83,9 +86,10 @@ export class CodexSurfaceTurnActionsController {
     this.host.patchConversationStatus(threadId, 'active', 'action');
     this.host.emitConversationActivity(threadId, 'action');
     try {
+      const target = normalizeReviewTarget(options.target ?? { type: 'uncommittedChanges' });
       const response = await this.client.request('review/start', {
         threadId,
-        target: normalizeReviewTarget(options.target ?? { type: 'uncommittedChanges' }),
+        target,
         delivery: 'inline',
       });
       if (response.reviewThreadId !== threadId) {
@@ -97,13 +101,33 @@ export class CodexSurfaceTurnActionsController {
       runtime.activeTurnId = response.turn.status === 'inProgress' ? response.turn.id : null;
       if (!runtime.turnIds.includes(response.turn.id)) runtime.turnIds.push(response.turn.id);
       this.host.patchConversationTurnCount(threadId, runtime.turnIds.length, 'action');
+      const responseMessages = codexTurnToSurfaceMessages(threadId, response.turn)
+        .filter((message) => !runtime.messages.some((candidate) => candidate.id === message.id))
+        .map((message) => message.role === 'user'
+          ? {
+            ...message,
+            parts: target.type === 'uncommittedChanges'
+              ? message.parts.map((part) => part.type === 'text' && part.text === 'current changes'
+                ? { ...part, text: UNCOMMITTED_REVIEW_PROMPT }
+                : part)
+              : message.parts,
+            metadata: { ...message.metadata, reviewPrompt: true },
+          }
+          : message);
+      const messages = insertTurnMessages(runtime.messages, response.turn.id, responseMessages);
       this.host.patchRuntime(threadId, {
         busy: runtime.activeTurnId !== null,
         turnStartPending: false,
         messages: runtime.activeTurnId
-          ? ensureAssistantTurnMessage(runtime.messages, threadId, response.turn.id)
-          : runtime.messages,
+          ? ensureAssistantTurnMessage(messages, threadId, response.turn.id)
+          : messages,
       });
+      for (const message of responseMessages) {
+        this.host.emitEvent('action', {
+          type: 'message.appended', conversationId: threadId, turnId: response.turn.id,
+          payload: { message: structuredClone(message) },
+        });
+      }
       this.host.patchConversationStatus(threadId, runtime.activeTurnId ? 'active' : 'idle', 'action');
       if (runtime.activeTurnId && !wasKnownTurn) {
         this.host.emitEvent('action', {
@@ -216,4 +240,19 @@ export class CodexSurfaceTurnActionsController {
     if (!threadId) throw new Error('There is no active conversation');
     return threadId;
   }
+}
+
+function insertTurnMessages(
+  current: readonly SurfaceMessage[],
+  turnId: string,
+  incoming: readonly SurfaceMessage[],
+): SurfaceMessage[] {
+  if (incoming.length === 0) return [...current];
+  const firstTurnMessageIndex = current.findIndex((message) => message.turnId === turnId);
+  if (firstTurnMessageIndex < 0) return [...current, ...incoming];
+  return [
+    ...current.slice(0, firstTurnMessageIndex),
+    ...incoming,
+    ...current.slice(firstTurnMessageIndex),
+  ];
 }
