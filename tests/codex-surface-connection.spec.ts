@@ -109,7 +109,7 @@ describe('CodexSurface', () => {
       params: {
         threadId: 'thread-existing',
         excludeTurns: true,
-        initialTurnsPage: { limit: 5, itemsView: 'full', sortDirection: 'desc' },
+        initialTurnsPage: { limit: 50, itemsView: 'full', sortDirection: 'desc' },
       },
     });
     expect(listener).toHaveBeenCalled();

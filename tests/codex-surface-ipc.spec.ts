@@ -49,6 +49,7 @@ const history = {
   conversationId: 'thread-1',
   messages: [],
   threadStatus: null,
+  hasOlder: false,
 };
 
 const surfaceEvent: CodexSurfaceEvent = {
@@ -82,6 +83,7 @@ describe('Codex surface Electron bridge', () => {
       interrupt: vi.fn(async () => snapshot),
       listConversations: vi.fn(async () => []),
       listModels: vi.fn(async () => []),
+      loadOlderConversationHistory: vi.fn(async () => history),
       logout: vi.fn(async () => snapshot),
       readConversationHistory: vi.fn(async () => history),
       refreshAccount: vi.fn(async () => snapshot),
@@ -127,6 +129,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:interrupt',
       'codex-surface:list-conversations',
       'codex-surface:list-models',
+      'codex-surface:load-older-conversation-history',
       'codex-surface:logout',
       'codex-surface:read-conversation-history',
       'codex-surface:refresh-account',
@@ -151,6 +154,7 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:clear-goal')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:compact-conversation')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:load-older-conversation-history', 'thread-1')).resolves.toBe(history);
     await expect(main.call('codex-surface:logout')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:refresh-account')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:start-chatgpt-login')).resolves.toStrictEqual({
