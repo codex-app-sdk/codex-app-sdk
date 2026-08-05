@@ -67,5 +67,13 @@ For applications composing the integration with an existing IPC system:
 The helpers validate method names, argument shapes at the integration boundary,
 listener cleanup, and request/event typing.
 
+The native attachment bridge carries bounded renderer-safe image previews. It
+does not expose local `file://` image sources to the renderer; restored local
+images without a surviving preview fall back to a file chip.
+
+Official remote-control pairing is intentionally a Node `CodexSurface` facade,
+not a default renderer IPC method. Hosts that expose pairing UI should define a
+narrow app-owned serialization boundary. See [Remote control](/guide/remote-control).
+
 See the [Electron integration guide](/guide/electron) and
 [security boundary](/guide/security).

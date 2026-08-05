@@ -50,6 +50,11 @@ handlers instead of exposing Node or Electron objects.
 `CodexConversationPane` consumes the controller and composes the standard
 conversation experience.
 
+Hosts with their own renderer state can use the grouped pane controller instead
+of forwarding dozens of props/events. That controller is a view adapter and is
+separate from the trusted `CodexAppBackend` composition root. See
+[Conversation pane integration](/guide/conversation-pane).
+
 Applications can progressively customize:
 
 1. semantic theme tokens;
@@ -83,6 +88,10 @@ Global catalog and authentication updates still notify every subscribed
 conversation. Consumers should keep message identities stable and prefer
 semantic events for incremental integrations instead of repeatedly projecting
 or serializing complete transcripts.
+
+History loading and Vue mounting are separate policies. The surface can keep
+full-detail history available while the renderer mounts only its newest bounded
+window. See [History and performance](/guide/history).
 
 ## Advanced protocol access
 

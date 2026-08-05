@@ -48,6 +48,13 @@ Temporary directories are deleted when the native bridge unregisters.
 
 The stock conversation pane wires both image paste and drag/drop.
 
+Optimistic image messages carry a bounded data preview through the renderer-safe
+surface contract. If app-server history later rematerializes the same attachment
+as a local path, the SDK preserves that preview instead of switching to a
+blocked `file://` source. After a full application restart, a local image with no
+surviving safe preview renders as a file chip; the SDK does not bypass Electron's
+local-resource policy.
+
 ## Clipboard
 
 Message copy actions send bounded text/HTML payloads to Electron's clipboard.

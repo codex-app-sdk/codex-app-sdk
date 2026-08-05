@@ -34,11 +34,15 @@ const surface = createCodexSurface({
 | `permissionMode` | Raw host policy: `read-only`, `workspace-write`, or `full-access` |
 | `approvalPreset` | Initial preset when advertised by app-server |
 | `conversationLimit` | Number of summaries loaded during bootstrap |
+| `loadingStrategy` | `lazy` demand-paging or `eager` progressive full-history hydration |
 | `autoSelectFirstConversation` | Whether bootstrap selects the first catalog item |
 | `extensions` | Host configuration hooks and dynamic tools |
 | `mcpServers` | Trusted default MCP definitions |
 | `onUnknownNotification` | Observation seam for newer app-server notifications |
 | `transport` | Explicit Codex command, arguments, environment, and timeouts |
+
+History loading is independent from Vue's DOM rendering strategy. See
+[History and performance](/guide/history) before changing either default.
 
 ## No implicit working directory
 

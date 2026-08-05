@@ -8,7 +8,7 @@
 - A compatible Codex executable available to discovery, or an explicit
   transport command
 
-The checked-in app-server bindings currently target `codex-cli 0.144.1`.
+The checked-in app-server bindings currently target `codex-cli 0.146.0`.
 
 ## Install from the repository
 

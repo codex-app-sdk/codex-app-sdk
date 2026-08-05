@@ -95,7 +95,7 @@ protocol types.
 ## Source-first today
 
 The SDK is currently `0.1.x`, installed from the repository, and generated
-against `codex-cli 0.144.1`. The high-level API is deliberately smaller and more
+against `codex-cli 0.146.0`. The high-level API is deliberately smaller and more
 stable than app-server. The generated client remains available for advanced
 work while a new capability is being promoted into the surface.
 

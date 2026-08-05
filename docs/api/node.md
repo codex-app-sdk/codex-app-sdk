@@ -190,6 +190,23 @@ schedulers are unref'd when supported and are always cleared during close.
 - `cancelLogin(loginId?)`
 - `logout()`
 
+### Remote control
+
+- `readConfigRequirements()`
+- `readRemoteControlStatus()`
+- `enableRemoteControl(options?)`
+- `disableRemoteControl(options?)`
+- `startRemoteControlPairing(options?)`
+- `readRemoteControlPairingStatus(options?)`
+- `listRemoteControlClients(options)`
+- `revokeRemoteControlClient(options)`
+
+These state-neutral methods expose app-server's official remote-control RPCs in
+trusted Node code. Pairing returns an opaque `pairingCode`, optional manual code,
+environment ID, and `bigint` expiry timestamp. The official QR payload is
+`https://chatgpt.com/codex/pair?pairing_code=<encoded code>`; use the raw code for
+status polling. See [Remote control and device pairing](/guide/remote-control).
+
 ### Catalogs
 
 - `refreshConversations()`
@@ -256,6 +273,20 @@ type CodexConversation = {
 `sendMessage` and `steerMessage` accept the same attachment options. Steering
 maps attachments to app-server `UserInput` blocks and includes them in the
 optimistic user steer message.
+
+Reviews accept:
+
+```ts
+type CodexSurfaceReviewTarget =
+  | { type: 'uncommittedChanges' }
+  | { type: 'baseBranch'; branch: string }
+  | { type: 'commit'; sha: string; title?: string | null }
+  | { type: 'custom'; instructions: string };
+```
+
+`sendMessage('/review')` and `/review <instructions>` route to `review/start`.
+The returned app-server turn supplies the visible review prompt; it is not a
+separate optimistic slash-command message.
 
 `serviceTier` is accepted by conversation creation, settings updates, and
 message options. Passing `null` to settings or message options clears Fast mode

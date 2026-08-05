@@ -44,3 +44,8 @@ renderer components depend on them.
 
 The [JSON-RPC coverage inventory](./json-rpc) tracks which generated app-server
 methods are projected by the high-level SDK and which remain low-level only.
+
+For the major composed contracts, start with
+[conversation pane integration](/guide/conversation-pane),
+[history and performance](/guide/history), or
+[remote control](/guide/remote-control) before dropping to individual types.

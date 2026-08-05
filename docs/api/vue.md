@@ -63,6 +63,11 @@ different copies of Vue. Prefer a stable controller with getters or refs for
 individual state leaves rather than allocating a new monolithic state object
 for every keystroke.
 
+When Vue is separately resolved across the host/package boundary, prefer a
+zero-argument getter such as `state: () => paneState`. The structural ref shape
+solves type compatibility, but the SDK must not be expected to own a foreign
+Vue runtime's dependency graph.
+
 Use it with `<CodexConversationPane :controller="controller" />`. The complete
 state groups are `identity`, `history`, `thread`, `composer`, `catalogs`,
 `capabilities`, and `policy`. Actions cover submit/steer, composer updates,
@@ -92,6 +97,25 @@ one gesture is dispatched exactly once.
 | `CodexApprovalPrompt` | Command, file-change, and permission approval UI |
 | `CodexWorkbenchLayout` | Measured sticky header/content/footer layout |
 | `CodexConversationHistoryLoader` | Restored-history loading treatment |
+
+`CodexConversationPane` exposes `focusComposer()`. `CodexComposer` exposes
+`focus()`.
+
+### Controlled composer state
+
+```ts
+type CodexComposerState = {
+  text: string;
+  selectionStart: number;
+  selectionEnd: number;
+};
+```
+
+`CodexComposer` and `CodexConversationPane` accept `composerState` and emit
+`update:composerState` continuously for text and selection-only changes. When
+`composerState` and `modelValue` are both supplied, `composerState` is
+authoritative. Changing `conversationKey` restores the incoming state without
+emitting an intermediate empty value.
 
 ### Controlled attachments and steering
 
@@ -184,6 +208,9 @@ expand the window. Changing `conversationKey` resets the window to the newest
 batch.
 The host still supplies the complete message array; no pagination or backend
 contract is required.
+
+`lazyMessages` remains as a deprecated compatibility alias. Use
+`renderStrategy="eager|lazy"` in new code.
 
 Configure `loadingStrategy` on `CodexSurfaceOptions` to select the data policy;
 configure `renderStrategy` on `CodexConversationPane` to select the DOM policy
@@ -311,5 +338,9 @@ keeps `$skill`, `@plugin`, and `@path` as the canonical submitted prompt text. S
 surface tool part. MCP metadata includes `server`, `tool`, `pluginId`, and MCP
 app resource identity when supplied by app-server.
 
-See the [Vue guide](/guide/vue), [Vue provider guide](/guide/vue-providers), and
+See the [Vue guide](/guide/vue),
+[conversation pane integration](/guide/conversation-pane),
+[composer guide](/guide/composer), [history guide](/guide/history),
+[message/tool guide](/guide/messages-tools),
+[Vue provider guide](/guide/vue-providers), and
 [presentation guide](/guide/presentation).

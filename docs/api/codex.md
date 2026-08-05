@@ -75,7 +75,7 @@ propagation, server-request response state, and transport cleanup.
 - `RpcRemoteError` and `RpcTransportProtocolError`;
 - `codexSchemaCliVersion`.
 
-The current checked-in schema version is `codex-cli 0.144.1`.
+The current checked-in schema version is `codex-cli 0.146.0`.
 
 See the [JSON-RPC coverage inventory](./json-rpc) for every generated request,
 notification, and server request, including whether the high-level SDK projects it.

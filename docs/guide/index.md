@@ -50,6 +50,10 @@ Use `CodexConversationPane` for the complete default experience. Use the
 exported composer, message, tool, media, menu, goal, and queue components when
 your product needs a different layout.
 
+The pane can bind directly to `useCodexSurface`, or consume one grouped
+controlled-view adapter when the application already owns its state and
+transport. See [Conversation pane integration](/guide/conversation-pane).
+
 ### Low-level client
 
 `CodexAppServerClient` and generated method types are available for capabilities
@@ -62,3 +66,4 @@ surface instead of leaking protocol into renderer code.
 - [Install the SDK](/guide/installation)
 - [Build the first surface](/guide/quick-start)
 - [Understand the architecture](/guide/architecture)
+- [Choose a pane integration](/guide/conversation-pane)

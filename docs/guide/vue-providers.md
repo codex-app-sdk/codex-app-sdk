@@ -108,4 +108,6 @@ Vue roots, tests, or server-rendered requests.
 | `provideCodexToolPresentation` | `useCodexToolPresentation` | Built-in or generic presentation |
 
 See the [Vue API reference](/api/vue) for exported types and the
-[MCP guide](/guide/mcp) for registering app-owned servers.
+[MCP guide](/guide/mcp) for registering app-owned servers. The complete fallback,
+grouping, file-link, and raw-detail behavior is documented in
+[Messages and tool calls](/guide/messages-tools).

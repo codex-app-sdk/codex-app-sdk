@@ -53,6 +53,10 @@ export default defineConfig({
             { text: 'Authentication', link: '/guide/authentication' },
             { text: 'Electron integration', link: '/guide/electron' },
             { text: 'Vue conversation kit', link: '/guide/vue' },
+            { text: 'Conversation pane integration', link: '/guide/conversation-pane' },
+            { text: 'Composer & input', link: '/guide/composer' },
+            { text: 'Messages & tool calls', link: '/guide/messages-tools' },
+            { text: 'History & performance', link: '/guide/history' },
             { text: 'Vue providers', link: '/guide/vue-providers' },
             { text: 'Native capabilities', link: '/guide/native-capabilities' },
             { text: 'Presentation & theming', link: '/guide/presentation' },
@@ -65,6 +69,7 @@ export default defineConfig({
           items: [
             { text: 'Extensions & dynamic tools', link: '/guide/extensions' },
             { text: 'MCP servers', link: '/guide/mcp' },
+            { text: 'Remote control', link: '/guide/remote-control' },
           ],
         },
         {

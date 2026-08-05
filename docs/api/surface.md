@@ -7,7 +7,7 @@ by Node, Electron IPC, and renderers.
 
 ```ts
 type CodexSurfaceSnapshot = {
-  status: 'idle' | 'connecting' | 'ready' | 'error' | 'closed';
+  status: 'idle' | 'connecting' | 'ready' | 'error';
   authentication: CodexSurfaceAuthentication;
   conversations: CodexConversationSummary[];
   activeConversationId: string | null;
@@ -36,6 +36,7 @@ type CodexSurfaceSnapshot = {
   queuedPrompts: CodexSurfaceQueuedPrompt[];
   busy: boolean;
   historyLoading: boolean;
+  historyState?: CodexConversationHistoryState;
   error: string | null;
 };
 ```
@@ -82,6 +83,21 @@ type SurfaceMessage = {
 
 This is the stable renderer model for both restored and live conversations.
 
+## History state
+
+```ts
+type CodexConversationHistoryState = {
+  loadingStrategy: 'eager' | 'lazy';
+  hasOlder: boolean;
+  loadingOlder: boolean;
+  fullyLoaded: boolean;
+};
+```
+
+`CodexConversationHistoryPage` contains `conversationId`, newly materialized
+`messages`, and `hasOlder`. Loading state and Vue rendering strategy are
+independent; see [History and performance](/guide/history).
+
 ## Input contracts
 
 ### `CreateCodexConversationOptions`
@@ -114,6 +130,23 @@ lifecycle, authentication, catalog, conversation, message, review, goal,
 approval, client-request, and event operations.
 
 `CodexSurfaceRendererApi` narrows only the trusted conversation-creation input.
+
+Remote-control pairing and device management intentionally remain Node-only
+`CodexSurface` methods because their app-server results contain trusted policy
+and `bigint` timestamps. See [Remote control](/guide/remote-control).
+
+## Review targets
+
+```ts
+type CodexSurfaceReviewTarget =
+  | { type: 'uncommittedChanges' }
+  | { type: 'baseBranch'; branch: string }
+  | { type: 'commit'; sha: string; title?: string | null }
+  | { type: 'custom'; instructions: string };
+```
+
+`StartCodexReviewOptions` accepts an optional `target`; omitted targets default
+to uncommitted changes.
 
 ## Other contract families
 

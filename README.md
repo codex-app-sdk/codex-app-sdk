@@ -69,6 +69,9 @@ npm install --save-dev electron
 - [Quick start](https://nbonamy.github.io/codex-app-sdk/guide/quick-start)
 - [Architecture](https://nbonamy.github.io/codex-app-sdk/guide/architecture)
 - [Vue conversation kit](https://nbonamy.github.io/codex-app-sdk/guide/vue)
+- [Controlled pane integration](https://nbonamy.github.io/codex-app-sdk/guide/conversation-pane)
+- [History and performance](https://nbonamy.github.io/codex-app-sdk/guide/history)
+- [Application backend](https://nbonamy.github.io/codex-app-sdk/guide/backend)
 - [Vue providers](https://nbonamy.github.io/codex-app-sdk/guide/vue-providers)
 - [API reference](https://nbonamy.github.io/codex-app-sdk/api/)
 - [JSON-RPC coverage inventory](https://nbonamy.github.io/codex-app-sdk/api/json-rpc)
@@ -105,7 +108,7 @@ npm run docs:preview
 ```
 
 The checked-in generated protocol bindings currently target
-`codex-cli 0.144.1`. See the
+`codex-cli 0.146.0`. See the
 [development guide](https://nbonamy.github.io/codex-app-sdk/guide/development)
 before updating them.
 

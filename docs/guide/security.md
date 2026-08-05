@@ -83,3 +83,7 @@ needs stronger external-link policy than the SDK's protocol validation.
 The SDK does not decide which workspaces, tools, MCP servers, permission modes,
 accounts, or external hosts are appropriate for your product. Configure those
 in trusted host code and test the resulting boundary.
+
+Remote-control pairing is also a trusted-host feature. Keep pairing codes out of
+logs, convert `bigint` timestamps before custom IPC, and expose only the product
+state the renderer needs. See [Remote control and device pairing](/guide/remote-control).

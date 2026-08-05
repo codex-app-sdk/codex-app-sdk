@@ -74,11 +74,12 @@ await Promise.all([
 Each handle exposes its own messages, active turn, turn IDs, approvals, queue,
 goal, model/settings selection, history-loading state, and errors.
 
-`load()` renders the five most recent turns with full item details first, then
-hydrates older turns in the background using full pages as well. This keeps
-conversation switching responsive without showing a second, less-detailed
-summary representation. Subscribe to `onStateChange` or the conversation
-history-replacement event if the UI needs to react when older turns arrive.
+`load()` returns the newest 50 turns with full item details first. With the
+default lazy loading strategy, older pages remain behind `loadOlderHistory()`;
+with eager loading, older full-detail pages hydrate progressively in the
+background. This keeps conversation switching responsive without showing a
+second, less-detailed summary representation. See
+[History and performance](/guide/history) for loading and rendering policies.
 
 ## Send rich input
 
@@ -125,12 +126,25 @@ await build.rollbackToTurn(turnId);
 Handles also expose edit, retry, delete-message, steering, reviews, goals,
 queued-prompt actions, approval resolution, and app-server question responses.
 
-When a review is submitted through `sendMessage('/review')` (or a custom
-`/review ...` command), the surface records that slash command as a normal user
-message before starting the review turn. Calling `startReview()` directly
-remains an action-only API and does not add a user prompt. Review output that
-arrives as the canonical `exitedReviewMode` item is rendered once; the surface
-ignores app-server's derived final `agentMessage` containing the same text.
+`sendMessage('/review')` selects uncommitted changes. `/review instructions`
+selects a custom review target. Both route through the official `review/start`
+operation rather than submitting the slash text as a normal turn.
+
+The app-server's returned review turn is authoritative for the visible user
+message. For the default uncommitted target, app-server currently reports
+`current changes`; the SDK expands that one exact placeholder to:
+
+> Review the current code changes (staged, unstaged, and untracked files) and
+> provide prioritized findings.
+
+The message is therefore available immediately and remains consistent with
+restored history; the SDK does not create a separate optimistic `/review`
+bubble. `startReview()` uses the same turn materialization. Review output from
+the canonical `exitedReviewMode` item is rendered once, while app-server's
+derived duplicate `agentMessage` is ignored.
+
+Programmatic targets also include `{ type: 'baseBranch', branch }`,
+`{ type: 'commit', sha, title? }`, and `{ type: 'custom', instructions }`.
 
 ## Archive and delete
 

@@ -141,4 +141,6 @@ conversation system.
 
 - [Configure the surface runtime](/guide/surface)
 - [Run concurrent conversations](/guide/conversations)
+- [Understand history loading and rendering](/guide/history)
+- [Integrate a controlled host backend](/guide/conversation-pane)
 - [Customize the pane](/guide/presentation)

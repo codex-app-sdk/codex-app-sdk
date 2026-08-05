@@ -9,6 +9,11 @@ The backend belongs in the trusted host, normally Electron main or a Node
 process. The renderer should continue to consume the surface through the
 Electron bridge rather than importing this module directly.
 
+`CodexAppBackend` is not the Vue pane controller. The backend composes trusted
+services around a shared `CodexSurface`; the pane controller normalizes
+renderer-owned state and actions. See
+[Conversation pane integration](/guide/conversation-pane#backend-versus-pane-controller).
+
 ## Compose one surface
 
 ```ts
@@ -132,6 +137,11 @@ deterministic tests, inject `now` and a `scheduler`. Scheduled timers call
 The cache does not own drafts, attachments, queues, approvals, browser state,
 or any other application data. The host's eviction callback must remove only
 the data it can rehydrate safely.
+
+For conversation runtimes specifically, pair host eviction with
+`surface.forgetConversation(id)`. That releases rehydratable SDK memory without
+archiving or deleting the app-server thread. See
+[History and performance](/guide/history#releasing-inactive-conversations).
 
 ## Electron boundary
 

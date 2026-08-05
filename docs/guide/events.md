@@ -38,6 +38,7 @@ The matching snapshot mutation is applied before the event is emitted.
 | Plans and goals | plan updates, goal set/clear/status |
 | Queues and diffs | queued prompts, git diff updates |
 | Usage | context usage and account rate limits |
+| Remote control | connection status changes for host-owned native behavior |
 
 ## Conversation-scoped subscription
 
@@ -79,4 +80,5 @@ Vue scope disposal automatically unregisters the underlying renderer listeners.
 - Use `readConversationHistory` after a history-replacement event when an
   integration needs the full historical payload.
 
-See the [event API](/api/events).
+See the [event API](/api/events), [history guide](/guide/history), and
+[remote-control guide](/guide/remote-control).
