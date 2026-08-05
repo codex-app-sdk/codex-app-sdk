@@ -1,0 +1,30 @@
+{
+  "name": "create-codex-app",
+  "version": "0.1.0",
+  "description": "Scaffold an Electron and Vue application powered by Codex App SDK.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nbonamy/codex-app-sdk.git",
+    "directory": "packages/create-codex-app"
+  },
+  "homepage": "https://nbonamy.github.io/codex-app-sdk/guide/scaffolding",
+  "bin": {
+    "create-codex-app": "./bin/create-codex-app.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "template"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

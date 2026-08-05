@@ -1,0 +1,157 @@
+:root {
+  color: #20211f;
+  background: #f7f7f5;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  --codex-surface-color: #fff;
+  --codex-composer-background: #fff;
+  --codex-border-color: #deded9;
+  --codex-message-list-content-width: 760px;
+  --codex-composer-content-width: 760px;
+  --color-surface-lowest: #fff;
+  --color-surface-low: #f4f4f4;
+  --color-shell-main: var(--color-surface-lowest);
+  --shell-glass-opacity: 65%;
+  --color-shell-sidebar: var(--color-surface-low);
+  --color-shell-appbar-divider: color-mix(in srgb, #b0b0b0 14%, transparent);
+  --workbench-appbar-height: 48px;
+}
+
+html[data-platform='macos'] {
+  background: transparent;
+  --color-shell-sidebar: color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent);
+}
+
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; }
+button { font: inherit; }
+
+.app-shell {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: 248px minmax(0, 1fr);
+  overflow: hidden;
+  background: transparent;
+}
+
+.sidebar {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid #deded9;
+  background: var(--color-shell-sidebar);
+  user-select: none;
+}
+
+.sidebar__header {
+  display: flex;
+  min-width: 0;
+  height: var(--workbench-appbar-height);
+  flex: 0 0 var(--workbench-appbar-height);
+  align-items: center;
+  padding: 0 12px 0 20px;
+  border-bottom: 1px solid var(--color-shell-appbar-divider);
+  -webkit-app-region: drag;
+}
+
+html[data-platform='macos'] .sidebar__header {
+  padding-left: 88px;
+}
+
+.sidebar__brand {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__actions {
+  padding: 10px 8px 4px;
+}
+
+.sidebar__actions .sidebar__new-chat {
+  width: 100%;
+}
+
+.sidebar button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #2a2b29;
+  background: transparent;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar button.sidebar__new-chat {
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sidebar__new-chat svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.sidebar button:hover,
+.sidebar button:focus-visible,
+.sidebar__conversation--active { background: #e2e2dd; }
+.sidebar button:focus-visible { outline: 2px solid #3b82f6; outline-offset: -2px; }
+.sidebar button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.sidebar__recents {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  flex: 1;
+}
+
+.sidebar__section-title {
+  margin: 6px 20px 7px;
+  color: #85857e;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sidebar__list {
+  display: flex;
+  min-height: 0;
+  padding: 0 8px 12px;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar__conversation span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__conversation--active { font-weight: 600; }
+.sidebar__empty { margin: 0; padding: 5px 20px; color: #85857e; font-size: 12px; }
+
+@media (max-width: 720px) {
+  .app-shell { grid-template-columns: 190px minmax(0, 1fr); }
+}

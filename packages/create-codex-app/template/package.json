@@ -1,0 +1,27 @@
+{
+  "name": "{{packageName}}",
+  "productName": "{{displayName}}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-main/main.js",
+  "scripts": {
+    "dev": "vite --mode electron",
+    "build": "vite build && vue-tsc --noEmit",
+    "start": "npm run build && electron .",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "codex-app-sdk": "github:nbonamy/codex-app-sdk",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "electron": "^43.1.0",
+    "typescript": "^6.0.0",
+    "vite": "^8.0.0",
+    "vite-plugin-electron": "^1.1.0",
+    "vue-tsc": "^3.3.0"
+  }
+}

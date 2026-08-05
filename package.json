@@ -13,6 +13,7 @@
   },
   "homepage": "https://nbonamy.github.io/codex-app-sdk/",
   "workspaces": [
+    "packages/*",
     "samples/*"
   ],
   "sideEffects": [
@@ -72,6 +73,8 @@
     "docs:dev": "vitepress dev docs --port 5175",
     "docs:build": "npm run rpc:check && vitepress build docs",
     "docs:preview": "vitepress preview docs --port 4175",
+    "create:app": "node packages/create-codex-app/bin/create-codex-app.js",
+    "create:app:test": "npm test -w create-codex-app",
     "sample:build": "npm run build -w @codex-app-sdk/basic-sample",
     "sample:start": "npm run start -w @codex-app-sdk/basic-sample",
     "sample:test": "npm run test -w @codex-app-sdk/basic-sample",
