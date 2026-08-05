@@ -57,6 +57,8 @@ describe('Codex surface catalog codecs', () => {
         shortDescription: 'Interface summary',
         iconSmall: '/icons/small.svg',
         iconLarge: '/icons/large.png',
+        iconSmallUrl: null,
+        iconLargeUrl: null,
         brandColor: '#00aaff',
         defaultPrompt: 'Ship it',
       },
@@ -80,6 +82,8 @@ describe('Codex surface catalog codecs', () => {
 
     await expect(surfaceSkill(skill({ shortDescription: undefined, interface: {
       shortDescription: 'Interface fallback',
+      iconSmallUrl: null,
+      iconLargeUrl: null,
     } }), loadIcon)).resolves.toMatchObject({
       shortDescription: 'Interface fallback',
       iconSmall: undefined,

@@ -97,7 +97,7 @@ describe('codexThreadToSurfaceMessages', () => {
       }],
     });
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
-      type: 'webSearch', id: 'search', query: '', action: null,
+      type: 'webSearch', id: 'search', query: '', action: null, results: null,
     })).toMatchObject({
       status: 'complete', parts: [{ type: 'tool', id: 'search', body: 'web search' }],
     });

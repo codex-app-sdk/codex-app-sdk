@@ -306,7 +306,9 @@ describe('CodexSurface', () => {
     });
     await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
     await surface.resolveApproval('legacy-command-deny', 'deny');
-    expect(lastResponse(transport, 'legacy-command-deny')).toMatchObject({ result: { decision: 'denied' } });
+    expect(lastResponse(transport, 'legacy-command-deny')).toMatchObject({
+      result: { decision: { denied: { rejection: 'Denied by user' } } },
+    });
 
     transport.emit({
       id: 'legacy-patch-deny', method: 'applyPatchApproval',
@@ -317,7 +319,9 @@ describe('CodexSurface', () => {
     });
     await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
     await surface.resolveApproval('legacy-patch-deny', 'deny');
-    expect(lastResponse(transport, 'legacy-patch-deny')).toMatchObject({ result: { decision: 'denied' } });
+    expect(lastResponse(transport, 'legacy-patch-deny')).toMatchObject({
+      result: { decision: { denied: { rejection: 'Denied by user' } } },
+    });
 
     transport.emit({
       id: 'legacy-patch-once', method: 'applyPatchApproval',

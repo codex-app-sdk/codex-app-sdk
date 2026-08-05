@@ -60,7 +60,9 @@ export function registerCodexApprovalHandlers(
           ...(request.params.reason ? { description: request.params.reason } : {}),
         },
         resolve: (decision, scope) => responder.resolve({
-          decision: decision === 'deny' ? 'denied' : scope === 'session' ? 'approved_for_session' : 'approved',
+          decision: decision === 'deny'
+            ? { denied: { rejection: 'Denied by user' } }
+            : scope === 'session' ? 'approved_for_session' : 'approved',
         }),
       });
       return true;
@@ -78,7 +80,9 @@ export function registerCodexApprovalHandlers(
           } : {}),
         },
         resolve: (decision, scope) => responder.resolve({
-          decision: decision === 'deny' ? 'denied' : scope === 'session' ? 'approved_for_session' : 'approved',
+          decision: decision === 'deny'
+            ? { denied: { rejection: 'Denied by user' } }
+            : scope === 'session' ? 'approved_for_session' : 'approved',
         }),
       });
       return true;

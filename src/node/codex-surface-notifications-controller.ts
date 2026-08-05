@@ -71,7 +71,7 @@ export interface CodexSurfaceNotificationsHost {
   runtime(threadId: string): ThreadRuntimeState | undefined;
   runtimes(): Iterable<ThreadRuntimeState>;
   snapshotForRuntime(runtime: ThreadRuntimeState): CodexSurfaceSnapshot;
-  unknownNotification(notification: never): void;
+  unknownNotification(notification: ServerNotification): void;
 }
 
 export class CodexSurfaceNotificationsController {

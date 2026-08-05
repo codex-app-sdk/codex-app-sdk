@@ -21,7 +21,10 @@ export function surfaceAccount(account: v2.Account): NonNullable<CodexSurfaceAut
     return { type: 'chatgpt', email: account.email, planType: account.planType };
   }
   if (account.type === 'amazonBedrock') {
-    return { type: 'amazonBedrock', credentialSource: account.credentialSource };
+    return {
+      type: 'amazonBedrock',
+      credentialSource: account.usesCodexManagedCredentials ? 'codexManaged' : 'awsManaged',
+    };
   }
   return { type: 'apiKey' };
 }

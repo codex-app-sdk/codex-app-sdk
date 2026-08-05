@@ -1,5 +1,6 @@
 import {
   CodexAppServerClient,
+  type ServerNotification,
   type v2,
 } from '../codex/index';
 import type {
@@ -956,7 +957,7 @@ export class CodexSurface {
   }
 
 
-  private handleUnknownNotification(notification: never): void {
+  private handleUnknownNotification(notification: ServerNotification): void {
     const runtimeNotification = notification as unknown as { method: string; params?: unknown };
     this.options.onUnknownNotification?.({
       method: runtimeNotification.method,

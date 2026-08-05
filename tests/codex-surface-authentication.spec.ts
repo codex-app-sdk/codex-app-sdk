@@ -22,8 +22,10 @@ describe('Codex surface authentication values', () => {
   it('normalizes each supported account type and identity', () => {
     expect(surfaceAccount({ type: 'chatgpt', email: 'person@example.test', planType: 'pro' }))
       .toStrictEqual({ type: 'chatgpt', email: 'person@example.test', planType: 'pro' });
-    expect(surfaceAccount({ type: 'amazonBedrock', credentialSource: 'codexManaged' }))
+    expect(surfaceAccount({ type: 'amazonBedrock', usesCodexManagedCredentials: true }))
       .toStrictEqual({ type: 'amazonBedrock', credentialSource: 'codexManaged' });
+    expect(surfaceAccount({ type: 'amazonBedrock', usesCodexManagedCredentials: false }))
+      .toStrictEqual({ type: 'amazonBedrock', credentialSource: 'awsManaged' });
     expect(surfaceAccount({ type: 'apiKey' })).toStrictEqual({ type: 'apiKey' });
 
     expect(surfaceAuthenticationIdentityKey(authentication({ account: null, requiresOpenaiAuth: true })))

@@ -444,6 +444,25 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot()).toStrictEqual(before);
   });
 
+  it('reports typed notifications that are not projected by the surface', async () => {
+    const transport = new FakeTransport();
+    const onUnknownNotification = vi.fn();
+    const surface = new CodexSurface({
+      client: new CodexAppServerClient(transport),
+      onUnknownNotification,
+    });
+    await surface.connect();
+    const notification = {
+      method: 'thread/environment/connected',
+      params: { threadId: 'thread-existing', environmentId: 'environment-1' },
+    };
+
+    transport.emit(notification);
+
+    expect(onUnknownNotification).toHaveBeenCalledOnce();
+    expect(onUnknownNotification).toHaveBeenCalledWith(notification);
+  });
+
   it('makes every non-UI server-request policy explicit and fail-closed', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();

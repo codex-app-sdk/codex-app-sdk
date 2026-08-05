@@ -488,7 +488,7 @@ export type CodexRealtimeInputAudioChunk = Omit<
 };
 
 export type CodexRealtimeOutputModality = 'text' | 'audio';
-export type CodexRealtimeVersion = 'v1' | 'v2';
+export type CodexRealtimeVersion = 'v1' | 'v2' | 'v3';
 export type CodexRealtimeTextRole = 'user' | 'developer' | 'assistant';
 export type CodexRealtimeTransport =
   | { type: 'websocket' }

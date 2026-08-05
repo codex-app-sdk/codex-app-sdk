@@ -215,14 +215,21 @@ function snapshot(models: CodexSurfaceModel[]): CodexSurfaceSnapshot {
 }
 
 function tokenUsage(lastTotalTokens: number, modelContextWindow: number | null): v2.ThreadTokenUsage {
-  const total = { totalTokens: 100, inputTokens: 60, cachedInputTokens: 20, outputTokens: 40, reasoningOutputTokens: 10 };
+  const total = {
+    totalTokens: 100,
+    inputTokens: 60,
+    cachedInputTokens: 20,
+    cacheWriteInputTokens: 0,
+    outputTokens: 40,
+    reasoningOutputTokens: 10,
+  };
   return { total, last: { ...total, totalTokens: lastTotalTokens }, modelContextWindow };
 }
 
 function rateSnapshot(overrides: Partial<v2.RateLimitSnapshot> = {}): v2.RateLimitSnapshot {
   return {
     limitId: null, limitName: null, primary: null, secondary: null,
-    credits: null, individualLimit: null, planType: null, rateLimitReachedType: null,
+    credits: null, individualLimit: null, spendControlReached: null, planType: null, rateLimitReachedType: null,
     ...overrides,
   };
 }
