@@ -12,6 +12,7 @@ const templates: Record<string, string> = {
   'chat.actions.delete': 'Delete',
   'chat.actions.edit': 'Edit',
   'chat.actions.editPrompt': 'Edit prompt',
+  'chat.actions.fork': 'Fork',
   'chat.actions.label': 'Message actions',
   'chat.actions.quote': 'Quote',
   'chat.actions.resubmit': 'Resubmit',

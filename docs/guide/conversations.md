@@ -28,6 +28,64 @@ await surface.createConversation({
 await surface.selectConversation(existingId);
 ```
 
+## Fork a conversation
+
+Forking creates a new app-server thread from the source through its latest
+completed turn. It returns a loaded handle and snapshot for the new
+conversation without changing the surface's active conversation:
+
+```ts
+const fork = await surface.forkConversation(sourceConversationId, {
+  model: 'available-model-id',
+  reasoningEffort: 'high',
+});
+
+fork.conversationId;
+fork.snapshot.messages;
+await fork.conversation.sendMessage('Try the alternative implementation');
+```
+
+The same operation is available from a stable handle:
+
+```ts
+const fork = await surface.conversation(sourceConversationId).fork();
+```
+
+Omitted model, service-tier, working-directory, permission, instruction, and
+configuration values inherit from the source thread. Trusted Node hosts can
+provide the same overrides accepted by `createConversation()` and the same
+`extensionContext` or MCP definitions in the second argument. The returned
+snapshot initially contains the newest 5 full-detail turns and follows the
+configured history-loading strategy. Call `fork.conversation.select()` only
+when the host wants to make the fork active in a single-selected UI.
+
+Forking the latest state of an actively running source is rejected so the
+result always has an unambiguous latest completed turn. The source conversation
+is not modified.
+
+### Fork at a message
+
+Message-level forking creates the same loaded, unselected result while choosing
+an explicit conversation boundary:
+
+```ts
+const fork = await surface
+  .conversation(sourceConversationId)
+  .forkMessage(messageIndex);
+```
+
+- An assistant message forks through that message's turn and omits every later
+  turn.
+- A user message forks through the preceding assistant turn, then submits that
+  user's text and attachments as the first prompt in the new conversation.
+- The first user message forks before its original turn, then submits it to the
+  empty fork.
+
+Because the boundary is explicit, a point before the current active turn may be
+forked while later work is still running. The source is never interrupted or
+modified. `surface.forkConversationAtMessage(sourceId, messageIndex, ...)`
+exposes the same operation without first obtaining a handle.
+
 ## Release inactive local state
 
 Hosts that keep many conversations available can release an idle conversation's

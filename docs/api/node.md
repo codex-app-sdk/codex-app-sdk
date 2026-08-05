@@ -217,6 +217,8 @@ status polling. See [Remote control and device pairing](/guide/remote-control).
 ### Conversation lifecycle
 
 - `createConversation(options?, hostOptions?)`
+- `forkConversation(sourceId, options?, hostOptions?)` — forks through the latest completed turn and returns `{ conversationId, conversation, snapshot }` without selecting it.
+- `forkConversationAtMessage(sourceId, index, options?, hostOptions?)` — forks through an assistant message, or through the preceding assistant and resubmits a user message.
 - `selectConversation(id)`
 - `forgetConversation(id)` — releases local runtime state without changing the app-server thread; the summary remains available and the conversation can be loaded again later.
 - `archiveConversation(id)`
@@ -237,6 +239,7 @@ status polling. See [Remote control and device pairing](/guide/remote-control).
 - `deleteMessage(index)`
 - `editMessage(index, content)`
 - `retryMessage(index)`
+- `forkMessage(index)` — forks the active conversation at a message and selects the new conversation.
 - queued-prompt actions
 - approval and app-server client-request responses
 - `setGoal(objective, tokenBudget?)` / `clearGoal()`
@@ -248,7 +251,16 @@ Stable Node handle for one conversation:
 ```ts
 type CodexConversation = {
   readonly id: string;
-  /** Loads 50 recent full-detail turns immediately; older pages follow the configured loading strategy. */
+  fork(
+    options?: ForkCodexConversationOptions,
+    hostOptions?: CodexConversationHostOptions,
+  ): Promise<CodexConversationForkResult>;
+  forkMessage(
+    index: number,
+    options?: ForkCodexConversationOptions,
+    hostOptions?: CodexConversationHostOptions,
+  ): Promise<CodexConversationForkResult>;
+  /** Loads 5 recent full-detail turns immediately; older pages follow the configured loading strategy. */
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;
@@ -269,6 +281,26 @@ type CodexConversation = {
   // message, queue, approval, client request, and goal actions are also exposed
 };
 ```
+
+Fork types are protocol-free and exported from `codex-app-sdk/node`:
+
+```ts
+type ForkCodexConversationOptions = CreateCodexConversationOptions;
+
+type CodexConversationForkResult = {
+  readonly conversationId: string;
+  readonly conversation: CodexConversation;
+  readonly snapshot: CodexConversationSnapshot;
+};
+```
+
+Omitted fork overrides inherit from the source app-server thread. A latest-state
+fork requires an idle source; a message fork may target a completed boundary
+before an active turn. Assistant messages fork through their turn. User
+messages fork through the preceding assistant turn and are submitted as the
+new fork's first prompt, including their attachments. The new conversation is
+fully usable immediately, but the surface's current selection remains unchanged
+until the host calls `result.conversation.select()`.
 
 `sendMessage` and `steerMessage` accept the same attachment options. Steering
 maps attachments to app-server `UserInput` blocks and includes them in the

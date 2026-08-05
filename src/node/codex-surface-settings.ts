@@ -143,7 +143,7 @@ export function approvalPresetFromSettings(
 }
 
 export function sessionSelection(
-  response: v2.ThreadResumeResponse | v2.ThreadStartResponse,
+  response: v2.ThreadForkResponse | v2.ThreadResumeResponse | v2.ThreadStartResponse,
   models: CodexSurfaceModel[],
   current: CodexSurfaceSnapshot,
 ): SurfaceSelection {

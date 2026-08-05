@@ -71,6 +71,15 @@ export type CodexConversationLoadOptions = CodexConversationHostOptions & {
   loadingStrategy?: CodexConversationLoadingStrategy;
 };
 
+/** Trusted thread-start overrides applied to a fork. Omitted values inherit from the source thread. */
+export type ForkCodexConversationOptions = CreateCodexConversationOptions;
+
+export type CodexConversationForkResult = {
+  readonly conversationId: string;
+  readonly conversation: CodexConversation;
+  readonly snapshot: CodexConversationSnapshot;
+};
+
 export type ListCodexSkillsOptions = {
   cwd?: string;
   forceReload?: boolean;
@@ -107,6 +116,15 @@ export type CodexSurfaceExtension = {
 
 export type CodexConversation = {
   readonly id: string;
+  fork(
+    options?: ForkCodexConversationOptions,
+    hostOptions?: CodexConversationHostOptions,
+  ): Promise<CodexConversationForkResult>;
+  forkMessage(
+    index: number,
+    options?: ForkCodexConversationOptions,
+    hostOptions?: CodexConversationHostOptions,
+  ): Promise<CodexConversationForkResult>;
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;

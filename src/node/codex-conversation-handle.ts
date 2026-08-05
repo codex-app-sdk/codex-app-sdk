@@ -13,8 +13,11 @@ import type {
 } from '../surface/types';
 import type {
   CodexConversation,
+  CodexConversationForkResult,
+  CodexConversationHostOptions,
   CodexConversationLoadOptions,
   CodexRealtimeSession,
+  ForkCodexConversationOptions,
 } from './codex-surface-contracts';
 
 export type CodexConversationHandleOperations = {
@@ -23,6 +26,15 @@ export type CodexConversationHandleOperations = {
   deleteMessage(index: number): Promise<void>;
   deleteQueuedPrompt(promptId: string): Promise<void>;
   editMessage(index: number, content: string): Promise<void>;
+  fork(
+    options?: ForkCodexConversationOptions,
+    hostOptions?: CodexConversationHostOptions,
+  ): Promise<CodexConversationForkResult>;
+  forkMessage(
+    index: number,
+    options?: ForkCodexConversationOptions,
+    hostOptions?: CodexConversationHostOptions,
+  ): Promise<CodexConversationForkResult>;
   getSnapshot(): CodexConversationSnapshot;
   interrupt(): Promise<void>;
   load(options?: CodexConversationLoadOptions): Promise<void>;
@@ -59,6 +71,8 @@ export function createCodexConversationHandle(
   };
   return {
     id,
+    fork: operations.fork,
+    forkMessage: operations.forkMessage,
     load: (options) => snapshotAfter(() => operations.load(options)),
     select: () => snapshotAfter(operations.select),
     readHistory: operations.readHistory,

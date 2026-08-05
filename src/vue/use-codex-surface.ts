@@ -110,6 +110,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     deleteMessage: (index: number) => run(() => api.deleteMessage(index)),
     deleteQueuedPrompt: (promptId: string) => run(() => api.deleteQueuedPrompt(promptId)),
     editMessage: (index: number, content: string) => run(() => api.editMessage(index, content)),
+    forkMessage: (index: number) => run(() => api.forkMessage(index)),
     interrupt: () => run(() => api.interrupt()),
     listConversations: (options?: ListCodexConversationsOptions) => api.listConversations(options),
     listModels: (options?: ListCodexModelsOptions) => api.listModels(options),

@@ -41,6 +41,7 @@ describe('useCodexSurface', () => {
     await surface.deleteMessage(2);
     await surface.deleteQueuedPrompt('queued-1');
     await surface.editMessage(1, 'Replacement');
+    await surface.forkMessage(4);
     await expect(surface.readConversationHistory('thread-1')).resolves.toStrictEqual({
       conversationId: 'thread-1', messages: [], threadStatus: null,
     });
@@ -74,6 +75,7 @@ describe('useCodexSurface', () => {
     expect(api.deleteMessage).toHaveBeenCalledWith(2);
     expect(api.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
     expect(api.editMessage).toHaveBeenCalledWith(1, 'Replacement');
+    expect(api.forkMessage).toHaveBeenCalledWith(4);
     expect(api.readConversationHistory).toHaveBeenCalledWith('thread-1');
     expect(api.renameConversation).toHaveBeenCalledWith('Renamed');
     expect(api.selectConversation).toHaveBeenCalledWith('thread-1');
@@ -194,6 +196,7 @@ function fakeApi(
     deleteMessage: vi.fn(async () => readySnapshot),
     deleteQueuedPrompt: vi.fn(async () => readySnapshot),
     editMessage: vi.fn(async () => readySnapshot),
+    forkMessage: vi.fn(async () => readySnapshot),
     getSnapshot: vi.fn(async () => readySnapshot),
     interrupt: vi.fn(async () => readySnapshot),
     listConversations: vi.fn(async () => []),

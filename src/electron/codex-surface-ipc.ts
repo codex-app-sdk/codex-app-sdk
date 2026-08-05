@@ -39,6 +39,7 @@ const channels = {
   deleteMessage: 'codex-surface:delete-message',
   deleteQueuedPrompt: 'codex-surface:delete-queued-prompt',
   editMessage: 'codex-surface:edit-message',
+  forkMessage: 'codex-surface:fork-message',
   getSnapshot: 'codex-surface:get-snapshot',
   interrupt: 'codex-surface:interrupt',
   listConversations: 'codex-surface:list-conversations',
@@ -76,6 +77,7 @@ type SurfaceRequests = {
   [channels.deleteMessage]: IpcRequest<[index: number], CodexSurfaceSnapshot>;
   [channels.deleteQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
   [channels.editMessage]: IpcRequest<[index: number, content: string], CodexSurfaceSnapshot>;
+  [channels.forkMessage]: IpcRequest<[index: number], CodexSurfaceSnapshot>;
   [channels.getSnapshot]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.interrupt]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.listConversations]: IpcRequest<[
@@ -130,6 +132,7 @@ export function registerCodexSurfaceIpc(
     | 'deleteMessage'
     | 'deleteQueuedPrompt'
     | 'editMessage'
+    | 'forkMessage'
     | 'getSnapshot'
     | 'interrupt'
     | 'listConversations'
@@ -174,6 +177,7 @@ export function registerCodexSurfaceIpc(
       messageIndex(index),
       nonEmptyString(content, 'Message content'),
     ),
+    [channels.forkMessage]: (_event, index) => surface.forkMessage(messageIndex(index)),
     [channels.getSnapshot]: () => surface.getSnapshot(),
     [channels.interrupt]: () => surface.interrupt(),
     [channels.listConversations]: (_event, options) => surface.listConversations(
@@ -596,6 +600,7 @@ const channelArities: Record<keyof SurfaceRequests, readonly [minimum: number, m
   [channels.deleteMessage]: [1, 1],
   [channels.deleteQueuedPrompt]: [1, 1],
   [channels.editMessage]: [2, 2],
+  [channels.forkMessage]: [1, 1],
   [channels.getSnapshot]: [0, 0],
   [channels.interrupt]: [0, 0],
   [channels.listConversations]: [0, 1],
@@ -648,6 +653,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     deleteMessage: (index) => renderer.invoke(channels.deleteMessage, index),
     deleteQueuedPrompt: (promptId) => renderer.invoke(channels.deleteQueuedPrompt, promptId),
     editMessage: (index, content) => renderer.invoke(channels.editMessage, index, content),
+    forkMessage: (index) => renderer.invoke(channels.forkMessage, index),
     getSnapshot: () => renderer.invoke(channels.getSnapshot),
     interrupt: () => renderer.invoke(channels.interrupt),
     listConversations: (options) => renderer.invoke(channels.listConversations, options),

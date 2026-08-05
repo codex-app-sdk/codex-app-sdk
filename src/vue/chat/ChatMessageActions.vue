@@ -41,6 +41,13 @@
       <RotateClockwiseIcon />
     </ChatIconButton>
     <ChatIconButton
+      v-if="canFork && showFork"
+      :label="t('chat.actions.fork')"
+      @click="emit('fork')"
+    >
+      <ArrowForkIcon class="chat-message-actions__fork-icon" />
+    </ChatIconButton>
+    <ChatIconButton
       v-if="canDelete && showDelete"
       danger
       :label="t('chat.actions.delete')"
@@ -59,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { CheckIcon, CopyIcon, PencilIcon, QuoteIcon, RotateClockwiseIcon, Trash2Icon } from '../icons/app-icons'
+import { ArrowForkIcon, CheckIcon, CopyIcon, PencilIcon, QuoteIcon, RotateClockwiseIcon, Trash2Icon } from '../icons/app-icons'
 import { computed } from 'vue'
 import { useCodexChatTranslate } from './chat-i18n'
 import ChatIconButton from './ChatIconButton.vue'
@@ -70,6 +77,7 @@ import type { Message } from './types'
 const props = withDefaults(defineProps<{
   canDelete?: boolean
   canEdit?: boolean
+  canFork?: boolean
   canRetry?: boolean
   copied?: boolean
   message: Message
@@ -77,6 +85,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   canDelete: true,
   canEdit: true,
+  canFork: false,
   canRetry: true,
 })
 
@@ -84,6 +93,7 @@ const emit = defineEmits<{
   copy: []
   delete: []
   edit: []
+  fork: []
   quote: []
   retry: []
 }>()
@@ -91,6 +101,7 @@ const t = useCodexChatTranslate()
 const showCopy = computed(() => props.presentation?.copy !== false)
 const showDelete = computed(() => props.presentation?.delete !== false)
 const showEdit = computed(() => props.presentation?.edit !== false)
+const showFork = computed(() => props.presentation?.fork !== false)
 const showQuote = computed(() => props.presentation?.quote !== false)
 const showRetry = computed(() => props.presentation?.retry !== false)
 const sentAtLabel = computed(() => props.message.createdAt ? formatMessageSentAt(props.message.createdAt) : '')
@@ -119,5 +130,9 @@ const sentAtTitle = computed(() => props.message.createdAt ? fullMessageSentAt(p
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-16);
   white-space: nowrap;
+}
+
+.chat-message-actions__fork-icon {
+  transform: rotate(90deg);
 }
 </style>

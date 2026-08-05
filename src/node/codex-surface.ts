@@ -40,6 +40,7 @@ import {
 import { startCodexRealtimeSession } from './codex-surface-realtime-session';
 import type {
   CodexConversation,
+  CodexConversationForkResult,
   CodexConversationHostOptions,
   CodexConversationLoadOptions,
   CodexRealtimeSession,
@@ -49,6 +50,7 @@ import type {
   CodexSurfaceRemoteControlPairing,
   CodexSurfaceRemoteControlPairingStatus,
   CodexSurfaceRemoteControlStatus,
+  ForkCodexConversationOptions,
   ListCodexSkillsOptions,
 } from './codex-surface-contracts';
 import {
@@ -78,11 +80,13 @@ import { CodexSurfaceLifecycleController } from './codex-surface-lifecycle-contr
 import { CodexSurfaceNotificationsController } from './codex-surface-notifications-controller';
 import { CodexSurfaceRuntimeController } from './codex-surface-runtime-controller';
 import { CodexSurfaceConnectionController } from './codex-surface-connection-controller';
+import { CodexSurfaceForkController } from './codex-surface-fork-controller';
 
 export type {
   CodexAppServerTransportOptions,
   CodexConversation,
   CodexConversationDefaults,
+  CodexConversationForkResult,
   CodexConversationHostOptions,
   CodexConversationLoadOptions,
   CodexDynamicTool,
@@ -99,6 +103,7 @@ export type {
   CodexSurfaceRemoteControlPairingStatus,
   CodexSurfaceRemoteControlStatus,
   CodexThreadStartExtension,
+  ForkCodexConversationOptions,
   ListCodexSkillsOptions,
 } from './codex-surface-contracts';
 
@@ -135,6 +140,7 @@ export class CodexSurface {
   private readonly turnActions: CodexSurfaceTurnActionsController;
   private readonly messagesController: CodexSurfaceMessagesController;
   private readonly lifecycle: CodexSurfaceLifecycleController;
+  private readonly forks: CodexSurfaceForkController;
   private readonly notifications: CodexSurfaceNotificationsController;
   private readonly runtimeState: CodexSurfaceRuntimeController;
   private readonly connection: CodexSurfaceConnectionController;
@@ -333,6 +339,35 @@ export class CodexSurface {
         requireRuntime: (threadId) => this.requireRuntime(threadId),
         runtime: (threadId) => this.runtimeState.get(threadId),
         runtimeProjection: (runtime) => this.runtimeProjection(runtime),
+        snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
+      },
+    );
+    this.forks = new CodexSurfaceForkController(
+      this.client,
+      options.loadingStrategy,
+      this.catalog,
+      this.extensions,
+      {
+        createRuntime: (threadId, patch) => this.createRuntime(threadId, patch),
+        emitConversationActivity: (threadId) => this.emitConversationActivity(threadId, 'action'),
+        emitConversationPermissions: (threadId) => this.emitConversationPermissions(threadId, 'action'),
+        emitConversationSettings: (threadId) => this.emitConversationSettings(threadId, 'action'),
+        emitConversationSkills: (threadId) => this.emitConversationSkills(threadId, 'action'),
+        emitHistoryReplaced: (threadId) => this.emitHistoryReplaced(threadId, 'fork', 'action'),
+        emitSummaryUpserted: (summary) => this.emitSummaryUpserted(summary, 'created', 'action'),
+        ensureConnected: () => this.ensureConnected(),
+        getState: () => this.state,
+        hydrateCompleteHistory: (threadId, cursor) => (
+          this.conversations.hydrateCompleteHistory(threadId, { cursor })
+        ),
+        patch: (patch) => this.patch(patch),
+        rememberHostOptions: (threadId, hostOptions) => (
+          this.lifecycle.rememberHostOptions(threadId, hostOptions)
+        ),
+        requireRuntime: (threadId) => this.requireRuntime(threadId),
+        sendMessageToThread: (threadId, prompt, sendOptions) => (
+          this.messagesController.sendToThread(threadId, prompt, sendOptions)
+        ),
         snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
       },
     );
@@ -536,6 +571,39 @@ export class CodexSurface {
     return this.lifecycle.create(options, hostOptions);
   }
 
+  /** Forks the latest completed source conversation without selecting the new conversation. */
+  async forkConversation(
+    sourceConversationId: string,
+    options: ForkCodexConversationOptions = {},
+    hostOptions: CodexConversationHostOptions = {},
+  ): Promise<CodexConversationForkResult> {
+    const sourceThreadId = normalizedConversationId(sourceConversationId);
+    await this.ensureThreadReady(sourceThreadId);
+    const inheritedHostOptions = this.lifecycle.hostOptions(sourceThreadId) ?? {};
+    const conversationId = await this.forks.fork(sourceThreadId, options, {
+      ...inheritedHostOptions,
+      ...hostOptions,
+    });
+    return this.conversationForkResult(conversationId);
+  }
+
+  /** Forks at a user or assistant message without selecting the new conversation. */
+  async forkConversationAtMessage(
+    sourceConversationId: string,
+    index: number,
+    options: ForkCodexConversationOptions = {},
+    hostOptions: CodexConversationHostOptions = {},
+  ): Promise<CodexConversationForkResult> {
+    const sourceThreadId = normalizedConversationId(sourceConversationId);
+    await this.ensureThreadReady(sourceThreadId);
+    const inheritedHostOptions = this.lifecycle.hostOptions(sourceThreadId) ?? {};
+    const conversationId = await this.forks.forkMessage(sourceThreadId, index, options, {
+      ...inheritedHostOptions,
+      ...hostOptions,
+    });
+    return this.conversationForkResult(conversationId);
+  }
+
   async selectConversation(conversationId: string): Promise<CodexSurfaceSnapshot> {
     return this.lifecycle.select(conversationId);
   }
@@ -642,6 +710,14 @@ export class CodexSurface {
     return this.turnActions.retryMessage(index);
   }
 
+  /** Forks at an active-conversation message and selects the new conversation. */
+  async forkMessage(index: number): Promise<CodexSurfaceSnapshot> {
+    const conversationId = this.state.activeConversationId;
+    if (!conversationId) throw new Error('There is no active conversation');
+    const result = await this.forkConversationAtMessage(conversationId, index);
+    return result.conversation.select();
+  }
+
   async deleteQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot> {
     return this.messagesController.deleteQueuedPrompt(promptId);
   }
@@ -674,6 +750,10 @@ export class CodexSurface {
       deleteMessage: (index) => this.turnActions.deleteMessageForThread(id, index),
       deleteQueuedPrompt: (promptId) => this.messagesController.deleteQueuedPromptForThread(id, promptId),
       editMessage: (index, content) => this.turnActions.editMessageForThread(id, index, content),
+      fork: (options, hostOptions) => this.forkConversation(id, options, hostOptions),
+      forkMessage: (index, options, hostOptions) => (
+        this.forkConversationAtMessage(id, index, options, hostOptions)
+      ),
       getSnapshot: () => this.getConversationSnapshot(id),
       interrupt: () => this.turnActions.interruptThread(id),
       load: async (options) => { await this.ensureThreadReady(id, options); },
@@ -712,6 +792,15 @@ export class CodexSurface {
       options,
       threadId,
     });
+  }
+
+  private conversationForkResult(conversationId: string): CodexConversationForkResult {
+    const conversation = this.conversation(conversationId);
+    return {
+      conversationId,
+      conversation,
+      snapshot: conversation.getSnapshot(),
+    };
   }
 
   getConversationSnapshot(conversationId: string): CodexConversationSnapshot {

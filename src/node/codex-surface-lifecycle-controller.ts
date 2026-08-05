@@ -89,6 +89,10 @@ export class CodexSurfaceLifecycleController {
     return this.hostOptionsByThread.get(threadId);
   }
 
+  rememberHostOptions(threadId: string, options: CodexConversationLoadOptions): void {
+    this.hostOptionsByThread.set(threadId, options);
+  }
+
   forget(threadId: string): void {
     this.hostOptionsByThread.delete(threadId);
     this.hydrationPromises.delete(threadId);

@@ -21,6 +21,7 @@
             :answered-client-request-ids="answeredClientRequestIds"
             :can-delete-message="canDeleteMessage"
             :can-edit-message="canEditMessage"
+            :can-fork-message="canForkMessage"
             :can-retry-message="canRetryMessage"
             :follow-ups-disabled="followUpsDisabled"
             :index="entry.index"
@@ -34,6 +35,7 @@
             @copy-message="emit('copy-message', $event)"
             @delete-message="emit('delete-message', $event)"
             @edit-message="emit('edit-message', $event)"
+            @fork-message="emit('fork-message', $event)"
             @open-link="emit('open-link', $event)"
             @quote-message="emit('quote-message', $event)"
             @retry-message="emit('retry-message', $event)"
@@ -83,6 +85,7 @@ const props = withDefaults(defineProps<{
   bottomThreshold?: number
   canDeleteMessage?: boolean
   canEditMessage?: boolean
+  canForkMessage?: boolean
   canRetryMessage?: boolean
   emptyLabel?: string
   followUpsDisabled?: boolean
@@ -107,6 +110,7 @@ const props = withDefaults(defineProps<{
   bottomThreshold: 24,
   canDeleteMessage: true,
   canEditMessage: true,
+  canForkMessage: false,
   canRetryMessage: true,
   emptyLabel: 'No messages yet',
   hasOlderMessages: false,
@@ -145,6 +149,7 @@ const emit = defineEmits<{
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]
+  'fork-message': [index: number]
   'load-older-messages': []
   'open-link': [link: CodexConversationLink]
   'quote-message': [index: number]

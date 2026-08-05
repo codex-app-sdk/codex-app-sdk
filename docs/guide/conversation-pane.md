@@ -64,6 +64,9 @@ const state: CodexConversationPaneState = {
     get files() { return files.value; },
   },
   get capabilities() { return capabilities.value; },
+  policy: {
+    canForkMessage: true,
+  },
 };
 
 const actions: CodexConversationPaneActions = {
@@ -75,6 +78,7 @@ const actions: CodexConversationPaneActions = {
   updateSettings: (next) => backend.updateSettings(next),
   loadOlderHistory: () => backend.loadOlderHistory(),
   resolveApproval: (id, decision, scope) => backend.resolveApproval(id, decision, scope),
+  forkMessage: (index) => backend.forkMessage(index),
 };
 
 export const paneController = createCodexConversationPaneController({
@@ -120,7 +124,7 @@ Controller actions cover:
 - submit, steer, interrupt, and queued-prompt steering;
 - composer state, attachments, settings, menu selection, and attachment picking;
 - older-history loading;
-- copy notification, quote, edit, retry, and delete message behavior;
+- copy notification, quote, edit, retry, fork, and delete message behavior;
 - approvals and app-server client responses;
 - goals, follow-ups, and queued-prompt deletion;
 - conversation-link navigation.
@@ -129,6 +133,14 @@ Actions return `void | Promise<void>`. The pane can preserve pending/error UI
 until an asynchronous host action settles. `onMessageCopied` is only a
 post-action notification: `CodexMessage` performs the clipboard write and
 copied-state feedback itself.
+
+Message forking is deliberately opt-in. In controlled mode, set
+`state.policy.canForkMessage = true` and implement `actions.forkMessage(index)`.
+The Fork control appears immediately before Delete on both user and assistant
+messages. With the granular compatibility API, use
+`:can-fork-message="true"` and `@fork-message="forkMessage"`. A surface-bound
+pane can also opt in with `:can-fork-message="true"`; the active surface action
+creates and selects the fork.
 
 ## Reactivity and package boundaries
 

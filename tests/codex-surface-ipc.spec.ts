@@ -79,6 +79,7 @@ describe('Codex surface Electron bridge', () => {
       deleteMessage: vi.fn(async () => snapshot),
       deleteQueuedPrompt: vi.fn(async () => snapshot),
       editMessage: vi.fn(async () => snapshot),
+      forkMessage: vi.fn(async () => snapshot),
       getSnapshot: vi.fn(() => snapshot),
       interrupt: vi.fn(async () => snapshot),
       listConversations: vi.fn(async () => []),
@@ -125,6 +126,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:delete-message',
       'codex-surface:delete-queued-prompt',
       'codex-surface:edit-message',
+      'codex-surface:fork-message',
       'codex-surface:get-snapshot',
       'codex-surface:interrupt',
       'codex-surface:list-conversations',
@@ -177,6 +179,7 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:delete-message', 2)).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:delete-queued-prompt', 'queued-1')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:edit-message', 1, 'Replacement')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:fork-message', 4)).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:create-conversation', 'unsafe')).rejects.toThrow(
       'Conversation options must be an object',
     );
@@ -199,6 +202,9 @@ describe('Codex surface Electron bridge', () => {
       'Message index must be a non-negative integer',
     );
     await expect(main.call('codex-surface:delete-message', '1')).rejects.toThrow(
+      'Message index must be a non-negative integer',
+    );
+    await expect(main.call('codex-surface:fork-message', -1)).rejects.toThrow(
       'Message index must be a non-negative integer',
     );
     await expect(main.call('codex-surface:archive-conversation', '   ')).rejects.toThrow(
@@ -472,6 +478,7 @@ describe('Codex surface Electron bridge', () => {
     expect(surface.deleteMessage).toHaveBeenCalledWith(2);
     expect(surface.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
     expect(surface.editMessage).toHaveBeenCalledWith(1, 'Replacement');
+    expect(surface.forkMessage).toHaveBeenCalledWith(4);
     expect(surface.getSnapshot).toHaveBeenCalledOnce();
     expect(surface.interrupt).toHaveBeenCalledOnce();
     expect(surface.listConversations).toHaveBeenCalledWith({
@@ -548,6 +555,7 @@ describe('Codex surface Electron bridge', () => {
     await api.deleteMessage(2);
     await api.deleteQueuedPrompt('queued-1');
     await api.editMessage(1, 'Replacement');
+    await api.forkMessage(4);
     await api.readConversationHistory('thread-2');
     await api.listConversations({ cwd: '/tmp/project', limit: 10 });
     await api.listModels({ includeHidden: true, forceReload: true });
@@ -586,6 +594,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:delete-message', 2],
       ['codex-surface:delete-queued-prompt', 'queued-1'],
       ['codex-surface:edit-message', 1, 'Replacement'],
+      ['codex-surface:fork-message', 4],
       ['codex-surface:read-conversation-history', 'thread-2'],
       ['codex-surface:list-conversations', { cwd: '/tmp/project', limit: 10 }],
       ['codex-surface:list-models', { includeHidden: true, forceReload: true }],

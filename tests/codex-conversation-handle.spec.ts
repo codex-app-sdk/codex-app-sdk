@@ -12,6 +12,8 @@ describe('createCodexConversationHandle', () => {
     const conversation = createCodexConversationHandle('thread-1', operations);
 
     expect(conversation.id).toBe('thread-1');
+    await expect(conversation.fork()).resolves.toStrictEqual({ conversationId: 'thread-fork' });
+    await expect(conversation.forkMessage(2)).resolves.toStrictEqual({ conversationId: 'thread-fork' });
     await expect(conversation.load({ cwd: '/workspace' })).resolves.toBe(snapshot);
     await expect(conversation.select()).resolves.toBe(snapshot);
     await expect(conversation.rename('New title')).resolves.toBe(snapshot);
@@ -63,7 +65,9 @@ function operationSpies(snapshot: CodexConversationSnapshot): CodexConversationH
   const operation = () => vi.fn(async () => undefined);
   return {
     clearGoal: operation(), compact: operation(), deleteMessage: operation(), deleteQueuedPrompt: operation(),
-    editMessage: operation(), getSnapshot: vi.fn(() => snapshot), interrupt: operation(), load: operation(),
+    editMessage: operation(), fork: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
+    forkMessage: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
+    getSnapshot: vi.fn(() => snapshot), interrupt: operation(), load: operation(),
     onEvent: vi.fn(() => 'event-unsubscribe' as never),
     onStateChange: vi.fn(() => 'state-unsubscribe' as never),
     readHistory: vi.fn(async () => ({ turns: [] }) as never), rename: operation(),

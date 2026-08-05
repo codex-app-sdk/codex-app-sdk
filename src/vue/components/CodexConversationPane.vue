@@ -27,6 +27,7 @@
         :busy="effectiveBusy"
         :can-delete-message="effectiveCanDeleteMessage"
         :can-edit-message="effectiveCanEditMessage"
+        :can-fork-message="effectiveCanForkMessage"
         :can-retry-message="effectiveCanRetryMessage"
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
@@ -48,6 +49,7 @@
         @copy-message="copyMessage"
         @delete-message="deleteMessage"
         @edit-message="editMessage"
+        @fork-message="forkMessage"
         @load-older-messages="loadOlderHistory"
         @open-link="handleConversationLink"
         @quote-message="quoteMessage"
@@ -263,6 +265,7 @@ const props = withDefaults(defineProps<{
   busy?: boolean;
   canDeleteMessage?: boolean;
   canEditMessage?: boolean;
+  canForkMessage?: boolean;
   canRetryMessage?: boolean;
   commands?: readonly CodexCommandSummary[];
   composerState?: CodexComposerState;
@@ -316,6 +319,7 @@ const props = withDefaults(defineProps<{
   busy: undefined,
   canDeleteMessage: true,
   canEditMessage: true,
+  canForkMessage: false,
   canRetryMessage: true,
   disabled: undefined,
   emptyDescription: '',
@@ -374,6 +378,7 @@ const emit = defineEmits<{
   deleteQueuedPrompt: [promptId: string];
   editGoal: [];
   editMessage: [payload: { content: string; index: number }];
+  forkMessage: [index: number];
   loadOlderHistory: [];
   error: [message: string | null];
   interrupt: [];
@@ -584,13 +589,16 @@ const effectiveCanEditMessage = computed(() => controlledValue(
   (state) => state.policy?.canEditMessage ?? true,
   () => props.canEditMessage,
 ));
+const effectiveCanForkMessage = computed(() => controlledValue(
+  (state) => state.policy?.canForkMessage ?? false,
+  () => props.canForkMessage,
+));
 const effectiveCanRetryMessage = computed(() => controlledValue(
   (state) => state.policy?.canRetryMessage ?? true,
   () => props.canRetryMessage,
 ));
 const effectiveActionsDisabled = computed(() => (
-  effectiveBusy.value
-  || controlledValue((state) => state.policy?.actionsDisabled ?? false, () => props.actionsDisabled ?? false)
+  controlledValue((state) => state.policy?.actionsDisabled ?? false, () => props.actionsDisabled ?? false)
 ));
 const effectiveFollowUpsDisabled = computed(() => (
   effectiveBusy.value
@@ -871,6 +879,13 @@ function editMessage(payload: { content: string; index: number }): void {
   if (effectiveController.value) return;
   emit('editMessage', payload);
   if (props.surface) void runSurfaceAction(() => props.surface!.editMessage(payload.index, payload.content));
+}
+
+function forkMessage(index: number): void {
+  if (dispatchControllerAction('forkMessage', index)) return;
+  if (effectiveController.value) return;
+  emit('forkMessage', index);
+  if (props.surface) void runSurfaceAction(() => props.surface!.forkMessage(index));
 }
 
 function retryMessage(index: number): void {

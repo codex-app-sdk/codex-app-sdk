@@ -110,6 +110,7 @@
           :inert="reserveActionSlot ? '' : undefined"
           :can-delete="canDelete"
           :can-edit="canEdit"
+          :can-fork="canFork"
           :can-retry="canRetry"
           :copied="copied"
           :message="chatMessage"
@@ -117,6 +118,7 @@
           @copy="copyMessage"
           @delete="deleteMessage"
           @edit="startEdit"
+          @fork="emit('fork-message', index)"
           @quote="emit('quote-message', index)"
           @retry="retryMessage"
         />
@@ -150,6 +152,7 @@ const props = withDefaults(defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
   canDeleteMessage?: boolean
   canEditMessage?: boolean
+  canForkMessage?: boolean
   canRetryMessage?: boolean
   followUpsDisabled?: boolean
   index?: number
@@ -161,6 +164,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   canDeleteMessage: true,
   canEditMessage: true,
+  canForkMessage: false,
   canRetryMessage: true,
   index: 0,
   showToolDetails: undefined,
@@ -194,6 +198,7 @@ const emit = defineEmits<{
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]
+  'fork-message': [index: number]
   'quote-message': [index: number]
   'retry-message': [index: number]
   'send-follow-up': [prompt: string]
@@ -233,6 +238,7 @@ const reserveActionSlot = computed(() => (
 const renderActionSlot = computed(() => showActions.value)
 const canDelete = computed(() => props.canDeleteMessage && effectivePresentation.value.messages.actions.delete)
 const canEdit = computed(() => props.canEditMessage && effectivePresentation.value.messages.actions.edit)
+const canFork = computed(() => props.canForkMessage && effectivePresentation.value.messages.actions.fork)
 const canRetry = computed(() => props.canRetryMessage && effectivePresentation.value.messages.actions.retry)
 const hasVisibleAssistantActivity = computed(() => blocks.value.some(isVisibleAssistantBlock))
 const showThinkingIndicator = computed(() => (

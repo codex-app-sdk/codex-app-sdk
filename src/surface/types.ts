@@ -450,7 +450,7 @@ export type CodexConversationHistoryPage = {
 };
 
 export type CodexSurfaceEventOrigin = 'action' | 'notification' | 'lifecycle';
-export type CodexSurfaceHistoryReason = 'load' | 'resume' | 'rollback' | 'resync';
+export type CodexSurfaceHistoryReason = 'fork' | 'load' | 'resume' | 'rollback' | 'resync';
 export type CodexSurfaceTurnStatus = 'completed' | 'interrupted' | 'failed' | 'inProgress';
 export type CodexSurfaceFileActivityAction = 'read' | 'edit' | 'create';
 export type CodexSurfaceFileActivityStatus = 'running' | 'completed' | 'failed';
@@ -844,6 +844,7 @@ export type CodexSurfaceApi = {
   interrupt(): Promise<CodexSurfaceSnapshot>;
   deleteMessage(index: number): Promise<CodexSurfaceSnapshot>;
   editMessage(index: number, content: string): Promise<CodexSurfaceSnapshot>;
+  forkMessage(index: number): Promise<CodexSurfaceSnapshot>;
   retryMessage(index: number): Promise<CodexSurfaceSnapshot>;
   deleteQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot>;
   steerQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot>;

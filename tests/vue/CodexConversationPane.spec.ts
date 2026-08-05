@@ -706,17 +706,23 @@ describe('CodexConversationPane', () => {
     expect(wrapper.text()).toContain('Ready to build');
   });
 
-  it('disables message actions by default while Codex is busy', () => {
+  it('keeps completed message actions available while reserving the message being generated', () => {
     const wrapper = mount(CodexConversationPane, {
       props: {
         busy: true,
-        messages: [{ id: 'user-1', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Ship it' }] }],
+        messages: [
+          { id: 'user-1', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Ship it' }] },
+          { id: 'assistant-1', role: 'assistant', status: 'streaming', parts: [] },
+        ],
         modelValue: '',
       },
     });
 
-    expect(wrapper.get('.chat-message__actions').attributes('aria-hidden')).toBe('true');
-    expect(wrapper.get('.chat-message__actions').attributes()).toHaveProperty('inert');
+    const actions = wrapper.findAll('.chat-message__actions');
+    expect(actions[0]?.attributes('aria-hidden')).toBeUndefined();
+    expect(actions[0]?.attributes()).not.toHaveProperty('inert');
+    expect(actions[1]?.attributes('aria-hidden')).toBe('true');
+    expect(actions[1]?.attributes()).toHaveProperty('inert');
   });
 
   it.each([

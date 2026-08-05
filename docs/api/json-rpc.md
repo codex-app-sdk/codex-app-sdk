@@ -22,7 +22,7 @@ handling. CI and local checks can use `npm run rpc:check` to detect drift.
 
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Client → app-server requests | 130 | 43 | 0 | 0 | 87 |
+| Client → app-server requests | 130 | 44 | 0 | 0 | 86 |
 | App-server → client notifications | 72 | 39 | 0 | 30 | 3 |
 | App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
@@ -33,7 +33,7 @@ handling. CI and local checks can use `npm run rpc:check` to detect drift.
 | `initialize` | High-level SDK | `src/node/codex-surface-connection-controller.ts` |
 | `thread/start` | High-level SDK | `src/node/codex-surface-lifecycle-controller.ts` |
 | `thread/resume` | High-level SDK | `src/node/codex-surface-lifecycle-controller.ts` |
-| `thread/fork` | Typed client only | — |
+| `thread/fork` | High-level SDK | `src/node/codex-surface-fork-controller.ts` |
 | `thread/archive` | High-level SDK | `src/node/codex-surface-conversations-controller.ts` |
 | `thread/delete` | High-level SDK | `src/node/codex-surface-conversations-controller.ts` |
 | `thread/unsubscribe` | Typed client only | — |
@@ -41,10 +41,10 @@ handling. CI and local checks can use `npm run rpc:check` to detect drift.
 | `thread/decrement_elicitation` | Typed client only | — |
 | `thread/name/set` | High-level SDK | `src/node/codex-surface-conversation-settings-controller.ts` |
 | `thread/goal/set` | High-level SDK | `src/node/codex-surface-conversation-settings-controller.ts` |
-| `thread/goal/get` | High-level SDK | `src/node/codex-surface-lifecycle-controller.ts` |
+| `thread/goal/get` | High-level SDK | `src/node/codex-surface-fork-controller.ts`<br>`src/node/codex-surface-lifecycle-controller.ts` |
 | `thread/goal/clear` | High-level SDK | `src/node/codex-surface-conversation-settings-controller.ts` |
 | `thread/metadata/update` | Typed client only | — |
-| `thread/settings/update` | High-level SDK | `src/node/codex-surface-conversation-settings-controller.ts`<br>`src/node/codex-surface-lifecycle-controller.ts` |
+| `thread/settings/update` | High-level SDK | `src/node/codex-surface-conversation-settings-controller.ts`<br>`src/node/codex-surface-fork-controller.ts`<br>`src/node/codex-surface-lifecycle-controller.ts` |
 | `thread/memoryMode/set` | Typed client only | — |
 | `memory/reset` | Typed client only | — |
 | `thread/unarchive` | High-level SDK | `src/node/codex-surface-conversations-controller.ts` |
@@ -60,7 +60,7 @@ handling. CI and local checks can use `npm run rpc:check` to detect drift.
 | `thread/searchOccurrences` | Typed client only | — |
 | `thread/loaded/list` | Typed client only | — |
 | `thread/read` | High-level SDK | `src/node/codex-surface-lifecycle-controller.ts` |
-| `thread/turns/list` | High-level SDK | `src/node/codex-surface-conversations-controller.ts`<br>`src/node/codex-surface-lifecycle-controller.ts` |
+| `thread/turns/list` | High-level SDK | `src/node/codex-surface-conversations-controller.ts`<br>`src/node/codex-surface-fork-controller.ts`<br>`src/node/codex-surface-lifecycle-controller.ts` |
 | `thread/items/list` | Typed client only | — |
 | `thread/inject_items` | Typed client only | — |
 | `skills/list` | High-level SDK | `src/node/codex-surface-catalog-controller.ts` |

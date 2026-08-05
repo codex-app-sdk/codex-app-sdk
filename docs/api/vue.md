@@ -13,7 +13,7 @@ Returned state and actions include:
 - authentication actions;
 - conversation list/create/select/archive/delete/unarchive actions;
 - history, settings, send, review, compact, steer, and interrupt actions;
-- message edit/delete/retry actions;
+- message edit/delete/retry/fork actions;
 - goals, approvals, client requests, and queued prompts.
 
 The composable subscribes immediately and disposes its listeners with the
@@ -40,7 +40,7 @@ const paneState = computed(() => ({
     composer: { state, attachments, placeholder, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
     catalogs: { files, models, commands, skills, plugins, modelCatalogStatus, skillCatalogStatus },
     capabilities,
-    policy: { actionsDisabled, attachEnabled, canDeleteMessage, canEditMessage, canRetryMessage, followUpsDisabled },
+    policy: { actionsDisabled, attachEnabled, canDeleteMessage, canEditMessage, canForkMessage, canRetryMessage, followUpsDisabled },
 }));
 
 const controller = createCodexConversationPaneController({
@@ -49,6 +49,7 @@ const controller = createCodexConversationPaneController({
     submit(prompt, options) { /* host transport */ },
     steer(prompt, options) { /* host transport */ },
     onMessageCopied(index) { /* optional analytics/UI notification */ },
+    forkMessage(index) { /* fork at this user or assistant message */ },
     updateComposerState(next) { /* persist draft */ },
     updateAttachments(next) { /* persist attachments */ },
     updateSettings(settings) { /* apply settings */ },
@@ -78,6 +79,13 @@ promises are surfaced through the pane error UI.
 `onMessageCopied(index)` is a post-action notification: the SDK always performs
 the clipboard write and copied-state feedback first. Omitting this hook does not
 disable copying.
+
+Message forking is disabled by default. Enable it with
+`state.policy.canForkMessage = true` and handle `actions.forkMessage(index)`.
+The compatibility props/events are `canForkMessage` / `forkMessage` in
+TypeScript and `:can-fork-message` / `@fork-message` in Vue templates. In
+surface-bound mode, enabling the prop delegates to the SDK surface action,
+which selects the newly forked conversation.
 
 The adapter does not load conversations, clone messages, wrap reactive sources,
 or own a backend. Keep

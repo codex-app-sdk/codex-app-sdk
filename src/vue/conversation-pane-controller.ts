@@ -77,6 +77,7 @@ export type CodexConversationPanePolicy = {
   attachEnabled?: boolean;
   canDeleteMessage?: boolean;
   canEditMessage?: boolean;
+  canForkMessage?: boolean;
   canRetryMessage?: boolean;
   followUpsDisabled?: boolean;
 };
@@ -124,6 +125,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   deleteQueuedPrompt?: PaneAction<[promptId: string]>;
   editGoal?: PaneAction;
   editMessage?: PaneAction<[payload: { content: string; index: number }]>;
+  forkMessage?: PaneAction<[index: number]>;
   interrupt?: PaneAction;
   loadOlderHistory?: PaneAction;
   menuSelect?: PaneAction<[item: CodexComposerMenuSelectableItem<Payload>]>;

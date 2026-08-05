@@ -1,6 +1,7 @@
 export {
   IconAffiliate as AffiliateIcon,
   IconArrowDown as ArrowDownIcon,
+  IconArrowFork as ArrowForkIcon,
   IconBolt as BoltIcon,
   IconBookmark as SaveToBenchIcon,
   IconBrandSpeedtest as BrandSpeedTest,

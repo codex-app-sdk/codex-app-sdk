@@ -18,6 +18,7 @@ export {
   createCodexSurface,
   type CodexConversation,
   type CodexConversationDefaults,
+  type CodexConversationForkResult,
   type CodexConversationHostOptions,
   type CodexConversationLoadOptions,
   type CodexRealtimeSession,
@@ -38,6 +39,7 @@ export {
   type CodexSurfaceRemoteControlPairingStatus,
   type CodexSurfaceRemoteControlStatus,
   type CodexThreadStartExtension,
+  type ForkCodexConversationOptions,
   type ListCodexSkillsOptions,
 } from './codex-surface';
 export type {

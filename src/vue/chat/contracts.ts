@@ -126,6 +126,7 @@ export type CodexMessageActionsPresentation = {
   copy?: boolean;
   delete?: boolean;
   edit?: boolean;
+  fork?: boolean;
   quote?: boolean;
   retry?: boolean;
 };
@@ -166,6 +167,7 @@ export const defaultCodexConversationPresentation: ResolvedCodexConversationPres
       copy: true,
       delete: true,
       edit: true,
+      fork: true,
       quote: true,
       retry: true,
     }),
@@ -192,6 +194,7 @@ export function resolveCodexConversationPresentation(
         copy: presentation?.messages?.actions?.copy ?? defaultCodexConversationPresentation.messages.actions.copy,
         delete: presentation?.messages?.actions?.delete ?? defaultCodexConversationPresentation.messages.actions.delete,
         edit: presentation?.messages?.actions?.edit ?? defaultCodexConversationPresentation.messages.actions.edit,
+        fork: presentation?.messages?.actions?.fork ?? defaultCodexConversationPresentation.messages.actions.fork,
         quote: presentation?.messages?.actions?.quote ?? defaultCodexConversationPresentation.messages.actions.quote,
         retry: presentation?.messages?.actions?.retry ?? defaultCodexConversationPresentation.messages.actions.retry,
       },
