@@ -4,6 +4,10 @@ The repository includes three Electron + Vue applications and one browser-only
 component lab. Each reuses the same SDK conversation components at a different
 product or testing boundary.
 
+For a new application, start with the [project scaffolder](/guide/scaffolding)
+and update the generated shell. Use these samples as focused references for a
+particular product shape or integration pattern, not as alternative templates.
+
 ## Basic: multi-thread client
 
 **Shape:** custom conversation sidebar + stock `CodexConversationPane`.

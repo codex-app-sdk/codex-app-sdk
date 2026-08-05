@@ -10,17 +10,36 @@
 
 The checked-in app-server bindings currently target `codex-cli 0.146.0`.
 
-## Install from the repository
+For a new Electron + Vue application, the fastest path is the
+[project scaffolder](/guide/scaffolding). Continue below when integrating the
+SDK into an existing application.
 
-The package is source-first and not yet published to npm:
+::: warning Package publication pending
+`codex-app-sdk` and `create-codex-app` are not yet published to npm. The npm
+commands below are the intended public API; use the repository source workflow
+at the end of this section until publication.
+:::
+
+## Install from npm
+
+Add the SDK to an existing Electron + Vue application:
 
 ```bash
-npm install github:nbonamy/codex-app-sdk vue
+npm install codex-app-sdk vue
 npm install --save-dev electron
 ```
 
 The package `prepare` script builds JavaScript, declarations, source maps, the
 scoped stylesheet, and the native helper assets during installation.
+
+### Temporary source installation
+
+Until npm publication, install the SDK directly from its repository:
+
+```bash
+npm install github:nbonamy/codex-app-sdk vue
+npm install --save-dev electron
+```
 
 ## Package entry points
 
@@ -81,4 +100,6 @@ npm run typecheck
 npm run build
 ```
 
-Continue with the [quick start](/guide/quick-start).
+Continue with the [tour of the generated application](/guide/quick-start) for
+the recommended ownership boundaries, then use the advanced guides as a
+checklist while adapting them to the existing host.

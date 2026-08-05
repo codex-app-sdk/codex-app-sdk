@@ -170,5 +170,5 @@ compositions, but new advanced integrations should prefer the grouped adapter.
 | `useCodexSurface` | Renderer | Make the surface IPC API reactive |
 | Pane controller | Renderer | Normalize host-owned view state and actions |
 
-See [Application backend](/guide/backend), [Composer and input](/guide/composer),
+See [Add a backend service](/guide/backend), [Composer and input](/guide/composer),
 and [History and performance](/guide/history).

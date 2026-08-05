@@ -19,7 +19,7 @@ narrowest entry point that owns the capability you need.
 
 ```ts
 // Electron main
-import { createCodexSurface } from 'codex-app-sdk/node';
+import { createCodexAppBackend } from 'codex-app-sdk/node';
 import { registerCodexElectronMain } from 'codex-app-sdk/electron';
 
 // Preload
@@ -32,6 +32,9 @@ import {
 } from 'codex-app-sdk/vue';
 import 'codex-app-sdk/styles.css';
 ```
+
+The [scaffold](/guide/scaffolding) wires these imports together. Use the entry
+point table when adding a capability to that generated baseline.
 
 ## Stability boundary
 

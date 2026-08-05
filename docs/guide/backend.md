@@ -1,159 +1,145 @@
-# Application backend
+# Add a backend service
 
-`CodexAppBackend` is an optional in-process composition root for applications
-that combine the reusable Codex runtime with product services such as agents,
-teams, or work integrations. It gives those services one shared
-`CodexSurface` without making the SDK own product state or transport.
+The scaffold creates one `CodexAppBackend` in Electron main. Add a backend
+module when an app-owned panel needs trusted data or behavior that should not
+live in the renderer.
 
-The backend belongs in the trusted host, normally Electron main or a Node
-process. The renderer should continue to consume the surface through the
-Electron bridge rather than importing this module directly.
+Use a backend module for deterministic application services. If Codex itself
+must decide when to call the capability, build an [MCP server](/guide/mcp)
+instead.
 
-`CodexAppBackend` is not the Vue pane controller. The backend composes trusted
-services around a shared `CodexSurface`; the pane controller normalizes
-renderer-owned state and actions. See
-[Conversation pane integration](/guide/conversation-pane#backend-versus-pane-controller).
+## 1. Define the service
 
-## Compose one surface
+Add `src/main/notes-service.ts`:
 
 ```ts
-import { createCodexAppBackend } from 'codex-app-sdk/node';
+import type { CodexAppBackendModule } from 'codex-app-sdk/node';
 
-type AgentService = {
-  list(): Promise<readonly { id: string; name: string }[]>;
+export type Note = {
+  id: string;
+  title: string;
 };
 
-const backend = createCodexAppBackend({
-  surfaceOptions: {
-    clientInfo: { name: 'my_app', version: '0.1.0' },
-    permissionMode: 'read-only',
+export type NotesService = {
+  list(): Promise<readonly Note[]>;
+};
+
+export function createNotesModule(): CodexAppBackendModule<NotesService> {
+  return {
+    id: 'notes',
+    create: () => ({
+      list: async () => readNotesFromDisk(),
+    }),
+  };
+}
+```
+
+`readNotesFromDisk` is application code. The service runs in the trusted main
+process and may use filesystem, database, or network clients that must never be
+exposed directly to the renderer.
+
+## 2. Register it in the generated backend
+
+In `src/main/index.ts`, replace the generated `createCodexAppBackend()` call:
+
+```ts
+import { createNotesModule, type NotesService } from './notes-service';
+
+backend = createCodexAppBackend({
+  modules: [createNotesModule()],
+});
+
+const notes = backend.module<NotesService>('notes');
+```
+
+Keep the generated `registerCodexElectronMain({ surface: backend.surface })`
+and `backend.close()` calls unchanged. Every module receives the same surface
+and shares its lifecycle.
+
+## 3. Expose a narrow renderer API
+
+The SDK bridge intentionally exposes Codex capabilities only. Add a separate,
+app-owned IPC contract for the panel:
+
+```ts
+// src/main/index.ts
+ipcMain.handle('notes:list', () => notes.list());
+```
+
+```ts
+// src/main/preload.ts
+import { contextBridge, ipcRenderer } from 'electron';
+import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
+
+exposeCodexElectronPreload(contextBridge, ipcRenderer);
+contextBridge.exposeInMainWorld('notes', {
+  list: () => ipcRenderer.invoke('notes:list'),
+});
+```
+
+Declare the renderer type next to the generated window declarations, then use
+it from your panel:
+
+```ts
+declare global {
+  interface Window {
+    notes: {
+      list(): Promise<readonly { id: string; title: string }[]>;
+    };
+  }
+}
+```
+
+Keep arguments and results serializable, validate renderer input in main, and
+remove custom handlers during shutdown if the window integration can be
+registered more than once. See [Electron integration](/guide/electron) for the
+SDK bridge and [Security boundary](/guide/security) for trust rules.
+
+## Use the shared surface when useful
+
+A module receives the SDK surface, backend shutdown hook, and cache factory:
+
+```ts
+const module: CodexAppBackendModule<NotesService> = {
+  id: 'notes',
+  create({ surface, createTtlCache }) {
+    const cache = createTtlCache({
+      ttlMs: 15 * 60_000,
+      identity: (entry: { conversationId: string }) => entry.conversationId,
+      canEvict: () => true,
+      onEvict: (entry) => surface.forgetConversation(entry.conversationId),
+    });
+
+    return createNotesService({ surface, cache });
   },
-  modules: [{
-    id: 'agents',
-    create({ surface }) {
-      return {
-        list: async () => {
-          // Product-owned state can use the shared Codex surface.
-          return loadAgentsForSurface(surface);
-        },
-      } satisfies AgentService;
-    },
-  }],
-});
-
-await backend.surface.connect();
-const agents = backend.module<AgentService>('agents');
-const availableAgents = await agents.list();
+};
 ```
 
-Every module receives the same surface instance. The SDK continues to own
-Codex connection lifecycle, catalogs, conversations, queues, approvals, and
-semantic events; the module owns its application-specific service and state.
+This does not make the SDK own notes, agents, teams, or other product state.
+The backend is only a composition root around one reusable `CodexSurface`.
 
-## Reuse an existing surface
+## Lifecycle and caching
 
-Pass `surface` when the host already created and configured one. `surface` and
-`surfaceOptions` are mutually exclusive:
+- `backend.close()` closes the shared surface and every TTL cache created by
+  the backend. The scaffold already calls it before application shutdown.
+- Modules remain responsible for closing their own database clients,
+  subscriptions, and timers.
+- `backend.createTtlCache()` is optional. It tracks activity and asks the host
+  whether an entry is safe to evict; it never decides which product data is
+  disposable.
+- `surface.forgetConversation(id)` releases rehydratable SDK memory without
+  deleting or archiving the app-server thread. See
+  [History and performance](/guide/history#releasing-inactive-conversations).
 
-```ts
-const backend = createCodexAppBackend({
-  surface,
-  modules: [createAgentsModule(), createTeamsModule()],
-});
-```
+## Choose the right seam
 
-This is useful when the host needs to configure the surface before composing
-application services, or when multiple host components must share one runtime.
-The backend does not start a second app-server for an adopted surface.
+| Requirement | Use |
+| --- | --- |
+| Data shown deterministically in an app panel | Backend module + app-owned IPC |
+| Capability the model may call | [MCP server](/guide/mcp) |
+| Small in-process model tool | [Dynamic tool](/guide/extensions#dynamic-tools) |
+| Conversation instructions or start/resume config | [Surface extension](/guide/extensions) |
+| Renderer-only visual state | Plain Vue state in the [app shell](/guide/app-ui) |
 
-## Module IDs and lookup
-
-Module IDs are trimmed, must be non-empty, and must be unique. `module(id)`
-returns the service created for that ID and throws for an unknown ID. The
-generic type on `module<Service>()` provides compile-time typing; the string ID
-remains the runtime namespace boundary.
-
-```ts
-const agents = backend.module<AgentService>('agents');
-// Throws: backend.module('missing')
-```
-
-## Lifecycle
-
-Call `backend.close()` once when the host is shutting down. Closing is
-idempotent, so a module may call the `closeBackend()` function from its module
-context when it owns a shutdown path:
-
-```ts
-const backend = createCodexAppBackend({
-  modules: [{
-    id: 'workspace',
-    create({ closeBackend }) {
-      return { closeBackend };
-    },
-  }],
-});
-
-await backend.close();
-```
-
-`closeBackend()` closes the shared surface. Modules are not disposed
-automatically; if a module owns timers, subscriptions, or external clients,
-its host service should release those resources as part of the host shutdown
-sequence.
-
-## Optional TTL caches
-
-For applications that keep rehydratable per-conversation or per-agent data in
-memory, the backend can create a generic TTL cache. The cache tracks identity
-and activity metadata; the host decides whether an entry is safe to remove and
-performs the actual eviction.
-
-```ts
-const cache = backend.createTtlCache({
-  ttlMs: 15 * 60_000,
-  sweepIntervalMs: 60_000,
-  identity: (entry: { agentId: string }) => entry.agentId,
-  canEvict: (entry) => isInactiveAndIdle(entry.agentId),
-  onEvict: (entry) => removeRehydratableTranscript(entry.agentId),
-});
-
-cache.set({ agentId: 'agent-a' }, lastSelectionAt);
-cache.touch('agent-a', lastBackendEventAt);
-```
-
-`set()` and `touch()` retain the greatest activity timestamp seen for an
-identity. Hosts should touch on both selection and generation/backend events,
-so a busy or recently selected entry cannot be evicted because an older event
-arrived later. An entry becomes eligible only after `ttlMs` has elapsed and
-`canEvict` returns true. `onEvict` may be synchronous or asynchronous; the
-entry is removed from the cache only after it succeeds.
-
-Omit `sweepIntervalMs` for manual eviction with `await cache.sweep()`. For
-deterministic tests, inject `now` and a `scheduler`. Scheduled timers call
-`unref()` when available and are stopped by `cache.close()` or
-`backend.close()`.
-
-The cache does not own drafts, attachments, queues, approvals, browser state,
-or any other application data. The host's eviction callback must remove only
-the data it can rehydrate safely.
-
-For conversation runtimes specifically, pair host eviction with
-`surface.forgetConversation(id)`. That releases rehydratable SDK memory without
-archiving or deleting the app-server thread. See
-[History and performance](/guide/history#releasing-inactive-conversations).
-
-## Electron boundary
-
-Create the backend in Electron main, register the bridge against
-`backend.surface`, and expose only the renderer-safe API:
-
-```ts
-const backend = createCodexAppBackend({ surfaceOptions: { cwd: workspace } });
-const bridge = registerCodexElectronMain({ surface: backend.surface });
-```
-
-Product services can coordinate with the surface in main without exposing
-generated app-server payloads, Node objects, MCP definitions, or business
-state through IPC. See the [Electron integration guide](/guide/electron) and
-the [Node API reference](/api/node) for the exact contracts.
+For the complete business-data loop—backend module, read-only IPC, MCP tools,
+and UI refresh after tool completion—see the [Relay sample](/guide/samples#relay-business-ui-mcp).

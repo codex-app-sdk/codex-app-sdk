@@ -3,6 +3,10 @@
 The SDK is a surface architecture, not a thin JSON-RPC wrapper. Each layer has a
 specific trust boundary and public vocabulary.
 
+For a file-by-file view of these layers in a runnable project, begin with the
+[generated application tour](/guide/quick-start). This page explains the deeper
+runtime boundaries behind that scaffold.
+
 ![Codex App SDK architecture](/architecture.svg)
 
 ## Node runtime
@@ -30,7 +34,7 @@ backend-close operation. Modules own app concepts such as teams or agents; the
 SDK continues to own product-neutral Codex connection, catalog, conversation,
 queue, and event behavior. The embedding application still chooses the process
 and transport boundary, so this composition does not require another daemon.
-See the [application backend guide](/guide/backend) for the module contract and
+See [Add a backend service](/guide/backend) for the module contract and
 shutdown lifecycle.
 
 ## Electron bridge

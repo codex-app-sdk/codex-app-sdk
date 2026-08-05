@@ -1,146 +1,123 @@
-# Quick start
+# Tour the generated application
 
-This is the complete three-layer path: create the surface in Electron main,
-expose the SDK APIs from preload, and bind the conversation pane in Vue.
+Begin with the canonical [scaffolding guide](/guide/scaffolding). This page
+assumes the generated application is already running and explains what you own,
+what the SDK owns, and where the next change belongs.
 
-## 1. Main process
+## Runtime flow
 
-Create one surface and register the surface plus native-capability IPC after the
-Electron app is ready.
+```text
+Electron main
+  createCodexAppBackend()
+    └─ CodexSurface
+         └─ Codex app-server
+
+registerCodexElectronMain()
+  └─ typed IPC + native capabilities
+
+preload
+  └─ window.codexSurface + window.codexAppSdkNative
+
+Vue renderer
+  useCodexSurface(window.codexSurface)
+    ├─ app-owned sidebar and panels
+    └─ CodexConversationPane
+```
+
+The scaffold uses the high-level path deliberately. Ordinary renderer code
+does not need app-server methods, Node APIs, Electron objects, or generated
+protocol types.
+
+## Generated files and ownership
+
+| File | What it already does | What you normally change |
+| --- | --- | --- |
+| `src/main/index.ts` | Creates the window and `CodexAppBackend`, registers the SDK bridge, enforces navigation policy, and closes the backend | Window policy, `surfaceOptions`, MCP definitions, backend modules, and app-owned IPC |
+| `src/main/preload.ts` | Exposes the two SDK renderer APIs | Add a narrow typed bridge only when an app-owned panel needs trusted host data |
+| `src/renderer/App.vue` | Binds `useCodexSurface`, renders recent conversations, and mounts `CodexConversationPane` | Navigation, branding, panels, empty states, and other product UI |
+| `src/renderer/styles.css` | Defines the app shell, native macOS sidebar material, and SDK theme tokens | Product colors, dimensions, typography, and panel layout |
+| `vite.config.ts` | Builds Electron main, preload, and Vue renderer | Additional build entries such as a bundled local MCP server |
+
+## The main-process seam
+
+The generated main process already contains the complete lifecycle. Do not
+replace it with a smaller hand-built example. Customize the existing backend
+construction:
 
 ```ts
-import path from 'node:path';
-import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  ipcMain,
-  shell,
-} from 'electron';
-import { registerCodexElectronMain } from 'codex-app-sdk/electron';
-import { createCodexSurface } from 'codex-app-sdk/node';
-
-await app.whenReady();
-
-const mainWindow = new BrowserWindow({
-  webPreferences: {
-    contextIsolation: true,
-    nodeIntegration: false,
-    preload: path.join(import.meta.dirname, 'preload.cjs'),
-    sandbox: true,
+backend = createCodexAppBackend({
+  surfaceOptions: {
+    clientInfo: {
+      name: 'my_codex_app',
+      title: 'My Codex App',
+      version: '0.1.0',
+    },
+    permissionMode: 'workspace-write',
   },
-});
-
-const surface = createCodexSurface();
-
-const unregisterSdk = registerCodexElectronMain({
-  clipboard,
-  dialog,
-  ipcMain,
-  shell,
-  surface,
-  sender: {
-    send: (channel, payload) => mainWindow.webContents.send(channel, payload),
-  },
-});
-
-app.on('before-quit', () => {
-  unregisterSdk();
-  void surface.close();
+  modules: [
+    // App-owned services belong here.
+  ],
 });
 ```
 
-Load your development URL or production renderer file as usual. The
-[Basic sample on GitHub](https://github.com/nbonamy/codex-app-sdk/tree/main/samples/basic)
-shows a complete navigation policy and development/production loader.
+Keep the generated `registerCodexElectronMain({ surface: backend.surface, ... })`
+call and shutdown handling. They are infrastructure, not customization points.
 
-## 2. Preload
+## The renderer seam
 
-The SDK preload exposes two narrow APIs through `contextBridge`:
-
-```ts
-import { contextBridge, ipcRenderer } from 'electron';
-import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
-
-exposeCodexElectronPreload(contextBridge, ipcRenderer);
-```
-
-Declare the globals once for the renderer:
-
-```ts
-import type {
-  CodexNativeRendererApi,
-  CodexSurfaceRendererApi,
-} from 'codex-app-sdk/electron';
-
-declare global {
-  interface Window {
-    codexAppSdkNative: CodexNativeRendererApi;
-    codexSurface: CodexSurfaceRendererApi;
-  }
-}
-
-export {};
-```
-
-## 3. Vue renderer
-
-Bind the typed renderer API to reactive state and pass the controller to the
-stock pane:
+`App.vue` owns the product shell. The SDK controller supplies conversation
+state and actions; the stock pane owns the conversation experience:
 
 ```vue
 <script setup lang="ts">
 import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
-import 'codex-app-sdk/styles.css';
 
 const surface = useCodexSurface(window.codexSurface);
 </script>
 
 <template>
   <main class="app-shell">
-    <CodexConversationPane
-      :surface="surface"
-      autofocus
-    />
+    <MyNavigation />
+    <CodexConversationPane :surface="surface" autofocus />
+    <MyInspectorPanel />
   </main>
 </template>
 ```
 
-The pane connects when mounted, renders the active app-server conversation, and
-wires standard actions, approvals, models, goals, attachments, image paste/drop,
-copy, and speech transcription through the SDK APIs.
+Your components may read `surface.state` and call controller actions such as
+`createConversation()` and `selectConversation()`. They should not reproduce
+composer, message, approval, queue, or history behavior already owned by
+`CodexConversationPane`.
 
-## Add an app-owned conversation list
+## Decide where a feature belongs
 
-The SDK owns conversation data and actions. Your application owns how a list is
-rendered:
+| You want to add… | Put it here |
+| --- | --- |
+| A sidebar, toolbar, inspector, canvas, dashboard, or settings screen | App-owned Vue components around the pane |
+| Data used only by app-owned UI | A backend module plus narrow app-owned IPC |
+| A capability the model should call | An app-owned MCP server |
+| Per-conversation instructions or a small in-process tool | A surface extension or dynamic tool |
+| Custom MCP tool icons or titles | Vue presentation providers |
+| A different conversation layout | Pane slots or exported leaf components |
 
-```vue
-<template>
-  <aside>
-    <button @click="surface.createConversation()">New conversation</button>
+Continue with:
 
-    <button
-      v-for="conversation in surface.state.conversations"
-      :key="conversation.id"
-      @click="surface.selectConversation(conversation.id)"
-    >
-      {{ conversation.title || 'Untitled conversation' }}
-    </button>
-  </aside>
+- [Add app-owned panels](/guide/app-ui)
+- [Add an MCP server](/guide/mcp)
+- [Add a backend service](/guide/backend)
+- [Customize conversation presentation](/guide/presentation)
 
-  <CodexConversationPane :surface="surface" />
-</template>
-```
+## Preserve the baseline
 
-That is the intended application boundary: custom product chrome, stock Codex
-conversation system.
+As the application grows:
 
-## Next
+- keep `contextIsolation: true`, `nodeIntegration: false`, and renderer
+  sandboxing;
+- keep Codex configuration and credentials in Electron main;
+- keep the generated navigation policy unless the product deliberately replaces
+  it with an equally strict policy;
+- close `CodexAppBackend` during application shutdown;
+- extend the renderer bridge with serializable, validated, product-shaped data.
 
-- [Configure the surface runtime](/guide/surface)
-- [Run concurrent conversations](/guide/conversations)
-- [Understand history loading and rendering](/guide/history)
-- [Integrate a controlled host backend](/guide/conversation-pane)
-- [Customize the pane](/guide/presentation)
+The [architecture guide](/guide/architecture) explains why these boundaries
+exist. The [security guide](/guide/security) lists the invariants in detail.

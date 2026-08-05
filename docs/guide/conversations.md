@@ -74,7 +74,7 @@ await Promise.all([
 Each handle exposes its own messages, active turn, turn IDs, approvals, queue,
 goal, model/settings selection, history-loading state, and errors.
 
-`load()` returns the newest 50 turns with full item details first. With the
+`load()` returns the newest 5 turns with full item details first. With the
 default lazy loading strategy, older pages remain behind `loadOlderHistory()`;
 with eager loading, older full-detail pages hydrate progressively in the
 background. This keeps conversation switching responsive without showing a

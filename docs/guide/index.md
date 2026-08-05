@@ -18,6 +18,19 @@ The SDK packages the generic work once:
 - rendering a complete Vue conversation pane with native attachments and
   transcription.
 
+## Default workflow
+
+1. Follow the [scaffolding guide](/guide/scaffolding) to create and run the
+   application.
+2. [Tour the generated project](/guide/quick-start) so you know which files the
+   SDK owns and which seams are yours.
+3. Add [app-owned panels](/guide/app-ui), an [MCP server](/guide/mcp), or a
+   [backend service](/guide/backend) without replacing the conversation runtime.
+
+The scaffold is the starting point, not a throwaway demonstration. Samples are
+references for particular product shapes; manual SDK installation is primarily
+for existing applications.
+
 ## The boundary
 
 The SDK owns the Codex surface. The host application owns the product.
@@ -36,10 +49,12 @@ its own subtly different conversation implementation.
 
 ## Choose your level
 
-### High-level surface
+### High-level backend and surface
 
-Most applications should create a `CodexSurface` in the main process, expose it
-through the Electron bridge, and bind it to `useCodexSurface` in Vue.
+Most applications should keep the scaffold's `CodexAppBackend` in the main
+process. It owns one `CodexSurface`, which the Electron bridge exposes to
+`useCodexSurface` in Vue. Applications that do not need backend modules may
+create the surface directly.
 
 This level uses product concepts and serializable contracts. It does not expose
 raw app-server messages to the renderer.
@@ -63,7 +78,10 @@ surface instead of leaking protocol into renderer code.
 
 ## Next
 
-- [Install the SDK](/guide/installation)
-- [Build the first surface](/guide/quick-start)
+- [Scaffold a complete Electron + Vue application](/guide/scaffolding)
+- [Tour the generated application](/guide/quick-start)
+- [Add an app-owned panel](/guide/app-ui)
+- [Add an MCP server](/guide/mcp)
+- [Install into an existing application](/guide/installation)
 - [Understand the architecture](/guide/architecture)
 - [Choose a pane integration](/guide/conversation-pane)

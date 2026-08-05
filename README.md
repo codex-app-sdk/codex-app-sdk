@@ -58,20 +58,23 @@ or Electron objects need to cross into ordinary renderer code.
 
 ## Start here
 
-The package is currently source-first and not yet published to npm.
+The default workflow is to scaffold a complete Electron + Vue application and
+then update its generated shell and backend for your product. The
+[scaffolding guide](https://nbonamy.github.io/codex-app-sdk/guide/scaffolding)
+is the canonical source for commands, package-publication status, and options.
+For an existing application, follow the
+[installation guide](https://nbonamy.github.io/codex-app-sdk/guide/installation).
 
-```bash
-npm install github:nbonamy/codex-app-sdk vue
-npm install --save-dev electron
-```
-
-- [Installation](https://nbonamy.github.io/codex-app-sdk/guide/installation)
-- [Quick start](https://nbonamy.github.io/codex-app-sdk/guide/quick-start)
+- [Scaffold an application](https://nbonamy.github.io/codex-app-sdk/guide/scaffolding)
+- [Tour the generated application](https://nbonamy.github.io/codex-app-sdk/guide/quick-start)
+- [Add app-owned panels](https://nbonamy.github.io/codex-app-sdk/guide/app-ui)
+- [Add an MCP server](https://nbonamy.github.io/codex-app-sdk/guide/mcp)
+- [Add a backend service](https://nbonamy.github.io/codex-app-sdk/guide/backend)
+- [Existing app installation](https://nbonamy.github.io/codex-app-sdk/guide/installation)
 - [Architecture](https://nbonamy.github.io/codex-app-sdk/guide/architecture)
 - [Vue conversation kit](https://nbonamy.github.io/codex-app-sdk/guide/vue)
 - [Controlled pane integration](https://nbonamy.github.io/codex-app-sdk/guide/conversation-pane)
 - [History and performance](https://nbonamy.github.io/codex-app-sdk/guide/history)
-- [Application backend](https://nbonamy.github.io/codex-app-sdk/guide/backend)
 - [Vue providers](https://nbonamy.github.io/codex-app-sdk/guide/vue-providers)
 - [API reference](https://nbonamy.github.io/codex-app-sdk/api/)
 - [JSON-RPC coverage inventory](https://nbonamy.github.io/codex-app-sdk/api/json-rpc)

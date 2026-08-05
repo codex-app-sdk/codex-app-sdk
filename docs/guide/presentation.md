@@ -3,6 +3,11 @@
 The default pane is complete, but products rarely want every control in every
 surface. The public API separates behavior from visibility.
 
+Use ordinary app-owned Vue components for sidebars, inspectors, dashboards,
+and other product layout. This page covers the presentation seams inside the
+conversation experience; see [Add app-owned panels](/guide/app-ui) for shell
+composition.
+
 ## Capabilities
 
 Capabilities describe which conversation behavior the host wants to offer:

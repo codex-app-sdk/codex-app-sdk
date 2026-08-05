@@ -12,7 +12,7 @@ paying the renderer cost of mounting every historical tool row.
 
 | Layer | Option | Default | Initial batch | Older batch |
 | --- | --- | --- | ---: | ---: |
-| Node surface | `loadingStrategy` | `lazy` | 50 turns | 25 turns |
+| Node surface | `loadingStrategy` | `lazy` | 5 turns | 25 turns |
 | Vue list/pane | `renderStrategy` | `lazy` | 50 messages | 25 messages |
 
 All app-server history requests use `itemsView: 'full'`. The SDK does not show a
@@ -161,4 +161,4 @@ app-server restart. The SDK does not parse private rollout JSONL as a fallback;
 that ownership remains with app-server.
 
 See [Concurrent conversations](/guide/conversations),
-[Application backend](/guide/backend), and [Semantic events](/guide/events).
+[Add a backend service](/guide/backend), and [Semantic events](/guide/events).

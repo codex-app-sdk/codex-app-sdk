@@ -3,6 +3,11 @@
 The Electron package provides one high-level registration function and reusable
 lower-level pieces for applications with an existing IPC framework.
 
+The [project scaffold](/guide/scaffolding) already applies the complete bridge,
+preload, window-security, navigation, and shutdown pattern below. Keep that
+generated wiring unless you are integrating the SDK into an existing Electron
+application or deliberately composing a custom IPC layer.
+
 ## Complete bridge
 
 ```ts

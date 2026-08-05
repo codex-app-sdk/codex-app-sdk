@@ -112,7 +112,7 @@ await backend.close();
 `createTtlCache(options)`, and an idempotent `close()`. It does not own product
 services or add a process/transport layer;
 the embedding host still decides where the backend runs and how the surface is
-bridged to a renderer. See the [application backend guide](/guide/backend) for
+bridged to a renderer. See [Add a backend service](/guide/backend) for
 composition and lifecycle guidance.
 
 ### `CodexAppBackendTtlCache<Value>`

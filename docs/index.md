@@ -10,8 +10,8 @@ hero:
     alt: Codex App SDK
   actions:
     - theme: brand
-      text: Build your first surface
-      link: /guide/quick-start
+      text: Scaffold an application
+      link: /guide/scaffolding
     - theme: alt
       text: Explore the architecture
       link: /guide/architecture
@@ -57,7 +57,9 @@ features:
   </div>
 </div>
 
-The result is intentionally small application code:
+Start with the [complete application scaffold](/guide/scaffolding), then update
+the generated project with your own shell, backend modules, tools, and product
+behavior. The renderer boundary remains intentionally small:
 
 ```vue
 <script setup lang="ts">
@@ -76,10 +78,11 @@ The pane connects through the SDK bridge and renders the active app-server
 conversation. Your app can add its own conversation list, workspace controls,
 business UI, or custom tools without recreating the conversation system.
 
-## Start with the product shape
+## Start with the scaffold, learn from the samples
 
 | If you are building… | Start from… |
 | --- | --- |
+| A new Electron + Vue application | [Project scaffolder](/guide/scaffolding) |
 | A full multi-thread Codex client | [Basic sample](/guide/samples#basic-multi-thread-client) |
 | A focused, branded chat experience | [Spark sample](/guide/samples#spark-focused-chat) |
 | A business application with model-driven operations | [Relay sample](/guide/samples#relay-business-ui-mcp) |
@@ -92,11 +95,11 @@ goals, and events—not `thread/*`, `turn/*`, JSON-RPC envelopes, or generated
 protocol types.
 :::
 
-## Source-first today
+## Publication status
 
-The SDK is currently `0.1.x`, installed from the repository, and generated
-against `codex-cli 0.146.0`. The high-level API is deliberately smaller and more
-stable than app-server. The generated client remains available for advanced
-work while a new capability is being promoted into the surface.
+The SDK is currently `0.1.x` and generated against `codex-cli 0.146.0`. Package
+publication is pending, but the documentation uses the intended npm package
+names and scaffold-first workflow throughout. The high-level API is deliberately
+smaller and more stable than app-server.
 
-[Install the SDK →](/guide/installation)
+[Scaffold an application →](/guide/scaffolding)

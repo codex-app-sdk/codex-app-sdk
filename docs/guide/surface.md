@@ -4,6 +4,10 @@
 usually Electron main, and let it own app-server for the lifetime of the
 application window or surface.
 
+The scaffold creates it through `CodexAppBackend`, so configure the same
+options under `surfaceOptions` there. Create a surface directly when integrating
+without the scaffold or without backend modules.
+
 ```ts
 import path from 'node:path';
 import { app } from 'electron';
