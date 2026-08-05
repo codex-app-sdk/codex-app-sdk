@@ -39,7 +39,7 @@ import {
   validateReasoningEffort,
 } from './codex-surface-settings';
 
-const CONVERSATION_HISTORY_PAGE_SIZE = 50;
+const CONVERSATION_HISTORY_PAGE_SIZE = 5;
 
 type HistoryReason = Extract<
   CodexSurfaceEvent,
