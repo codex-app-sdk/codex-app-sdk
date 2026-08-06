@@ -50,6 +50,23 @@ describe('CodexMessage', () => {
     expect(wrapper.emitted('quote-message')).toStrictEqual([[2]]);
   });
 
+  it('places matching metadata spacing immediately above and below a steered message', () => {
+    const wrapper = mount(CodexMessage, {
+      props: {
+        message: { id: 'steered-header', role: 'user', content: 'Keep SDK rendering', type: 'steer' },
+      },
+      slots: {
+        header: () => h('div', 'Message from the host'),
+      },
+    });
+
+    const header = wrapper.get('.chat-message--steer-above');
+    const stack = wrapper.get('.chat-message__stack');
+    const footer = wrapper.get('.chat-message--steer-below');
+    expect(header.element.nextElementSibling).toBe(stack.element);
+    expect(stack.element.nextElementSibling).toBe(footer.element);
+  });
+
   it('delegates compaction presentation to the dedicated component', () => {
     const wrapper = mountMessage({
       message: { role: 'assistant', content: '', compactionStatus: 'running', type: 'compaction' },

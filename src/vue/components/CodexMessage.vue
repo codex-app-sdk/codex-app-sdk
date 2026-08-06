@@ -22,7 +22,7 @@
     }]"
   >
     <div class="chat-message__body">
-      <div v-if="$slots.header" class="chat-message--steer">
+      <div v-if="$slots.header" class="chat-message--steer chat-message--steer-above">
         <slot name="header" :index="index" :message="chatMessage" />
       </div>
       <div
@@ -124,7 +124,7 @@
           @retry="retryMessage"
         />
       </slot>
-      <div v-if="chatMessage.type === 'steer'" class="chat-message--steer">
+      <div v-if="chatMessage.type === 'steer'" class="chat-message--steer chat-message--steer-below">
         Steered conversation
       </div>
     </div>
@@ -340,9 +340,16 @@ onBeforeUnmount(() => {
 }
 
 .chat-message--steer {
-  margin-top: var(--space-1);
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
+}
+
+.chat-message--steer-above {
+  margin-bottom: var(--space-1);
+}
+
+.chat-message--steer-below {
+  margin-top: var(--space-1);
 }
 
 .chat-message__steer-line {
@@ -425,7 +432,6 @@ onBeforeUnmount(() => {
 .chat-message--user .chat-message__stack {
   background: var(--color-shell-sidebar);
   border-radius: var(--radius-xl);
-  border-bottom-right-radius: var(--radius-xs);
 }
 
 .chat-message--editing .chat-message__stack {
