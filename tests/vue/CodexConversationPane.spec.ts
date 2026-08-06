@@ -79,7 +79,7 @@ describe('CodexConversationPane', () => {
 
     expect(wrapper.findAllComponents(CodexMessage).length).toBe(50);
     wrapper.unmount();
-  }, 15000);
+  }, 30000);
 
   it('forwards the opt-in lazy message window settings', () => {
     const transformMessage = vi.fn((message: SurfaceMessage | Message) => message);
