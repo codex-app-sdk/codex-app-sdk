@@ -63,6 +63,24 @@ npm create codex-app@latest my-codex-app -- --no-install
 The target may be new or empty. The initializer refuses to overwrite a
 non-empty directory and has no destructive force mode.
 
+## Programmatic scaffolding
+
+Builder applications and automation can call the same implementation through
+the package root:
+
+```ts
+import { scaffoldProject } from 'create-codex-app';
+
+const project = await scaffoldProject({
+  cwd: '/absolute/parent/directory',
+  directory: 'my-codex-app',
+});
+```
+
+The function applies the same naming, template substitution, and non-empty
+directory protections as the CLI. Dependency installation remains the caller's
+responsibility in this form.
+
 ## Generated application
 
 ```text
@@ -92,6 +110,13 @@ app-owned translucent conversation sidebar, and passes the controller to
 window uses native vibrancy, and other platforms receive an opaque fallback.
 The renderer imports the scoped SDK stylesheet and includes a restrictive
 Content Security Policy.
+
+The generated renderer also owns the signed-out landing state. When app-server
+reports `account: null` with `requiresOpenaiAuth: true`, it shows a Connect Codex
+screen instead of a disabled conversation shell. Browser login uses
+`startChatGptLogin()` plus the native external-link bridge, and the same mounted
+surface becomes ready after `account/login/completed`. This is especially
+important when a host configures a separate `codexHome` for the generated app.
 
 This gives a new application a credible working shell and conversation system
 while leaving its navigation, branding, product data, and additional backend

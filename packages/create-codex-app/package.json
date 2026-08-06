@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Scaffold an Electron and Vue application powered by Codex App SDK.",
   "type": "module",
+  "main": "./src/cli.js",
+  "exports": {
+    ".": "./src/cli.js"
+  },
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

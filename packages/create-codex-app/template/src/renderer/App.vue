@@ -1,7 +1,35 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue';
 import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
 
 const surface = useCodexSurface(window.codexSurface);
+const localSignInError = ref<string | null>(null);
+const requiresSignIn = computed(() => (
+  surface.state.authentication.account === null
+  && surface.state.authentication.requiresOpenaiAuth === true
+));
+const signInBusy = computed(() => (
+  surface.state.authentication.login.status === 'starting'
+  || surface.state.authentication.login.status === 'pending'
+));
+const signInError = computed(() => (
+  localSignInError.value
+  ?? surface.state.authentication.login.error
+  ?? surface.state.authentication.error
+));
+
+async function signIn(): Promise<void> {
+  localSignInError.value = null;
+  let loginId: string | undefined;
+  try {
+    const login = await surface.startChatGptLogin();
+    loginId = login.loginId;
+    await window.codexAppSdkNative.openExternal(login.authUrl);
+  } catch {
+    if (loginId) await surface.cancelLogin(loginId).catch(() => undefined);
+    localSignInError.value = 'Could not open Codex sign in. Please try again.';
+  }
+}
 </script>
 
 <template>
@@ -46,6 +74,17 @@ const surface = useCodexSurface(window.codexSurface);
       </section>
     </aside>
 
-    <CodexConversationPane :surface="surface" autofocus />
+    <section v-if="requiresSignIn" class="auth-landing">
+      <div class="auth-landing__card">
+        <span class="auth-landing__mark" aria-hidden="true">✦</span>
+        <h1>Connect Codex</h1>
+        <p>Sign in to start conversations and build with Codex in this app.</p>
+        <button type="button" :disabled="signInBusy" @click="signIn">
+          {{ signInBusy ? 'Waiting for sign in…' : 'Sign in with ChatGPT' }}
+        </button>
+        <p v-if="signInError" class="auth-landing__error" role="alert">{{ signInError }}</p>
+      </div>
+    </section>
+    <CodexConversationPane v-else :surface="surface" autofocus />
   </main>
 </template>

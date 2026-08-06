@@ -40,6 +40,9 @@ test('creates a complete app without retaining template tokens', async (t) => {
   assert.match(app, /CodexConversationPane/);
   assert.match(app, /Recent chats/);
   assert.match(app, /sidebar__new-chat/);
+  assert.match(app, /requiresSignIn/);
+  assert.match(app, /surface\.startChatGptLogin\(\)/);
+  assert.match(app, /Sign in with ChatGPT/);
   assert.match(app, /:title="conversation\.title/);
   assert.match(styles, /\.sidebar__conversation span[\s\S]*text-overflow: ellipsis/);
   assert.match(styles, /\.sidebar__conversation span[\s\S]*white-space: nowrap/);
