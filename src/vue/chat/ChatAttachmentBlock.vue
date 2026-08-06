@@ -25,7 +25,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { getCodexNativeRendererApi } from '../native-capabilities'
 import { PaperclipIcon, PhotoIcon } from '../icons/app-icons'
 import type { MessageAttachment } from './types'
 
@@ -34,10 +35,11 @@ const props = defineProps<{
 }>()
 
 const previewFailed = ref(false)
+const nativePreviewSource = ref<string>()
 const previewSource = computed(() => (
   props.attachment.kind === 'image' && isSafeImageSource(props.attachment.url)
     ? props.attachment.url
-    : undefined
+    : nativePreviewSource.value
 ))
 const chipHref = computed(() => (
   safeFileHref(props.attachment.path) || safeLinkHref(props.attachment.url)
@@ -45,6 +47,31 @@ const chipHref = computed(() => (
 
 watch(previewSource, () => {
   previewFailed.value = false
+})
+
+let previewRequest = 0
+watch(
+  () => [props.attachment.kind, props.attachment.path, props.attachment.url] as const,
+  async ([kind, path, url]) => {
+    const request = ++previewRequest
+    nativePreviewSource.value = undefined
+    if (kind !== 'image' || !path || isSafeImageSource(url)) return
+    const readImagePreview = getCodexNativeRendererApi()?.readImagePreview
+    if (!readImagePreview) return
+    try {
+      const source = await readImagePreview(path)
+      if (request === previewRequest && source && isSafeImageSource(source)) {
+        nativePreviewSource.value = source
+      }
+    } catch {
+      // Missing, stale, or unreadable historical attachments remain file chips.
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  previewRequest += 1
 })
 
 function isSafeImageSource(value: string | undefined): value is string {

@@ -17,6 +17,7 @@ type CodexNativeRendererApi = {
   };
   pickAttachments(): Promise<CodexNativeAttachment[]>;
   ingestAttachments(files: readonly CodexNativeAttachmentInput[]): Promise<CodexNativeAttachment[]>;
+  readImagePreview?(path: string): Promise<string | null>;
   copyToClipboard(content: CodexNativeClipboardContent): Promise<void>;
   openExternal(href: string): Promise<void>;
   transcribeAudio(audio: ArrayBuffer, options?: { locale?: string; live?: boolean }): Promise<CodexSpeechTranscriptionResult>;
@@ -44,16 +45,18 @@ Browser `File` objects cannot be sent as trusted filesystem paths. The Vue
 ingestion helper transfers their bytes through validated IPC, writes them to a
 private temporary directory, and returns serializable attachment records.
 
-Temporary directories are deleted when the native bridge unregisters.
+Pasted files live in the operating system's temporary directory so app-server's
+historical `localImage` paths remain usable across an application restart. The
+operating system eventually reclaims those files.
 
 The stock conversation pane wires both image paste and drag/drop.
 
 Optimistic image messages carry a bounded data preview through the renderer-safe
 surface contract. If app-server history later rematerializes the same attachment
-as a local path, the SDK preserves that preview instead of switching to a
-blocked `file://` source. After a full application restart, a local image with no
-surviving safe preview renders as a file chip; the SDK does not bypass Electron's
-local-resource policy.
+as a local path, the SDK preserves that preview. After a restart,
+`ChatAttachmentBlock` lazily asks the native bridge for a bounded image-only data
+preview instead of navigating the renderer to a blocked `file://` URL. Missing,
+oversized, unsupported, or already-reclaimed files remain file chips.
 
 ## Clipboard
 

@@ -35,6 +35,7 @@ export type CodexNativeRendererApi = {
   ingestAttachments(files: readonly CodexNativeAttachmentInput[]): Promise<CodexNativeAttachment[]>;
   openExternal(href: string): Promise<void>;
   pickAttachments(): Promise<CodexNativeAttachment[]>;
+  readImagePreview?(path: string): Promise<string | null>;
   transcribeAudio(
     audioData: ArrayBuffer,
     options?: { locale?: string; live?: boolean },

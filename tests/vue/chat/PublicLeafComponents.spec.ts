@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ChatAttachmentBlock from '../../../src/vue/chat/ChatAttachmentBlock.vue';
 import ChatComposerSlashMenu from '../../../src/vue/chat/ChatComposerSlashMenu.vue';
 import ChatFoldTransition from '../../../src/vue/chat/ChatFoldTransition.vue';
@@ -16,6 +16,10 @@ import ChatQueuedPrompt from '../../../src/vue/chat/ChatQueuedPrompt.vue';
 import ChatTurnGitInfo from '../../../src/vue/chat/ChatTurnGitInfo.vue';
 
 describe('public conversation leaf components', () => {
+  afterEach(() => {
+    delete (window as Window & { codexAppSdkNative?: unknown }).codexAppSdkNative;
+  });
+
   it('does not use blocked filesystem URLs as image previews', async () => {
     const wrapper = mount(ChatAttachmentBlock, {
       props: {
@@ -40,6 +44,27 @@ describe('public conversation leaf components', () => {
     });
     expect(wrapper.find('a').exists()).toBe(false);
     expect(wrapper.get('span.chat-attachment-block--chip').text()).toContain('unsafe.txt');
+  });
+
+  it('loads historical local image previews through the native bridge', async () => {
+    const readImagePreview = vi.fn(async () => 'data:image/png;base64,cG5n');
+    Object.defineProperty(window, 'codexAppSdkNative', {
+      configurable: true,
+      value: { readImagePreview },
+    });
+    const wrapper = mount(ChatAttachmentBlock, {
+      props: {
+        attachment: {
+          kind: 'image',
+          name: 'diagram.png',
+          path: '/tmp/diagram.png',
+        },
+      },
+    });
+
+    await flushPromises();
+    expect(readImagePreview).toHaveBeenCalledWith('/tmp/diagram.png');
+    expect(wrapper.get('img').attributes('src')).toBe('data:image/png;base64,cG5n');
   });
 
   it('mounts the slash menu independently', () => {

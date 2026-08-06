@@ -54,14 +54,15 @@ action exposed by the renderer API.
 The native bridge validates:
 
 - attachment counts, per-file size, total size, file metadata, and preview
-  limits;
+  limits, including bounded image-only historical preview reads;
 - ingested file names and binary payloads;
 - clipboard text/HTML bounds;
 - audio payload bounds and transcription options;
 - external-link protocols.
 
-It creates private temporary attachment directories and removes them during
-cleanup.
+It creates private operating-system temporary attachment directories. They
+survive bridge teardown so app-server `localImage` history remains valid across
+an application restart, and are eventually reclaimed by the operating system.
 
 ## Electron window policy
 

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -44,6 +44,7 @@ describe('Codex native Electron bridge', () => {
       'codex-native:ingest-attachments',
       'codex-native:open-external',
       'codex-native:pick-attachments',
+      'codex-native:read-image-preview',
       'codex-native:transcribe-audio',
     ]);
     const picked = await main.call('codex-native:pick-attachments') as Array<Record<string, unknown>>;
@@ -80,6 +81,12 @@ describe('Codex native Electron bridge', () => {
       size: 5,
     });
     expect(path.basename(ingested[0]?.path as string)).toBe('0-notes.md');
+    temporaryDirectories.push(path.dirname(ingested[0]?.path as string));
+
+    await expect(main.call('codex-native:read-image-preview', imagePath)).resolves.toBe(
+      'data:image/png;base64,cG5n',
+    );
+    await expect(main.call('codex-native:read-image-preview', path.join(directory, 'missing.png'))).resolves.toBeNull();
 
     const audioData = new TextEncoder().encode('audio').buffer;
     await expect(main.call('codex-native:transcribe-audio', audioData, { locale: 'en-US' })).resolves.toStrictEqual({
@@ -87,8 +94,10 @@ describe('Codex native Electron bridge', () => {
     });
     expect(transcribeAudio).toHaveBeenCalledWith(Buffer.from(audioData), { locale: 'en-US' });
 
+    const ingestedPath = ingested[0]?.path as string;
     dispose();
     expect(main.handlers.size).toBe(0);
+    await expect(access(ingestedPath)).resolves.toBeUndefined();
   });
 
   it('creates and exposes a typed preload API', async () => {
@@ -100,10 +109,12 @@ describe('Codex native Electron bridge', () => {
     await api.pickAttachments();
     await api.copyToClipboard({ text: 'Copied' });
     await api.openExternal('https://example.com');
+    await api.readImagePreview?.('/tmp/diagram.png');
 
     expect(port.invoke).toHaveBeenNthCalledWith(1, 'codex-native:pick-attachments');
     expect(port.invoke).toHaveBeenNthCalledWith(2, 'codex-native:copy-to-clipboard', { text: 'Copied' });
     expect(port.invoke).toHaveBeenNthCalledWith(3, 'codex-native:open-external', 'https://example.com');
+    expect(port.invoke).toHaveBeenNthCalledWith(4, 'codex-native:read-image-preview', '/tmp/diagram.png');
 
     const contextBridge = { exposeInMainWorld: vi.fn() };
     const exposed = exposeCodexNativeRendererApi(contextBridge, port);
@@ -136,6 +147,9 @@ describe('Codex native Electron bridge', () => {
     );
     await expect(main.call('codex-native:copy-to-clipboard', { text: 42 })).rejects.toThrow(
       'Clipboard text must be a string',
+    );
+    await expect(main.call('codex-native:read-image-preview', 'relative.png')).rejects.toThrow(
+      'must be an absolute local path',
     );
     dispose();
   });

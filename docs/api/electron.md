@@ -48,9 +48,16 @@ type CodexNativeMainOptions = {
   maxAttachmentBytes?: number;
   maxTotalAttachmentBytes?: number;
   maxAudioBytes?: number;
+  maxImagePreviewBytes?: number;
   transcribeAudio?: (audioData, options?) => Promise<AppleSpeechTranscriptionResult>;
 };
 ```
+
+`CodexNativeRendererApi.readImagePreview?(path)` lazily requests a bounded,
+non-SVG local image as a renderer-safe data URL. It returns `null` when the file
+is missing, unsupported, or larger than `maxImagePreviewBytes` (8 MiB by
+default). The optional method keeps custom/older preload implementations
+backward compatible.
 
 ## Typed IPC primitives
 
@@ -69,7 +76,8 @@ listener cleanup, and request/event typing.
 
 The native attachment bridge carries bounded renderer-safe image previews. It
 does not expose local `file://` image sources to the renderer; restored local
-images without a surviving preview fall back to a file chip.
+images are read on demand through the native bridge, while missing or reclaimed
+files fall back to a file chip.
 
 Official remote-control pairing is intentionally a Node `CodexSurface` facade,
 not a default renderer IPC method. Hosts that expose pairing UI should define a

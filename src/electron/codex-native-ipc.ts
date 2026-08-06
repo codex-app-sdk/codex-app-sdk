@@ -42,6 +42,7 @@ export type CodexNativeMainOptions = {
   maxAttachmentBytes?: number;
   maxTotalAttachmentBytes?: number;
   maxAudioBytes?: number;
+  maxImagePreviewBytes?: number;
   transcribeAudio?: (
     audioData: Buffer,
     options?: AppleSpeechTranscriptionOptions,
@@ -80,7 +81,11 @@ export function registerCodexNativeIpc(
     defaultMaxTotalAttachmentBytes,
     'Total attachment byte limit',
   );
-  const temporaryDirectories = new Set<string>();
+  const maxImagePreviewBytes = positiveByteLimit(
+    options.maxImagePreviewBytes,
+    maxPreviewBytes,
+    'Image preview byte limit',
+  );
 
   const unregister = registerIpcMainHandlers<NativeRequests>(dependencies.ipcMain, {
     [channels.copyToClipboard]: (_event, value) => {
@@ -91,7 +96,6 @@ export function registerCodexNativeIpc(
       const inputs = attachmentInputs(value, maxAttachmentBytes, maxTotalAttachmentBytes);
       if (inputs.length === 0) return [];
       const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-app-sdk-attachments-'));
-      temporaryDirectories.add(temporaryDirectory);
       return Promise.all(inputs.map(async (input, index) => {
         const filePath = path.join(temporaryDirectory, `${index}-${safeFileName(input.name)}`);
         const data = Buffer.from(input.data);
@@ -145,6 +149,22 @@ export function registerCodexNativeIpc(
       }
       return attachments;
     },
+    [channels.readImagePreview]: async (_event, value) => {
+      const filePath = absoluteLocalPath(value, 'Image preview path');
+      const mimeType = mimeTypeForPath(filePath);
+      if (!mimeType.startsWith('image/') || mimeType === 'image/svg+xml') return null;
+      let metadata;
+      try {
+        metadata = await fs.stat(filePath);
+      } catch (error) {
+        if (isMissingFileError(error)) return null;
+        throw error;
+      }
+      if (!metadata.isFile() || metadata.size > maxImagePreviewBytes) return null;
+      const data = await fs.readFile(filePath);
+      if (data.byteLength > maxImagePreviewBytes) return null;
+      return `data:${mimeType};base64,${data.toString('base64')}`;
+    },
     [channels.transcribeAudio]: async (_event, value, rawOptions) => {
       const audioData = arrayBuffer(value, 'Audio data');
       if (audioData.byteLength > maxAudioBytes) {
@@ -165,10 +185,6 @@ export function registerCodexNativeIpc(
 
   return () => {
     unregister();
-    for (const directory of temporaryDirectories) {
-      void fs.rm(directory, { force: true, recursive: true });
-    }
-    temporaryDirectories.clear();
   };
 }
 
@@ -278,6 +294,18 @@ function objectRecord(value: unknown, label: string): Record<string, unknown> {
 function nonEmptyString(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${label} must be a non-empty string`);
   return value.trim();
+}
+
+function absoluteLocalPath(value: unknown, label: string): string {
+  const filePath = nonEmptyString(value, label);
+  if (!path.isAbsolute(filePath) || filePath.includes('\0')) {
+    throw new TypeError(`${label} must be an absolute local path`);
+  }
+  return filePath;
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
 }
 
 function safeFileName(value: string): string {

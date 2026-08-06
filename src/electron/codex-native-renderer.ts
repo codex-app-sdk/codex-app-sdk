@@ -16,6 +16,7 @@ export const codexNativeChannels = {
   ingestAttachments: 'codex-native:ingest-attachments',
   openExternal: 'codex-native:open-external',
   pickAttachments: 'codex-native:pick-attachments',
+  readImagePreview: 'codex-native:read-image-preview',
   transcribeAudio: 'codex-native:transcribe-audio',
 } as const;
 
@@ -26,6 +27,7 @@ export type CodexNativeRequests = {
   ], CodexNativeAttachment[]>;
   [codexNativeChannels.openExternal]: IpcRequest<[href: string], void>;
   [codexNativeChannels.pickAttachments]: IpcRequest<[], CodexNativeAttachment[]>;
+  [codexNativeChannels.readImagePreview]: IpcRequest<[path: string], string | null>;
   [codexNativeChannels.transcribeAudio]: IpcRequest<[
     audioData: ArrayBuffer,
     options?: { locale?: string; live?: boolean },
@@ -52,6 +54,7 @@ export function createCodexNativeRendererApi(
     ingestAttachments: (files) => renderer.invoke(codexNativeChannels.ingestAttachments, files),
     openExternal: (href) => renderer.invoke(codexNativeChannels.openExternal, href),
     pickAttachments: () => renderer.invoke(codexNativeChannels.pickAttachments),
+    readImagePreview: (path) => renderer.invoke(codexNativeChannels.readImagePreview, path),
     transcribeAudio: (audioData, transcriptionOptions) => (
       renderer.invoke(codexNativeChannels.transcribeAudio, audioData, transcriptionOptions)
     ),
