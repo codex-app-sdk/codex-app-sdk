@@ -268,6 +268,7 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
     deleteMessage: vi.fn(async () => snapshot),
     deleteQueuedPrompt: vi.fn(async () => snapshot),
     editMessage: vi.fn(async () => snapshot),
+    forkMessage: vi.fn(async () => snapshot),
     getSnapshot: vi.fn(async () => snapshot),
     interrupt: vi.fn(async () => snapshot),
     listConversations: vi.fn(async () => snapshot.conversations),

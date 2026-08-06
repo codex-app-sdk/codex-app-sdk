@@ -20,7 +20,7 @@ describe('component lab', () => {
     expect(toolHeader.get('.chat-animated-diff-stat--deleted').text()).toBe('-96');
     await toolHeader.trigger('click');
     expect(wrapper.text()).toContain('Explored src/vue');
-    expect(wrapper.find('.tabler-icon-eye').exists()).toBe(true);
+    expect(wrapper.find('.tabler-icon-folder').exists()).toBe(true);
     expect(wrapper.find('.tabler-icon-tool').exists()).toBe(true);
     const steer = wrapper.findAll('.chat-message')
       .find((message) => message.text().includes('Message from codex-claw'));
@@ -57,7 +57,7 @@ describe('component lab', () => {
       ['Created src/vue/chat/ToolGallery.vue', 'pencil'],
       ['Deleted src/vue/chat/LegacyTool.vue', 'trash'],
       ['Edited src/vue/chat/ChatToolCall.vue', 'pencil'],
-      ['Explored src/vue/chat', 'eye'],
+      ['Explored src/vue/chat', 'folder'],
       ['Listed src/vue/chat', 'folder'],
       ['Updated plan', 'list-details'],
       ['Read README.md', 'file-text'],
@@ -96,7 +96,7 @@ describe('component lab', () => {
     expect(group.get('.chat-tool-group__title').text()).toBe('3 actions done');
     expect(group.get('.chat-tool-group__running').text()).toContain('Searched composer code');
 
-    await vi.advanceTimersByTimeAsync(1_499);
+    await vi.advanceTimersByTimeAsync(2_999);
     expect(group.get('.chat-tool-group__running').text()).toContain('Searched composer code');
     await vi.advanceTimersByTimeAsync(1);
     expect(group.get('.chat-tool-group__running').text()).not.toContain('Searched composer code');
