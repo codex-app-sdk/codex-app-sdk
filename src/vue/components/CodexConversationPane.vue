@@ -108,7 +108,7 @@
             aria-label="Prompt attachments"
           >
             <div
-              v-for="attachment in selectedAttachments"
+              v-for="(attachment, index) in selectedAttachments"
               :key="attachment.id"
               class="codex-conversation-pane__attachment"
             >
@@ -122,13 +122,23 @@
               <span class="codex-conversation-pane__attachment-name" :title="attachment.path">
                 {{ attachment.name }}
               </span>
-              <button
-                type="button"
-                class="codex-conversation-pane__attachment-remove"
-                :aria-label="`Remove ${attachment.name}`"
-                :disabled="effectiveDisabled"
-                @click="removeAttachment(attachment.id)"
-              >×</button>
+              <span class="codex-conversation-pane__attachment-actions">
+                <slot
+                  name="composer-attachment-actions"
+                  :attachments="selectedAttachments"
+                  :index="index"
+                  :disabled="effectiveDisabled"
+                />
+                <button
+                  type="button"
+                  class="codex-conversation-pane__attachment-remove"
+                  :aria-label="`Remove ${attachment.name}`"
+                  :disabled="effectiveDisabled"
+                  @click="removeAttachment(attachment.id)"
+                >
+                  <XIcon aria-hidden="true" />
+                </button>
+              </span>
             </div>
           </div>
           <CodexComposer
@@ -243,6 +253,7 @@ import {
 import type { CodexSurfaceController } from '../use-codex-surface';
 import type { CodexComposerState } from '../composer-state';
 import { normalizeCodexComposerState } from '../composer-state';
+import { X as XIcon } from '../icons/app-icons';
 import ChatComposerShelf from '../chat/ChatComposerShelf.vue';
 import CodexComposer from './CodexComposer.vue';
 import CodexApprovalPrompt from './CodexApprovalPrompt.vue';
@@ -342,6 +353,11 @@ defineSlots<{
   'before-composer'(): unknown;
   'composer-after'(): unknown;
   'composer-after-input'(): unknown;
+  'composer-attachment-actions'(props: {
+    attachments: readonly CodexNativeAttachment[];
+    disabled: boolean;
+    index: number;
+  }): unknown;
   empty(props: { description: string; title: string }): unknown;
   'menu-icon'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
   'menu-item'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
@@ -1146,7 +1162,7 @@ defineExpose({ focusComposer });
 .codex-conversation-pane__attachment {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-3);
+  gap: 0;
   align-items: center;
   min-width: 0;
   max-width: 240px;
@@ -1160,6 +1176,7 @@ defineExpose({ focusComposer });
 .codex-conversation-pane__attachment-file {
   width: 32px;
   height: 32px;
+  margin-inline-end: var(--space-3);
   border-radius: var(--radius-md);
 }
 
@@ -1181,10 +1198,18 @@ defineExpose({ focusComposer });
   white-space: nowrap;
 }
 
+.codex-conversation-pane__attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: var(--space-4);
+}
+
 .codex-conversation-pane__attachment-remove {
   display: grid;
   width: 24px;
   height: 24px;
+  margin-inline-start: calc(-1 * var(--space-3));
   padding: 0;
   border: 0;
   border-radius: var(--radius-full);
@@ -1197,6 +1222,11 @@ defineExpose({ focusComposer });
 .codex-conversation-pane__attachment-remove:hover:not(:disabled) {
   color: var(--color-text);
   background: var(--color-surface-low);
+}
+
+.codex-conversation-pane__attachment-remove svg {
+  width: 16px;
+  height: 16px;
 }
 
 .codex-conversation-pane__history-loader {

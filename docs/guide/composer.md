@@ -85,6 +85,23 @@ The same `SendCodexMessageOptions.attachments` shape is used for send and steer.
 Changing conversations restores the host's incoming attachments without first
 emitting an empty list.
 
+Add host-specific controls beside each selected attachment with the generic
+`composer-attachment-actions` slot:
+
+```vue
+<CodexConversationPane>
+  <template #composer-attachment-actions="{ attachments, index, disabled }">
+    <button :disabled="disabled" @click="inspect(attachments[index])">
+      Inspect
+    </button>
+  </template>
+</CodexConversationPane>
+```
+
+The slot renders immediately before the SDK-owned remove button. It exposes the
+complete readonly attachment list and current index so hosts can derive the
+selected attachment without duplicating attachment state.
+
 An attachment-only submission is valid. When text is empty but attachments are
 present, the composer submits the canonical prompt:
 

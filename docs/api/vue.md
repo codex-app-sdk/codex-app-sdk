@@ -131,6 +131,20 @@ emitting an intermediate empty value.
 for host-controlled attachment queues. Changing `conversationKey` restores the
 incoming `attachments` value and does not emit an intermediate empty queue.
 
+The `composer-attachment-actions` slot adds host-owned controls immediately
+before the SDK remove button for each selected attachment. Its exact scope is:
+
+```ts
+{
+  attachments: readonly CodexNativeAttachment[];
+  index: number;
+  disabled: boolean;
+}
+```
+
+Derive the current attachment as `attachments[index]`; the slot intentionally
+does not pass a second `attachment` field.
+
 The pane's exact steering event is:
 
 ```ts
