@@ -5,9 +5,12 @@
     :class="{
       'chat-icon-button--bordered': bordered,
       'chat-icon-button--danger': danger,
+      'chat-icon-button--disabled': disabled,
     }"
+    :aria-disabled="disabled ? 'true' : undefined"
+    :disabled="href ? undefined : disabled"
     :download="download ? '' : undefined"
-    :href="href"
+    :href="disabled ? undefined : href"
     :rel="rel"
     :target="target"
     :type="href ? undefined : 'button'"
@@ -22,6 +25,7 @@
 defineProps<{
   bordered?: boolean
   danger?: boolean
+  disabled?: boolean
   download?: boolean
   href?: string
   label: string
@@ -55,15 +59,20 @@ defineProps<{
   background: var(--color-surface-lowest);
 }
 
-.chat-icon-button:hover,
-.chat-icon-button:focus-visible {
+.chat-icon-button:not(:disabled):not([aria-disabled='true']):hover,
+.chat-icon-button:not(:disabled):not([aria-disabled='true']):focus-visible {
   background-color: var(--color-surface-low);
   color: var(--color-text);
 }
 
-.chat-icon-button--danger:hover,
-.chat-icon-button--danger:focus-visible {
+.chat-icon-button--danger:not(:disabled):not([aria-disabled='true']):hover,
+.chat-icon-button--danger:not(:disabled):not([aria-disabled='true']):focus-visible {
   color: var(--color-error);
+}
+
+.chat-icon-button--disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .chat-icon-button :deep(svg) {

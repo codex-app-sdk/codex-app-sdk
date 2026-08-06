@@ -35,6 +35,7 @@
     </ChatIconButton>
     <ChatIconButton
       v-if="message.role === 'assistant' && canRetry && showRetry"
+      :disabled="mutationDisabled"
       :label="t('chat.actions.retry')"
       @click="emit('retry')"
     >
@@ -42,6 +43,7 @@
     </ChatIconButton>
     <ChatIconButton
       v-if="canFork && showFork"
+      :disabled="mutationDisabled"
       :label="t('chat.actions.fork')"
       @click="emit('fork')"
     >
@@ -50,6 +52,7 @@
     <ChatIconButton
       v-if="canDelete && showDelete"
       danger
+      :disabled="mutationDisabled"
       :label="t('chat.actions.delete')"
       @click="emit('delete')"
     >
@@ -81,6 +84,7 @@ const props = withDefaults(defineProps<{
   canRetry?: boolean
   copied?: boolean
   message: Message
+  mutationDisabled?: boolean
   presentation?: CodexMessageActionsPresentation
 }>(), {
   canDelete: true,

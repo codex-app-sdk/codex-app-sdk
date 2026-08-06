@@ -114,11 +114,12 @@
           :can-retry="canRetry"
           :copied="copied"
           :message="chatMessage"
+          :mutation-disabled="threadActionsDisabled"
           :presentation="effectivePresentation.messages.actions"
           @copy="copyMessage"
           @delete="deleteMessage"
           @edit="startEdit"
-          @fork="emit('fork-message', index)"
+          @fork="forkMessage"
           @quote="emit('quote-message', index)"
           @retry="retryMessage"
         />
@@ -161,6 +162,7 @@ const props = withDefaults(defineProps<{
   presentation?: CodexConversationPresentation
   showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]
+  threadActionsDisabled?: boolean
 }>(), {
   canDeleteMessage: true,
   canEditMessage: true,
@@ -269,15 +271,20 @@ function saveEdit(content: string) {
 }
 
 function deleteMessage() {
-  if (!canDelete.value) {
+  if (!canDelete.value || props.threadActionsDisabled) {
     return
   }
 
   emit('delete-message', props.index)
 }
 
+function forkMessage() {
+  if (!canFork.value || props.threadActionsDisabled) return
+  emit('fork-message', props.index)
+}
+
 function retryMessage() {
-  if (!canRetry.value) {
+  if (!canRetry.value || props.threadActionsDisabled) {
     return
   }
 

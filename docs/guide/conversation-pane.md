@@ -142,6 +142,11 @@ messages. With the granular compatibility API, use
 pane can also opt in with `:can-fork-message="true"`; the active surface action
 creates and selects the fork.
 
+While a turn is running, completed-message actions remain rendered, but Retry,
+Delete, and Fork are disabled because they change thread history. Copy and Quote
+remain available. The assistant message currently being generated keeps its
+action toolbar hidden until streaming completes.
+
 ## Reactivity and package boundaries
 
 `CodexConversationPaneValueSource<T>` accepts a value, a zero-argument getter,

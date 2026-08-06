@@ -30,6 +30,7 @@
             :presentation="presentation"
             :show-tool-details="showToolDetails"
             :skills="skills"
+            :thread-actions-disabled="busy"
             @cancel="emit('cancel')"
             @client-response="emit('client-response', $event)"
             @copy-message="emit('copy-message', $event)"
