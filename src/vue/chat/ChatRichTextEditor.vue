@@ -229,6 +229,13 @@ function domPositionForCanonicalOffset(root: HTMLElement, position: number): { n
       continue;
     }
     if (child instanceof HTMLBRElement) {
+      // A real BR consumes one canonical character, so its two DOM sides map
+      // to distinct offsets. This matters for a leading empty line: offset 0
+      // is before the BR, while offset 1 is after it. The zero-length trailing
+      // sentinel exists only to give Chromium a caret box, so its valid side
+      // remains after the element.
+      if (length === 0) return { node: root, offset: index + 1 };
+      if (remaining === 0) return { node: root, offset: index };
       if (remaining <= length) return { node: root, offset: index + 1 };
       remaining -= length;
       continue;

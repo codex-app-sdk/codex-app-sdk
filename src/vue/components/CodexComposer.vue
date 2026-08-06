@@ -204,6 +204,7 @@ const selectionStart = ref(0);
 const selectionEnd = ref(0);
 let restoringComposerState = false;
 let lastEmittedComposerState: CodexComposerState | null = null;
+let composerRestoreRevision = 0;
 const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCapabilities);
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
 const voiceVisible = computed(() => (
@@ -391,19 +392,44 @@ function setComposerText(value: string): void {
 
 function restoreComposerState(state: CodexComposerState): void {
   const normalized = normalizeCodexComposerState(state);
+  const revision = ++composerRestoreRevision;
+  const currentSelection = editorEl.value?.getSelectionRange();
+  if (editorEl.value
+    && prompt.value === normalized.text
+    && editorEl.value.readText() === normalized.text
+    && currentSelection?.valid
+    && currentSelection.start === normalized.selectionStart
+    && currentSelection.end === normalized.selectionEnd) {
+    selectionStart.value = normalized.selectionStart;
+    selectionEnd.value = normalized.selectionEnd;
+    caretPosition.value = normalized.selectionEnd;
+    lastEmittedComposerState = normalized;
+    restoringComposerState = false;
+    return;
+  }
+
   restoringComposerState = true;
   prompt.value = normalized.text;
   selectionStart.value = normalized.selectionStart;
   selectionEnd.value = normalized.selectionEnd;
   caretPosition.value = normalized.selectionEnd;
+  lastEmittedComposerState = normalized;
   closeComposerMenus();
   void nextTick(() => {
+    if (revision !== composerRestoreRevision) return;
     if (prompt.value !== normalized.text) {
       restoringComposerState = false;
       return;
     }
-    editorEl.value?.setText(normalized.text, normalized.selectionEnd, { focus: false });
-    editorEl.value?.setSelection(normalized.selectionStart, normalized.selectionEnd, { focus: false });
+    if (editorEl.value?.readText() !== normalized.text) {
+      editorEl.value?.setText(normalized.text, normalized.selectionEnd, { focus: false });
+    }
+    const restoredSelection = editorEl.value?.getSelectionRange();
+    if (!restoredSelection?.valid
+      || restoredSelection.start !== normalized.selectionStart
+      || restoredSelection.end !== normalized.selectionEnd) {
+      editorEl.value?.setSelection(normalized.selectionStart, normalized.selectionEnd, { focus: false });
+    }
     resizeEditor();
     restoringComposerState = false;
   });
