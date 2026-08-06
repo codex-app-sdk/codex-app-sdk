@@ -60,6 +60,11 @@ describe('CodexConversationPane composer attachment actions', () => {
 
     const rows = wrapper.findAll('.codex-conversation-pane__attachment');
     expect(rows).toHaveLength(2);
+    const attachmentsRow = wrapper.get('.codex-conversation-pane__attachments');
+    const composer = wrapper.get('.chat-composer');
+    expect(attachmentsRow.element.parentElement).toBe(composer.element);
+    expect(attachmentsRow.element.nextElementSibling)
+      .toBe(composer.get('.chat-composer__input-row').element);
     expect(wrapper.findAll('.host-attachment-action').map((action) => action.attributes('data-name')))
       .toStrictEqual(['first.md', 'second.png']);
     expect(receivedScopes).toHaveLength(2);

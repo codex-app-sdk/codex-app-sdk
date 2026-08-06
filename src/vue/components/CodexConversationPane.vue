@@ -102,45 +102,6 @@
             @edit-goal="editGoal"
             @steer-queued-prompt="steerQueuedPrompt"
           />
-          <div
-            v-if="selectedAttachments.length > 0"
-            class="codex-conversation-pane__attachments"
-            aria-label="Prompt attachments"
-          >
-            <div
-              v-for="(attachment, index) in selectedAttachments"
-              :key="attachment.id"
-              class="codex-conversation-pane__attachment"
-            >
-              <img
-                v-if="attachment.previewUrl"
-                class="codex-conversation-pane__attachment-preview"
-                :src="attachment.previewUrl"
-                :alt="attachment.name"
-              >
-              <span v-else class="codex-conversation-pane__attachment-file" aria-hidden="true">📎</span>
-              <span class="codex-conversation-pane__attachment-name" :title="attachment.path">
-                {{ attachment.name }}
-              </span>
-              <span class="codex-conversation-pane__attachment-actions">
-                <slot
-                  name="composer-attachment-actions"
-                  :attachments="selectedAttachments"
-                  :index="index"
-                  :disabled="effectiveDisabled"
-                />
-                <button
-                  type="button"
-                  class="codex-conversation-pane__attachment-remove"
-                  :aria-label="`Remove ${attachment.name}`"
-                  :disabled="effectiveDisabled"
-                  @click="removeAttachment(attachment.id)"
-                >
-                  <XIcon aria-hidden="true" />
-                </button>
-              </span>
-            </div>
-          </div>
           <CodexComposer
             :key="effectiveConversationKey ?? 'no-conversation'"
             ref="composer"
@@ -186,6 +147,47 @@
             @update:reasoning-effort="updateReasoningEffort"
             @update:service-tier="updateServiceTier"
           >
+            <template #before>
+              <div
+                v-if="selectedAttachments.length > 0"
+                class="codex-conversation-pane__attachments"
+                aria-label="Prompt attachments"
+              >
+                <div
+                  v-for="(attachment, index) in selectedAttachments"
+                  :key="attachment.id"
+                  class="codex-conversation-pane__attachment"
+                >
+                  <img
+                    v-if="attachment.previewUrl"
+                    class="codex-conversation-pane__attachment-preview"
+                    :src="attachment.previewUrl"
+                    :alt="attachment.name"
+                  >
+                  <span v-else class="codex-conversation-pane__attachment-file" aria-hidden="true">📎</span>
+                  <span class="codex-conversation-pane__attachment-name" :title="attachment.path">
+                    {{ attachment.name }}
+                  </span>
+                  <span class="codex-conversation-pane__attachment-actions">
+                    <slot
+                      name="composer-attachment-actions"
+                      :attachments="selectedAttachments"
+                      :index="index"
+                      :disabled="effectiveDisabled"
+                    />
+                    <button
+                      type="button"
+                      class="codex-conversation-pane__attachment-remove"
+                      :aria-label="`Remove ${attachment.name}`"
+                      :disabled="effectiveDisabled"
+                      @click="removeAttachment(attachment.id)"
+                    >
+                      <XIcon aria-hidden="true" />
+                    </button>
+                  </span>
+                </div>
+              </div>
+            </template>
             <template v-if="$slots['menu-icon']" #menu-icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
             <template v-if="$slots['menu-item']" #menu-item="scope"><slot name="menu-item" v-bind="scope" /></template>
             <template v-if="$slots['composer-after-input']" #after-input><slot name="composer-after-input" /></template>
@@ -1155,7 +1157,9 @@ defineExpose({ focusComposer });
 .codex-conversation-pane__attachments {
   display: flex;
   gap: var(--space-4);
-  padding: 0 var(--space-4) var(--space-4);
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: 0;
   overflow-x: auto;
 }
 
