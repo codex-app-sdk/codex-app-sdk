@@ -63,5 +63,6 @@ export {
   IconTextWrapDisabled as TextWrapDisabledIcon,
   IconTrash as Trash2Icon,
   IconUserCircle as UserCircleIcon,
+  IconWorldSearch as WorldSearchIcon,
   IconX as X,
 } from '@tabler/icons-vue';

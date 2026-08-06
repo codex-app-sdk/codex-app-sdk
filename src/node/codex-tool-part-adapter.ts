@@ -154,7 +154,7 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
     return {
       type: 'tool',
       id: item.id,
-      kind: 'generic',
+      kind: 'webSearch',
       title: 'Web search',
       status: 'completed',
       body: query,

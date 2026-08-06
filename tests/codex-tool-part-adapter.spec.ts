@@ -289,7 +289,7 @@ describe('tool-part-adapter', () => {
       query: 'codex app server',
     })).toMatchObject({
       id: 'search-1',
-      kind: 'generic',
+      kind: 'webSearch',
       title: 'Web search',
       status: 'completed',
       body: 'codex app server',

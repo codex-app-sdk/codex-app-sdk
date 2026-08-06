@@ -18,6 +18,7 @@ import {
   Terminal2Icon,
   ToolIcon,
   Trash2Icon,
+  WorldSearchIcon,
 } from '../icons/app-icons'
 import type { CodexToolPresentation } from './tool-presentation'
 import { parseToolStatusDescriptor } from './tool-status'
@@ -31,6 +32,8 @@ const props = defineProps<{
 const resolvedIcon = computed<Component | undefined>(() => {
   if (props.presentation?.icon === null) return undefined
   if (props.presentation?.icon) return props.presentation.icon
+
+  if (props.toolCall.kind === 'webSearch') return WorldSearchIcon
 
   const descriptor = parseToolStatusDescriptor(props.toolCall.status)
   if (descriptor?.source === 'codex') {

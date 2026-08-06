@@ -39,6 +39,25 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('svg').classes()).toContain('tabler-icon-tool');
   });
 
+  it('renders a dedicated icon for a web search tool', () => {
+    const wrapper = mount(ChatToolIcon, {
+      props: {
+        toolCall: {
+          args: { query: 'Codex App SDK' },
+          done: true,
+          function: 'Web search',
+          id: 'web-search-icon',
+          kind: 'webSearch',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(wrapper.get('svg').classes()).toContain('tabler-icon-world-search');
+  });
+
   it.each(actions)('renders an icon for the %s action', (action, iconName) => {
     const toolCall: MessageToolCall = {
       args: undefined,
