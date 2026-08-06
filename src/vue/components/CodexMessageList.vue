@@ -26,6 +26,7 @@
             :follow-ups-disabled="followUpsDisabled"
             :index="entry.index"
             :message="entry.message"
+            :open-image="openImage"
             :plugins="plugins"
             :presentation="presentation"
             :show-tool-details="showToolDetails"
@@ -74,6 +75,7 @@ import type {
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
+import type { CodexMessageImageOpenHandler } from '../chat/message-image'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
 import CodexScrollToBottom from './CodexScrollToBottom.vue'
@@ -98,6 +100,7 @@ const props = withDefaults(defineProps<{
   loadingOlderMessages?: boolean
   messageBatchSize?: number
   messages: readonly (Message | SurfaceMessage)[]
+  openImage?: CodexMessageImageOpenHandler
   transformMessage?: (message: Message | SurfaceMessage, index: number) => Message | SurfaceMessage
   plugins?: readonly CodexSurfacePlugin[]
   presentation?: CodexConversationPresentation

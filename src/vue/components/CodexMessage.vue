@@ -35,7 +35,7 @@
           :key="`attachment-${blockIndex}`"
         >
           <slot name="block" :block="block" :block-index="blockIndex" :index="index" :message="chatMessage">
-            <ChatMessageBlock :block="block">
+            <ChatMessageBlock :block="block" :open-image="openImage">
               <template v-if="$slots.attachment" #attachment="scope">
                 <slot name="attachment" v-bind="scope" :index="index" :message="chatMessage" />
               </template>
@@ -61,6 +61,7 @@
                 :block="block"
                 :follow-ups-disabled="followUpsDisabled"
                 :plugins="plugins"
+                :open-image="openImage"
                 :show-tool-details="showToolDetails"
                 :skills="skills"
                 @cancel="emit('cancel')"
@@ -139,6 +140,7 @@ import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
 import type { MessageBlock } from '../chat/message-blocks'
+import type { CodexMessageImage, CodexMessageImageOpenHandler } from '../chat/message-image'
 import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
 import ChatCompactionMessage from '../chat/ChatCompactionMessage.vue'
@@ -158,6 +160,7 @@ const props = withDefaults(defineProps<{
   followUpsDisabled?: boolean
   index?: number
   message: Message | SurfaceMessage
+  openImage?: CodexMessageImageOpenHandler
   plugins?: readonly CodexSurfacePlugin[]
   presentation?: CodexConversationPresentation
   showToolDetails?: boolean
@@ -289,6 +292,10 @@ function retryMessage() {
   }
 
   emit('retry-message', props.index)
+}
+
+function openImage(image: CodexMessageImage) {
+  return props.openImage?.(image, { index: props.index, message: chatMessage.value })
 }
 
 async function copyMessage() {

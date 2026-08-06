@@ -1,15 +1,31 @@
 <template>
   <figure
     v-if="previewSource && !previewFailed"
+    ref="rootElement"
     class="codex-chat-theme chat-attachment-block chat-attachment-block--image"
     :title="attachment.path || attachment.url || attachment.name"
   >
-    <img
-      class="chat-attachment-block__preview"
-      :alt="attachment.name"
-      :src="previewSource"
-      @error="previewFailed = true"
+    <button
+      class="chat-attachment-block__preview-button"
+      type="button"
+      :aria-label="`Open ${attachment.name} fullscreen`"
+      @click="openFullscreen"
     >
+      <img
+        class="chat-attachment-block__preview"
+        :alt="attachment.name"
+        :src="previewSource"
+        @error="previewFailed = true"
+      >
+    </button>
+    <ChatImageLightbox
+      :alt="attachment.name"
+      :label="attachment.name"
+      :open="fullscreenOpen"
+      :src="previewSource"
+      :theme-source="rootElement"
+      @close="fullscreenOpen = false"
+    />
   </figure>
   <component
     :is="chipHref ? 'a' : 'span'"
@@ -28,14 +44,19 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { getCodexNativeRendererApi } from '../native-capabilities'
 import { PaperclipIcon, PhotoIcon } from '../icons/app-icons'
+import ChatImageLightbox from './ChatImageLightbox.vue'
+import type { CodexMessageImageOpenHandler } from './message-image'
 import type { MessageAttachment } from './types'
 
 const props = defineProps<{
   attachment: MessageAttachment
+  openImage?: CodexMessageImageOpenHandler
 }>()
 
 const previewFailed = ref(false)
 const nativePreviewSource = ref<string>()
+const fullscreenOpen = ref(false)
+const rootElement = ref<HTMLElement | null>(null)
 const previewSource = computed(() => (
   props.attachment.kind === 'image' && isSafeImageSource(props.attachment.url)
     ? props.attachment.url
@@ -73,6 +94,22 @@ watch(
 onBeforeUnmount(() => {
   previewRequest += 1
 })
+
+async function openFullscreen() {
+  const src = previewSource.value
+  if (!src) return
+  const image = {
+    alt: props.attachment.name,
+    kind: 'attachment',
+    mimeType: props.attachment.mimeType,
+    name: props.attachment.name,
+    path: props.attachment.path,
+    src,
+    title: props.attachment.name,
+  } as const
+  if (await props.openImage?.(image) === true) return
+  fullscreenOpen.value = true
+}
 
 function isSafeImageSource(value: string | undefined): value is string {
   if (!value) return false
@@ -119,6 +156,16 @@ function safeFileHref(value: string | undefined): string | undefined {
   height: 120px;
   border-radius: calc(var(--radius-lg) - var(--space-1));
   object-fit: cover;
+}
+
+.chat-attachment-block__preview-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
 }
 
 .chat-attachment-block--chip {

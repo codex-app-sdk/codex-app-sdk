@@ -17,7 +17,7 @@
     <ChatMermaidBlock :code="block.code" />
   </slot>
   <slot v-else-if="block.type === 'media'" name="media" :block="block" :media="block.media">
-    <ChatMediaBlock :media="block.media" />
+    <ChatMediaBlock :media="block.media" :open-image="openImage" />
   </slot>
   <slot
     v-else-if="block.type === 'attachment'"
@@ -25,7 +25,7 @@
     :attachment="block.attachment"
     :block="block"
   >
-    <ChatAttachmentBlock :attachment="block.attachment" />
+    <ChatAttachmentBlock :attachment="block.attachment" :open-image="openImage" />
   </slot>
   <slot v-else-if="block.type === 'tool'" name="tool" :block="block" :tool-call="block.toolCall">
     <ChatToolCall
@@ -67,6 +67,7 @@ import { renderMarkdown } from './message-markdown'
 import type { MessageBlock } from './message-blocks'
 import type { ClientRequestResponse, CodexConversationLink } from './contracts'
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../surface/types'
+import type { CodexMessageImageOpenHandler } from './message-image'
 
 defineSlots<{
   attachment(props: {
@@ -87,6 +88,7 @@ withDefaults(defineProps<{
   block: MessageBlock
   answeredClientRequestIds?: ReadonlySet<string>
   followUpsDisabled?: boolean
+  openImage?: CodexMessageImageOpenHandler
   plugins?: readonly CodexSurfacePlugin[]
   showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]

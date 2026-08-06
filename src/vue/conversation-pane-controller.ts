@@ -14,6 +14,7 @@ import type {
 } from './chat/contracts';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from './composer-menu';
 import type { Message } from './chat/types';
+import type { CodexMessageImageOpenHandler } from './chat/message-image';
 import type { CodexComposerState } from './composer-state';
 import type { QueuedChatPrompt } from './chat/queued-prompts';
 import type { CodexNativeAttachment } from '../native/types';
@@ -129,6 +130,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   interrupt?: PaneAction;
   loadOlderHistory?: PaneAction;
   menuSelect?: PaneAction<[item: CodexComposerMenuSelectableItem<Payload>]>;
+  openImage?: CodexMessageImageOpenHandler;
   openLink?: PaneAction<[link: CodexConversationLink]>;
   quoteMessage?: PaneAction<[index: number]>;
   resolveApproval?: PaneAction<[

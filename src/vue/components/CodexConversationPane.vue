@@ -37,6 +37,7 @@
         :initial-message-batch-size="initialMessageBatchSize"
         :message-batch-size="messageBatchSize"
         :messages="effectiveMessages"
+        :open-image="openImage"
         :plugins="effectivePlugins"
         :presentation="effectivePresentation"
         :reset-key="effectiveConversationKey"
@@ -222,6 +223,11 @@ import type {
 import { resolveCodexConversationPaneValue } from '../conversation-pane-controller';
 import type { Message } from '../chat/types';
 import type { MessageBlock } from '../chat/message-blocks';
+import type {
+  CodexMessageImage,
+  CodexMessageImageContext,
+  CodexMessageImageOpenHandler,
+} from '../chat/message-image';
 import { stripMessageContext } from '../chat/message-blocks';
 import type { QueuedChatPrompt } from '../chat/queued-prompts';
 import { chatMessageFromInput } from '../chat/renderer-message-adapter';
@@ -304,6 +310,7 @@ const props = withDefaults(defineProps<{
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
   modelValue?: string;
+  openImage?: CodexMessageImageOpenHandler;
   openConversationLink?: (link: CodexConversationLink) => void | Promise<void>;
   pickAttachments?: CodexAttachmentPicker;
   ingestAttachments?: CodexAttachmentIngester;
@@ -756,6 +763,23 @@ function handleConversationLink(link: CodexConversationLink): void {
     const nativeApi = getCodexNativeRendererApi();
     if (nativeApi) void nativeApi.openExternal(link.href).catch(setLocalError);
     else window.open(link.href, '_blank', 'noopener,noreferrer');
+  }
+}
+
+async function openImage(
+  image: CodexMessageImage,
+  context?: CodexMessageImageContext,
+): Promise<boolean> {
+  const handler = effectiveController.value
+    ? effectiveControllerActions.value?.openImage
+    : props.openImage;
+  if (!handler) return false;
+  localError.value = null;
+  try {
+    return await handler(image, context) !== false;
+  } catch (error) {
+    setLocalError(error);
+    return true;
   }
 }
 

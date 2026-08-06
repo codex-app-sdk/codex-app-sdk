@@ -185,8 +185,16 @@ delivered to `onTranscript`, or `false` when recording/transcription fails.
 ### Messages and media
 
 `CodexMessageBlock`, `CodexUserText`, `CodexAttachmentBlock`, `CodexMediaBlock`,
+`CodexImageLightbox`,
 `CodexMermaidBlock`, `CodexCompactionMessage`, `CodexMessageActions`,
 `CodexMessageEditor`, and `CodexFoldTransition`.
+
+Image attachments and media open `CodexImageLightbox` by default. Override
+message image clicks with either `CodexConversationPane`'s `openImage` prop or
+the controlled pane's `actions.openImage(image, context)`. The handler owns the
+click when it returns `void` or `true`; return `false` to use the stock lightbox.
+The exported renderer-safe types are `CodexMessageImage`,
+`CodexMessageImageContext`, and `CodexMessageImageOpenHandler`.
 
 ### Tools and conversation state
 

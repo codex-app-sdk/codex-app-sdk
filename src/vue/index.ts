@@ -55,6 +55,7 @@ export { default as CodexFoldTransition } from './chat/ChatFoldTransition.vue';
 export { default as CodexFollowUps } from './chat/ChatFollowUps.vue';
 export { default as CodexGoal } from './chat/ChatGoal.vue';
 export { default as CodexIconButton } from './chat/ChatIconButton.vue';
+export { default as CodexImageLightbox } from './chat/ChatImageLightbox.vue';
 export { default as CodexMediaBlock } from './chat/ChatMediaBlock.vue';
 export { default as CodexMermaidBlock } from './chat/ChatMermaidBlock.vue';
 export { default as CodexMessageActions } from './chat/ChatMessageActions.vue';
@@ -111,6 +112,11 @@ export {
 export { renderMarkdown } from './chat/message-markdown';
 export { humanizeMentionName, parseCodexUserText } from './chat/user-text';
 export type { CodexUserTextToken } from './chat/user-text';
+export type {
+  CodexMessageImage,
+  CodexMessageImageContext,
+  CodexMessageImageOpenHandler,
+} from './chat/message-image';
 export { languageForFilePath, renderCodeBlock } from './chat/syntax-highlighting';
 export { registerCodexToolTitlePresenter } from './chat/tool-status';
 export type { CodexToolTitlePresenter, CodexToolTitlePresenterContext } from './chat/tool-status';

@@ -9,6 +9,7 @@ import ChatFoldTransition from '../../../src/vue/chat/ChatFoldTransition.vue';
 import ChatFollowUps from '../../../src/vue/chat/ChatFollowUps.vue';
 import ChatGoal from '../../../src/vue/chat/ChatGoal.vue';
 import ChatIconButton from '../../../src/vue/chat/ChatIconButton.vue';
+import ChatImageLightbox from '../../../src/vue/chat/ChatImageLightbox.vue';
 import ChatMediaBlock from '../../../src/vue/chat/ChatMediaBlock.vue';
 import ChatMermaidBlock from '../../../src/vue/chat/ChatMermaidBlock.vue';
 import ChatMessageActions from '../../../src/vue/chat/ChatMessageActions.vue';
@@ -160,6 +161,22 @@ describe('public conversation leaf components', () => {
     const link = mount(ChatIconButton, { props: { href: '/artifact', label: 'Artifact' } });
     expect(link.element.tagName).toBe('A');
     expect(link.attributes('href')).toBe('/artifact');
+  });
+
+  it('mounts the shared image lightbox independently', async () => {
+    const wrapper = mount(ChatImageLightbox, {
+      props: {
+        alt: 'Preview',
+        label: 'Image preview',
+        open: true,
+        src: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
+      },
+    });
+    expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('alt')).toBe('Preview');
+    document.body.querySelector<HTMLElement>('[aria-label="Close fullscreen"]')?.click();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    wrapper.unmount();
   });
 
   it('mounts media independently', () => {

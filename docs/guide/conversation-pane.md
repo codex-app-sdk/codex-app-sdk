@@ -79,6 +79,7 @@ const actions: CodexConversationPaneActions = {
   loadOlderHistory: () => backend.loadOlderHistory(),
   resolveApproval: (id, decision, scope) => backend.resolveApproval(id, decision, scope),
   forkMessage: (index) => backend.forkMessage(index),
+  openImage: (image, context) => imageTabs.open(image, context),
 };
 
 export const paneController = createCodexConversationPaneController({
@@ -125,6 +126,7 @@ Controller actions cover:
 - composer state, attachments, settings, menu selection, and attachment picking;
 - older-history loading;
 - copy notification, quote, edit, retry, fork, and delete message behavior;
+- image opening, with the SDK fullscreen lightbox as the default fallback;
 - approvals and app-server client responses;
 - goals, follow-ups, and queued-prompt deletion;
 - conversation-link navigation.

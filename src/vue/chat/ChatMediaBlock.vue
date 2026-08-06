@@ -32,48 +32,31 @@
         <p class="chat-media-block__prompt">{{ media.prompt }}</p>
       </div>
     </ChatFoldTransition>
-    <Teleport to="body">
-      <div
-        v-if="fullscreenOpen"
-        class="codex-chat-theme chat-media-block__fullscreen"
-        :data-codex-theme="portalTheme.mode"
-        :style="portalTheme.style"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="media.title || generatedLabel"
-        @click.self="closeFullscreen"
-      >
-        <ChatIconButton
-          bordered
-          class="chat-media-block__fullscreen-close"
-          :label="closeFullscreenLabel"
-          @click="closeFullscreen"
-        >
-          <X />
-        </ChatIconButton>
-        <img
-          class="chat-media-block__fullscreen-image"
-          :alt="media.alt || generatedAltLabel"
-          :src="media.url"
-        >
-      </div>
-    </Teleport>
+    <ChatImageLightbox
+      :alt="media.alt || generatedAltLabel"
+      :label="media.title || generatedLabel"
+      :open="fullscreenOpen"
+      :src="media.url"
+      :theme-source="rootElement"
+      @close="closeFullscreen"
+    />
   </figure>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
-import { Download, Info, Maximize2, X } from '../icons/app-icons'
+import { ref } from 'vue'
+import { Download, Info, Maximize2 } from '../icons/app-icons'
 import ChatFoldTransition from './ChatFoldTransition.vue'
+import ChatImageLightbox from './ChatImageLightbox.vue'
 import ChatIconButton from './ChatIconButton.vue'
+import type { CodexMessageImageOpenHandler } from './message-image'
 import type { MessageMedia } from './types'
-import { captureCodexPortalTheme, type CodexPortalTheme } from './portal-theme'
 
-defineProps<{
+const props = defineProps<{
   media: MessageMedia
+  openImage?: CodexMessageImageOpenHandler
 }>()
 
-const closeFullscreenLabel = 'Close fullscreen'
 const downloadLabel = 'Download media'
 const fullscreenLabel = 'Open fullscreen'
 const generatedAltLabel = 'Generated media'
@@ -82,10 +65,17 @@ const promptLabel = 'Prompt'
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
 const rootElement = ref<HTMLElement | null>(null)
-const portalTheme = ref<CodexPortalTheme>({ mode: 'light', style: {} })
 
-function openFullscreen() {
-  portalTheme.value = captureCodexPortalTheme(rootElement.value)
+async function openFullscreen() {
+  const image = {
+    alt: props.media.alt || generatedAltLabel,
+    kind: 'media',
+    mimeType: props.media.mimeType,
+    name: props.media.title,
+    src: props.media.url,
+    title: props.media.title || generatedLabel,
+  } as const
+  if (await props.openImage?.(image) === true) return
   fullscreenOpen.value = true
 }
 
@@ -97,23 +87,6 @@ function toggleDetails() {
   detailsOpen.value = !detailsOpen.value
 }
 
-function handleFullscreenKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    closeFullscreen()
-  }
-}
-
-watch(fullscreenOpen, (open) => {
-  if (open) {
-    window.addEventListener('keydown', handleFullscreenKeydown)
-  } else {
-    window.removeEventListener('keydown', handleFullscreenKeydown)
-  }
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleFullscreenKeydown)
-})
 </script>
 
 <style scoped>
@@ -185,29 +158,4 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
 }
 
-.chat-media-block__fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-12);
-  background: var(--color-overlay);
-}
-
-.chat-media-block__fullscreen-close {
-  position: absolute;
-  top: var(--space-6);
-  right: var(--space-6);
-}
-
-.chat-media-block__fullscreen-image {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  object-fit: contain;
-}
 </style>

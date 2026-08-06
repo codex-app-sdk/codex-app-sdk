@@ -16,6 +16,35 @@ While a turn is accepted but no assistant row exists yet, the list renders a
 `Thinking` shimmer. It disappears when the first assistant content is
 materialized.
 
+## Image previews
+
+Clicking an image attachment or generated assistant image opens the SDK
+fullscreen lightbox by default. The overlay closes from its close control, the
+backdrop, or Escape.
+
+Controlled applications can replace that behavior with `actions.openImage`:
+
+```ts
+const actions: CodexConversationPaneActions = {
+  async openImage(image, context) {
+    await imageTabs.open({
+      id: `${context?.message.id ?? context?.index}-${image.name ?? image.title}`,
+      image,
+    });
+  },
+};
+```
+
+The image value contains `kind`, `src`, `alt`, and optional `name`, `title`,
+`path`, and `mimeType`. Context contains the absolute message `index` and the
+adapted `message`. When the action is omitted, the SDK lightbox remains active.
+A configured action owns the click when it returns `void` or `true`; return
+`false` to deliberately fall back to the SDK lightbox. Non-controller hosts can
+pass the same callback through the `openImage` pane prop.
+
+`CodexImageLightbox` is also exported for custom message renderers that want the
+stock overlay without the stock attachment or media block.
+
 ## Additive message headers
 
 Use `message-header` to add host context without replacing SDK rendering:
@@ -52,7 +81,7 @@ behavior is:
 | All tools complete | Counter only | Counter plus completed rows |
 
 A tool that completes while the group is collapsed remains visible for about
-1.5 seconds before joining the hidden completed count. This prevents very fast
+3 seconds before joining the hidden completed count. This prevents very fast
 tools from flashing in and disappearing before the user can identify them.
 
 Completed rows retain original chronological order. Running rows are always
