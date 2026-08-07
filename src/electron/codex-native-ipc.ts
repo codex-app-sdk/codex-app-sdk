@@ -11,7 +11,7 @@ import {
   transcribeWithAppleSpeechAnalyzer,
   type AppleSpeechTranscriptionOptions,
   type AppleSpeechTranscriptionResult,
-} from '../node/apple-speech-transcription';
+} from '@codex-app-sdk/backend';
 import {
   registerIpcMainHandlers,
   type IpcMainPort,

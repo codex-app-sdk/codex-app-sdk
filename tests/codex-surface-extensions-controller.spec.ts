@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexSurfaceExtensionsController } from '../src/node/codex-surface-extensions-controller';
+import { CodexSurfaceExtensionsController } from '../packages/backend/src/node/codex-surface-extensions-controller';
 
 describe('CodexSurfaceExtensionsController', () => {
   it('validates and exposes normalized dynamic tool definitions', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '../src/codex';
+import type { v2 } from '../packages/backend/src/codex';
 import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '../src/surface';
 import {
   approvalPresetFromSettings,
@@ -16,7 +16,7 @@ import {
   turnSettings,
   validateReasoningEffort,
   validateServiceTier,
-} from '../src/node/codex-surface-settings';
+} from '../packages/backend/src/node/codex-surface-settings';
 
 const models: CodexSurfaceModel[] = [
   {

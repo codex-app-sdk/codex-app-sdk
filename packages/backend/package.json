@@ -1,0 +1,32 @@
+{
+  "name": "@codex-app-sdk/backend",
+  "version": "0.1.0",
+  "description": "Node.js app-server runtime and backend composition for Codex applications.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": [
+    "assets",
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/codex/index.d.ts",
+      "import": "./dist/protocol.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@codex-app-sdk/core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

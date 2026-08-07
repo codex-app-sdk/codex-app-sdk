@@ -124,6 +124,8 @@ Commit: `feat: extract renderer-safe core package`
 
 ### Phase 2: Extract the backend runtime
 
+Status: complete
+
 - Move the app-server protocol/client and Node runtime into
   `@codex-app-sdk/backend`.
 - Preserve the low-level protocol API through a backend subpath and the legacy

@@ -21,7 +21,7 @@ describe('package boundary', () => {
   });
 
   it('keeps native, Electron, Node, and surface layers independent from Vue', async () => {
-    const files = (await Promise.all(['src/native', 'src/electron', 'src/node', 'src/surface']
+    const files = (await Promise.all(['src/native', 'src/electron', 'src/surface', 'packages/backend/src']
       .map((root) => sourceFiles(path.join(packageRoot, root))))).flat();
     const violations: string[] = [];
     for (const file of files) {

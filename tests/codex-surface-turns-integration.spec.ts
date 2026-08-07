@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
-import { CodexSurface } from '../src/node';
+import { CodexAppServerClient } from '../packages/backend/src/codex';
+import { CodexSurface } from '../packages/backend/src/node';
 import type { CodexSurfaceEvent } from '../src/surface';
 import { generatedPngBase64, FakeTransport, createSurface, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 

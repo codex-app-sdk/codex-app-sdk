@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '../src/codex';
+import type { v2 } from '../packages/backend/src/codex';
 import type {
   SurfaceMessage,
   SurfaceMessageMediaPart,
@@ -18,7 +18,7 @@ import {
   upsertAssistantMediaPart,
   upsertAssistantText,
   upsertAssistantToolPart,
-} from '../src/node/codex-surface-message-state';
+} from '../packages/backend/src/node/codex-surface-message-state';
 
 describe('Codex surface message state', () => {
   it('selects the most recent active turn', () => {

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient } from '../packages/backend/src/codex';
 import type { CodexSurfaceSnapshot } from '../src/surface';
 import {
   CodexSurfaceApprovalsController,
   type CodexSurfaceApprovalsHost,
-} from '../src/node/codex-surface-approvals-controller';
-import { createThreadRuntime, initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
-import { initialAuthentication } from '../src/node/codex-surface-authentication';
+} from '../packages/backend/src/node/codex-surface-approvals-controller';
+import { createThreadRuntime, initialSurfaceSnapshot } from '../packages/backend/src/node/codex-surface-runtime';
+import { initialAuthentication } from '../packages/backend/src/node/codex-surface-authentication';
 import { FakeCodexTransport } from './helpers/fake-codex-transport';
 
 describe('CodexSurfaceApprovalsController', () => {

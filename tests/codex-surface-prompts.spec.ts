@@ -16,7 +16,7 @@ import {
   promptSkillInputsFromText,
   stringValue,
   validateSkillInputs,
-} from '../src/node/codex-surface-prompts';
+} from '../packages/backend/src/node/codex-surface-prompts';
 
 describe('Codex surface prompt policy', () => {
   it('parses built-in plan, goal, and review commands precisely', () => {

@@ -3,7 +3,7 @@ import {
   codexRuntimePathEntries,
   discoverCodexExecutable,
   withCodexRuntimePath,
-} from '../src/node';
+} from '../packages/backend/src/node';
 
 describe('Codex executable discovery', () => {
   it('merges current, login-shell, user, Homebrew, and nvm paths', () => {

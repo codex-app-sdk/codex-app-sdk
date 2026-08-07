@@ -5,8 +5,8 @@ import {
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
   preserveHistoricalAttachmentPreviews,
-} from '../src/node/codex-conversation-history';
-import type { v2 } from '../src/codex';
+} from '../packages/backend/src/node/codex-conversation-history';
+import type { v2 } from '../packages/backend/src/codex';
 
 const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 

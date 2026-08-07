@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
-import type { RpcMessage, RpcTransport } from '../../src/codex';
-import { CodexAppServerClient } from '../../src/codex';
-import { CodexSurface } from '../../src/node';
+import type { RpcMessage, RpcTransport } from '../../packages/backend/src/codex';
+import { CodexAppServerClient } from '../../packages/backend/src/codex';
+import { CodexSurface } from '../../packages/backend/src/node';
 
 export const generatedPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 

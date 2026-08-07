@@ -4,7 +4,7 @@ import {
   mcpServerConfig,
   normalizeMcpServers,
   type CodexMcpServerDefinition,
-} from '../src/node/codex-surface-mcp';
+} from '../packages/backend/src/node/codex-surface-mcp';
 
 describe('Codex surface MCP configuration', () => {
   it('normalizes complete HTTP and stdio definitions', () => {

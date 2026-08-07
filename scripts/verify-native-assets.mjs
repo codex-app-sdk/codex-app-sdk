@@ -1,15 +1,16 @@
 import { access, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveAppleSpeechAnalyzerPath } from '../dist/node.js';
+import { resolveAppleSpeechAnalyzerPath } from '../packages/backend/dist/index.js';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const packageJson = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8'));
+const backendRoot = path.join(packageRoot, 'packages/backend');
+const packageJson = JSON.parse(await readFile(path.join(backendRoot, 'package.json'), 'utf8'));
 if (!packageJson.files?.includes('assets')) {
   throw new Error('package.json must publish the SDK native assets directory');
 }
 
-const sourceAsset = path.join(packageRoot, 'assets/apple-speechanalyzer-cli');
+const sourceAsset = path.join(backendRoot, 'assets/apple-speechanalyzer-cli');
 const resolvedAsset = resolveAppleSpeechAnalyzerPath();
 await access(sourceAsset);
 await access(resolvedAsset);

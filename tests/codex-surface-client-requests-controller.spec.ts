@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CodexSurfaceClientRequestsController,
   type CodexSurfaceClientRequestsHost,
-} from '../src/node/codex-surface-client-requests-controller';
-import { createThreadRuntime, initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
-import { initialAuthentication } from '../src/node/codex-surface-authentication';
+} from '../packages/backend/src/node/codex-surface-client-requests-controller';
+import { createThreadRuntime, initialSurfaceSnapshot } from '../packages/backend/src/node/codex-surface-runtime';
+import { initialAuthentication } from '../packages/backend/src/node/codex-surface-authentication';
 
 describe('CodexSurfaceClientRequestsController', () => {
   it('rejects empty prompts and resolves normalized ask-user answers', async () => {

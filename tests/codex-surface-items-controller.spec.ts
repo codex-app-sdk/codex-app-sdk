@@ -3,13 +3,13 @@ import type { CodexSurfaceSnapshot, SurfaceMessage } from '../src/surface';
 import {
   CodexSurfaceItemsController,
   type CodexSurfaceItemsHost,
-} from '../src/node/codex-surface-items-controller';
+} from '../packages/backend/src/node/codex-surface-items-controller';
 import {
   createThreadRuntime,
   initialSurfaceSnapshot,
   type ThreadRuntimeState,
-} from '../src/node/codex-surface-runtime';
-import { initialAuthentication } from '../src/node/codex-surface-authentication';
+} from '../packages/backend/src/node/codex-surface-runtime';
+import { initialAuthentication } from '../packages/backend/src/node/codex-surface-authentication';
 
 describe('CodexSurfaceItemsController', () => {
   it('emits append, delta, and replacement events for completed agent text', () => {

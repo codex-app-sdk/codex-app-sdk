@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   resolveAppleSpeechAnalyzerPath,
   transcribeWithAppleSpeechAnalyzer,
-} from '../src/node/apple-speech-transcription';
+} from '../packages/backend/src/node/apple-speech-transcription';
 
 describe('transcribeWithAppleSpeechAnalyzer', () => {
   afterEach(() => {

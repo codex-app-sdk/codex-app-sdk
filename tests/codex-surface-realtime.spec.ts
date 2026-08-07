@@ -5,7 +5,7 @@ import {
   normalizedRealtimeText,
   realtimeAudioChunk,
   realtimeAudioChunkParams,
-} from '../src/node/codex-surface-realtime';
+} from '../packages/backend/src/node/codex-surface-realtime';
 
 describe('Codex surface realtime codecs', () => {
   it('normalizes optional model and voice strings', () => {

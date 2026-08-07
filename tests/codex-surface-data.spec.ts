@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '../src/codex';
+import type { v2 } from '../packages/backend/src/codex';
 import type {
   CodexConversationSummary,
   CodexSurfaceModel,
@@ -19,7 +19,7 @@ import {
   upsertConversation,
   validateAttachments,
   validatedSendOptions,
-} from '../src/node/codex-surface-data';
+} from '../packages/backend/src/node/codex-surface-data';
 
 describe('Codex surface data codecs', () => {
   it('summarizes thread titles, timestamps, status, and recency', () => {

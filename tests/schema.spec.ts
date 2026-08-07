@@ -3,7 +3,7 @@ import {
   codexSchemaCliVersion,
   type CodexAppServerMethodMap,
   type CodexServerRequestMethodMap,
-} from '../src/codex';
+} from '../packages/backend/src/codex';
 
 describe('generated Codex app-server schema', () => {
   it('records the Codex CLI version used to generate bindings', () => {

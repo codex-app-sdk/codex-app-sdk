@@ -16,7 +16,7 @@
     },
     "./events": {
       "types": "./dist/typed-event-bus.d.ts",
-      "import": "./dist/typed-event-bus.js"
+      "import": "./dist/events.js"
     },
     "./native": {
       "types": "./dist/native.d.ts",
@@ -28,7 +28,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "vite build && tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {

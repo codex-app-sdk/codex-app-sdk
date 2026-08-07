@@ -7,7 +7,7 @@ import {
   RpcTransportProtocolError,
   type RpcMessage,
   type RpcTransport,
-} from '../src/codex';
+} from '../packages/backend/src/codex';
 
 class FakeTransport implements RpcTransport {
   readonly sent: RpcMessage[] = [];

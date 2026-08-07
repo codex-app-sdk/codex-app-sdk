@@ -6,11 +6,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = join(root, 'docs/api/json-rpc.md');
 const check = process.argv.includes('--check');
 
-const methodMap = await read('src/codex/method-map.ts');
-const serverRequestMap = await read('src/codex/server-request-map.ts');
-const serverNotification = await read('src/codex/generated/ServerNotification.ts');
-const notificationController = await read('src/node/codex-surface-notifications-controller.ts');
-const schemaVersion = (await read('src/codex/schema-version.ts')).match(
+const backendSource = 'packages/backend/src';
+const methodMap = await read(`${backendSource}/codex/method-map.ts`);
+const serverRequestMap = await read(`${backendSource}/codex/server-request-map.ts`);
+const serverNotification = await read(`${backendSource}/codex/generated/ServerNotification.ts`);
+const notificationController = await read(`${backendSource}/node/codex-surface-notifications-controller.ts`);
+const schemaVersion = (await read(`${backendSource}/codex/schema-version.ts`)).match(
   /codexSchemaCliVersion\s*=\s*['"]([^'"]+)['"]/,
 )?.[1]
   ?? 'unknown';
@@ -52,7 +53,7 @@ const requestRows = clientMethods.map((method) => ({
   method,
   status: highLevelRequests.has(method) ? 'High-level SDK' : 'Typed client only',
   implementation: method === 'initialize'
-    ? '`src/node/codex-surface-connection-controller.ts`'
+    ? '`packages/backend/src/node/codex-surface-connection-controller.ts`'
     : highLevelRequests.has(method)
       ? implementationFiles(method, productionSources)
       : '—',
@@ -65,7 +66,7 @@ const notificationRows = notifications.map((method) => ({
       ? 'High-level SDK'
       : 'Typed client only',
   implementation: handledNotifications.has(method)
-    ? '`src/node/codex-surface-notifications-controller.ts`'
+    ? '`packages/backend/src/node/codex-surface-notifications-controller.ts`'
     : '—',
 }));
 const serverRequestRows = serverRequests.map((method) => ({
@@ -146,7 +147,7 @@ async function sourceFiles(directory) {
   for (const entry of entries) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      if (path === join(root, 'src/codex/generated')) continue;
+      if (path === join(root, 'packages/backend/src/codex/generated')) continue;
       files.push(...await sourceFiles(path));
     } else if (entry.isFile() && entry.name.endsWith('.ts')) {
       files.push(path);
@@ -169,7 +170,7 @@ function implementationFiles(method, sources) {
   const files = sources
     .filter(({ text }) => text.includes(`'${method}'`) || text.includes(`"${method}"`))
     .map(({ path }) => relative(root, path))
-    .filter((path) => !path.startsWith('src/codex/'))
+    .filter((path) => !path.startsWith('packages/backend/src/codex/'))
     .sort();
   return files.length > 0 ? files.map((path) => `\`${path}\``).join('<br>') : 'built into typed client';
 }

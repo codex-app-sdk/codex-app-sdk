@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { v2 } from '../src/codex';
+import type { v2 } from '../packages/backend/src/codex';
 import {
   boundedImageDataUrl,
   catalogIconMimeType,
@@ -9,7 +9,7 @@ import {
   surfacePlugin,
   surfaceSkill,
   surfaceSkills,
-} from '../src/node/codex-surface-catalog';
+} from '../packages/backend/src/node/codex-surface-catalog';
 
 describe('Codex surface catalog codecs', () => {
   it('maps every model catalog field', () => {

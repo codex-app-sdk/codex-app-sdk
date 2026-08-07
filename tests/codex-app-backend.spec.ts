@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexSurface } from '../src/node/codex-surface';
+import { CodexSurface } from '../packages/backend/src/node/codex-surface';
 import {
   createCodexAppBackend,
   type CodexAppBackendTtlCacheScheduler,
   type CodexAppBackendTtlTimer,
-} from '../src/node';
+} from '../packages/backend/src/node';
 
 describe('CodexAppBackend', () => {
   it('creates app modules over one shared surface and exposes them by namespace', () => {

@@ -1,4 +1,4 @@
-import type { CodexSurface } from '../node/codex-surface';
+import type { CodexSurface } from '@codex-app-sdk/backend';
 import {
   registerCodexNativeIpc,
   type CodexNativeMainDependencies,

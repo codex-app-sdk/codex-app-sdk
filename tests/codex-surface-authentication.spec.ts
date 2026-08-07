@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexAppServerClient } from '../src/codex';
+import type { CodexAppServerClient } from '../packages/backend/src/codex';
 import type {
   CodexSurfaceAuthentication,
   CodexSurfaceEventOrigin,
@@ -11,12 +11,12 @@ import {
   surfaceAccount,
   surfaceAuthenticationIdentityKey,
   surfaceAuthenticationKey,
-} from '../src/node/codex-surface-authentication';
+} from '../packages/backend/src/node/codex-surface-authentication';
 import {
   CodexSurfaceAuthenticationController,
   type CodexSurfaceAuthenticationHost,
-} from '../src/node/codex-surface-authentication-controller';
-import { initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
+} from '../packages/backend/src/node/codex-surface-authentication-controller';
+import { initialSurfaceSnapshot } from '../packages/backend/src/node/codex-surface-runtime';
 
 describe('Codex surface authentication values', () => {
   it('normalizes each supported account type and identity', () => {

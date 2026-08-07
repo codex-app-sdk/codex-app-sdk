@@ -3,7 +3,7 @@ import {
   absoluteCodexHome,
   isUnixSocketTransportOptions,
   surfaceTransportOptions,
-} from '../src/node/codex-surface-transport-options';
+} from '../packages/backend/src/node/codex-surface-transport-options';
 
 describe('Codex surface transport options', () => {
   it('validates and normalizes the Codex home path', () => {

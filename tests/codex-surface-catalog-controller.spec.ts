@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexAppServerClient } from '../src/codex';
+import type { CodexAppServerClient } from '../packages/backend/src/codex';
 import type { CodexSurfaceSnapshot } from '../src/surface';
 import {
   CodexSurfaceCatalogController,
   type CodexSurfaceCatalogHost,
-} from '../src/node/codex-surface-catalog-controller';
-import { initialAuthentication } from '../src/node/codex-surface-authentication';
-import { createThreadRuntime, initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
+} from '../packages/backend/src/node/codex-surface-catalog-controller';
+import { initialAuthentication } from '../packages/backend/src/node/codex-surface-authentication';
+import { createThreadRuntime, initialSurfaceSnapshot } from '../packages/backend/src/node/codex-surface-runtime';
 
 describe('CodexSurfaceCatalogController', () => {
   it('returns cached models or paginates and applies a fresh selection', async () => {

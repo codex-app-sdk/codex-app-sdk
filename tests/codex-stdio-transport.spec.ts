@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CodexAppServerStdioTransport } from '../src/node';
+import { CodexAppServerStdioTransport } from '../packages/backend/src/node';
 
 const spawnMock = vi.hoisted(() => vi.fn());
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ResponseItem } from '../src/codex/generated/ResponseItem';
-import { rawResponseItemToEvent } from '../src/node/codex-raw-response-item-adapter';
+import type { ResponseItem } from '../packages/backend/src/codex/generated/ResponseItem';
+import { rawResponseItemToEvent } from '../packages/backend/src/node/codex-raw-response-item-adapter';
 
 const adapt = (item: unknown) => rawResponseItemToEvent(item as ResponseItem);
 

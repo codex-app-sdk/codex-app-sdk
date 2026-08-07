@@ -2,8 +2,8 @@ import { afterAll, beforeAll, bench, describe } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { CodexAppServerClient } from '../../src/codex';
-import { CodexSurface } from '../../src/node';
+import { CodexAppServerClient } from '../../packages/backend/src/codex';
+import { CodexSurface } from '../../packages/backend/src/node';
 import { FakeTransport, resumeResponse, thread, turn } from '../helpers/codex-surface-fixture';
 
 const THREAD_COUNT = 5;

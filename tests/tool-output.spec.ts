@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toolOutputText } from '../src/node/tool-output';
+import { toolOutputText } from '../packages/backend/src/node/tool-output';
 
 describe('tool output text', () => {
   it('passes through strings and serializes primitive values', () => {

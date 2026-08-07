@@ -8,7 +8,7 @@ import {
   mcpProgressToToolPartUpdate,
   rawOutputToToolPartUpdate,
   shouldForwardCommandExecutionOutput,
-} from '../src/node/codex-tool-part-adapter';
+} from '../packages/backend/src/node/codex-tool-part-adapter';
 
 describe('tool-part-adapter', () => {
   it('extracts full-path read, create, and edit file activities', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
-import { CodexSurface } from '../src/node';
+import { CodexAppServerClient } from '../packages/backend/src/codex';
+import { CodexSurface } from '../packages/backend/src/node';
 import { FakeCodexTransport, lastRequest } from './helpers/fake-codex-transport';
 
 describe('CodexSurface remote control', () => {

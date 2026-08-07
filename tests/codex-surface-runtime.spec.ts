@@ -4,7 +4,7 @@ import {
   createThreadRuntime,
   initialSurfaceSnapshot,
   runtimeProjection,
-} from '../src/node/codex-surface-runtime';
+} from '../packages/backend/src/node/codex-surface-runtime';
 
 const authentication: CodexSurfaceAuthentication = {
   status: 'notLoaded',

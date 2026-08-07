@@ -3,7 +3,7 @@ import type { CodexConversationSnapshot } from '../src/surface';
 import {
   createCodexConversationHandle,
   type CodexConversationHandleOperations,
-} from '../src/node/codex-conversation-handle';
+} from '../packages/backend/src/node/codex-conversation-handle';
 
 describe('createCodexConversationHandle', () => {
   it('delegates conversation operations and returns the latest snapshot', async () => {

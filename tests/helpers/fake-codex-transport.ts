@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { RpcMessage, RpcTransport } from '../../src/codex';
+import type { RpcMessage, RpcTransport } from '../../packages/backend/src/codex';
 
 export class FakeCodexTransport implements RpcTransport {
   readonly sent: RpcMessage[] = [];
