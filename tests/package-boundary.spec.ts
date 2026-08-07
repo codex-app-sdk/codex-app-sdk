@@ -46,6 +46,24 @@ describe('package boundary', () => {
     expect(violations).toStrictEqual([]);
   });
 
+  it('keeps the web transport independent from HTTP frameworks and WebSocket implementations', async () => {
+    const files = await sourceFiles(path.join(packageRoot, 'packages/web/src'));
+    const violations: string[] = [];
+    for (const file of files) {
+      const content = await readFile(file, 'utf8');
+      if (/from\s+['"](?:express|ws|node:)/.test(content)) {
+        violations.push(path.relative(packageRoot, file));
+      }
+    }
+    const manifest = JSON.parse(await readFile(
+      path.join(packageRoot, 'packages/web/package.json'),
+      'utf8',
+    )) as { dependencies?: Record<string, string> };
+
+    expect(violations).toStrictEqual([]);
+    expect(manifest.dependencies).toEqual({ '@codex-app-sdk/core': '0.1.0' });
+  });
+
   it('builds Electron samples against the explicit modular packages', async () => {
     const sampleRoot = path.join(packageRoot, 'samples/electron');
     const files = await sourceFiles(sampleRoot);
