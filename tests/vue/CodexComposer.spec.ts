@@ -22,6 +22,7 @@ type ChatComposerProps = {
   draftRevision?: number;
   isSending: boolean;
   hasAttachments?: boolean;
+  interruptArmed?: boolean;
   placeholder: string;
   queuedPromptId?: string | null;
 };
@@ -184,6 +185,19 @@ describe('ChatComposer', () => {
     expect(wrapper.get('.chat-composer__send').attributes('aria-label')).toBe('Codex is working');
 
     await wrapper.get('.chat-composer__send').trigger('click');
+
+    expect(wrapper.emitted('interrupt')).toStrictEqual([[]]);
+    expect(wrapper.emitted('send')).toBeUndefined();
+  });
+
+  it('interrupts from the armed stop button even when a draft is present', async () => {
+    const wrapper = mountComposer({ interruptArmed: true, isSending: true });
+    await setEditorValue(wrapper, 'queue this next');
+
+    const button = wrapper.get('.chat-composer__send');
+    expect(button.classes()).toContain('codex-composer-send-button--interrupt-armed');
+    expect(button.attributes('aria-label')).toBe('Press Escape again or click to stop generation');
+    await button.trigger('click');
 
     expect(wrapper.emitted('interrupt')).toStrictEqual([[]]);
     expect(wrapper.emitted('send')).toBeUndefined();

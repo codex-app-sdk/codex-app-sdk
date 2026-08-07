@@ -116,6 +116,7 @@
           class="chat-composer__send"
           :disabled="sendButtonDisabled"
           :busy="sendButtonLoading"
+          :interrupt-armed="interruptArmed"
           :submit-label="sendButtonLabel"
           interrupt-label="Codex is working"
           @click="handleSendButtonClick"
@@ -165,6 +166,7 @@ const props = defineProps<{
   commands?: readonly CodexCommandSummary[];
   composerState?: CodexComposerState;
   isSending: boolean;
+  interruptArmed?: boolean;
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
@@ -226,6 +228,7 @@ const canInterrupt = computed(() => Boolean(
 ));
 const sendButtonLoading = computed(() => canInterrupt.value);
 const sendButtonDisabled = computed(() => {
+  if (props.interruptArmed) return false;
   if (transcribeAndSendPending.value || isTranscribing.value) return true;
   if (isRecording.value && !props.disabled) return false;
   return !canSend.value && !canInterrupt.value;
@@ -313,6 +316,10 @@ function submitPrompt(): void {
 
 async function handleSendButtonClick(): Promise<void> {
   if (transcribeAndSendPending.value) return;
+  if (props.interruptArmed) {
+    emit('interrupt');
+    return;
+  }
   if (isRecording.value) {
     transcribeAndSendPending.value = true;
     try {

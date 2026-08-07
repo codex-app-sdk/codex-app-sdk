@@ -22,5 +22,12 @@ describe('CodexComposerSendButton', () => {
     expect(wrapper.classes()).toContain('codex-composer-send-button--busy');
     expect(wrapper.find('.codex-composer-send-button__spinner').exists()).toBe(true);
     expect(wrapper.find('.codex-composer-send-button__stop').exists()).toBe(true);
+
+    await wrapper.setProps({ interruptArmed: true });
+    expect(wrapper.attributes('aria-label')).toBe('Press Escape again or click to stop generation');
+    expect(wrapper.classes()).toContain('codex-composer-send-button--interrupt-armed');
+    expect(wrapper.find('.tabler-icon-player-play-filled').exists()).toBe(false);
+    expect(wrapper.find('.codex-composer-send-button__spinner').exists()).toBe(true);
+    expect(wrapper.find('.codex-composer-send-button__stop').exists()).toBe(true);
   });
 });

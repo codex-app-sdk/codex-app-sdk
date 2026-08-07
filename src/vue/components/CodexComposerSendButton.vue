@@ -1,15 +1,18 @@
 <template>
   <button
     class="codex-chat-theme codex-composer-send-button"
-    :class="{ 'codex-composer-send-button--busy': busy }"
+    :class="{
+      'codex-composer-send-button--busy': busy || interruptArmed,
+      'codex-composer-send-button--interrupt-armed': interruptArmed,
+    }"
     type="button"
     :disabled="disabled"
-    :aria-label="busy ? interruptLabel : submitLabel"
+    :aria-label="interruptArmed ? interruptArmedLabel : busy ? interruptLabel : submitLabel"
     @click="emit('click')"
   >
-    <PlayerPlayFilledIcon v-if="!busy" aria-hidden="true" :size="16" />
+    <PlayerPlayFilledIcon v-if="!busy && !interruptArmed" aria-hidden="true" :size="16" />
     <svg
-      v-else
+      v-if="busy"
       class="codex-composer-send-button__spinner"
       aria-hidden="true"
       width="16"
@@ -19,7 +22,7 @@
       <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="28" stroke-dashoffset="10" />
     </svg>
     <svg
-      v-if="busy"
+      v-if="busy || interruptArmed"
       class="codex-composer-send-button__stop"
       aria-hidden="true"
       width="16"
@@ -37,11 +40,15 @@ import { PlayerPlayFilledIcon } from '../icons/app-icons';
 withDefaults(defineProps<{
   busy?: boolean;
   disabled?: boolean;
+  interruptArmed?: boolean;
+  interruptArmedLabel?: string;
   interruptLabel?: string;
   submitLabel?: string;
 }>(), {
   busy: false,
   disabled: false,
+  interruptArmed: false,
+  interruptArmedLabel: 'Press Escape again or click to stop generation',
   interruptLabel: 'Interrupt',
   submitLabel: 'Send',
 });
@@ -100,6 +107,14 @@ const emit = defineEmits<{
 }
 
 .codex-composer-send-button--busy:hover .codex-composer-send-button__stop {
+  opacity: 1;
+}
+
+.codex-composer-send-button--interrupt-armed .codex-composer-send-button__spinner {
+  opacity: 0;
+}
+
+.codex-composer-send-button--interrupt-armed .codex-composer-send-button__stop {
   opacity: 1;
 }
 

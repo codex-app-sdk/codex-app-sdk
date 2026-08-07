@@ -36,12 +36,22 @@ file catalog, normally backed by a conversation with a working directory.
 | `Shift+Enter` | Insert a newline at the current selection |
 | `Cmd+Enter` | Steer the active turn |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |
+| `Escape`, then `Escape` again within two seconds | Interrupt the active turn |
 
 Suggestion menus consume navigation keys before composer shortcuts. Newline
 insertion preserves the caret even when it splits text in the middle of a line,
 and the editor scrolls immediately when the new line exceeds its visible height.
 The composer grows upward with multiline content until twelve lines are visible,
 then keeps that height and scrolls internally.
+
+While a conversation pane is busy, the first unhandled `Escape` holds the
+button's normal hover state for two seconds: the progress spinner gives way to
+the stop square. Press `Escape` again or click the button to interrupt. The
+listener is document-wide, so the composer does not need focus. It ignores
+modified, repeated, already-handled, IME, and modal-dialog key events. If more
+than one pane is busy, the shortcut only applies when focus is inside one of
+them. Set `:escape-interrupt="false"` on `CodexConversationPane` when the host
+owns the shortcut.
 
 When `queuedPromptId` is supplied and the composer is empty, `Cmd+Enter` emits
 `steerQueuedPrompt` for that queued item. It does not create an empty steer.

@@ -1,8 +1,10 @@
 <template>
   <section
+    ref="paneElement"
     class="codex-chat-theme codex-conversation-pane"
     :aria-busy="effectiveBusy || effectiveHistoryLoading"
     :aria-label="ariaLabel"
+    :data-codex-generating="effectiveBusy ? 'true' : undefined"
     @click="handleConversationClick"
     @dragover="handleDragOver"
     @drop="handleDrop"
@@ -118,6 +120,7 @@
             :draft-revision="draftRevision"
             :files="effectiveFiles"
             :has-attachments="selectedAttachments.length > 0"
+            :interrupt-armed="escapeInterruptArmed"
             :plugins="effectivePlugins"
             :queued-prompt-id="effectiveQueuedPrompts[0]?.id ?? null"
             :is-sending="effectiveBusy"
@@ -261,6 +264,7 @@ import {
 import type { CodexSurfaceController } from '../use-codex-surface';
 import type { CodexComposerState } from '../composer-state';
 import { normalizeCodexComposerState } from '../composer-state';
+import { useConversationEscapeInterrupt } from '../chat/use-conversation-escape-interrupt';
 import { X as XIcon } from '../icons/app-icons';
 import ChatComposerShelf from '../chat/ChatComposerShelf.vue';
 import CodexComposer from './CodexComposer.vue';
@@ -294,6 +298,7 @@ const props = withDefaults(defineProps<{
   emptyDescription?: string;
   emptyTitle?: string;
   error?: string | null;
+  escapeInterrupt?: boolean;
   files?: readonly CodexFileSearchItem[];
   followUpsDisabled?: boolean;
   goal?: ThreadGoal | null;
@@ -335,6 +340,7 @@ const props = withDefaults(defineProps<{
   ariaLabel: 'Conversation',
   attachEnabled: true,
   attachments: () => [],
+  escapeInterrupt: true,
   autofocus: false,
   busy: undefined,
   canDeleteMessage: true,
@@ -431,6 +437,7 @@ const emit = defineEmits<{
 
 const draftRevision = ref(0);
 const composer = ref<{ focus(): void } | null>(null);
+const paneElement = ref<HTMLElement | null>(null);
 const effectiveController = computed(() => resolveCodexConversationPaneValue(props.controller));
 const effectiveControllerState = computed<CodexConversationPaneState | undefined>(() => {
   const controller = effectiveController.value;
@@ -483,6 +490,15 @@ const effectiveBusy = computed(() => controlledValue(
   (state) => state.identity.busy ?? false,
   () => props.busy ?? surfaceState.value?.busy ?? false,
 ));
+const {
+  armed: escapeInterruptArmed,
+  clear: clearEscapeInterruptArm,
+} = useConversationEscapeInterrupt({
+  root: paneElement,
+  busy: () => effectiveBusy.value,
+  enabled: () => props.escapeInterrupt,
+  onInterrupt: interrupt,
+});
 const effectiveConversationKey = computed(() => controlledValue(
   (state) => state.identity.conversationKey,
   () => (props.conversationKey !== undefined ? props.conversationKey : surfaceState.value?.activeConversationId),
@@ -662,6 +678,7 @@ watch(effectiveAttachEnabled, (enabled) => {
 });
 
 watch(effectiveConversationKey, () => {
+  clearEscapeInterruptArm();
   localError.value = null;
   const incoming = normalizeCodexComposerState(effectiveComposerState.value ?? (
     effectiveController.value
@@ -966,6 +983,7 @@ function steerQueuedPrompt(promptId: string): void {
 }
 
 function interrupt(): void {
+  clearEscapeInterruptArm();
   if (dispatchControllerAction('interrupt')) return;
   if (effectiveController.value) return;
   emit('interrupt');

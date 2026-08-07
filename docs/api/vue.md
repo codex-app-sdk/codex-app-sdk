@@ -109,6 +109,12 @@ one gesture is dispatched exactly once.
 `CodexConversationPane` exposes `focusComposer()`. `CodexComposer` exposes
 `focus()`.
 
+While `busy`, `CodexConversationPane` listens for two unhandled `Escape`
+presses within two seconds and interrupts the active turn. The first press arms
+the stop-square control; clicking that armed control also interrupts. Set the
+`escapeInterrupt` prop to `false` to disable the document-wide shortcut. When
+multiple panes are busy, only the pane containing document focus responds.
+
 ### Controlled composer state
 
 ```ts
