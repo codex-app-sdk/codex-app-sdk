@@ -35,6 +35,17 @@ describe('TypedEventBus', () => {
     expect(persistent).toHaveBeenCalledTimes(2);
   });
 
+  it('can cancel a one-shot listener before it fires', () => {
+    const bus = new TypedEventBus<TestEvents>();
+    const listener = vi.fn();
+    const unsubscribe = bus.once('turn.completed', listener);
+
+    unsubscribe();
+    bus.emit('turn.completed', { turnId: 'turn-1' });
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('clears one event or the full bus', () => {
     const bus = new TypedEventBus<TestEvents>();
     bus.on('message.updated', vi.fn());
@@ -47,4 +58,3 @@ describe('TypedEventBus', () => {
     expect(bus.listenerCount('turn.completed')).toBe(0);
   });
 });
-
