@@ -106,6 +106,9 @@ describe('Codex web transport', () => {
       serviceTier: 'fast',
     });
 
+    await expect(client.createConversation(undefined)).resolves.toStrictEqual(snapshot);
+    expect(surface.createConversation).toHaveBeenCalledWith(undefined);
+
     surface.emitState({ ...snapshot, busy: true });
     surface.emitEvent(event);
     await nextTask();
@@ -243,8 +246,10 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
   const sendMessage = vi.fn(async () => initialSnapshot);
   const archiveConversation = vi.fn(async () => initialSnapshot);
   const refreshAccount = vi.fn(async () => initialSnapshot);
+  const createConversation = vi.fn(async () => initialSnapshot);
   const partial = {
     connect,
+    createConversation,
     getSnapshot: vi.fn(() => initialSnapshot),
     sendMessage,
     archiveConversation,
@@ -263,6 +268,7 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
     connect,
     sendMessage,
     archiveConversation,
+    createConversation,
     refreshAccount,
     emitState: (value: CodexSurfaceSnapshot) => stateListener?.(value),
     emitEvent: (value: CodexSurfaceEvent) => eventListener?.(value),

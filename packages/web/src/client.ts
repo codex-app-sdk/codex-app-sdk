@@ -172,7 +172,7 @@ class ClientTransport {
         type: 'request',
         id,
         operation,
-        args: [...args] as CodexSurfaceBridgeOperationArguments<Name>,
+        args: webSocketArguments(args) as CodexSurfaceBridgeOperationArguments<Name>,
       }));
     } catch (error) {
       this.#rejectPending(id, transportError(error));
@@ -401,6 +401,12 @@ function shouldReconnect(close: CodexWebSocketClose): boolean {
 function requestId(sequence: number): string {
   const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
   return `codex-${sequence}-${random}`;
+}
+
+function webSocketArguments(args: readonly unknown[]): unknown[] {
+  let length = args.length;
+  while (length > 0 && args[length - 1] === undefined) length -= 1;
+  return args.slice(0, length);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
