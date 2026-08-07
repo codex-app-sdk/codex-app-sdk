@@ -39,7 +39,7 @@ From the SDK repository root:
 
 ```bash
 npm install
-npm run sample:start
+npm run start:electron
 ```
 
 For renderer HMR, preload reloads, and automatic Electron restarts when sample

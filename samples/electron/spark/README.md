@@ -27,11 +27,11 @@ The sample demonstrates:
 From the repository root:
 
 ```bash
-npm run spark:start
+npm run start:spark
 ```
 
 For renderer HMR and automatic Electron restarts:
 
 ```bash
-npm run spark:dev
+npm run dev:spark
 ```

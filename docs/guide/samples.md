@@ -32,7 +32,7 @@ npm run dev
 Production-style build/start:
 
 ```bash
-npm run sample:start
+npm run start:electron
 ```
 
 ## Spark: focused chat
@@ -52,7 +52,7 @@ It demonstrates:
 - custom empty state and conversation chrome around the stock pane.
 
 ```bash
-npm run spark:dev
+npm run dev:spark
 ```
 
 Spark demonstrates SDK customization. It is not a child-safety system or a
@@ -76,7 +76,7 @@ It demonstrates:
 - no raw app-server or MCP configuration in the renderer.
 
 ```bash
-npm run relay:dev
+npm run dev:relay
 ```
 
 Relay uses a seeded local JSON store. It demonstrates the integration loop, not
@@ -98,7 +98,7 @@ It demonstrates:
   reconnect implementation.
 
 ```bash
-npm run web-sample:start
+npm run start:web
 ```
 
 The fixed demo user is not production authentication. Replace the two named
@@ -109,7 +109,7 @@ host seams with the website's session lookup and per-user backend/process pool.
 Run it from the repository root:
 
 ```bash
-npm run lab:dev
+npm run dev:lab
 ```
 
 The browser-only component lab uses deterministic mock data instead of

@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
 import type {
+  CodexRendererSendMessageOptions,
   CodexSurfaceEvent,
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
-  SendCodexMessageOptions,
 } from '@codex-app-sdk/core';
 import { relaySnapshot, createRelaySeedState } from '../src/shared/relay-contracts';
 
@@ -102,7 +102,7 @@ export function fakeSurfaceApi(snapshot = surfaceSnapshot()) {
     retryMessage: vi.fn(async () => snapshot),
     setGoal: vi.fn(async () => snapshot),
     selectConversation: vi.fn(async () => snapshot),
-    sendMessage: vi.fn(async (_prompt: string, _options?: SendCodexMessageOptions) => snapshot),
+    sendMessage: vi.fn(async (_prompt: string, _options?: CodexRendererSendMessageOptions) => snapshot),
     startReview: vi.fn(async () => snapshot),
     startChatGptLogin: vi.fn(async () => ({
       loginId: 'login-relay',

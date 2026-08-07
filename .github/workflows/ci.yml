@@ -31,26 +31,8 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Check generated RPC inventory
-        run: npm run rpc:check
-
-      - name: Check core package
-        run: npm run check -w @codex-app-sdk/core
-
-      - name: Check backend package
-        run: npm run check -w @codex-app-sdk/backend
-
-      - name: Check Vue package
-        run: npm run check -w @codex-app-sdk/vue
-
-      - name: Check Electron package
-        run: npm run check -w @codex-app-sdk/electron
-
-      - name: Check web package
-        run: npm run check -w @codex-app-sdk/web
-
-      - name: Check compatibility facade
-        run: npm run lint:compat && npm run test:compat && npm run build:compat
+      - name: Check SDK packages and compatibility facade
+        run: npm run check:sdk
 
   docs:
     name: Documentation
@@ -69,7 +51,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Build documentation
-        run: npm run docs:build
+        run: npm run build:docs
 
   workspaces:
     name: Scaffolder and samples
@@ -87,17 +69,5 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Build SDK dependency
-        run: npm run build
-
-      - name: Check scaffolder
-        run: npm run create:app:test
-
-      - name: Check component lab
-        run: npm run lab:typecheck && npm run lab:test && npm run lab:build
-
-      - name: Check Electron samples
-        run: npm run sample:typecheck && npm run sample:test && npm run sample:build && npm run spark:typecheck && npm run spark:test && npm run spark:build && npm run relay:typecheck && npm run relay:test && npm run relay:build
-
-      - name: Check web sample
-        run: npm run web-sample:typecheck && npm run web-sample:build
+      - name: Check scaffolder and samples
+        run: npm run check:workspaces

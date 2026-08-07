@@ -46,19 +46,19 @@ from other samples.
 From the repository root:
 
 ```bash
-npm run relay:start
+npm run start:relay
 ```
 
 For renderer HMR and automatic Electron restarts:
 
 ```bash
-npm run relay:dev
+npm run dev:relay
 ```
 
 Focused gates:
 
 ```bash
-npm run relay:test
-npm run relay:typecheck
-npm run relay:build
+npm run test:relay
+npm run typecheck:relay
+npm run build:relay
 ```

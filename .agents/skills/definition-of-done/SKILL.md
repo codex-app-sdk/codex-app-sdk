@@ -48,7 +48,7 @@ Update documentation whenever public behavior, API, configuration, security defa
 - Update the relevant file under `docs/guide/` for usage and design guidance.
 - Update the relevant file under `docs/api/` for exported names and exact contracts.
 - Add new VitePress pages to `docs/.vitepress/config.mts` and link them from neighboring pages.
-- Run `npm run docs:build` whenever VitePress content or navigation changes.
+- Run `npm run build:docs` whenever VitePress content or navigation changes.
 
 Documentation-only internal refactors do not require unrelated product documentation.
 
@@ -74,12 +74,12 @@ Run a sample, lab, or documentation gate only when that surface changed, the
 task explicitly requests it, or it is the selected validation surface:
 
 ```bash
-npm run lab:test
-npm run lab:typecheck
-npm run lab:build
-npm run sample:test
-npm run sample:build
-npm run docs:build
+npm run test:lab
+npm run typecheck:lab
+npm run build:lab
+npm run test:electron
+npm run build:electron
+npm run build:docs
 ```
 
 When the user says not to overthink validation, prefer the focused test and

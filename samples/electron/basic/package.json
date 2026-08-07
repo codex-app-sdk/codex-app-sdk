@@ -6,7 +6,9 @@
   "main": "dist-main/main.js",
   "scripts": {
     "build": "vite build",
+    "check": "npm run lint && npm test && npm run build",
     "dev": "vite --mode electron",
+    "lint": "npm run typecheck",
     "start": "npm run build && electron .",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit"

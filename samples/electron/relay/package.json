@@ -7,7 +7,9 @@
   "scripts": {
     "build:mcp": "vite build --config vite.mcp.config.ts",
     "build": "npm run build:mcp && vite build",
+    "check": "npm run lint && npm test && npm run build",
     "dev": "npm run build:mcp && vite --mode electron",
+    "lint": "npm run typecheck",
     "start": "npm run build && electron .",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit"

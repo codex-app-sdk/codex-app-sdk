@@ -24,6 +24,8 @@
     "template-web"
   ],
   "scripts": {
+    "check": "npm run lint && npm test",
+    "lint": "node --check bin/create-codex-app.js && node --check src/cli.js && node --check tests/*.test.mjs",
     "test": "node --test tests/*.test.mjs"
   },
   "engines": {

@@ -6,8 +6,8 @@ the SDK's high-level runtime. Every method remains available through the typed
 `CodexAppServerClient`; the status indicates whether `CodexSurface` or another
 high-level SDK runtime currently projects it.
 
-Run `npm run rpc:generate` after regenerating the schema or changing protocol
-handling. CI and local checks can use `npm run rpc:check` to detect drift.
+Run `npm run generate:rpc` after regenerating the schema or changing protocol
+handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 ## Status definitions
 

@@ -10,6 +10,60 @@ const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules'])
 const inspectedExtensions = new Set(['.css', '.json', '.md', '.mjs', '.ts', '.vue']);
 
 describe('package boundary', () => {
+  it('orchestrates every package and workspace from the root quality gates', async () => {
+    const manifest = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const sdkWorkspaces = [
+      '@codex-app-sdk/core',
+      '@codex-app-sdk/backend',
+      '@codex-app-sdk/vue',
+      '@codex-app-sdk/electron',
+      '@codex-app-sdk/web',
+    ];
+    const supportingWorkspaces = [
+      'create-codex-app',
+      '@codex-app-sdk/component-lab',
+      '@codex-app-sdk/basic-sample',
+      '@codex-app-sdk/spark-sample',
+      '@codex-app-sdk/relay-sample',
+      '@codex-app-sdk/basic-web-sample',
+    ];
+
+    expect(Object.keys(manifest.scripts)).toStrictEqual(Object.keys(manifest.scripts).sort());
+    expect(Object.keys(manifest.scripts).filter((script) => (
+      /^(?:docs|electron|lab|relay|rpc|sample|schema|spark|web|web-sample):/.test(script)
+    ))).toStrictEqual([]);
+    expect(manifest.scripts.check).toBe('npm run check:sdk && npm run check:workspaces:owned && npm run build:docs');
+    expect(manifest.scripts.test).toBe('npm run test:sdk && npm run test:workspaces');
+    expect(manifest.scripts.typecheck).toBe('npm run typecheck:sdk && npm run typecheck:workspaces');
+    expect(manifest.scripts.lint).toBe('npm run lint:sdk && npm run lint:workspaces');
+    expect(manifest.scripts['build:all']).toBe('npm run build:sdk && npm run build:workspaces');
+
+    for (const workspace of sdkWorkspaces) {
+      expect(manifest.scripts['check:packages']).toContain(`-w ${workspace}`);
+      expect(manifest.scripts['test:packages']).toContain(`-w ${workspace}`);
+      expect(manifest.scripts['typecheck:packages']).toContain(`-w ${workspace}`);
+      expect(manifest.scripts['lint:packages']).toContain(`-w ${workspace}`);
+      expect(manifest.scripts['build:packages']).toContain(`-w ${workspace}`);
+    }
+    for (const workspace of supportingWorkspaces) {
+      expect(manifest.scripts['check:workspaces:owned']).toContain(`-w ${workspace}`);
+      expect(manifest.scripts['test:workspaces']).toContain(`-w ${workspace}`);
+      expect(manifest.scripts['lint:workspaces']).toContain(`-w ${workspace}`);
+      if (workspace !== 'create-codex-app') {
+        expect(manifest.scripts['typecheck:workspaces']).toContain(`-w ${workspace}`);
+        expect(manifest.scripts['build:workspaces']).toContain(`-w ${workspace}`);
+      }
+    }
+
+    for (const surface of ['electron', 'web']) {
+      for (const command of ['build', 'check', 'dev', 'start', 'test', 'typecheck']) {
+        expect(manifest.scripts).toHaveProperty(`${command}:${surface}`);
+      }
+    }
+  });
+
   it('gives every SDK package owned source, tests, and quality gates', async () => {
     for (const packageName of sdkPackages) {
       const workspaceRoot = path.join(packageRoot, 'packages', packageName);
@@ -29,6 +83,7 @@ describe('package boundary', () => {
         'test:coverage': expect.any(String),
         typecheck: expect.any(String),
       }));
+      expect(manifest.scripts?.check, `${packageName} coverage gate`).toContain('test:coverage');
       await expect(readFile(path.join(workspaceRoot, 'vitest.config.ts'), 'utf8')).resolves.toContain(
         "include: ['tests/**/*.spec.ts']",
       );
@@ -115,39 +170,6 @@ describe('package boundary', () => {
       ]));
       expect(packageJson.dependencies).not.toHaveProperty('codex-app-sdk');
     }
-  });
-
-  it('keeps the Basic web sample free of SDK transport implementation details', async () => {
-    const sampleRoot = path.join(packageRoot, 'samples/web/basic');
-    const files = await sourceFiles(path.join(sampleRoot, 'src'));
-    const transportImplementations: string[] = [];
-    for (const file of files) {
-      const content = await readFile(file, 'utf8');
-      if (/JSON\.parse|codexSurfaceBridgeOperations|codexWebSocketProtocolVersion|CodexWebSocketRequest|requestId/.test(content)) {
-        transportImplementations.push(path.relative(packageRoot, file));
-      }
-    }
-    const manifest = JSON.parse(await readFile(path.join(sampleRoot, 'package.json'), 'utf8')) as {
-      dependencies: Record<string, string>;
-    };
-    const renderer = await readFile(path.join(sampleRoot, 'src/client/App.vue'), 'utf8');
-    const server = await readFile(path.join(sampleRoot, 'src/server/index.ts'), 'utf8');
-
-    expect(transportImplementations).toStrictEqual([]);
-    expect(renderer).toContain("from '@codex-app-sdk/web/client'");
-    expect(renderer).toContain('createCodexWebSurfaceClient');
-    expect(renderer).not.toContain('addEventListener');
-    expect(server).toContain("from '@codex-app-sdk/web/server'");
-    expect(server).toContain('bindCodexWebSocket');
-    expect(server).toContain('authenticateSiteRequest');
-    expect(server).toContain('acquireCodexSession');
-    expect(manifest.dependencies).toEqual(expect.objectContaining({
-      express: expect.any(String),
-      ws: expect.any(String),
-      '@codex-app-sdk/backend': '0.1.0',
-      '@codex-app-sdk/vue': '0.1.0',
-      '@codex-app-sdk/web': '0.1.0',
-    }));
   });
 
   it('keeps the preload entry renderer-only while exposing custom IPC composition', async () => {

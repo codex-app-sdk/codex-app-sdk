@@ -6,7 +6,7 @@ Express owns the HTTP server and site-authentication seam; `ws` owns the
 upgrade; the SDK owns the Codex WebSocket protocol and Vue surface integration.
 
 ```bash
-npm run web-sample:start
+npm run start:web
 ```
 
 Open `http://127.0.0.1:3000`. The sample uses the default Codex home, so it

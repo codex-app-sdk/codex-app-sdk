@@ -4,13 +4,23 @@
 
 ```bash
 npm install
+npm run check
+```
+
+The root quality commands are repository-wide: they cover the five SDK
+packages, the compatibility facade, the scaffolder, and every sample workspace.
+Use them independently while iterating:
+
+```bash
 npm test
+npm run lint
 npm run typecheck
-npm run build
+npm run build:all
 ```
 
 Each SDK workspace owns its source, tests, Vitest configuration, typecheck,
-lint, coverage, and build commands. Run the complete gate for one package with:
+lint, coverage thresholds, and build commands. Run the complete gate for one
+package with:
 
 ```bash
 npm run check -w @codex-app-sdk/core
@@ -20,28 +30,39 @@ npm run check -w @codex-app-sdk/electron
 npm run check -w @codex-app-sdk/web
 ```
 
-The root commands orchestrate the five package gates and then check the legacy
-`codex-app-sdk` compatibility facade. For local applications, use:
+`npm run check:sdk` runs those five coverage-enforcing package gates plus the
+legacy `codex-app-sdk` compatibility facade. `npm run check:workspaces` first
+builds the SDK, then checks the scaffolder and all sample workspaces.
+
+The Basic Electron and Basic Web samples expose matching command families:
 
 ```bash
-npm run electron:dev
-npm run web:dev
+npm run dev:electron
+npm run start:electron
+npm run test:electron
+npm run typecheck:electron
+npm run build:electron
+npm run check:electron
+
+npm run dev:web
+npm run start:web
+npm run test:web
+npm run typecheck:web
+npm run build:web
+npm run check:web
 ```
 
-Sample gates:
+Root shortcuts consistently use `verb:target`. The other sample applications
+keep the same convention:
 
 ```bash
-npm run sample:test
-npm run sample:build
-npm run typecheck -w @codex-app-sdk/basic-sample
+npm run test:spark
+npm run typecheck:spark
+npm run build:spark
 
-npm run spark:test
-npm run spark:typecheck
-npm run spark:build
-
-npm run relay:test
-npm run relay:typecheck
-npm run relay:build
+npm run test:relay
+npm run typecheck:relay
+npm run build:relay
 ```
 
 ## Documentation
@@ -49,9 +70,9 @@ npm run relay:build
 The docs use VitePress, the same stack as `multi-llm-ts`.
 
 ```bash
-npm run docs:dev
-npm run docs:build
-npm run docs:preview
+npm run dev:docs
+npm run build:docs
+npm run preview:docs
 ```
 
 The GitHub Pages workflow runs `npm ci`, builds the site, uploads
@@ -64,7 +85,7 @@ Do not commit `.vitepress/cache` or `.vitepress/dist`.
 Checked-in generated bindings currently target `codex-cli 0.146.0`.
 
 ```bash
-npm run schema:generate
+npm run generate:schema
 ```
 
 The generator records the source CLI version and recreates request/response,
@@ -75,12 +96,12 @@ After regeneration:
 1. inspect the schema diff;
 2. update method maps and surface projections where needed;
 3. regenerate the [JSON-RPC coverage inventory](../api/json-rpc) with
-   `npm run rpc:generate`;
+   `npm run generate:rpc`;
 4. add strict protocol and high-level behavior tests;
 5. run the full SDK and sample gates;
 6. update documentation for intentional public changes.
 
-`npm run rpc:check` verifies that the committed inventory matches both the
+`npm run check:rpc` verifies that the committed inventory matches both the
 generated protocol maps and the high-level SDK handlers. The documentation build
 runs this check automatically.
 
