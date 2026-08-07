@@ -53,8 +53,6 @@ export type CodexNodeWebSocketLike = {
   on(event: 'message', listener: (data: unknown) => void): unknown;
   on(event: 'close', listener: (code: number, reason: unknown) => void): unknown;
   on(event: 'error', listener: (error: unknown) => void): unknown;
-  off?(event: 'message' | 'close' | 'error', listener: (...args: never[]) => void): unknown;
-  removeListener?(event: 'message' | 'close' | 'error', listener: (...args: never[]) => void): unknown;
 };
 
 const defaultMaximumMessageBytes = 16 * 1024 * 1024;
@@ -291,14 +289,18 @@ function errorMessage(error: unknown): string {
 function nodeSocketListener(
   socket: CodexNodeWebSocketLike,
   event: 'message' | 'close' | 'error',
-  listener: (...args: never[]) => void,
+  listener: (first: unknown, second?: unknown) => void,
 ): () => void {
   if (event === 'message') socket.on(event, listener as (data: unknown) => void);
   if (event === 'close') socket.on(event, listener as (code: number, reason: unknown) => void);
   if (event === 'error') socket.on(event, listener as (error: unknown) => void);
   return () => {
-    if (socket.off) socket.off(event, listener);
-    else socket.removeListener?.(event, listener);
+    const removable = socket as CodexNodeWebSocketLike & {
+      off?(name: string, callback: (first: unknown, second?: unknown) => void): unknown;
+      removeListener?(name: string, callback: (first: unknown, second?: unknown) => void): unknown;
+    };
+    if (removable.off) removable.off(event, listener);
+    else removable.removeListener?.(event, listener);
   };
 }
 

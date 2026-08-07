@@ -91,6 +91,39 @@ describe('package boundary', () => {
     }
   });
 
+  it('keeps the Express sample free of SDK transport implementation details', async () => {
+    const sampleRoot = path.join(packageRoot, 'samples/web/express');
+    const files = await sourceFiles(path.join(sampleRoot, 'src'));
+    const transportImplementations: string[] = [];
+    for (const file of files) {
+      const content = await readFile(file, 'utf8');
+      if (/JSON\.parse|codexSurfaceBridgeOperations|codexWebSocketProtocolVersion|CodexWebSocketRequest|requestId/.test(content)) {
+        transportImplementations.push(path.relative(packageRoot, file));
+      }
+    }
+    const manifest = JSON.parse(await readFile(path.join(sampleRoot, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>;
+    };
+    const renderer = await readFile(path.join(sampleRoot, 'src/client/App.vue'), 'utf8');
+    const server = await readFile(path.join(sampleRoot, 'src/server/index.ts'), 'utf8');
+
+    expect(transportImplementations).toStrictEqual([]);
+    expect(renderer).toContain("from '@codex-app-sdk/web/client'");
+    expect(renderer).toContain('createCodexWebSurfaceClient');
+    expect(renderer).not.toContain('addEventListener');
+    expect(server).toContain("from '@codex-app-sdk/web/server'");
+    expect(server).toContain('bindCodexWebSocket');
+    expect(server).toContain('authenticateSiteRequest');
+    expect(server).toContain('acquireCodexSession');
+    expect(manifest.dependencies).toEqual(expect.objectContaining({
+      express: expect.any(String),
+      ws: expect.any(String),
+      '@codex-app-sdk/backend': '0.1.0',
+      '@codex-app-sdk/vue': '0.1.0',
+      '@codex-app-sdk/web': '0.1.0',
+    }));
+  });
+
   it('keeps the preload entry renderer-only while exposing custom IPC composition', async () => {
     const preload = await readFile(path.join(packageRoot, 'packages/electron/src/preload.ts'), 'utf8');
     const compatibilityEntry = await readFile(path.join(packageRoot, 'src/electron/preload.ts'), 'utf8');

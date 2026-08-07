@@ -15,7 +15,8 @@
   "workspaces": [
     "packages/*",
     "samples/*",
-    "samples/electron/*"
+    "samples/electron/*",
+    "samples/web/*"
   ],
   "sideEffects": [
     "**/*.css"
@@ -93,6 +94,9 @@
     "relay:start": "npm run start -w @codex-app-sdk/relay-sample",
     "relay:test": "npm run test -w @codex-app-sdk/relay-sample",
     "relay:typecheck": "npm run typecheck -w @codex-app-sdk/relay-sample",
+    "web-sample:build": "npm run build -w @codex-app-sdk/express-web-sample",
+    "web-sample:start": "npm run start -w @codex-app-sdk/express-web-sample",
+    "web-sample:typecheck": "npm run typecheck -w @codex-app-sdk/express-web-sample",
     "prepare": "npm run build"
   },
   "dependencies": {
