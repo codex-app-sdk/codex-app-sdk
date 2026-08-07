@@ -4,7 +4,7 @@ import type {
   CodexNativeClipboardContent,
   CodexNativeRendererApi,
   CodexSpeechTranscriptionResult,
-} from '../native/types';
+} from '@codex-app-sdk/core/native';
 import {
   TypedIpcRenderer,
   type IpcRendererPort,

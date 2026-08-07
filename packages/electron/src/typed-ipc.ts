@@ -1,4 +1,4 @@
-import type { TypedEventBus } from '../events/typed-event-bus';
+import type { TypedEventBus } from '@codex-app-sdk/core/events';
 
 export type IpcRequest<Arguments extends unknown[] = unknown[], Result = unknown> = {
   args: Arguments;

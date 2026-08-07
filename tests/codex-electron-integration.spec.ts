@@ -9,19 +9,19 @@ const mocks = vi.hoisted(() => ({
   registerSurface: vi.fn(() => mocks.disposeSurface),
 }));
 
-vi.mock('../src/electron/codex-native-ipc', () => ({
+vi.mock('../packages/electron/src/codex-native-ipc', () => ({
   registerCodexNativeIpc: mocks.registerNative,
 }));
-vi.mock('../src/electron/codex-native-renderer', () => ({
+vi.mock('../packages/electron/src/codex-native-renderer', () => ({
   createCodexNativeRendererApi: mocks.createNative,
 }));
-vi.mock('../src/electron/codex-surface-ipc', () => ({
+vi.mock('../packages/electron/src/codex-surface-ipc', () => ({
   createCodexSurfaceRendererApi: mocks.createSurface,
   registerCodexSurfaceIpc: mocks.registerSurface,
 }));
 
-import { registerCodexElectronMain } from '../src/electron/codex-electron-integration';
-import { exposeCodexElectronPreload } from '../src/electron/codex-electron-preload';
+import { registerCodexElectronMain } from '../packages/electron/src/codex-electron-integration';
+import { exposeCodexElectronPreload } from '../packages/electron/src/codex-electron-preload';
 
 describe('combined Electron integration', () => {
   beforeEach(() => vi.clearAllMocks());

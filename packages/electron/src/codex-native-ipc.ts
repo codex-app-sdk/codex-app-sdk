@@ -6,7 +6,7 @@ import type {
   CodexNativeAttachment,
   CodexNativeAttachmentInput,
   CodexNativeClipboardContent,
-} from '../native/types';
+} from '@codex-app-sdk/core/native';
 import {
   transcribeWithAppleSpeechAnalyzer,
   type AppleSpeechTranscriptionOptions,

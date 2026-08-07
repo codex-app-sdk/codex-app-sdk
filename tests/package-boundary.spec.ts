@@ -47,7 +47,8 @@ describe('package boundary', () => {
   });
 
   it('keeps the preload entry renderer-only while exposing custom IPC composition', async () => {
-    const preload = await readFile(path.join(packageRoot, 'src/electron/preload.ts'), 'utf8');
+    const preload = await readFile(path.join(packageRoot, 'packages/electron/src/preload.ts'), 'utf8');
+    const compatibilityEntry = await readFile(path.join(packageRoot, 'src/electron/preload.ts'), 'utf8');
 
     expect(preload).toContain('TypedIpcRenderer');
     expect(preload).toContain('exposeCodexNativeRendererApi');
@@ -55,6 +56,7 @@ describe('package boundary', () => {
     expect(preload).not.toContain("from './index'");
     expect(preload).not.toContain('codex-native-ipc');
     expect(preload).not.toContain('codex-electron-integration');
+    expect(compatibilityEntry).toContain("@codex-app-sdk/electron/preload");
   });
 
   it('mirrors every public Vue component with one isolated test file', async () => {

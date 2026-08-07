@@ -1,0 +1,35 @@
+{
+  "name": "@codex-app-sdk/electron",
+  "version": "0.1.0",
+  "description": "Electron main, preload, IPC, and native capability adapter for Codex applications.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./preload": {
+      "types": "./dist/preload.d.ts",
+      "import": "./dist/preload.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@codex-app-sdk/backend": "0.1.0",
+    "@codex-app-sdk/core": "0.1.0"
+  },
+  "peerDependencies": {
+    "electron": ">=30"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

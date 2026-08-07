@@ -25,6 +25,10 @@
     "./surface": {
       "types": "./dist/surface.d.ts",
       "import": "./dist/surface.js"
+    },
+    "./surface-bridge": {
+      "types": "./dist/surface-bridge.d.ts",
+      "import": "./dist/surface-bridge.js"
     }
   },
   "scripts": {

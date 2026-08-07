@@ -1,5 +1,5 @@
-import type { CodexNativeRendererApi } from '../native/types';
-import type { CodexSurfaceRendererApi } from '../surface/types';
+import type { CodexNativeRendererApi } from '@codex-app-sdk/core/native';
+import type { CodexSurfaceRendererApi } from '@codex-app-sdk/core/surface';
 import {
   createCodexNativeRendererApi,
   type CodexContextBridge,

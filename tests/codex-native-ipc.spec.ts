@@ -11,7 +11,7 @@ import {
   createCodexNativeRendererApi,
   exposeCodexNativeRendererApi,
   TypedIpcRenderer,
-} from '../src/electron/preload';
+} from '../packages/electron/src/preload';
 
 const temporaryDirectories: string[] = [];
 
