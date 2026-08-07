@@ -12,7 +12,7 @@ This is the recommended path for a new Codex application:
 <script setup lang="ts">
 import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 
-const surface = useCodexSurface(window.codexSurface);
+const surface = useCodexSurface(rendererApi);
 </script>
 
 <template>
@@ -22,7 +22,8 @@ const surface = useCodexSurface(window.codexSurface);
 
 The pane derives messages, catalogs, approvals, settings, goals, queues,
 attachments, history state, and actions from the surface controller. The host
-still owns its window, navigation, header, conversation list, and product views.
+still owns its page/window, navigation, header, conversation list, and product
+views. Electron preload and the web client both satisfy the same renderer API.
 
 ## Controlled pane
 
@@ -184,9 +185,9 @@ compositions, but new advanced integrations should prefer the grouped adapter.
 
 | API | Runtime | Responsibility |
 | --- | --- | --- |
-| `CodexAppBackend` | Trusted Node/Electron main | Compose one `CodexSurface` with app-owned services |
-| `CodexSurface` | Trusted Node/Electron main | Own app-server and Codex conversation state |
-| `useCodexSurface` | Renderer | Make the surface IPC API reactive |
+| `CodexAppBackend` | Trusted Node host | Compose one `CodexSurface` with app-owned services |
+| `CodexSurface` | Trusted Node host | Own app-server and Codex conversation state |
+| `useCodexSurface` | Renderer | Make any `CodexSurfaceRendererApi` reactive |
 | Pane controller | Renderer | Normalize host-owned view state and actions |
 
 See [Add a backend service](/guide/backend), [Composer and input](/guide/composer),

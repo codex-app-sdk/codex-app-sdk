@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress';
 export default defineConfig({
   title: 'Codex App SDK',
   titleTemplate: ':title · Codex App SDK',
-  description: 'Build complete desktop Codex experiences without rebuilding the app-server runtime, IPC, and conversation UI.',
+  description: 'Build desktop and web Codex experiences with a modular app-server runtime, host transports, and Vue conversation UI.',
   lang: 'en-US',
   base: '/codex-app-sdk/',
   cleanUrls: true,
@@ -26,6 +26,13 @@ export default defineConfig({
     siteTitle: 'Codex App SDK',
     nav: [
       { text: 'Guide', link: '/guide/' },
+      {
+        text: 'Targets',
+        items: [
+          { text: 'Electron', link: '/guide/electron' },
+          { text: 'Web', link: '/guide/web' },
+        ],
+      },
       { text: 'Components', link: '/guide/vue' },
       { text: 'API', link: '/api/' },
       { text: 'Samples', link: '/guide/samples' },
@@ -39,7 +46,7 @@ export default defineConfig({
           items: [
             { text: 'Why Codex App SDK', link: '/guide/' },
             { text: 'Scaffold an application', link: '/guide/scaffolding' },
-            { text: 'Tour the generated app', link: '/guide/quick-start' },
+            { text: 'Tour the generated targets', link: '/guide/quick-start' },
             { text: 'Add app-owned panels', link: '/guide/app-ui' },
             { text: 'Add an MCP server', link: '/guide/mcp' },
             { text: 'Add a backend service', link: '/guide/backend' },

@@ -17,6 +17,11 @@ upgrade; the SDK owns protocol framing and surface routing. Replace
 session lookup and per-user backend/process pool. Stable `codexHome`
 directories, stored tokens, quotas, and persistence remain host concerns.
 
+The SDK transport is framework-neutral; Express and `ws` make the generated
+boundary runnable but are not dependencies of `@codex-app-sdk/web`. See the
+[web integration guide](https://nbonamy.github.io/codex-app-sdk/guide/web)
+before replacing the demo authorization seams.
+
 ## Commands
 
 - `npm run dev` builds and starts the local server.

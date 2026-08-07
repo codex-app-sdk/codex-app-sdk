@@ -19,8 +19,8 @@ Returned state and actions include:
 The composable subscribes immediately and disposes its listeners with the
 current Vue effect scope.
 
-`steerMessage(prompt, options?)` accepts `SendCodexMessageOptions`, including
-attachments, just like `sendMessage`.
+`steerMessage(prompt, options?)` accepts `CodexRendererSendMessageOptions`,
+including opaque-reference attachments, just like `sendMessage`.
 
 ### Controlled pane controller
 
@@ -97,7 +97,6 @@ one gesture is dispatched exactly once.
 
 | Component | Purpose |
 | --- | --- |
-| `CodexConversationSidebar` | Conversation create/select/delete navigation shared by desktop and web shells |
 | `CodexConversationPane` | Complete bound or unbound conversation surface |
 | `CodexConversationSidebar` | Reusable conversation list with create, select, status, relative time, and confirmed delete actions |
 | `CodexComposer` | Full composer with menus, attachments, voice, model/reasoning/Fast mode settings, and send/steer behavior |
@@ -144,7 +143,7 @@ before the SDK remove button for each selected attachment. Its exact scope is:
 
 ```ts
 {
-  attachments: readonly CodexNativeAttachment[];
+  attachments: readonly CodexHostAttachment[];
   index: number;
   disabled: boolean;
 }
@@ -153,15 +152,19 @@ before the SDK remove button for each selected attachment. Its exact scope is:
 Derive the current attachment as `attachments[index]`; the slot intentionally
 does not pass a second `attachment` field.
 
-The pane's exact steering event is:
+The pane's submit and steering actions remain renderer-safe. Their exact
+attachment option type is:
 
 ```ts
-steer: [prompt: string, options?: SendCodexMessageOptions]
+submit: [prompt: string, options?: CodexRendererSendMessageOptions]
+steer: [prompt: string, options?: CodexRendererSendMessageOptions]
 ```
 
 Template listeners use `@steer="(prompt, options) => ..."`. Selected
 attachments are included in `options.attachments` and intentionally cleared
-after the steer intent is emitted.
+after the steer intent is emitted. Each attachment contains `{ type,
+reference }` plus optional image `detail`; renderer actions never receive a
+filesystem path.
 
 `CodexComposer` accepts `hasAttachments` when the host owns the attachment
 queue. This enables submit with an otherwise empty prompt and emits the

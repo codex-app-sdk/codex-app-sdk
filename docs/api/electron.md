@@ -5,6 +5,9 @@
 ### `registerCodexElectronMain(options)`
 
 Registers the surface and native IPC handlers and returns one cleanup function.
+It creates one `CodexElectronAttachmentRegistry` shared by both handler sets,
+so renderer references are resolved to trusted paths only at the main-process
+surface boundary.
 
 ```ts
 type CodexElectronMainOptions = {
@@ -39,6 +42,7 @@ The renderer variant narrows conversation creation to `approvalPreset`, `model`,
 - `exposeCodexNativeRendererApi`
 - `CodexNativeRendererApi`
 - attachment, clipboard, and transcription contracts
+- `CodexElectronAttachmentRegistry` for custom composed integrations
 
 ### `CodexNativeMainOptions`
 

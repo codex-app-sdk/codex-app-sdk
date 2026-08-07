@@ -3,9 +3,9 @@
 The SDK is a surface architecture, not a thin JSON-RPC wrapper. Each layer has a
 specific trust boundary and public vocabulary.
 
-For a file-by-file view of these layers in a runnable project, begin with the
-[generated application tour](/guide/quick-start). This page explains the deeper
-runtime boundaries behind that scaffold.
+For a file-by-file view of these layers in runnable Electron and web projects,
+begin with the [generated target tour](/guide/quick-start). This page explains
+the deeper runtime boundaries behind both scaffolds.
 
 ![Codex App SDK architecture](/architecture.svg)
 

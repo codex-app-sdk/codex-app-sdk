@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Codex App SDK
   text: Ship the app, not the plumbing.
-  tagline: A complete app-server runtime, Electron bridge, and Vue conversation kit for building distinctive Codex desktop products.
+  tagline: A modular app-server runtime, Electron and web transports, and a shared Vue conversation kit for distinctive Codex products.
   image:
     src: /logo.svg
     alt: Codex App SDK
@@ -30,8 +30,8 @@ features:
     title: Full conversation UI
     details: Composer, messages, thinking, tools, approvals, goals, queues, generated media, Markdown, LaTeX, Mermaid, and native attachments.
   - icon: 🧱
-    title: Narrow Electron boundary
-    details: Main-process policy stays trusted while the renderer gets serializable snapshots, semantic events, and validated actions.
+    title: Two narrow host adapters
+    details: Electron IPC and framework-neutral WebSockets carry the same renderer-safe snapshots, events, and validated actions.
   - icon: 🧰
     title: Built to extend
     details: Add host instructions, opaque context, dynamic tools, and app-owned MCP servers without leaking raw protocol into the renderer.
@@ -40,20 +40,28 @@ features:
     details: Capabilities, presentation controls, slots, reusable leaf components, scoped styles, semantic tokens, and light/dark themes.
 ---
 
-## One surface. Three reusable layers.
+## One surface. Five focused packages.
 
 <div class="sdk-layer-grid">
   <div class="sdk-layer">
-    <strong>Runtime</strong>
+    <strong>Core</strong>
+    <p>Share renderer-safe surface, event, attachment, and host-capability contracts across every runtime.</p>
+  </div>
+  <div class="sdk-layer">
+    <strong>Backend</strong>
     <p>Own app-server startup, global state, concurrent conversations, semantic events, extensions, tools, and MCP configuration.</p>
   </div>
   <div class="sdk-layer">
-    <strong>Electron bridge</strong>
-    <p>Project a narrow typed API over IPC and keep commands, environments, raw permissions, and filesystem policy in main.</p>
+    <strong>Electron</strong>
+    <p>Project the surface over typed IPC and provide native attachments, clipboard, links, and speech capabilities.</p>
   </div>
   <div class="sdk-layer">
-    <strong>Vue kit</strong>
-    <p>Drop in the stock conversation pane or compose the same polished messages, composer, tools, media, and menus yourself.</p>
+    <strong>Web</strong>
+    <p>Bind a host-authorized WebSocket without taking ownership of HTTP, authentication, users, or process pooling.</p>
+  </div>
+  <div class="sdk-layer">
+    <strong>Vue</strong>
+    <p>Drop in the shared sidebar and conversation pane or compose the same messages, composer, tools, media, and menus yourself.</p>
   </div>
 </div>
 
@@ -66,7 +74,7 @@ behavior. The renderer boundary remains intentionally small:
 import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 import '@codex-app-sdk/vue/styles.css';
 
-const surface = useCodexSurface(window.codexSurface);
+const surface = useCodexSurface(rendererApi);
 </script>
 
 <template>
@@ -83,6 +91,8 @@ business UI, or custom tools without recreating the conversation system.
 | If you are building… | Start from… |
 | --- | --- |
 | A new Electron + Vue application | [Project scaffolder](/guide/scaffolding) |
+| A web application embedded in an existing site | [Web integration](/guide/web) |
+| A runnable Express + `ws` web baseline | [Basic web sample](/guide/samples#basic-web-transport-boundary) |
 | A full multi-thread Codex client | [Basic sample](/guide/samples#basic-multi-thread-client) |
 | A focused, branded chat experience | [Spark sample](/guide/samples#spark-focused-chat) |
 | A business application with model-driven operations | [Relay sample](/guide/samples#relay-business-ui-mcp) |

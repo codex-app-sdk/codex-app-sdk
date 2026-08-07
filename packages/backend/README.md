@@ -1,7 +1,30 @@
 # `@codex-app-sdk/backend`
 
-The trusted Node.js runtime for Codex applications. It owns app-server protocol
-handling, process and socket transports, `CodexSurface`, and `CodexAppBackend`.
+Trusted Node.js runtime for Codex applications. It owns app-server protocol and
+process lifecycle, transports, `CodexSurface`, and `CodexAppBackend`.
 
-Renderer code should depend on `@codex-app-sdk/core` and a host adapter instead
-of importing this package.
+```bash
+npm install @codex-app-sdk/backend @codex-app-sdk/core
+```
+
+```ts
+import { createCodexAppBackend } from '@codex-app-sdk/backend';
+
+const backend = createCodexAppBackend({
+  surfaceOptions: {
+    clientInfo: { name: 'my_app', title: 'My App', version: '0.1.0' },
+  },
+});
+
+await backend.surface.connect();
+// Grant backend.surface to one trusted Electron or web adapter.
+```
+
+Use `@codex-app-sdk/backend/protocol` only for low-level app-server methods not
+yet projected by `CodexSurface`. Renderer code must use
+`@codex-app-sdk/core` plus a host adapter instead of importing this package.
+
+The backend does not own website users, authentication sessions, business data,
+token storage, or process-pool policy. See the [runtime
+guide](https://nbonamy.github.io/codex-app-sdk/guide/surface) and [Node
+API](https://nbonamy.github.io/codex-app-sdk/api/node).

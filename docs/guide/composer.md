@@ -92,10 +92,13 @@ The stock pane supports native picking, paste, and drag/drop. `attachments` and
 `attachmentsChange` form the granular controlled contract; a pane controller
 uses `composer.attachments` and `updateAttachments`.
 
-Attachment paths are deduplicated and the standard pane keeps at most 20 items.
-The same `SendCodexMessageOptions.attachments` shape is used for send and steer.
-Changing conversations restores the host's incoming attachments without first
-emitting an empty list.
+Attachment references are deduplicated and the standard pane keeps at most 20
+items. Send and steer both emit `CodexRendererSendMessageOptions`; each
+attachment contains an opaque `{ type, reference }` plus optional image
+`detail`, never a filesystem path. Electron main or the authorized web lease
+resolves that reference immediately before the backend call. Changing
+conversations restores the host's incoming attachments without first emitting
+an empty list.
 
 Add host-specific controls beside each selected attachment with the generic
 `composer-attachment-actions` slot:

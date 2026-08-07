@@ -15,6 +15,10 @@ Start by updating `src/renderer/App.vue` and `styles.css` with your product
 shell. Add trusted backend modules or MCP servers from `src/main/index.ts` while
 keeping renderer privileges behind the typed preload boundary.
 
+Architecture and extension guidance lives in the [generated target
+tour](https://nbonamy.github.io/codex-app-sdk/guide/quick-start) and [Electron
+integration guide](https://nbonamy.github.io/codex-app-sdk/guide/electron).
+
 ## Commands
 
 - `npm run dev` starts Vite and Electron with hot reload.

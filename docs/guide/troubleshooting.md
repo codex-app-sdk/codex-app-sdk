@@ -21,6 +21,25 @@ summary list does not.
 The surface keeps resume host options per thread and rejects mismatched thread
 IDs returned by app-server.
 
+## The web client reports a WebSocket response failure
+
+Check the browser console and server close reason first. The SDK defaults to a
+64 MiB maximum message on both client and server; reverse proxies and hosting
+platforms may enforce a lower limit. If the host overrides `maxMessageBytes`,
+configure the same value on `createCodexWebSurfaceClient()` and
+`bindCodexWebSocket()`.
+
+Large persisted threads can make the initial ready snapshot much larger than a
+normal action response. Vue's default lazy render strategy limits how many
+messages enter the DOM, but it does not change the snapshot sent over the
+socket. A close caused by size or an intermediary must be fixed at the
+transport/deployment boundary; repeated page reloads will otherwise request
+the same snapshot again.
+
+Also verify that reconnect creates a new authorized lease, that the host does
+not reuse a released backend, and that the upgrade route and origin policy are
+the same after a page reload.
+
 ## Signed out is shown as an error
 
 Treat `account: null` with `requiresOpenaiAuth: true` as a normal landing state.

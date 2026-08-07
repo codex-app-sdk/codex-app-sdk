@@ -1,8 +1,9 @@
 # Add a backend service
 
-The scaffold creates one `CodexAppBackend` in Electron main. Add a backend
-module when an app-owned panel needs trusted data or behavior that should not
-live in the renderer.
+Both scaffolds create `CodexAppBackend` in a trusted Node host: Electron main
+for desktop, or the server-side session seam for web. Add a backend module when
+an app-owned panel needs trusted data or behavior that should not live in the
+renderer.
 
 Use a backend module for deterministic application services. If Codex itself
 must decide when to call the capability, build an [MCP server](/guide/mcp)
@@ -10,7 +11,8 @@ instead.
 
 ## 1. Define the service
 
-Add `src/main/notes-service.ts`:
+Add the service beside the trusted host (`src/main/notes-service.ts` for
+Electron or a server-side module for web):
 
 ```ts
 import type { CodexAppBackendModule } from '@codex-app-sdk/backend';
@@ -38,7 +40,7 @@ export function createNotesModule(): CodexAppBackendModule<NotesService> {
 process and may use filesystem, database, or network clients that must never be
 exposed directly to the renderer.
 
-## 2. Register it in the generated backend
+## 2. Register it in the host backend
 
 In `src/main/index.ts`, replace the generated `createCodexAppBackend()` call:
 
@@ -52,14 +54,19 @@ backend = createCodexAppBackend({
 const notes = backend.module<NotesService>('notes');
 ```
 
-Keep the generated `registerCodexElectronMain({ surface: backend.surface })`
-and `backend.close()` calls unchanged. Every module receives the same surface
-and shares its lifecycle.
+Every module receives the same surface and shares its lifecycle. Keep the
+generated `backend.close()` call. Electron passes `backend.surface` to
+`registerCodexElectronMain()`; a web session lease returns it from
+`authorize()`.
 
-## 3. Expose a narrow renderer API
+## 3. Expose a narrow product API
 
-The SDK bridge intentionally exposes Codex capabilities only. Add a separate,
-app-owned IPC contract for the panel:
+The SDK adapters intentionally expose Codex capabilities only. Product data
+uses a separate host-owned contract.
+
+### Electron
+
+Add a narrow app-owned IPC API:
 
 ```ts
 // src/main/index.ts
@@ -94,6 +101,23 @@ Keep arguments and results serializable, validate renderer input in main, and
 remove custom handlers during shutdown if the window integration can be
 registered more than once. See [Electron integration](/guide/electron) for the
 SDK bridge and [Security boundary](/guide/security) for trust rules.
+
+### Web
+
+Expose product data through the website's existing authenticated HTTP or RPC
+layer; do not add it to the Codex WebSocket protocol:
+
+```ts
+app.get('/api/notes', requireSiteSession, async (request, response) => {
+  const session = await acquireProductSession(request.siteUser.id);
+  response.json(await session.notes.list());
+});
+```
+
+The host decides how the service maps to a user or organization, validates the
+request, and serializes its result. `@codex-app-sdk/web` remains concerned only
+with projecting one authorized Codex surface. See [Web
+integration](/guide/web) for the session lease boundary.
 
 ## Use the shared surface when useful
 
@@ -135,7 +159,7 @@ The backend is only a composition root around one reusable `CodexSurface`.
 
 | Requirement | Use |
 | --- | --- |
-| Data shown deterministically in an app panel | Backend module + app-owned IPC |
+| Data shown deterministically in an app panel | Backend module + app-owned IPC or HTTP/RPC |
 | Capability the model may call | [MCP server](/guide/mcp) |
 | Small in-process model tool | [Dynamic tool](/guide/extensions#dynamic-tools) |
 | Conversation instructions or start/resume config | [Surface extension](/guide/extensions) |

@@ -153,8 +153,11 @@ await build.sendMessage('Review the design and the attached diagram', {
 });
 ```
 
-The Electron/Vue integration creates these attachment records through the
-native picker, paste, and drag/drop pipeline.
+This is the trusted Node form and contains resolved paths. Electron creates the
+renderer records through its native picker/paste/drop pipeline and resolves
+their opaque references in main. A web host receives references from its own
+authenticated upload flow and resolves them through the authorized socket
+lease.
 
 ## History
 

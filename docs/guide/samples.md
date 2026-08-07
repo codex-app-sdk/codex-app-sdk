@@ -1,7 +1,8 @@
 # Samples
 
-The repository includes three Electron + Vue applications, one web + Vue
-application with a thin Express host, and one browser-only component lab. Each reuses the same SDK
+The repository includes three Electron + Vue applications under
+`samples/electron`, one web + Vue application with a thin Express host under
+`samples/web`, and one browser-only component lab. Each reuses the same SDK
 conversation components at a different product or testing boundary.
 
 For a new application, start with the [project scaffolder](/guide/scaffolding)
@@ -20,7 +21,7 @@ It demonstrates:
 - the full composer, models, reasoning, permissions, plan mode, goals, skills,
   approvals, queues, message actions, and history;
 - native picking, ingestion, paste/drop, copy, and speech transcription;
-- almost no renderer-side SDK plumbing.
+- almost no renderer-side SDK plumbing;
 - a trusted main-process `CodexAppBackend` that owns the shared surface.
 
 ```bash

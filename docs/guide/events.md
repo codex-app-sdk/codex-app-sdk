@@ -57,7 +57,7 @@ conversation.onEvent((event) => {
 `useCodexSurface` exposes the last event and a local subscription API:
 
 ```ts
-const surface = useCodexSurface(window.codexSurface);
+const surface = useCodexSurface(rendererApi);
 
 const stop = surface.onEvent((event) => {
   if (event.type === 'turn.completed') celebrate();
@@ -65,6 +65,8 @@ const stop = surface.onEvent((event) => {
 ```
 
 Vue scope disposal automatically unregisters the underlying renderer listeners.
+`rendererApi` may come from Electron preload or
+`createCodexWebSurfaceClient()`; event semantics are identical.
 
 ## When to use which
 

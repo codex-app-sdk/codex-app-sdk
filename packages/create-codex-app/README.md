@@ -1,6 +1,12 @@
 # create-codex-app
 
-Scaffold a secure Electron or Express web Vue application powered by Codex App SDK.
+Scaffold a secure Electron or Express web Vue application powered by Codex App
+SDK.
+
+```bash
+npx create-codex-app@latest my-codex-app
+npx create-codex-app@latest my-codex-web --target web
+```
 
 See the canonical
 [scaffolding guide](https://nbonamy.github.io/codex-app-sdk/guide/scaffolding)

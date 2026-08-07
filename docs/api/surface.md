@@ -1,7 +1,7 @@
 # Surface contracts
 
-`@codex-app-sdk/core/surface` contains framework-neutral serializable contracts shared
-by Node, Electron IPC, and renderers.
+`@codex-app-sdk/core/surface` contains framework-neutral serializable contracts
+shared by the Node backend, Electron IPC, web transport, and renderers.
 
 ## `CodexSurfaceSnapshot`
 
@@ -123,13 +123,32 @@ type SendCodexMessageOptions = {
 };
 ```
 
+This trusted-host form carries resolved filesystem `path` values. Renderer
+boundaries instead use opaque references:
+
+```ts
+type CodexRendererAttachment =
+  | { type: 'image'; reference: string; detail?: 'auto' | 'low' | 'high' | 'original' }
+  | { type: 'file'; reference: string };
+
+type CodexRendererSendMessageOptions =
+  Omit<SendCodexMessageOptions, 'attachments'> & {
+    attachments?: readonly CodexRendererAttachment[];
+  };
+```
+
+Electron resolves references through its integration-scoped attachment
+registry. A web lease may provide `resolveAttachment`; the website owns upload
+authorization and reference lifetime.
+
 ## `CodexSurfaceApi`
 
-Framework-neutral async interface exposed through Electron IPC. It includes
-lifecycle, authentication, catalog, conversation, message, review, goal,
-approval, client-request, and event operations.
+Framework-neutral async interface exposed through Electron IPC or the web
+client. It includes lifecycle, authentication, catalog, conversation, message,
+review, goal, approval, client-request, and event operations.
 
-`CodexSurfaceRendererApi` narrows only the trusted conversation-creation input.
+`CodexSurfaceRendererApi` narrows trusted conversation-creation input and uses
+`CodexRendererSendMessageOptions` for send/steer attachments.
 
 Remote-control pairing and device management intentionally remain Node-only
 `CodexSurface` methods because their app-server results contain trusted policy

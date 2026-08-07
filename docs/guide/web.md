@@ -11,6 +11,21 @@ sidebar/pane shell as the Basic desktop sample plus the web client; its server
 is almost entirely Express/`ws`, site-authentication, and session-acquisition
 code.
 
+## What you add to an existing website
+
+The SDK-specific integration is deliberately small:
+
+1. create or acquire a `CodexAppBackend` for the authenticated site user;
+2. authorize the HTTP upgrade using the website's existing session system;
+3. adapt the accepted socket and grant a connection-scoped surface lease;
+4. create `CodexWebSurfaceClient` in the browser and pass it to
+   `useCodexSurface()`;
+5. mount the Vue pane wherever it belongs in the larger page.
+
+Everything else—Express/Fastify/Hono routes, page layout, login, organizations,
+token encryption, persistence, upload APIs, and deployment—is ordinary host
+application code.
+
 ## Server boundary
 
 Authenticate the HTTP upgrade in the host, adapt the accepted socket, and
@@ -55,6 +70,13 @@ The SDK validates protocol envelopes and surface arguments, serializes actions,
 correlates responses, pushes snapshots and events, and applies message-size
 limits. The host still validates upgrade paths, cookies, CSRF/origin policy,
 user status, quotas, and concurrency before granting the lease.
+
+Both endpoints default to a 64 MiB message ceiling. This is a transport safety
+bound, not the history-rendering policy: a large ready snapshot must first fit
+through the socket, after which the Vue pane's default lazy render strategy
+mounts only the newest message batch. Configure `maxMessageBytes` consistently
+on client and server if the host chooses another ceiling, and account for lower
+limits imposed by reverse proxies or hosting platforms.
 
 ## Multi-user ownership
 

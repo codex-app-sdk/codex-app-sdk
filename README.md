@@ -10,10 +10,18 @@ process management, transport bridges, conversation state, and chat UI in every 
 
 **[Read the full documentation →](https://nbonamy.github.io/codex-app-sdk/)**
 
-Codex App SDK is a modular runtime, host transport layer, and full Vue
-conversation kit for Codex app-server. The SDK owns reusable Codex plumbing and
-the conversation experience. Your app owns its product shell, authentication,
-tenancy, policy, business data, and integrations.
+Codex App SDK is a set of five focused packages around Codex app-server. The
+SDK owns reusable Codex plumbing, renderer-safe contracts, desktop/web
+transports, and the conversation experience. Your app owns its product shell,
+authentication, tenancy, policy, business data, and integrations.
+
+| Package | Responsibility |
+| --- | --- |
+| `@codex-app-sdk/core` | Renderer-safe surface, event, attachment, and host-capability contracts |
+| `@codex-app-sdk/backend` | Trusted Node app-server lifecycle, `CodexSurface`, and backend composition |
+| `@codex-app-sdk/electron` | Electron IPC, preload exposure, and native desktop capabilities |
+| `@codex-app-sdk/web` | Framework-neutral WebSocket server binding and browser client |
+| `@codex-app-sdk/vue` | Shared sidebar, conversation pane, composer, messages, tools, and theme |
 
 ## What you get
 
@@ -36,12 +44,16 @@ tenancy, policy, business data, and integrations.
 
 ## A deliberately small renderer
 
+Both host adapters provide `CodexSurfaceRendererApi`. Electron exposes it from
+preload; web applications create it with `@codex-app-sdk/web/client`. The Vue
+code after that boundary is the same:
+
 ```vue
 <script setup lang="ts">
 import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 import '@codex-app-sdk/vue/styles.css';
 
-const surface = useCodexSurface(window.codexSurface);
+const surface = useCodexSurface(rendererApi);
 </script>
 
 <template>
@@ -56,7 +68,10 @@ const surface = useCodexSurface(window.codexSurface);
 ```
 
 No raw JSON-RPC method names, generated app-server payloads, Node primitives,
-or Electron objects need to cross into ordinary renderer code.
+filesystem paths, or Electron objects need to cross into ordinary renderer
+code. See the [Electron](https://nbonamy.github.io/codex-app-sdk/guide/electron)
+and [web](https://nbonamy.github.io/codex-app-sdk/guide/web) guides for how each
+host creates `rendererApi`.
 
 ## Start here
 
@@ -69,7 +84,7 @@ For an existing application, follow the
 [installation guide](https://nbonamy.github.io/codex-app-sdk/guide/installation).
 
 - [Scaffold an application](https://nbonamy.github.io/codex-app-sdk/guide/scaffolding)
-- [Tour the generated application](https://nbonamy.github.io/codex-app-sdk/guide/quick-start)
+- [Tour the generated targets](https://nbonamy.github.io/codex-app-sdk/guide/quick-start)
 - [Add app-owned panels](https://nbonamy.github.io/codex-app-sdk/guide/app-ui)
 - [Add an MCP server](https://nbonamy.github.io/codex-app-sdk/guide/mcp)
 - [Add a backend service](https://nbonamy.github.io/codex-app-sdk/guide/backend)

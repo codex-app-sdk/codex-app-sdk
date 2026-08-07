@@ -1,48 +1,55 @@
-# Tour the generated application
+# Tour the generated targets
 
 Begin with the canonical [scaffolding guide](/guide/scaffolding). This page
-assumes the generated application is already running and explains what you own,
-what the SDK owns, and where the next change belongs.
+assumes an Electron or web target is already running and explains what the SDK
+owns, what the host owns, and where the next change belongs.
 
-## Runtime flow
+## Shared runtime flow
+
+Both targets converge on the same renderer contract and Vue components:
 
 ```text
-Electron main
+Trusted Node host
   createCodexAppBackend()
     └─ CodexSurface
          └─ Codex app-server
 
-registerCodexElectronMain()
-  └─ typed IPC + native capabilities
-
-preload
-  └─ window.codexSurface + window.codexAppSdkNative
+Host adapter
+  ├─ Electron: typed IPC + native capabilities
+  └─ Web: authorized WebSocket lease
 
 Vue renderer
-  useCodexSurface(window.codexSurface)
-    ├─ app-owned sidebar and panels
+  useCodexSurface(rendererApi)
+    ├─ app-owned shell, sidebar, and panels
     └─ CodexConversationPane
 ```
 
-The scaffold uses the high-level path deliberately. Ordinary renderer code
-does not need app-server methods, Node APIs, Electron objects, or generated
-protocol types.
+Ordinary renderer code does not need app-server method names, Node APIs,
+Electron objects, filesystem paths, or generated protocol types.
 
-## Generated files and ownership
+## Electron target
+
+```text
+Electron main
+  createCodexAppBackend()
+  registerCodexElectronMain()
+        │
+preload │ window.codexSurface + window.codexAppSdkNative
+        ▼
+Vue renderer
+  useCodexSurface(window.codexSurface)
+```
 
 | File | What it already does | What you normally change |
 | --- | --- | --- |
-| `src/main/index.ts` | Creates the window and `CodexAppBackend`, registers the SDK bridge, enforces navigation policy, and closes the backend | Window policy, `surfaceOptions`, MCP definitions, backend modules, and app-owned IPC |
-| `src/main/preload.ts` | Exposes the two SDK renderer APIs | Add a narrow typed bridge only when an app-owned panel needs trusted host data |
-| `src/renderer/App.vue` | Binds `useCodexSurface`, renders recent conversations, and mounts `CodexConversationPane` | Navigation, branding, panels, empty states, and other product UI |
-| `src/renderer/styles.css` | Defines the app shell, native macOS sidebar material, and SDK theme tokens | Product colors, dimensions, typography, and panel layout |
+| `src/main/index.ts` | Creates the window and backend, registers the SDK bridge, enforces navigation policy, and closes the backend | Window policy, `surfaceOptions`, MCP definitions, backend modules, and app-owned IPC |
+| `src/main/preload.ts` | Exposes the surface and native renderer APIs | Add a narrow typed bridge only when an app-owned panel needs trusted host data |
+| `src/renderer/App.vue` | Binds `useCodexSurface`, renders recent conversations, and mounts the stock pane | Navigation, branding, panels, empty states, and other product UI |
+| `src/renderer/styles.css` | Defines the app shell and SDK theme tokens | Product colors, dimensions, typography, and layout |
 | `vite.config.ts` | Builds Electron main, preload, and Vue renderer | Additional build entries such as a bundled local MCP server |
 
-## The main-process seam
-
-The generated main process already contains the complete lifecycle. Do not
-replace it with a smaller hand-built example. Customize the existing backend
-construction:
+Customize the generated backend construction while retaining bridge
+registration and shutdown:
 
 ```ts
 backend = createCodexAppBackend({
@@ -60,19 +67,52 @@ backend = createCodexAppBackend({
 });
 ```
 
-Keep the generated `registerCodexElectronMain({ surface: backend.surface, ... })`
-call and shutdown handling. They are infrastructure, not customization points.
+Keep `registerCodexElectronMain({ surface: backend.surface, ... })`, the strict
+`webPreferences`, navigation policy, and `backend.close()` lifecycle.
 
-## The renderer seam
+## Web target
 
-`App.vue` owns the product shell. The SDK controller supplies conversation
-state and actions; the stock pane owns the conversation experience:
+```text
+Node web server
+  authenticateSiteRequest()
+  acquireCodexSession()
+  bindCodexWebSocket()
+        │ authorized WebSocket lease
+        ▼
+Browser client
+  createCodexWebSurfaceClient()
+  useCodexSurface(api)
+```
+
+| File | What it already does | What you normally change |
+| --- | --- | --- |
+| `src/server/index.ts` | Serves the browser bundle, accepts one WebSocket path, authorizes it, and grants a backend surface lease | Website session lookup, origin policy, per-user backend/process acquisition, quotas, and uploads |
+| `src/client/main.ts` | Creates the reconnecting browser surface API and mounts Vue | Socket URL or host-specific browser bootstrapping |
+| `src/client/App.vue` | Uses the shared sidebar and conversation pane | The surrounding website/product shell and signed-in experience |
+| `src/client/styles.css` | Defines the standalone sample shell and SDK theme tokens | Styles needed when embedding the pane in the larger site |
+| `vite.config.ts` | Builds the browser bundle | Existing-site bundler integration |
+
+The generated `authenticateSiteRequest()` and `acquireCodexSession()` seams are
+local-demo placeholders. A production host replaces them with its own website
+authentication and a stable per-user backend/process pool. The SDK does not own
+users, cookies, tokens, `codexHome` mapping, databases, HTTP routes, or
+deployment topology.
+
+The web package also does not require Express or `ws`. Those dependencies are
+used by the generated target to make the boundary concrete. Existing servers
+can adapt any accepted socket to `CodexWebSocketPort` and mount the browser
+client inside any page.
+
+## Shared renderer seam
+
+After the adapter creates a `CodexSurfaceRendererApi`, the Vue integration is
+identical:
 
 ```vue
 <script setup lang="ts">
 import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 
-const surface = useCodexSurface(window.codexSurface);
+const surface = useCodexSurface(rendererApi);
 </script>
 
 <template>
@@ -94,7 +134,7 @@ composer, message, approval, queue, or history behavior already owned by
 | You want to add… | Put it here |
 | --- | --- |
 | A sidebar, toolbar, inspector, canvas, dashboard, or settings screen | App-owned Vue components around the pane |
-| Data used only by app-owned UI | A backend module plus narrow app-owned IPC |
+| Data used only by app-owned UI | A backend module plus host-owned IPC or HTTP API |
 | A capability the model should call | An app-owned MCP server |
 | Per-conversation instructions or a small in-process tool | A surface extension or dynamic tool |
 | Custom MCP tool icons or titles | Vue presentation providers |
@@ -102,22 +142,12 @@ composer, message, approval, queue, or history behavior already owned by
 
 Continue with:
 
+- [Electron integration](/guide/electron)
+- [Web integration](/guide/web)
 - [Add app-owned panels](/guide/app-ui)
 - [Add an MCP server](/guide/mcp)
 - [Add a backend service](/guide/backend)
 - [Customize conversation presentation](/guide/presentation)
 
-## Preserve the baseline
-
-As the application grows:
-
-- keep `contextIsolation: true`, `nodeIntegration: false`, and renderer
-  sandboxing;
-- keep Codex configuration and credentials in Electron main;
-- keep the generated navigation policy unless the product deliberately replaces
-  it with an equally strict policy;
-- close `CodexAppBackend` during application shutdown;
-- extend the renderer bridge with serializable, validated, product-shaped data.
-
-The [architecture guide](/guide/architecture) explains why these boundaries
-exist. The [security guide](/guide/security) lists the invariants in detail.
+The [architecture guide](/guide/architecture) explains the package boundaries.
+The [security guide](/guide/security) lists the invariants for both targets.

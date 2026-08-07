@@ -2,8 +2,9 @@
 
 Use an app-owned MCP server when Codex should call a capability supplied by your
 application: search product data, inspect a project, operate a browser, or
-perform a business action. Register it in the scaffold's trusted main process;
-do not send MCP commands, URLs, environments, or credentials to the renderer.
+perform a business action. Register it in the trusted Node host—Electron main
+or the web user's backend session. Do not send MCP commands, URLs,
+environments, or credentials to the renderer.
 
 ## Connect an existing HTTP server
 
@@ -27,7 +28,7 @@ backend = createCodexAppBackend({
 });
 ```
 
-Keep the generated bridge registration unchanged:
+For Electron, keep the generated bridge registration unchanged:
 
 ```ts
 registerCodexElectronMain({
@@ -39,7 +40,10 @@ registerCodexElectronMain({
 Only HTTP and HTTPS URLs are accepted. A required server prevents a conversation
 from starting when the server cannot initialize.
 
-## Bundle a local stdio server
+A web host configures the same `surfaceOptions` while acquiring the authorized
+user backend; `bindCodexWebSocket()` needs no MCP-specific configuration.
+
+## Bundle a local stdio server for Electron
 
 A local MCP server needs its own build entry because it runs as a separate Node
 process rather than inside Electron main.
@@ -162,7 +166,7 @@ absolute command path instead.
 ### Share data with app-owned panels
 
 The stdio server is a separate process. It cannot share an in-memory backend
-module with Electron main. If a Vue panel and MCP tools use the same data, put
+module with the trusted host. If a Vue panel and MCP tools use the same data, put
 the authoritative state in a file, database, or service both processes can
 access. Expose a narrow read API to the panel through the application backend;
 let MCP expose the model-callable operations.

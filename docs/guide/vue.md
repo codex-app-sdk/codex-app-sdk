@@ -9,7 +9,7 @@ used as one bound pane or as a library of independently reusable components.
 <script setup lang="ts">
 import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 
-const surface = useCodexSurface(window.codexSurface);
+const surface = useCodexSurface(rendererApi);
 </script>
 
 <template>
@@ -20,6 +20,10 @@ const surface = useCodexSurface(window.codexSurface);
 When `surface` is provided, the pane derives messages, approvals, catalogs,
 settings, queue, goal, diff, context usage, busy/loading state, and actions from
 the controller.
+
+`rendererApi` is a `CodexSurfaceRendererApi`. Electron exposes one from preload;
+web applications create one with `createCodexWebSurfaceClient()`. The Vue
+package does not depend on either host adapter.
 
 The pane is deliberately headerless. The host decides whether a header exists
 and what product information it contains.

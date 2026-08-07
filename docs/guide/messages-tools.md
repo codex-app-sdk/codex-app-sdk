@@ -161,11 +161,12 @@ Component props override the provided policy.
 
 ## Attachments and media
 
-Renderer-safe image data previews survive live history rematerialization when
-the same local path is still known. Raw `file://` image URLs are never used as
-Electron image sources. When no safe preview survives—for example after an app
-restart—the renderer falls back to a file chip instead of attempting a blocked
-local-resource load.
+Renderer-safe image previews may survive live history rematerialization while
+the host still recognizes the opaque reference. Raw `file://` URLs are never
+used as renderer image sources. Electron can read a bounded preview through its
+native registry; a web host can provide its own authorized preview/upload flow.
+When no safe preview survives—for example after an app restart—the renderer
+falls back to a file chip instead of attempting a blocked local-resource load.
 
 Generated images are validated, MIME-sniffed, and bounded before becoming data
 URLs. Markdown, syntax highlighting, KaTeX, and Mermaid rendering share the

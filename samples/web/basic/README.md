@@ -21,3 +21,7 @@ encrypted token storage, quotas, persistence, and backend shutdown policy.
 The renderer contains only the shared SDK sidebar/pane and the SDK web client.
 It does not implement request IDs, protocol parsing, surface-operation routing,
 or reconnect behavior.
+
+Client and server use the SDK's 64 MiB default WebSocket message ceiling. The
+pane also uses lazy DOM rendering by default, so opening a long thread delivers
+one authoritative snapshot but initially mounts only its newest message batch.

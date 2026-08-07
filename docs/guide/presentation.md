@@ -78,7 +78,7 @@ hidden. Disabled attachment/transcription behavior does not leave dead controls.
 ::: warning Visibility is not authorization
 Hiding a model, permission preset, tool block, or action is a presentation
 choice. Enforce raw permission, approval, filesystem, network, command, and MCP
-policy in the main process and app-server configuration.
+policy in the trusted Node host and app-server configuration.
 :::
 
 ## Theme mode

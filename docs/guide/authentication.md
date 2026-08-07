@@ -32,12 +32,24 @@ const { authUrl, loginId } = await surface.startChatGptLogin();
 await shell.openExternal(authUrl);
 ```
 
-From the renderer controller:
+From an Electron renderer controller:
 
 ```ts
 const login = await surface.startChatGptLogin();
 await window.codexAppSdkNative.openExternal(login.authUrl);
 ```
+
+From a browser surface, opening the URL is website UI policy:
+
+```ts
+const login = await surface.startChatGptLogin();
+window.open(login.authUrl, '_blank', 'noopener,noreferrer');
+```
+
+The web transport carries the authentication action and state but does not own
+the popup, redirect, or website session. A multi-user host must grant the
+socket a surface whose `codexHome` belongs to the already authenticated site
+user; never select that identity from a browser-supplied user ID.
 
 The SDK tracks `account/login/completed`, refreshes account-dependent catalogs
 and conversations, and keeps the same mounted surface usable. The application
@@ -64,8 +76,8 @@ const surface = createCodexSurface({
 });
 ```
 
-`codexHome` is applied only to the spawned app-server child. It is main-process
-configuration and never crosses the renderer IPC boundary.
+`codexHome` is applied only to the spawned app-server child. It is trusted Node
+host configuration and never crosses Electron IPC or the web transport.
 
 ::: warning Account replacement
 If credentials are replaced underneath a running app-server and the reported

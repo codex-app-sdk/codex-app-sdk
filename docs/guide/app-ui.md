@@ -7,8 +7,9 @@ to the application.
 
 ## Add a panel beside the conversation
 
-Start in `src/renderer/App.vue`. Keep the existing surface controller and pane,
-then compose ordinary Vue components around them:
+Start in `src/renderer/App.vue` for Electron or `src/client/App.vue` for web.
+Keep the existing surface controller and pane, then compose ordinary Vue
+components around them:
 
 ```vue
 <script setup lang="ts">
@@ -16,7 +17,7 @@ import { ref } from 'vue';
 import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 import ProjectInspector from './components/ProjectInspector.vue';
 
-const surface = useCodexSurface(window.codexSurface);
+const surface = useCodexSurface(rendererApi);
 const inspectorOpen = ref(true);
 </script>
 
@@ -44,7 +45,7 @@ const inspectorOpen = ref(true);
 </template>
 ```
 
-Add the layout in `src/renderer/styles.css`:
+Add the layout in the target's renderer/client `styles.css`:
 
 ```css
 .workspace {
@@ -103,8 +104,9 @@ or context usage.
 
 If the panel reads files, databases, credentials, OS services, or business
 state, create an [application backend module](/guide/backend) and expose a
-narrow typed API through preload. Do not import Node or Electron into the Vue
-renderer.
+narrow typed API through Electron preload or the website's authenticated
+HTTP/RPC layer. Do not import Node or Electron into the Vue renderer, and do
+not overload the Codex WebSocket protocol with product APIs.
 
 ### Model-callable application data
 

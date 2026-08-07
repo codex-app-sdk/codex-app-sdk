@@ -83,6 +83,13 @@ user. The website owns encrypted storage, process pooling, eviction, deployment
 routing, and tenancy; the SDK lease only connects one authorized socket to one
 surface. See [Web integration](/guide/web).
 
+The web transport defaults to a 64 MiB message ceiling on both endpoints.
+Treat that as a resource bound, not a guarantee that every proxy or deployment
+accepts the same size. Set a lower host-specific limit when appropriate, keep
+client/server values aligned, apply connection and request quotas, and monitor
+large initial snapshots. Vue's lazy DOM rendering reduces browser mount cost
+after delivery but does not reduce the WebSocket payload itself.
+
 ## Electron window policy
 
 Use the bridge with:

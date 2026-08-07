@@ -1,16 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-labelledby="title description">
-  <title id="title">Codex App SDK architecture</title>
-  <desc id="description">The Electron main-process surface connects Codex app-server and app-owned MCP servers to a constrained renderer controller and Vue conversation pane.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title description">
+  <title id="title">Codex App SDK modular architecture</title>
+  <desc id="description">A trusted Node host owns the backend and Codex app-server. Electron IPC or an authorized WebSocket projects the same core surface contracts to a Vue renderer.</desc>
   <style>
     .panel { fill: #f6fbfa; stroke: #b9dcd4; stroke-width: 2; }
     .card { fill: #ffffff; stroke: #c7d7d3; stroke-width: 2; }
     .accent { fill: #e2f7f1; stroke: #58b9a5; stroke-width: 2; }
     .external { fill: #eef3ff; stroke: #7d9fdf; stroke-width: 2; }
-    .label { fill: #12231f; font: 600 18px ui-sans-serif, system-ui, sans-serif; }
-    .small { fill: #4d625c; font: 500 14px ui-sans-serif, system-ui, sans-serif; }
-    .group { fill: #087f6a; font: 700 16px ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; }
-    .line { fill: none; stroke: #3c8f7e; stroke-linecap: round; stroke-width: 3; marker-end: url(#arrow); }
-    .line-blue { fill: none; stroke: #587bc4; stroke-linecap: round; stroke-width: 3; marker-end: url(#arrow-blue); }
+    .label { fill: #12231f; font: 600 17px ui-sans-serif, system-ui, sans-serif; }
+    .small { fill: #4d625c; font: 500 13px ui-sans-serif, system-ui, sans-serif; }
+    .group { fill: #087f6a; font: 700 15px ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; }
+    .line { fill: none; stroke: #3c8f7e; stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; marker-end: url(#arrow); }
+    .line-blue { fill: none; stroke: #587bc4; stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; marker-end: url(#arrow-blue); }
+    .line-dashed { fill: none; stroke: #3c8f7e; stroke-dasharray: 7 7; stroke-width: 2; }
     @media (prefers-color-scheme: dark) {
       .panel { fill: #121b1a; stroke: #315f55; }
       .card { fill: #1a2422; stroke: #3b5550; }
@@ -30,61 +31,80 @@
     </marker>
   </defs>
 
-  <rect class="panel" x="30" y="42" width="520" height="436" rx="28"/>
-  <text class="group" x="62" y="82">ELECTRON MAIN · TRUSTED</text>
+  <rect class="panel" x="28" y="34" width="510" height="552" rx="28"/>
+  <text class="group" x="60" y="74">TRUSTED NODE HOST</text>
 
-  <rect class="card" x="64" y="110" width="210" height="84" rx="16"/>
-  <text class="label" x="86" y="143">Product host</text>
-  <text class="small" x="86" y="169">Policy · services · state</text>
+  <rect class="card" x="60" y="102" width="196" height="82" rx="16"/>
+  <text class="label" x="82" y="135">Product host</text>
+  <text class="small" x="82" y="160">Auth · policy · services</text>
 
-  <rect class="accent" x="310" y="110" width="206" height="84" rx="16"/>
-  <text class="label" x="332" y="143">CodexSurface</text>
-  <text class="small" x="332" y="169">Snapshots · events · threads</text>
+  <rect class="accent" x="294" y="102" width="212" height="82" rx="16"/>
+  <text class="label" x="316" y="135">Backend + Surface</text>
+  <text class="small" x="316" y="160">Threads · state · events</text>
 
-  <rect class="card" x="64" y="234" width="210" height="84" rx="16"/>
-  <text class="label" x="86" y="267">Extensions</text>
-  <text class="small" x="86" y="293">Context · tools · instructions</text>
+  <rect class="card" x="60" y="222" width="196" height="82" rx="16"/>
+  <text class="label" x="82" y="255">Extensions</text>
+  <text class="small" x="82" y="280">Context · tools · MCP</text>
 
-  <rect class="card" x="310" y="234" width="206" height="84" rx="16"/>
-  <text class="label" x="332" y="267">Typed transport</text>
-  <text class="small" x="332" y="293">JSONL · lifecycle · schema</text>
+  <rect class="card" x="294" y="222" width="212" height="82" rx="16"/>
+  <text class="label" x="316" y="255">App-server transport</text>
+  <text class="small" x="316" y="280">Process · JSONL · socket</text>
 
-  <rect class="card" x="187" y="358" width="206" height="84" rx="16"/>
-  <text class="label" x="209" y="391">Electron bridge</text>
-  <text class="small" x="209" y="417">Surface IPC · native IPC</text>
+  <text class="group" x="60" y="338">HOST ADAPTERS</text>
 
-  <path class="line" d="M274 152H306"/>
-  <path class="line" d="M274 276H306"/>
-  <path class="line" d="M413 198V230"/>
-  <path class="line" d="M393 400H566"/>
+  <rect class="accent" x="60" y="380" width="196" height="90" rx="16"/>
+  <text class="label" x="82" y="414">Electron</text>
+  <text class="small" x="82" y="439">IPC · preload · native</text>
+  <text class="small" x="82" y="458">attachment registry</text>
 
-  <rect class="external" x="584" y="94" width="250" height="102" rx="20"/>
-  <text class="label" x="610" y="134">Codex app-server</text>
-  <text class="small" x="610" y="162">Models · threads · tools · auth</text>
+  <rect class="accent" x="294" y="380" width="212" height="90" rx="16"/>
+  <text class="label" x="316" y="414">Web</text>
+  <text class="small" x="316" y="439">Authorized socket lease</text>
+  <text class="small" x="316" y="458">framing · reconnect</text>
 
-  <rect class="external" x="584" y="236" width="250" height="102" rx="20"/>
-  <text class="label" x="610" y="276">App-owned MCP</text>
-  <text class="small" x="610" y="304">Trusted stdio or HTTP servers</text>
+  <rect class="card" x="60" y="504" width="446" height="52" rx="14"/>
+  <text class="label" x="82" y="536">Core · renderer-safe contracts and validation</text>
 
-  <path class="line-blue" d="M516 276C550 276 550 145 580 145"/>
-  <path class="line-blue" d="M709 200V232"/>
+  <path class="line" d="M256 143H290"/>
+  <path class="line" d="M256 263H290"/>
+  <path class="line" d="M400 188V218"/>
+  <path class="line" d="M400 308V360H158V376"/>
+  <path class="line" d="M400 360V376"/>
+  <path class="line-dashed" d="M158 474V500M400 474V500"/>
 
-  <rect class="panel" x="868" y="42" width="302" height="436" rx="28"/>
-  <text class="group" x="900" y="82">RENDERER · SANDBOXED</text>
+  <rect class="external" x="574" y="102" width="238" height="96" rx="20"/>
+  <text class="label" x="598" y="140">Codex app-server</text>
+  <text class="small" x="598" y="166">Models · threads · auth · tools</text>
 
-  <rect class="accent" x="902" y="120" width="234" height="84" rx="16"/>
-  <text class="label" x="924" y="153">useCodexSurface</text>
-  <text class="small" x="924" y="179">Reactive state · typed actions</text>
+  <rect class="external" x="574" y="242" width="238" height="96" rx="20"/>
+  <text class="label" x="598" y="280">App-owned MCP</text>
+  <text class="small" x="598" y="306">Trusted stdio or HTTP servers</text>
 
-  <rect class="card" x="902" y="244" width="234" height="84" rx="16"/>
-  <text class="label" x="924" y="277">Conversation pane</text>
-  <text class="small" x="924" y="303">Messages · composer · tools</text>
+  <path class="line-blue" d="M506 263C546 263 544 150 570 150"/>
+  <path class="line-blue" d="M693 202V238"/>
 
-  <rect class="card" x="902" y="368" width="234" height="74" rx="16"/>
-  <text class="label" x="924" y="399">Product UI</text>
-  <text class="small" x="924" y="423">Shell · lists · business views</text>
+  <rect class="panel" x="850" y="34" width="322" height="552" rx="28"/>
+  <text class="group" x="882" y="74">BROWSER / RENDERER</text>
 
-  <path class="line" d="M834 400H864"/>
-  <path class="line" d="M1019 208V240"/>
-  <path class="line" d="M1019 332V364"/>
+  <rect class="accent" x="884" y="118" width="254" height="82" rx="16"/>
+  <text class="label" x="906" y="151">Surface renderer API</text>
+  <text class="small" x="906" y="176">Same contract for both adapters</text>
+
+  <rect class="accent" x="884" y="242" width="254" height="82" rx="16"/>
+  <text class="label" x="906" y="275">useCodexSurface</text>
+  <text class="small" x="906" y="300">Reactive state · typed actions</text>
+
+  <rect class="card" x="884" y="366" width="254" height="82" rx="16"/>
+  <text class="label" x="906" y="399">Vue conversation kit</text>
+  <text class="small" x="906" y="424">Sidebar · pane · components</text>
+
+  <rect class="card" x="884" y="490" width="254" height="66" rx="16"/>
+  <text class="label" x="906" y="520">Product UI</text>
+  <text class="small" x="906" y="543">Shell · panels · business views</text>
+
+  <path class="line" d="M256 425C650 425 650 159 880 159"/>
+  <path class="line" d="M506 425C690 425 690 159 880 159"/>
+  <path class="line" d="M1011 204V238"/>
+  <path class="line" d="M1011 328V362"/>
+  <path class="line" d="M1011 452V486"/>
 </svg>

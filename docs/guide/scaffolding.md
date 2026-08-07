@@ -31,6 +31,12 @@ npm run create:app -- ../my-codex-app
 cd ../my-codex-app
 npm run dev
 ```
+
+For a web target from the repository checkout, append `--target web`:
+
+```bash
+npm run create:app -- ../my-codex-web --target web
+```
 :::
 
 ## Scaffold, then update
@@ -44,8 +50,9 @@ The generated project is the default starting point for a Codex application:
    session acquisition seam in `src/server/index.ts` (web).
 4. Add app-owned backend modules or MCP servers next to that backend when the
    product needs capabilities beyond the Codex conversation surface.
-5. Keep the typed preload boundary narrow; expose additional host APIs only for
-   deliberate product features.
+5. Keep the host boundary narrow: typed preload APIs for Electron, or
+   authenticated HTTP/WebSocket endpoints for web. Expose additional host
+   capabilities only for deliberate product features.
 
 This workflow preserves a runnable baseline while the application becomes its
 own product. Do not copy a sample wholesale when the scaffold plus one focused
@@ -163,7 +170,9 @@ See [Web integration](/guide/web) before deploying it.
 
 ## Next steps
 
-- [Tour the generated application](/guide/quick-start)
+- [Tour the generated targets](/guide/quick-start)
+- [Integrate the Electron adapter](/guide/electron)
+- [Integrate the web adapter](/guide/web)
 - [Add an app-owned panel](/guide/app-ui)
 - [Add a model-callable MCP server](/guide/mcp)
 - [Add a trusted backend service](/guide/backend)

@@ -1,16 +1,16 @@
 # The surface runtime
 
-`CodexSurface` is the high-level Node runtime. Create it in the trusted host,
-usually Electron main, and let it own app-server for the lifetime of the
-application window or surface.
+`CodexSurface` is the high-level Node runtime. Create it in the trusted host:
+Electron main for a desktop app, or a server-side session/process owner for a
+website. Let it own app-server for the lifetime of the application surface or
+pooled user session.
 
-The scaffold creates it through `CodexAppBackend`, so configure the same
+Both scaffolds create it through `CodexAppBackend`, so configure the same
 options under `surfaceOptions` there. Create a surface directly when integrating
-without the scaffold or without backend modules.
+without a scaffold or backend modules.
 
 ```ts
 import path from 'node:path';
-import { app } from 'electron';
 import { createCodexSurface } from '@codex-app-sdk/backend';
 
 const surface = createCodexSurface({
@@ -19,7 +19,7 @@ const surface = createCodexSurface({
     title: 'My App',
     version: '0.1.0',
   },
-  codexHome: path.join(app.getPath('userData'), 'codex-home'),
+  codexHome: path.join(hostDataDirectory, 'codex-home'),
   approvalMode: 'ask',
   permissionMode: 'read-only',
   conversationLimit: 50,
@@ -119,3 +119,6 @@ Snapshots are authoritative. Events are ordered and emitted after the matching
 state mutation.
 
 See the complete [Node runtime API](/api/node).
+
+For transport ownership, continue with [Electron integration](/guide/electron)
+or [Web integration](/guide/web).
