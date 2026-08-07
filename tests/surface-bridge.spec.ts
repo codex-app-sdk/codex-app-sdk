@@ -20,9 +20,20 @@ describe('Codex surface bridge', () => {
 
     await expect(invokeCodexSurfaceBridgeOperation(target, 'sendMessage', [
       'Hello',
-      { serviceTier: 'priority', planMode: true },
-    ])).resolves.toStrictEqual({ marker: 'snapshot' });
+      {
+        attachments: [{ type: 'file', reference: 'attachment:notes' }],
+        serviceTier: 'priority',
+        planMode: true,
+      },
+    ], {
+      resolveAttachment: async (attachment) => ({
+        type: attachment.type,
+        path: '/srv/user/notes.md',
+        name: 'notes.md',
+      }),
+    })).resolves.toStrictEqual({ marker: 'snapshot' });
     expect(sendMessage).toHaveBeenCalledWith('Hello', {
+      attachments: [{ type: 'file', path: '/srv/user/notes.md', name: 'notes.md' }],
       serviceTier: 'priority',
       planMode: true,
     });
@@ -37,7 +48,7 @@ describe('Codex surface bridge', () => {
       target,
       'sendMessage',
       [],
-      'transport:send-message',
+      { operationLabel: 'transport:send-message' },
     )).rejects.toThrow('transport:send-message received an invalid number of arguments');
     await expect(invokeCodexSurfaceBridgeOperation(target, 'sendMessage', [
       'Hello',

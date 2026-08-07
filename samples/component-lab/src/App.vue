@@ -96,7 +96,7 @@ import {
   type CodexNativeAttachmentInput,
   type CodexQueuedPromptData,
   type CodexSkillSummary,
-  type SendCodexMessageOptions,
+  type CodexRendererSendMessageOptions,
   type SurfaceMessage,
   type SurfaceMessagePart,
   type TurnGitDiff,
@@ -269,6 +269,7 @@ const activity = ref('Ready');
 const messages = ref<SurfaceMessage[]>([]);
 const selected = computed<Scenario>(() => scenarios.find((scenario) => scenario.id === selectedId.value) ?? scenarios[0]);
 const streamTimers = new Set<number>();
+const mockAttachments = new Map<string, CodexNativeAttachment>();
 
 watch(selected, resetScenario, { immediate: true });
 
@@ -305,17 +306,20 @@ function startBusyToolCompletion(): void {
   streamTimers.add(timer);
 }
 
-function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
-  const attachmentParts: SurfaceMessagePart[] = (options?.attachments ?? []).map((attachment) => ({
-    type: 'attachment',
-    attachment: {
-      kind: attachment.type,
-      name: attachment.name ?? attachment.path.split('/').at(-1) ?? 'attachment',
-      path: attachment.path,
-      ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
-      ...(attachment.type === 'image' && attachment.previewUrl ? { url: attachment.previewUrl } : {}),
-    },
-  }));
+function submitPrompt(prompt: string, options?: CodexRendererSendMessageOptions): void {
+  const attachmentParts: SurfaceMessagePart[] = (options?.attachments ?? []).map((attachment) => {
+    const resolved = mockAttachments.get(attachment.reference);
+    return {
+      type: 'attachment',
+      attachment: {
+        kind: attachment.type,
+        name: resolved?.name ?? attachment.reference.split(':').at(-1) ?? 'attachment',
+        path: attachment.reference,
+        ...(resolved?.mimeType ? { mimeType: resolved.mimeType } : {}),
+        ...(attachment.type === 'image' && resolved?.previewUrl ? { url: resolved.previewUrl } : {}),
+      },
+    };
+  });
   messages.value.push({
     id: `mock-user-${messages.value.length}`,
     role: 'user',
@@ -329,17 +333,21 @@ function submitPrompt(prompt: string, options?: SendCodexMessageOptions): void {
 }
 
 async function ingestMockAttachments(inputs: readonly CodexNativeAttachmentInput[]): Promise<CodexNativeAttachment[]> {
-  return inputs.map((input, index) => ({
-    id: `mock-attachment-${index}-${input.name}`,
-    type: input.mimeType?.startsWith('image/') ? 'image' : 'file',
-    path: `/mock/clipboard/${input.name}`,
-    name: input.name,
-    mimeType: input.mimeType ?? 'application/octet-stream',
-    size: input.data.byteLength,
-    ...(input.mimeType?.startsWith('image/')
-      ? { previewUrl: `data:${input.mimeType};base64,${arrayBufferToBase64(input.data)}` }
-      : {}),
-  }));
+  return inputs.map((input, index) => {
+    const attachment: CodexNativeAttachment = {
+      id: `mock-attachment-${index}-${input.name}`,
+      type: input.mimeType?.startsWith('image/') ? 'image' : 'file',
+      reference: `mock-attachment:${index}:${input.name}`,
+      name: input.name,
+      mimeType: input.mimeType ?? 'application/octet-stream',
+      size: input.data.byteLength,
+      ...(input.mimeType?.startsWith('image/')
+        ? { previewUrl: `data:${input.mimeType};base64,${arrayBufferToBase64(input.data)}` }
+        : {}),
+    };
+    mockAttachments.set(attachment.reference, attachment);
+    return attachment;
+  });
 }
 
 function arrayBufferToBase64(value: ArrayBuffer): string {

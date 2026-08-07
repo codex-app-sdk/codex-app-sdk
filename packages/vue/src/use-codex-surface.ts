@@ -10,7 +10,7 @@ import type {
   CreateCodexRendererConversationOptions,
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
-  SendCodexMessageOptions,
+  CodexRendererSendMessageOptions,
   StartCodexReviewOptions,
   UpdateCodexConversationSettings,
 } from '@codex-app-sdk/core/surface';
@@ -138,10 +138,10 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     retryMessage: (index: number) => run(() => api.retryMessage(index)),
     setGoal: (objective: string, tokenBudget?: number | null) => run(() => api.setGoal(objective, tokenBudget)),
     selectConversation: (conversationId: string) => run(() => api.selectConversation(conversationId)),
-    sendMessage: (prompt: string, options?: SendCodexMessageOptions) => run(() => api.sendMessage(prompt, options)),
+    sendMessage: (prompt: string, options?: CodexRendererSendMessageOptions) => run(() => api.sendMessage(prompt, options)),
     startReview: (options?: StartCodexReviewOptions) => run(() => api.startReview(options)),
     startChatGptLogin: () => api.startChatGptLogin(),
-    steerMessage: (prompt: string, options?: SendCodexMessageOptions) => run(() => api.steerMessage(prompt, options)),
+    steerMessage: (prompt: string, options?: CodexRendererSendMessageOptions) => run(() => api.steerMessage(prompt, options)),
     steerQueuedPrompt: (promptId: string) => run(() => api.steerQueuedPrompt(promptId)),
     unarchiveConversation: (conversationId: string) => run(() => api.unarchiveConversation(conversationId)),
     updateConversationSettings: (settings: UpdateCodexConversationSettings) => (

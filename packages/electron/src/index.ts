@@ -30,7 +30,13 @@ export {
   type CodexNativeMainOptions,
   type CodexNativeShell,
 } from './codex-native-ipc';
+export {
+  CodexElectronAttachmentRegistry,
+  type CodexElectronAttachmentRegistration,
+} from './codex-attachment-registry';
 export type {
+  CodexHostAttachment,
+  CodexHostAttachmentInput,
   CodexNativeAttachment,
   CodexNativeAttachmentInput,
   CodexNativeClipboardContent,

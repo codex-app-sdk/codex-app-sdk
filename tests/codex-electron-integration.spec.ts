@@ -34,8 +34,17 @@ describe('combined Electron integration', () => {
 
     const dispose = registerCodexElectronMain(options as never);
 
-    expect(mocks.registerSurface).toHaveBeenCalledWith(options.ipcMain, options.sender, options.surface);
-    expect(mocks.registerNative).toHaveBeenCalledWith(options, options.native);
+    expect(mocks.registerSurface).toHaveBeenCalledWith(
+      options.ipcMain,
+      options.sender,
+      options.surface,
+      { resolveAttachment: expect.any(Function) },
+    );
+    expect(mocks.registerNative).toHaveBeenCalledWith(
+      options,
+      options.native,
+      expect.any(Object),
+    );
     dispose();
     expect(mocks.disposeNative).toHaveBeenCalledOnce();
     expect(mocks.disposeSurface).toHaveBeenCalledOnce();

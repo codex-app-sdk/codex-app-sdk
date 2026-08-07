@@ -92,7 +92,7 @@ describe('basic sample App', () => {
     const attachment = {
       id: 'diagram',
       type: 'image' as const,
-      path: '/tmp/diagram.png',
+      reference: 'attachment:diagram',
       name: 'diagram.png',
       mimeType: 'image/png',
       size: 3,
@@ -116,10 +116,7 @@ describe('basic sample App', () => {
     expect(api.sendMessage).toHaveBeenCalledWith('Review this image', {
       attachments: [{
         type: 'image',
-        path: '/tmp/diagram.png',
-        name: 'diagram.png',
-        mimeType: 'image/png',
-        previewUrl: 'data:image/png;base64,cG5n',
+        reference: 'attachment:diagram',
       }],
     });
   });
@@ -130,7 +127,7 @@ describe('basic sample App', () => {
     const ingestAttachments = vi.fn(async (files: readonly CodexNativeAttachmentInput[]) => files.map((file) => ({
       id: file.name,
       type: 'image' as const,
-      path: `/tmp/${file.name}`,
+      reference: `attachment:${file.name}`,
       name: file.name,
       mimeType: file.mimeType ?? 'image/png',
       size: file.data.byteLength,

@@ -17,7 +17,7 @@ import type { Message } from './chat/types';
 import type { CodexMessageImageOpenHandler } from './chat/message-image';
 import type { CodexComposerState } from './composer-state';
 import type { QueuedChatPrompt } from './chat/queued-prompts';
-import type { CodexNativeAttachment } from '@codex-app-sdk/core/native';
+import type { CodexHostAttachment } from '@codex-app-sdk/core/native';
 import type {
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
@@ -53,7 +53,7 @@ export type CodexConversationPaneThreadState = {
 
 export type CodexConversationPaneComposerState = {
   state?: CodexComposerState;
-  attachments?: readonly CodexNativeAttachment[];
+  attachments?: readonly CodexHostAttachment[];
   placeholder?: string;
   menuItems?: readonly CodexComposerMenuItem[];
   approvalPreset?: ApprovalPreset | null;
@@ -144,7 +144,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   steer?: PaneAction<[prompt: string, options?: SendCodexMessageOptions]>;
   steerQueuedPrompt?: PaneAction<[promptId: string]>;
   submit?: PaneAction<[prompt: string, options?: SendCodexMessageOptions]>;
-  updateAttachments?: PaneAction<[attachments: readonly CodexNativeAttachment[]]>;
+  updateAttachments?: PaneAction<[attachments: readonly CodexHostAttachment[]]>;
   updateComposerState?: PaneAction<[state: CodexComposerState]>;
   updateSettings?: PaneAction<[settings: UpdateCodexConversationSettings]>;
 };

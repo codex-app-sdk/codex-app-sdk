@@ -108,7 +108,7 @@ function nativeAttachment(name: string): CodexNativeAttachment {
   return {
     id: `attachment-${name}`,
     type: 'file',
-    path: `/tmp/${name}`,
+    reference: `attachment:${name}`,
     name,
     mimeType: 'text/plain',
     size: 3,

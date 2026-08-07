@@ -205,9 +205,16 @@ export {
 } from './native-capabilities';
 export type {
   CodexHostCapabilities,
+  CodexHostAttachment,
+  CodexHostAttachmentInput,
   CodexNativeAttachment,
   CodexNativeAttachmentInput,
   CodexNativeClipboardContent,
   CodexNativeRendererApi,
 } from '@codex-app-sdk/core/native';
-export type { CodexSurfaceAttachment, SendCodexMessageOptions } from '@codex-app-sdk/core/surface';
+export type {
+  CodexRendererAttachment,
+  CodexRendererSendMessageOptions,
+  CodexSurfaceAttachment,
+  SendCodexMessageOptions,
+} from '@codex-app-sdk/core/surface';

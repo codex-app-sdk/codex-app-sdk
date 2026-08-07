@@ -219,7 +219,7 @@ describe('CodexConversationPane', () => {
     const attachment: CodexNativeAttachment = {
       id: 'attachment-1',
       type: 'image',
-      path: '/tmp/diagram.png',
+      reference: 'attachment:diagram',
       name: 'diagram.png',
       mimeType: 'image/png',
       size: 3,
@@ -245,10 +245,7 @@ describe('CodexConversationPane', () => {
       {
         attachments: [{
           type: 'image',
-          path: '/tmp/diagram.png',
-          name: 'diagram.png',
-          mimeType: 'image/png',
-          previewUrl: 'data:image/png;base64,cG5n',
+          reference: 'attachment:diagram',
         }],
       },
     ]]);
@@ -260,7 +257,7 @@ describe('CodexConversationPane', () => {
     const ingestAttachments = vi.fn(async () => [{
       id: 'clipboard-image',
       type: 'image' as const,
-      path: '/tmp/clipboard.png',
+      reference: 'attachment:clipboard',
       name: 'clipboard.png',
       mimeType: 'image/png',
       size: 3,
@@ -333,7 +330,7 @@ describe('CodexConversationPane', () => {
     const pickAttachments = vi.fn(async () => [{
       id: 'queued-image',
       type: 'image' as const,
-      path: '/tmp/queued.png',
+      reference: 'attachment:queued',
       name: 'queued.png',
       mimeType: 'image/png',
       size: 3,
@@ -380,10 +377,10 @@ describe('CodexConversationPane', () => {
 
   it('restores controlled attachments on conversation changes without emitting an empty state', async () => {
     const first: CodexNativeAttachment = {
-      id: 'first', type: 'file', path: '/tmp/first.md', name: 'first.md', mimeType: 'text/markdown', size: 1,
+      id: 'first', type: 'file', reference: 'attachment:first', name: 'first.md', mimeType: 'text/markdown', size: 1,
     };
     const second: CodexNativeAttachment = {
-      id: 'second', type: 'file', path: '/tmp/second.md', name: 'second.md', mimeType: 'text/markdown', size: 1,
+      id: 'second', type: 'file', reference: 'attachment:second', name: 'second.md', mimeType: 'text/markdown', size: 1,
     };
     const wrapper = mount(CodexConversationPane, {
       props: { attachments: [first], conversationKey: 'thread-1', messages, modelValue: '' },
@@ -399,7 +396,7 @@ describe('CodexConversationPane', () => {
 
   it('emits attachment options when steering and clears the selected attachments', async () => {
     const attachment: CodexNativeAttachment = {
-      id: 'notes', type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown', size: 1,
+      id: 'notes', type: 'file', reference: 'attachment:notes', name: 'Notes', mimeType: 'text/markdown', size: 1,
     };
     const wrapper = mount(CodexConversationPane, {
       props: { attachments: [attachment], busy: true, messages, modelValue: '' },
@@ -409,7 +406,7 @@ describe('CodexConversationPane', () => {
 
     expect(wrapper.emitted('steer')).toStrictEqual([[
       'Use these notes',
-      { attachments: [{ type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' }] },
+      { attachments: [{ type: 'file', reference: 'attachment:notes' }] },
     ]]);
     expect(wrapper.emitted('attachmentsChange')).toContainEqual([[]]);
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
@@ -417,7 +414,7 @@ describe('CodexConversationPane', () => {
 
   it('submits attachment-only prompts with the no-instructions sentinel', async () => {
     const attachment: CodexNativeAttachment = {
-      id: 'image', type: 'image', path: '/tmp/image.png', name: 'image.png', mimeType: 'image/png', size: 1,
+      id: 'image', type: 'image', reference: 'attachment:image', name: 'image.png', mimeType: 'image/png', size: 1,
     };
     const wrapper = mount(CodexConversationPane, {
       props: { attachments: [attachment], messages, modelValue: '' },
@@ -427,7 +424,7 @@ describe('CodexConversationPane', () => {
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
       '(no user instructions)',
-      { attachments: [{ type: 'image', path: '/tmp/image.png', name: 'image.png', mimeType: 'image/png' }] },
+      { attachments: [{ type: 'image', reference: 'attachment:image' }] },
     ]]);
   });
 

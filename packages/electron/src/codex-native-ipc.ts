@@ -1,9 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type {
-  CodexNativeAttachment,
+  CodexHostAttachment,
   CodexNativeAttachmentInput,
   CodexNativeClipboardContent,
 } from '@codex-app-sdk/core/native';
@@ -20,6 +19,7 @@ import {
   codexNativeChannels as channels,
   type CodexNativeRequests as NativeRequests,
 } from './codex-native-renderer';
+import { CodexElectronAttachmentRegistry } from './codex-attachment-registry';
 
 export type CodexNativeDialog = {
   showOpenDialog(options: {
@@ -65,6 +65,7 @@ const maxTotalPreviewBytes = 16 * 1024 * 1024;
 export function registerCodexNativeIpc(
   dependencies: CodexNativeMainDependencies,
   options: CodexNativeMainOptions = {},
+  attachments = new CodexElectronAttachmentRegistry(),
 ): () => void {
   const maxAttachmentBytes = positiveByteLimit(
     options.maxAttachmentBytes,
@@ -100,7 +101,7 @@ export function registerCodexNativeIpc(
         const filePath = path.join(temporaryDirectory, `${index}-${safeFileName(input.name)}`);
         const data = Buffer.from(input.data);
         await fs.writeFile(filePath, data, { mode: 0o600 });
-        return attachmentFromPath(filePath, {
+        return attachmentFromPath(attachments, filePath, {
           mimeType: input.mimeType ?? mimeTypeForPath(input.name),
           name: safeFileName(input.name),
           previewData: data,
@@ -119,7 +120,7 @@ export function registerCodexNativeIpc(
         ],
       });
       if (result.canceled) return [];
-      const attachments: CodexNativeAttachment[] = [];
+      const pickedAttachments: CodexHostAttachment[] = [];
       let totalBytes = 0;
       let previewBytes = 0;
       for (const filePath of result.filePaths) {
@@ -140,17 +141,18 @@ export function registerCodexNativeIpc(
           ? await fs.readFile(filePath)
           : undefined;
         if (previewData) previewBytes += previewData.byteLength;
-        attachments.push(attachmentFromPath(filePath, {
+        pickedAttachments.push(attachmentFromPath(attachments, filePath, {
           mimeType,
           name: path.basename(filePath),
           previewData,
           size: metadata.size,
         }));
       }
-      return attachments;
+      return pickedAttachments;
     },
     [channels.readImagePreview]: async (_event, value) => {
-      const filePath = absoluteLocalPath(value, 'Image preview path');
+      const reference = nonEmptyString(value, 'Image preview attachment reference');
+      const filePath = attachments.path(reference);
       const mimeType = mimeTypeForPath(filePath);
       if (!mimeType.startsWith('image/') || mimeType === 'image/svg+xml') return null;
       let metadata;
@@ -185,6 +187,7 @@ export function registerCodexNativeIpc(
 
   return () => {
     unregister();
+    attachments.clear();
   };
 }
 
@@ -218,6 +221,7 @@ function attachmentInputs(
 }
 
 function attachmentFromPath(
+  attachments: CodexElectronAttachmentRegistry,
   filePath: string,
   metadata: {
     mimeType: string;
@@ -225,10 +229,9 @@ function attachmentFromPath(
     previewData?: Uint8Array;
     size?: number;
   },
-): CodexNativeAttachment {
+): CodexHostAttachment {
   const size = metadata.size ?? metadata.previewData?.byteLength ?? 0;
-  return {
-    id: randomUUID(),
+  return attachments.register({
     type: metadata.mimeType.startsWith('image/') ? 'image' : 'file',
     path: filePath,
     name: metadata.name,
@@ -239,7 +242,7 @@ function attachmentFromPath(
       && metadata.previewData.byteLength <= maxPreviewBytes
       ? { previewUrl: `data:${metadata.mimeType};base64,${Buffer.from(metadata.previewData).toString('base64')}` }
       : {}),
-  };
+  });
 }
 
 function clipboardContent(value: unknown): CodexNativeClipboardContent {
@@ -294,14 +297,6 @@ function objectRecord(value: unknown, label: string): Record<string, unknown> {
 function nonEmptyString(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${label} must be a non-empty string`);
   return value.trim();
-}
-
-function absoluteLocalPath(value: unknown, label: string): string {
-  const filePath = nonEmptyString(value, label);
-  if (!path.isAbsolute(filePath) || filePath.includes('\0')) {
-    throw new TypeError(`${label} must be an absolute local path`);
-  }
-  return filePath;
 }
 
 function isMissingFileError(error: unknown): boolean {

@@ -68,6 +68,15 @@ describe('Codex surface Electron bridge', () => {
     let eventListener: ((value: CodexSurfaceEvent) => void) | undefined;
     const unsubscribeState = vi.fn();
     const unsubscribeEvents = vi.fn();
+    const resolveAttachment = vi.fn(async (attachment: { type: 'file' | 'image'; reference: string }) => {
+      if (attachment.reference === 'attachment:screenshot') {
+        return { type: 'image' as const, path: '/tmp/screenshot.png', name: 'screenshot.png', mimeType: 'image/png' };
+      }
+      if (attachment.reference === 'attachment:notes') {
+        return { type: 'file' as const, path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' };
+      }
+      throw new TypeError('Attachment reference is invalid or expired');
+    });
     const surface = {
       archiveConversation: vi.fn(async () => snapshot),
       cancelLogin: vi.fn(async () => snapshot),
@@ -114,7 +123,7 @@ describe('Codex surface Electron bridge', () => {
       }),
     };
 
-    const dispose = registerCodexSurfaceIpc(main, sender, surface);
+    const dispose = registerCodexSurfaceIpc(main, sender, surface, { resolveAttachment });
     expect([...main.handlers.keys()].sort()).toStrictEqual([
       'codex-surface:archive-conversation',
       'codex-surface:cancel-login',
@@ -326,31 +335,24 @@ describe('Codex surface Electron bridge', () => {
       attachments: [
         {
           type: 'image',
-          path: '/tmp/screenshot.png',
+          reference: 'attachment:screenshot',
           detail: 'original',
-          name: 'screenshot.png',
-          mimeType: 'image/png',
-          previewUrl: 'data:image/png;base64,cG5n',
         },
-        { type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' },
+        { type: 'file', reference: 'attachment:notes' },
       ],
     })).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:send-message', 'Attachments', {
-      attachments: [{ type: 'image', path: '/tmp/screenshot.png', detail: 'huge' }],
+      attachments: [{ type: 'image', reference: 'attachment:screenshot', detail: 'huge' }],
     })).rejects.toThrow('Message image detail is invalid');
     await expect(main.call('codex-surface:send-message', 'Attachments', {
-      attachments: [{ type: 'unknown', path: '/tmp/file' }],
+      attachments: [{ type: 'unknown', reference: 'attachment:file' }],
     })).rejects.toThrow('Message attachment type is invalid');
     await expect(main.call('codex-surface:send-message', 'Attachments', {
-      attachments: [{
-        type: 'image', path: '/tmp/screenshot.png', previewUrl: 'https://example.com/screenshot.png',
-      }],
-    })).rejects.toThrow('Message attachment preview URL must be a base64 image data URL');
+      attachments: [{ type: 'image', path: '/tmp/screenshot.png' }],
+    })).rejects.toThrow('Message attachment contains unsupported property "path"');
     await expect(main.call('codex-surface:send-message', 'Attachments', {
-      attachments: [{
-        type: 'image', path: '/tmp/screenshot.svg', previewUrl: 'data:image/svg+xml;base64,PHN2Zy8+',
-      }],
-    })).rejects.toThrow('Message attachment preview URL must be a base64 image data URL');
+      attachments: [{ type: 'file', reference: 'attachment:missing' }],
+    })).rejects.toThrow('Attachment reference is invalid or expired');
     await expect(main.call('codex-surface:send-message', 'Hello', { cwd: '/' })).rejects.toThrow(
       'Message options contains unsupported property "cwd"',
     );
@@ -426,7 +428,7 @@ describe('Codex surface Electron bridge', () => {
       target: { type: 'custom', instructions: '' },
     })).rejects.toThrow('Review instructions must be a non-empty string');
     await expect(main.call('codex-surface:steer-message', 'More detail', {
-      attachments: [{ type: 'file', path: '/tmp/notes.md' }],
+      attachments: [{ type: 'file', reference: 'attachment:notes' }],
     })).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:steer-queued-prompt', 'queued-2')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:unarchive-conversation', 'thread-unarchive')).resolves.toBe(snapshot);
@@ -513,14 +515,15 @@ describe('Codex surface Electron bridge', () => {
           detail: 'original',
           name: 'screenshot.png',
           mimeType: 'image/png',
-          previewUrl: 'data:image/png;base64,cG5n',
         },
         { type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' },
       ],
     });
     expect(surface.startReview).toHaveBeenCalledWith({ target: { type: 'baseBranch', branch: 'main' } });
     expect(surface.steerMessage).toHaveBeenCalledWith('More detail', {
-      attachments: [{ type: 'file', path: '/tmp/notes.md' }],
+      attachments: [{
+        type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown',
+      }],
     });
     expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2');
     expect(surface.unarchiveConversation).toHaveBeenCalledWith('thread-unarchive');
@@ -571,7 +574,9 @@ describe('Codex surface Electron bridge', () => {
     await api.sendMessage('Build it', { model: 'gpt-5' });
     await api.startChatGptLogin();
     await api.startReview({ target: { type: 'uncommittedChanges' } });
-    await api.steerMessage('Keep going', { attachments: [{ type: 'file', path: '/tmp/notes.md' }] });
+    await api.steerMessage('Keep going', {
+      attachments: [{ type: 'file', reference: 'attachment:notes' }],
+    });
     await api.steerQueuedPrompt('queued-2');
     await api.unarchiveConversation('thread-unarchive');
     await api.updateConversationSettings({ modelId: 'gpt-5', approvalPreset: 'ask-for-approval' });
@@ -610,7 +615,9 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:send-message', 'Build it', { model: 'gpt-5' }],
       ['codex-surface:start-chatgpt-login'],
       ['codex-surface:start-review', { target: { type: 'uncommittedChanges' } }],
-      ['codex-surface:steer-message', 'Keep going', { attachments: [{ type: 'file', path: '/tmp/notes.md' }] }],
+      ['codex-surface:steer-message', 'Keep going', {
+        attachments: [{ type: 'file', reference: 'attachment:notes' }],
+      }],
       ['codex-surface:steer-queued-prompt', 'queued-2'],
       ['codex-surface:unarchive-conversation', 'thread-unarchive'],
       ['codex-surface:update-conversation-settings', { modelId: 'gpt-5', approvalPreset: 'ask-for-approval' }],

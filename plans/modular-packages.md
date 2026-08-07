@@ -96,6 +96,19 @@ introduce a provider-neutral account or tenancy abstraction. A surface must not
 be accidentally shared between unrelated users. Renderer selection and pending
 approvals are scoped to the authorized session.
 
+For a multi-user website, the web server binder receives host-authenticated
+context and requires the host to return a connection-scoped session lease. The
+lease contains the authorized surface, attachment resolver, and release hook.
+The browser never selects a user or surface by identifier, and the SDK never
+keeps a global user registry. The host owns user sessions, encrypted credential
+storage, runner acquisition, quotas, idle eviction, and persistence.
+
+The simplest OpenAI-auth persistence model is a stable, isolated `codexHome`
+for each user: the normal `startChatGptLogin()` surface action returns the URL to
+the browser and the user's app-server persists its credential state there. A
+host-managed token provider may be added to the backend boundary independently;
+database and vault policy do not belong in the web transport.
+
 A deployed web app operates on a server-side workspace or runner. Controlling a
 user's local repository from a browser requires a separately secured local
 companion process and is not implicit in the web adapter.

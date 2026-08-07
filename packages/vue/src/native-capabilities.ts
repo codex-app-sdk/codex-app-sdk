@@ -1,7 +1,7 @@
 import type {
   CodexHostCapabilities,
-  CodexNativeAttachment,
-  CodexNativeAttachmentInput,
+  CodexHostAttachment,
+  CodexHostAttachmentInput,
   CodexNativeRendererApi,
 } from '@codex-app-sdk/core/native';
 import {
@@ -19,10 +19,10 @@ const hostCapabilitiesKey: InjectionKey<CodexHostCapabilities | undefined> = Sym
   'codex-app-sdk-host-capabilities',
 );
 
-export type CodexAttachmentPicker = () => Promise<CodexNativeAttachment[]>;
+export type CodexAttachmentPicker = () => Promise<CodexHostAttachment[]>;
 export type CodexAttachmentIngester = (
-  files: readonly CodexNativeAttachmentInput[],
-) => Promise<CodexNativeAttachment[]>;
+  files: readonly CodexHostAttachmentInput[],
+) => Promise<CodexHostAttachment[]>;
 
 export function provideCodexHostCapabilities(
   capabilities: CodexHostCapabilities | undefined,
@@ -49,7 +49,7 @@ export function getCodexNativeRendererApi(): CodexNativeRendererApi | undefined 
 export async function pickCodexAttachments(
   override?: CodexAttachmentPicker,
   capabilities: CodexHostCapabilities | undefined = getCodexGlobalHostCapabilities(),
-): Promise<CodexNativeAttachment[]> {
+): Promise<CodexHostAttachment[]> {
   const pick = override ?? capabilities?.pickAttachments;
   return pick ? pick() : [];
 }
@@ -58,7 +58,7 @@ export async function ingestCodexAttachments(
   files: readonly File[],
   override?: CodexAttachmentIngester,
   capabilities: CodexHostCapabilities | undefined = getCodexGlobalHostCapabilities(),
-): Promise<CodexNativeAttachment[]> {
+): Promise<CodexHostAttachment[]> {
   if (files.length === 0) return [];
   const ingest = override ?? capabilities?.ingestAttachments;
   if (!ingest) return [];

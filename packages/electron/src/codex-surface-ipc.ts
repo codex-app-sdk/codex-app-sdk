@@ -17,7 +17,7 @@ import type {
   CreateCodexRendererConversationOptions,
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
-  SendCodexMessageOptions,
+  CodexRendererSendMessageOptions,
   StartCodexReviewOptions,
   UpdateCodexConversationSettings,
 } from '@codex-app-sdk/core/surface';
@@ -29,6 +29,10 @@ import {
   type IpcRendererPort,
   type IpcRequest,
 } from './typed-ipc';
+
+export type CodexSurfaceIpcOptions = {
+  resolveAttachment?: import('@codex-app-sdk/core/surface-bridge').CodexSurfaceBridgeAttachmentResolver;
+};
 
 const channels = {
   archiveConversation: 'codex-surface:archive-conversation',
@@ -101,12 +105,12 @@ type SurfaceRequests = {
   [channels.retryMessage]: IpcRequest<[index: number], CodexSurfaceSnapshot>;
   [channels.setGoal]: IpcRequest<[objective: string, tokenBudget?: number | null], CodexSurfaceSnapshot>;
   [channels.selectConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
-  [channels.sendMessage]: IpcRequest<[prompt: string, options?: SendCodexMessageOptions], CodexSurfaceSnapshot>;
+  [channels.sendMessage]: IpcRequest<[prompt: string, options?: CodexRendererSendMessageOptions], CodexSurfaceSnapshot>;
   [channels.startReview]: IpcRequest<[options?: StartCodexReviewOptions], CodexSurfaceSnapshot>;
   [channels.startChatGptLogin]: IpcRequest<[], CodexSurfaceChatGptLogin>;
   [channels.steerMessage]: IpcRequest<[
     prompt: string,
-    options?: SendCodexMessageOptions,
+    options?: CodexRendererSendMessageOptions,
   ], CodexSurfaceSnapshot>;
   [channels.steerQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
   [channels.unarchiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
@@ -125,6 +129,7 @@ export function registerCodexSurfaceIpc(
   sender: IpcEventSender,
   surface: Omit<CodexSurfaceBridgeTarget, 'loadOlderConversationHistory'>
     & Partial<Pick<CodexSurfaceBridgeTarget, 'loadOlderConversationHistory'>>,
+  options: CodexSurfaceIpcOptions = {},
 ): () => void {
   const invoke = <Name extends CodexSurfaceBridgeOperation>(name: Name, args: readonly unknown[]) => {
     if (name === 'loadOlderConversationHistory' && !surface.loadOlderConversationHistory) {
@@ -134,7 +139,12 @@ export function registerCodexSurfaceIpc(
       surface as CodexSurfaceBridgeTarget,
       name,
       args,
-      channels[name],
+      {
+        operationLabel: channels[name],
+        ...(options.resolveAttachment === undefined
+          ? {}
+          : { resolveAttachment: options.resolveAttachment }),
+      },
     );
   };
   const unregisterHandlers = registerIpcMainHandlers<SurfaceRequests>(port, {

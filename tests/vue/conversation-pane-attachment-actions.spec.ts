@@ -14,7 +14,7 @@ describe('CodexConversationPane composer attachment actions', () => {
       {
         id: 'first',
         type: 'file',
-        path: '/tmp/first.md',
+        reference: 'attachment:first',
         name: 'first.md',
         mimeType: 'text/markdown',
         size: 1,
@@ -22,7 +22,7 @@ describe('CodexConversationPane composer attachment actions', () => {
       {
         id: 'second',
         type: 'image',
-        path: '/tmp/second.png',
+        reference: 'attachment:second',
         name: 'second.png',
         mimeType: 'image/png',
         size: 2,

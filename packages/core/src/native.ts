@@ -3,21 +3,27 @@ export type CodexSpeechTranscriptionResult = {
   error?: string;
 };
 
-export type CodexNativeAttachment = {
+/** Renderer-safe attachment metadata. `reference` is an opaque host capability, never a filesystem path. */
+export type CodexHostAttachment = {
   id: string;
   type: 'file' | 'image';
-  path: string;
+  reference: string;
   name: string;
   mimeType: string;
   size: number;
   previewUrl?: string;
 };
 
-export type CodexNativeAttachmentInput = {
+export type CodexHostAttachmentInput = {
   name: string;
   mimeType?: string;
   data: ArrayBuffer;
 };
+
+/** @deprecated Use the platform-neutral `CodexHostAttachment` name. */
+export type CodexNativeAttachment = CodexHostAttachment;
+/** @deprecated Use the platform-neutral `CodexHostAttachmentInput` name. */
+export type CodexNativeAttachmentInput = CodexHostAttachmentInput;
 
 export type CodexNativeClipboardContent = {
   text: string;
@@ -32,10 +38,10 @@ export type CodexHostCapabilities = {
     transcription: boolean;
   };
   copyToClipboard(content: CodexNativeClipboardContent): Promise<void>;
-  ingestAttachments(files: readonly CodexNativeAttachmentInput[]): Promise<CodexNativeAttachment[]>;
+  ingestAttachments(files: readonly CodexHostAttachmentInput[]): Promise<CodexHostAttachment[]>;
   openExternal(href: string): Promise<void>;
-  pickAttachments(): Promise<CodexNativeAttachment[]>;
-  readImagePreview?(path: string): Promise<string | null>;
+  pickAttachments(): Promise<CodexHostAttachment[]>;
+  readImagePreview?(reference: string): Promise<string | null>;
   transcribeAudio(
     audioData: ArrayBuffer,
     options?: { locale?: string; live?: boolean },

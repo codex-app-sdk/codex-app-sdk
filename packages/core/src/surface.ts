@@ -774,6 +774,21 @@ export type SendCodexMessageOptions = {
   outputSchema?: CodexSurfaceJsonValue;
 };
 
+export type CodexRendererAttachment =
+  | {
+    type: 'image';
+    reference: string;
+    detail?: 'auto' | 'low' | 'high' | 'original';
+  }
+  | {
+    type: 'file';
+    reference: string;
+  };
+
+export type CodexRendererSendMessageOptions = Omit<SendCodexMessageOptions, 'attachments'> & {
+  attachments?: readonly CodexRendererAttachment[];
+};
+
 export type CodexSurfaceAttachment =
   | {
     type: 'image';
@@ -860,6 +875,11 @@ export type CodexSurfaceApi = {
   onEvent(listener: (event: CodexSurfaceEvent) => void): () => void;
 };
 
-export type CodexSurfaceRendererApi = Omit<CodexSurfaceApi, 'createConversation'> & {
+export type CodexSurfaceRendererApi = Omit<
+  CodexSurfaceApi,
+  'createConversation' | 'sendMessage' | 'steerMessage'
+> & {
   createConversation(options?: CreateCodexRendererConversationOptions): Promise<CodexSurfaceSnapshot>;
+  sendMessage(prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  steerMessage(prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
 };

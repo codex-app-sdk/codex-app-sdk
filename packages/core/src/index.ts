@@ -6,6 +6,8 @@ export {
   codexSurfaceBridgeOperations,
   invokeCodexSurfaceBridgeOperation,
   isCodexSurfaceBridgeOperation,
+  type CodexSurfaceBridgeAttachmentResolver,
+  type CodexSurfaceBridgeInvokeOptions,
   type CodexSurfaceBridgeOperation,
   type CodexSurfaceBridgeOperationArguments,
   type CodexSurfaceBridgeOperationResult,

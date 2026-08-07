@@ -49,7 +49,9 @@ describe('useCodexSurface', () => {
     await surface.selectConversation('thread-1');
     await surface.sendMessage('Hello', { model: 'gpt-5-mini' });
     await surface.startReview({ target: { type: 'uncommittedChanges' } });
-    await surface.steerMessage('Keep going', { attachments: [{ type: 'file', path: '/tmp/notes.md' }] });
+    await surface.steerMessage('Keep going', {
+      attachments: [{ type: 'file', reference: 'attachment:notes' }],
+    });
     await surface.unarchiveConversation('thread-unarchive');
     await surface.updateConversationSettings({ modelId: 'gpt-5', planMode: true });
     await surface.interrupt();
@@ -83,7 +85,7 @@ describe('useCodexSurface', () => {
     expect(api.startReview).toHaveBeenCalledWith({ target: { type: 'uncommittedChanges' } });
     expect(api.steerMessage).toHaveBeenCalledWith(
       'Keep going',
-      { attachments: [{ type: 'file', path: '/tmp/notes.md' }] },
+      { attachments: [{ type: 'file', reference: 'attachment:notes' }] },
     );
     expect(api.unarchiveConversation).toHaveBeenCalledWith('thread-unarchive');
     expect(api.updateConversationSettings).toHaveBeenCalledWith({ modelId: 'gpt-5', planMode: true });

@@ -5,6 +5,8 @@ import type {
   CodexSurfaceAskUserAnswers,
   CodexSurfaceClientRequestResponse,
   CodexSurfaceJsonValue,
+  CodexRendererAttachment,
+  CodexSurfaceAttachment,
   CodexSurfaceRendererApi,
   CreateCodexRendererConversationOptions,
   ListCodexConversationsOptions,
@@ -25,11 +27,23 @@ export type CodexSurfaceBridgeOperationArguments<Name extends CodexSurfaceBridge
 export type CodexSurfaceBridgeOperationResult<Name extends CodexSurfaceBridgeOperation> =
   Awaited<ReturnType<OperationFunction<Name>>>;
 type Awaitable<Value> = Value | Promise<Value>;
+type SurfaceOperationFunction<Name extends CodexSurfaceBridgeOperation> = Name extends keyof Required<CodexSurfaceApi>
+  ? Extract<Required<CodexSurfaceApi>[Name], (...args: never[]) => unknown>
+  : never;
 export type CodexSurfaceBridgeTarget = {
   [Name in CodexSurfaceBridgeOperation]: (
-    ...args: CodexSurfaceBridgeOperationArguments<Name>
-  ) => Awaitable<CodexSurfaceBridgeOperationResult<Name>>;
+    ...args: Parameters<SurfaceOperationFunction<Name>>
+  ) => Awaitable<Awaited<ReturnType<SurfaceOperationFunction<Name>>>>;
 } & Pick<CodexSurfaceApi, 'onEvent' | 'onStateChange'>;
+
+export type CodexSurfaceBridgeAttachmentResolver = (
+  attachment: CodexRendererAttachment,
+) => Awaitable<CodexSurfaceAttachment>;
+
+export type CodexSurfaceBridgeInvokeOptions = {
+  operationLabel?: string;
+  resolveAttachment?: CodexSurfaceBridgeAttachmentResolver;
+};
 
 export const codexSurfaceBridgeOperations = [
   'archiveConversation', 'cancelLogin', 'clearGoal', 'compactConversation', 'connect',
@@ -67,13 +81,13 @@ export async function invokeCodexSurfaceBridgeOperation<Name extends CodexSurfac
   target: CodexSurfaceBridgeTarget,
   operation: Name,
   args: readonly unknown[],
-  operationLabel: string = operation,
+  options: CodexSurfaceBridgeInvokeOptions = {},
 ): Promise<CodexSurfaceBridgeOperationResult<Name>> {
   const [minimum, maximum] = codexSurfaceBridgeArities[operation];
   if (args.length < minimum || args.length > maximum) {
-    throw new TypeError(`${operationLabel} received an invalid number of arguments`);
+    throw new TypeError(`${options.operationLabel ?? operation} received an invalid number of arguments`);
   }
-  const result = await invokeValidated(target, operation, args);
+  const result = await invokeValidated(target, operation, args, options);
   return result as CodexSurfaceBridgeOperationResult<Name>;
 }
 
@@ -81,6 +95,7 @@ async function invokeValidated(
   target: CodexSurfaceBridgeTarget,
   operation: CodexSurfaceBridgeOperation,
   args: readonly unknown[],
+  options: CodexSurfaceBridgeInvokeOptions,
 ): Promise<unknown> {
   switch (operation) {
     case 'archiveConversation': return target.archiveConversation(nonEmptyString(args[0], 'Conversation id'));
@@ -110,11 +125,17 @@ async function invokeValidated(
     );
     case 'retryMessage': return target.retryMessage(messageIndex(args[0]));
     case 'selectConversation': return target.selectConversation(nonEmptyString(args[0], 'Conversation id'));
-    case 'sendMessage': return target.sendMessage(nonEmptyString(args[0], 'Message prompt'), sendOptions(args[1]));
+    case 'sendMessage': return target.sendMessage(
+      nonEmptyString(args[0], 'Message prompt'),
+      await sendOptions(args[1], options.resolveAttachment),
+    );
     case 'setGoal': return target.setGoal(nonEmptyString(args[0], 'Goal objective'), tokenBudget(args[1]));
     case 'startChatGptLogin': return target.startChatGptLogin();
     case 'startReview': return target.startReview(reviewOptions(args[0]));
-    case 'steerMessage': return target.steerMessage(nonEmptyString(args[0], 'Steer prompt'), sendOptions(args[1]));
+    case 'steerMessage': return target.steerMessage(
+      nonEmptyString(args[0], 'Steer prompt'),
+      await sendOptions(args[1], options.resolveAttachment),
+    );
     case 'steerQueuedPrompt': return target.steerQueuedPrompt(nonEmptyString(args[0], 'Queued prompt id'));
     case 'unarchiveConversation': return target.unarchiveConversation(nonEmptyString(args[0], 'Conversation id'));
     case 'updateConversationSettings': return target.updateConversationSettings(settings(args[0]));
@@ -214,11 +235,16 @@ function askUserAnswers(value: unknown): CodexSurfaceAskUserAnswers {
   return answers;
 }
 
-function sendOptions(value: unknown): SendCodexMessageOptions | undefined {
+async function sendOptions(
+  value: unknown,
+  resolveAttachment: CodexSurfaceBridgeAttachmentResolver | undefined,
+): Promise<SendCodexMessageOptions | undefined> {
   if (value === undefined) return undefined;
   const record = plainObject(value, 'Message options');
   onlyKeys(record, ['attachments', 'model', 'reasoningEffort', 'serviceTier', 'planMode', 'skills', 'outputSchema'], 'Message options');
-  const attachments = record.attachments === undefined ? undefined : attachmentInputs(record.attachments);
+  const attachments = record.attachments === undefined
+    ? undefined
+    : await attachmentInputs(record.attachments, resolveAttachment);
   const skills = record.skills === undefined ? undefined : skillInputs(record.skills);
   if (record.outputSchema !== undefined && !isJsonValue(record.outputSchema)) {
     throw new TypeError('Message output schema must be JSON-serializable');
@@ -234,9 +260,15 @@ function sendOptions(value: unknown): SendCodexMessageOptions | undefined {
   };
 }
 
-function attachmentInputs(value: unknown): NonNullable<SendCodexMessageOptions['attachments']> {
+async function attachmentInputs(
+  value: unknown,
+  resolveAttachment: CodexSurfaceBridgeAttachmentResolver | undefined,
+): Promise<NonNullable<SendCodexMessageOptions['attachments']>> {
   if (!Array.isArray(value)) throw new TypeError('Message attachments must be an array');
-  return value.map((rawAttachment) => {
+  if (value.length > 0 && !resolveAttachment) {
+    throw new TypeError('Message attachment references are not supported by this host');
+  }
+  return Promise.all(value.map(async (rawAttachment) => {
     const attachment = plainObject(rawAttachment, 'Message attachment');
     if (attachment.type !== 'image' && attachment.type !== 'file') {
       throw new TypeError('Message attachment type is invalid');
@@ -244,24 +276,41 @@ function attachmentInputs(value: unknown): NonNullable<SendCodexMessageOptions['
     const image = attachment.type === 'image';
     onlyKeys(
       attachment,
-      image ? ['type', 'path', 'detail', 'name', 'mimeType', 'previewUrl'] : ['type', 'path', 'name', 'mimeType'],
+      image ? ['type', 'reference', 'detail'] : ['type', 'reference'],
       'Message attachment',
     );
     if (image && attachment.detail !== undefined && !['auto', 'low', 'high', 'original'].includes(String(attachment.detail))) {
       throw new TypeError('Message image detail is invalid');
     }
-    const common = {
-      path: nonEmptyString(attachment.path, 'Message attachment path'),
-      ...(attachment.name === undefined ? {} : { name: displayString(attachment.name, 'Message attachment name') }),
-      ...(attachment.mimeType === undefined ? {} : { mimeType: displayString(attachment.mimeType, 'Message attachment MIME type') }),
-    };
-    return image ? {
+    const rendererAttachment: CodexRendererAttachment = image ? {
       type: 'image' as const,
-      ...common,
+      reference: nonEmptyString(attachment.reference, 'Message attachment reference'),
       ...(attachment.detail === undefined ? {} : { detail: attachment.detail as 'auto' | 'low' | 'high' | 'original' }),
-      ...(attachment.previewUrl === undefined ? {} : { previewUrl: imagePreviewUrl(attachment.previewUrl) }),
-    } : { type: 'file' as const, ...common };
-  });
+    } : {
+      type: 'file' as const,
+      reference: nonEmptyString(attachment.reference, 'Message attachment reference'),
+    };
+    const resolved = await resolveAttachment!(rendererAttachment);
+    return resolvedAttachment(resolved, rendererAttachment);
+  }));
+}
+
+function resolvedAttachment(
+  value: CodexSurfaceAttachment,
+  source: CodexRendererAttachment,
+): CodexSurfaceAttachment {
+  const attachment = plainObject(value, 'Resolved message attachment');
+  if (attachment.type !== source.type) throw new TypeError('Resolved message attachment type does not match');
+  const common = {
+    path: nonEmptyString(attachment.path, 'Resolved message attachment path'),
+    ...(attachment.name === undefined ? {} : { name: displayString(attachment.name, 'Resolved message attachment name') }),
+    ...(attachment.mimeType === undefined ? {} : { mimeType: displayString(attachment.mimeType, 'Resolved message attachment MIME type') }),
+  };
+  return source.type === 'image' ? {
+    type: 'image',
+    ...common,
+    ...(source.detail === undefined ? {} : { detail: source.detail }),
+  } : { type: 'file', ...common };
 }
 
 function skillInputs(value: unknown): NonNullable<SendCodexMessageOptions['skills']> {
@@ -362,15 +411,6 @@ function displayString(value: unknown, label: string): string {
   if (result.length > 1_024) throw new RangeError(`${label} is too long`);
   return result;
 }
-function imagePreviewUrl(value: unknown): string {
-  const result = nonEmptyString(value, 'Message attachment preview URL');
-  if (result.length > 16 * 1024 * 1024) throw new RangeError('Message attachment preview URL is too large');
-  if (!/^data:image\/(?:avif|bmp|gif|heic|heif|jpe?g|png|webp);base64,[a-z\d+/=]+$/i.test(result)) {
-    throw new TypeError('Message attachment preview URL must be a base64 image data URL');
-  }
-  return result;
-}
-
 function isJsonValue(value: unknown, seen = new Set<object>()): value is CodexSurfaceJsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);

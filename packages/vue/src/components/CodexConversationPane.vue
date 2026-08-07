@@ -169,7 +169,7 @@
                     :alt="attachment.name"
                   >
                   <span v-else class="codex-conversation-pane__attachment-file" aria-hidden="true">📎</span>
-                  <span class="codex-conversation-pane__attachment-name" :title="attachment.path">
+                  <span class="codex-conversation-pane__attachment-name" :title="attachment.name">
                     {{ attachment.name }}
                   </span>
                   <span class="codex-conversation-pane__attachment-actions">
@@ -208,15 +208,15 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import type {
   CodexConversationRenderStrategy,
-  CodexSurfaceAttachment,
+  CodexRendererAttachment,
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfacePlugin,
   SurfaceMessage,
-  SendCodexMessageOptions,
+  CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/core/surface';
-import type { CodexNativeAttachment } from '@codex-app-sdk/core/native';
+import type { CodexHostAttachment } from '@codex-app-sdk/core/native';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import type {
   CodexConversationPaneActions,
@@ -280,7 +280,7 @@ const props = withDefaults(defineProps<{
   approvals?: readonly CodexSurfaceApproval[];
   approvalPresets?: readonly ApprovalPreset[];
   attachEnabled?: boolean;
-  attachments?: readonly CodexNativeAttachment[];
+  attachments?: readonly CodexHostAttachment[];
   autofocus?: boolean;
   capabilities?: CodexCapabilities;
   /** Controlled state/actions adapter. When supplied, it takes precedence over legacy props and surface state. */
@@ -369,7 +369,7 @@ defineSlots<{
   'composer-after'(): unknown;
   'composer-after-input'(): unknown;
   'composer-attachment-actions'(props: {
-    attachments: readonly CodexNativeAttachment[];
+    attachments: readonly CodexHostAttachment[];
     disabled: boolean;
     index: number;
   }): unknown;
@@ -400,7 +400,7 @@ defineSlots<{
 
 const emit = defineEmits<{
   attach: [];
-  attachmentsChange: [attachments: readonly CodexNativeAttachment[]];
+  attachmentsChange: [attachments: readonly CodexHostAttachment[]];
   cancel: [];
   clientResponse: [response: ClientRequestResponse];
   copyMessage: [index: number];
@@ -424,8 +424,8 @@ const emit = defineEmits<{
   retryMessage: [index: number];
   selectApprovalPreset: [preset: ApprovalPreset];
   sendFollowUp: [prompt: string];
-  submit: [prompt: string, options?: SendCodexMessageOptions];
-  steer: [prompt: string, options?: SendCodexMessageOptions];
+  submit: [prompt: string, options?: CodexRendererSendMessageOptions];
+  steer: [prompt: string, options?: CodexRendererSendMessageOptions];
   steerQueuedPrompt: [promptId: string];
   'update:modelId': [modelId: string];
   'update:composerState': [state: CodexComposerState];
@@ -475,7 +475,7 @@ const initialComposerState = normalizeCodexComposerState(effectiveComposerState.
 const localComposerState = ref<CodexComposerState>(initialComposerState);
 const localDraft = ref(initialComposerState.text);
 const localError = ref<string | null>(null);
-const selectedAttachments = ref<CodexNativeAttachment[]>([...effectiveAttachments.value]);
+const selectedAttachments = ref<CodexHostAttachment[]>([...effectiveAttachments.value]);
 const effectiveMessages = computed(() => controlledValue(
   (state) => state.identity.messages,
   () => props.messages ?? surfaceState.value?.messages ?? [],
@@ -855,17 +855,17 @@ async function ingestFiles(files: readonly File[]): Promise<void> {
   }
 }
 
-function appendAttachments(attachments: readonly CodexNativeAttachment[]): void {
-  const byPath = new Map(selectedAttachments.value.map((attachment) => [attachment.path, attachment]));
-  for (const attachment of attachments) byPath.set(attachment.path, attachment);
-  replaceAttachments([...byPath.values()].slice(0, 20));
+function appendAttachments(attachments: readonly CodexHostAttachment[]): void {
+  const byReference = new Map(selectedAttachments.value.map((attachment) => [attachment.reference, attachment]));
+  for (const attachment of attachments) byReference.set(attachment.reference, attachment);
+  replaceAttachments([...byReference.values()].slice(0, 20));
 }
 
 function removeAttachment(id: string): void {
   replaceAttachments(selectedAttachments.value.filter((attachment) => attachment.id !== id));
 }
 
-function replaceAttachments(attachments: CodexNativeAttachment[]): void {
+function replaceAttachments(attachments: CodexHostAttachment[]): void {
   selectedAttachments.value = attachments;
   if (dispatchControllerAction('updateAttachments', attachments)) return;
   if (effectiveController.value) return;
@@ -873,20 +873,17 @@ function replaceAttachments(attachments: CodexNativeAttachment[]): void {
 }
 
 function sendOptionsForAttachments(
-  attachments: readonly CodexNativeAttachment[],
-): SendCodexMessageOptions | undefined {
+  attachments: readonly CodexHostAttachment[],
+): CodexRendererSendMessageOptions | undefined {
   if (attachments.length === 0) return undefined;
-  const surfaceAttachments: CodexSurfaceAttachment[] = attachments.map((attachment) => (
+  const surfaceAttachments: CodexRendererAttachment[] = attachments.map((attachment) => (
     attachment.type === 'image'
       ? {
         type: 'image',
-        path: attachment.path,
-        name: attachment.name,
-        mimeType: attachment.mimeType,
-        ...(attachment.previewUrl ? { previewUrl: attachment.previewUrl } : {}),
+        reference: attachment.reference,
       }
       : {
-        type: 'file', path: attachment.path, name: attachment.name, mimeType: attachment.mimeType,
+        type: 'file', reference: attachment.reference,
       }
   ));
   return { attachments: surfaceAttachments };
