@@ -23,7 +23,7 @@ import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfacePlugin,
-  SendCodexMessageOptions,
+  CodexRendererSendMessageOptions,
   SurfaceMessage,
   UpdateCodexConversationSettings,
 } from '@codex-app-sdk/core/surface';
@@ -141,9 +141,9 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   retryMessage?: PaneAction<[index: number]>;
   selectApprovalPreset?: PaneAction<[preset: ApprovalPreset]>;
   sendFollowUp?: PaneAction<[prompt: string]>;
-  steer?: PaneAction<[prompt: string, options?: SendCodexMessageOptions]>;
+  steer?: PaneAction<[prompt: string, options?: CodexRendererSendMessageOptions]>;
   steerQueuedPrompt?: PaneAction<[promptId: string]>;
-  submit?: PaneAction<[prompt: string, options?: SendCodexMessageOptions]>;
+  submit?: PaneAction<[prompt: string, options?: CodexRendererSendMessageOptions]>;
   updateAttachments?: PaneAction<[attachments: readonly CodexHostAttachment[]]>;
   updateComposerState?: PaneAction<[state: CodexComposerState]>;
   updateSettings?: PaneAction<[settings: UpdateCodexConversationSettings]>;

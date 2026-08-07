@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { nextTick, shallowRef } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
   createCodexConversationPaneController,
   resolveCodexConversationPaneValue,
   type CodexConversationPaneActions,
   type CodexConversationPaneState,
+  type CodexRendererSendMessageOptions,
 } from '../../packages/vue/src';
 import type { SurfaceMessage } from '../../src/surface';
 
@@ -27,6 +28,14 @@ function state(messages: readonly SurfaceMessage[]): CodexConversationPaneState 
 }
 
 describe('createCodexConversationPaneController', () => {
+  it('types controlled submissions with opaque renderer attachments', () => {
+    type SubmitOptions = Parameters<NonNullable<CodexConversationPaneActions['submit']>>[1];
+    type SteerOptions = Parameters<NonNullable<CodexConversationPaneActions['steer']>>[1];
+
+    expectTypeOf<SubmitOptions>().toEqualTypeOf<CodexRendererSendMessageOptions | undefined>();
+    expectTypeOf<SteerOptions>().toEqualTypeOf<CodexRendererSendMessageOptions | undefined>();
+  });
+
   it('accepts ref-like sources from another Vue package resolution', () => {
     const messages = [message('message-1')];
     const externalState: { readonly value: CodexConversationPaneState } = {
