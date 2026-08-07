@@ -91,7 +91,7 @@ For an existing application, follow the
 | [Component lab](./samples/component-lab) | Fully mocked conversation, composer, streaming, and lifecycle scenarios | `npm run lab:dev` |
 | [Spark](./samples/electron/spark) | Focused themed chat with isolated auth and fixed defaults | `npm run spark:dev` |
 | [Relay](./samples/electron/relay) | Logistics operations UI backed by an app-owned MCP server | `npm run relay:dev` |
-| [Express web](./samples/web/express) | The Basic shell over a thin Express/`ws` host | `npm run web-sample:start` |
+| [Basic web](./samples/web/basic) | The Basic shell over a thin Express/`ws` host | `npm run web-sample:start` |
 
 The samples are product demonstrations, not templates for child safety or a
 production logistics backend. See the

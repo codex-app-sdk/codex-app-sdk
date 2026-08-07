@@ -1,7 +1,7 @@
 # Samples
 
-The repository includes three Electron + Vue applications, one Express web
-application, and one browser-only component lab. Each reuses the same SDK
+The repository includes three Electron + Vue applications, one web + Vue
+application with a thin Express host, and one browser-only component lab. Each reuses the same SDK
 conversation components at a different product or testing boundary.
 
 For a new application, start with the [project scaffolder](/guide/scaffolding)
@@ -81,7 +81,7 @@ npm run relay:dev
 Relay uses a seeded local JSON store. It demonstrates the integration loop, not
 a production logistics backend.
 
-## Express web: transport boundary
+## Basic web: transport boundary
 
 **Shape:** the same sidebar/pane shell as Basic over a thin Express + `ws` host.
 
@@ -126,7 +126,7 @@ without Codex authentication or Electron.
 | Visual regression and interaction inspection | Component lab |
 | Narrow branded assistant | Spark |
 | Model-assisted business workflow | Relay |
-| Web transport and website embedding | Express web |
+| Web transport and website embedding | Basic web |
 
 Copy the product shape, not internal SDK code. Applications should import the
 public package entry points and leave app-server protocol handling inside the

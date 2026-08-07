@@ -49,7 +49,7 @@ httpServer.on('upgrade', (request, socket, head) => {
 });
 
 httpServer.listen(port, '127.0.0.1', () => {
-  console.log(`Codex Express sample: http://127.0.0.1:${port}`);
+  console.log(`Codex Basic web sample: http://127.0.0.1:${port}`);
 });
 
 function authenticateSiteRequest(_request: import('node:http').IncomingMessage): SiteUser | null {

@@ -1,4 +1,4 @@
-# Express web sample
+# Basic web sample
 
 A web version of the Basic desktop sample. Both use the shared
 `CodexConversationSidebar`, stock conversation pane, and surface controller.

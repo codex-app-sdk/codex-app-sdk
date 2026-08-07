@@ -1,5 +1,5 @@
 {
-  "name": "@codex-app-sdk/express-web-sample",
+  "name": "@codex-app-sdk/basic-web-sample",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -91,8 +91,8 @@ describe('package boundary', () => {
     }
   });
 
-  it('keeps the Express sample free of SDK transport implementation details', async () => {
-    const sampleRoot = path.join(packageRoot, 'samples/web/express');
+  it('keeps the Basic web sample free of SDK transport implementation details', async () => {
+    const sampleRoot = path.join(packageRoot, 'samples/web/basic');
     const files = await sourceFiles(path.join(sampleRoot, 'src'));
     const transportImplementations: string[] = [];
     for (const file of files) {
