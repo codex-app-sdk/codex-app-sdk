@@ -97,7 +97,9 @@ one gesture is dispatched exactly once.
 
 | Component | Purpose |
 | --- | --- |
+| `CodexConversationSidebar` | Conversation create/select/delete navigation shared by desktop and web shells |
 | `CodexConversationPane` | Complete bound or unbound conversation surface |
+| `CodexConversationSidebar` | Reusable conversation list with create, select, status, relative time, and confirmed delete actions |
 | `CodexComposer` | Full composer with menus, attachments, voice, model/reasoning/Fast mode settings, and send/steer behavior |
 | `CodexMessageList` | Conversation message collection |
 | `CodexScrollToBottom` | Reusable circular control for returning to the latest messages |
@@ -314,7 +316,7 @@ for one component tree with the `show-tool-details` prop on
 or `CodexToolCall`. Applications can set the policy once for a Vue subtree:
 
 ```ts
-import { provideCodexToolCallDetails } from 'codex-app-sdk/vue';
+import { provideCodexToolCallDetails } from '@codex-app-sdk/vue';
 
 provideCodexToolCallDetails(true);
 ```

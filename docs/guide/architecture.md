@@ -9,6 +9,21 @@ runtime boundaries behind that scaffold.
 
 ![Codex App SDK architecture](/architecture.svg)
 
+## Modular packages
+
+| Package | Owns | Must not own |
+| --- | --- | --- |
+| `@codex-app-sdk/core` | Renderer-safe surface, bridge, event, attachment, and host-capability contracts | Node, Electron, Vue, or generated app-server code |
+| `@codex-app-sdk/backend` | Trusted Node app-server runtime, process transports, `CodexSurface`, backend composition | Website users, product data, or UI |
+| `@codex-app-sdk/vue` | Reusable conversation controller, components, and scoped theme | Backend processes or host transports |
+| `@codex-app-sdk/electron` | Main/preload/renderer IPC and native desktop capabilities | Product orchestration |
+| `@codex-app-sdk/web` | Established-WebSocket surface projection and browser client | HTTP frameworks, website authentication, user storage, or runner pools |
+
+The root `codex-app-sdk` package is a compatibility facade while applications
+migrate to explicit packages. Core is the shared vocabulary; Electron and web
+are sibling adapters over the same surface bridge, so operation validation is
+not duplicated between frontends.
+
 ## Node runtime
 
 `CodexSurface` owns the app-server client and turns a volatile protocol into a
@@ -47,6 +62,16 @@ context, or protocol envelopes.
 
 Native file, clipboard, link, and transcription operations use explicit typed
 handlers instead of exposing Node or Electron objects.
+
+## Web bridge
+
+The web server binds an established WebSocket only after a host authorization
+callback grants a connection-scoped surface lease. The browser receives the
+same renderer-safe API used by the Vue controller in Electron. The SDK owns
+framing, correlation, validation, ordering, snapshots, events, and bounded
+reconnect; the embedding website owns HTTP, site authentication, tenancy,
+stable per-user `codexHome` selection, process pooling, quotas, persistence,
+and upload endpoints. See [Web integration](/guide/web).
 
 ## Vue kit
 

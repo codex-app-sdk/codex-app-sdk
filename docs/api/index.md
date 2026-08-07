@@ -5,32 +5,32 @@ narrowest entry point that owns the capability you need.
 
 | Entry point | Runtime | Main exports |
 | --- | --- | --- |
-| `codex-app-sdk/node` | Node / Electron main | `CodexSurface`, `CodexAppBackend`, `CodexAppBackendTtlCache`, stdio transport, discovery, extensions, MCP, history and transcription adapters |
-| `codex-app-sdk/electron` | Electron main + types | Complete bridge, native bridge, typed IPC composition |
-| `codex-app-sdk/electron/preload` | Electron preload | `exposeCodexElectronPreload` and preload-safe types |
-| `codex-app-sdk/vue` | Vue renderer | Controller, pane, composer, messages, tools, media, theme, utilities |
-| `codex-app-sdk/styles.css` | Renderer CSS | Complete scoped component theme |
-| `codex-app-sdk/surface` | Any TypeScript runtime | Serializable snapshots, actions, messages, approvals, and event contracts |
-| `codex-app-sdk/events` | Any TypeScript runtime | Generic typed event bus |
-| `codex-app-sdk/codex` | Trusted advanced host | Generated app-server schema, typed client, wire contracts |
-| `codex-app-sdk` | Mixed | Aggregate core exports; prefer layer entry points in applications |
+| `@codex-app-sdk/core` | Any TypeScript runtime | Renderer-safe surface, event, attachment, and host-capability contracts |
+| `@codex-app-sdk/backend` | Trusted Node host | `CodexSurface`, `CodexAppBackend`, transports, discovery, extensions, MCP, history adapters |
+| `@codex-app-sdk/electron` | Electron main + renderer types | Complete bridge, native capabilities, typed IPC composition |
+| `@codex-app-sdk/electron/preload` | Electron preload | `exposeCodexElectronPreload` and preload-safe types |
+| `@codex-app-sdk/web/client` | Browser | WebSocket-backed `CodexSurfaceRendererApi` and reconnect policy |
+| `@codex-app-sdk/web/server` | Node or compatible server runtime | Established-socket binding, authorization callback, and surface lease |
+| `@codex-app-sdk/vue` | Vue renderer | Controller, pane, composer, messages, tools, media, theme, utilities |
+| `@codex-app-sdk/vue/styles.css` | Renderer CSS | Complete scoped component theme |
+| `codex-app-sdk/*` | Compatibility | Previous aggregate entry points retained during migration |
 
 ## Typical imports
 
 ```ts
 // Electron main
-import { createCodexAppBackend } from 'codex-app-sdk/node';
-import { registerCodexElectronMain } from 'codex-app-sdk/electron';
+import { createCodexAppBackend } from '@codex-app-sdk/backend';
+import { registerCodexElectronMain } from '@codex-app-sdk/electron';
 
 // Preload
-import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
+import { exposeCodexElectronPreload } from '@codex-app-sdk/electron/preload';
 
 // Vue renderer
 import {
   CodexConversationPane,
   useCodexSurface,
-} from 'codex-app-sdk/vue';
-import 'codex-app-sdk/styles.css';
+} from '@codex-app-sdk/vue';
+import '@codex-app-sdk/vue/styles.css';
 ```
 
 The [scaffold](/guide/scaffolding) wires these imports together. Use the entry

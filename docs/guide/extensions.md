@@ -6,7 +6,7 @@ surface/renderer boundary.
 ## Configure conversation start and resume
 
 ```ts
-import { createCodexSurface } from 'codex-app-sdk/node';
+import { createCodexSurface } from '@codex-app-sdk/backend';
 
 const surface = createCodexSurface({
   extensions: [{

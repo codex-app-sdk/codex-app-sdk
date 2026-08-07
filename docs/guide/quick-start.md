@@ -70,7 +70,7 @@ state and actions; the stock pane owns the conversation experience:
 
 ```vue
 <script setup lang="ts">
-import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
+import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 
 const surface = useCodexSurface(window.codexSurface);
 </script>

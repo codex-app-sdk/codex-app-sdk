@@ -13,7 +13,7 @@ composition.
 Capabilities describe which conversation behavior the host wants to offer:
 
 ```ts
-import type { CodexCapabilities } from 'codex-app-sdk/vue';
+import type { CodexCapabilities } from '@codex-app-sdk/vue';
 
 export const capabilities: CodexCapabilities = {
   models: false,
@@ -38,7 +38,7 @@ Presentation controls hide optional default UI without changing the operations
 available on the controller:
 
 ```ts
-import type { CodexConversationPresentation } from 'codex-app-sdk/vue';
+import type { CodexConversationPresentation } from '@codex-app-sdk/vue';
 
 export const presentation: CodexConversationPresentation = {
   composer: {
@@ -86,7 +86,7 @@ policy in the main process and app-server configuration.
 Apply light, dark, or system behavior to an application-owned ancestor:
 
 ```ts
-import { applyCodexTheme } from 'codex-app-sdk/vue';
+import { applyCodexTheme } from '@codex-app-sdk/vue';
 
 const restore = applyCodexTheme(element, {
   mode: 'system',

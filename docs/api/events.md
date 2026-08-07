@@ -105,10 +105,10 @@ type CodexSurfaceEventOrigin = 'action' | 'notification' | 'lifecycle';
 
 ## Generic event bus
 
-`codex-app-sdk/events` exports:
+`@codex-app-sdk/core/events` exports:
 
 ```ts
-import { TypedEventBus } from 'codex-app-sdk/events';
+import { TypedEventBus } from '@codex-app-sdk/core/events';
 
 type AppEvents = {
   refreshed: { source: string };

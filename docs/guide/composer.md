@@ -137,7 +137,7 @@ The microphone control records without disabling the normal Send button:
 Custom composer layouts can reuse the same state machine:
 
 ```ts
-import { useCodexComposerVoice } from 'codex-app-sdk/vue';
+import { useCodexComposerVoice } from '@codex-app-sdk/vue';
 
 const voice = useCodexComposerVoice({
   isDisabled: () => disabled.value,

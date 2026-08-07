@@ -1,7 +1,7 @@
 {
   "name": "codex-app-sdk",
   "version": "0.1.0",
-  "description": "High-level runtime, Electron bridge, and Vue kit for building Codex surfaces.",
+  "description": "Modular runtime, Electron and web bridges, and Vue kit for building Codex surfaces.",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {

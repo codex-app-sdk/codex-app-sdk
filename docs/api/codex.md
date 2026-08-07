@@ -5,8 +5,8 @@ Use it in trusted host code when app-server adds a capability that the high-leve
 surface does not project yet.
 
 ```ts
-import { CodexAppServerClient } from 'codex-app-sdk/codex';
-import { CodexAppServerStdioTransport } from 'codex-app-sdk/node';
+import { CodexAppServerClient } from '@codex-app-sdk/backend/protocol';
+import { CodexAppServerStdioTransport } from '@codex-app-sdk/backend';
 
 const client = new CodexAppServerClient(
   new CodexAppServerStdioTransport(),

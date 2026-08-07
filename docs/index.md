@@ -63,8 +63,8 @@ behavior. The renderer boundary remains intentionally small:
 
 ```vue
 <script setup lang="ts">
-import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
-import 'codex-app-sdk/styles.css';
+import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
+import '@codex-app-sdk/vue/styles.css';
 
 const surface = useCodexSurface(window.codexSurface);
 </script>

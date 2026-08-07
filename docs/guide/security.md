@@ -1,7 +1,7 @@
 # Security boundary
 
-The main process is the trusted policy boundary. The renderer receives a narrow,
-serializable, shape-validated surface.
+The Electron main process or web server is the trusted policy boundary. The
+renderer receives a narrow, serializable, shape-validated surface.
 
 ## What stays in main
 
@@ -26,6 +26,7 @@ serializable, shape-validated surface.
 - catalog-validated model, reasoning, and approval-preset selection
 - semantic events
 - explicit native capability methods
+- opaque attachment references rather than trusted filesystem paths
 
 ## Renderer conversation creation
 
@@ -63,6 +64,24 @@ The native bridge validates:
 It creates private operating-system temporary attachment directories. They
 survive bridge teardown so app-server `localImage` history remains valid across
 an application restart, and are eventually reclaimed by the operating system.
+
+The renderer cannot submit a filesystem path. Electron resolves only references
+issued by its integration-scoped registry. A web host must apply the same rule:
+authenticate upload endpoints, scope references to the authorized user/session,
+and resolve them inside the granted surface lease.
+
+## Web session policy
+
+`bindCodexWebSocket()` never authenticates a website user. It requires the host
+to authorize every accepted connection and returns `4401` when authorization is
+denied. Before binding, validate the upgrade path, website session, expected
+origin/CSRF policy, account state, and connection quota. Never accept a browser
+supplied user ID as authority for selecting a surface.
+
+Use stable isolated `codexHome` directories when credentials should persist per
+user. The website owns encrypted storage, process pooling, eviction, deployment
+routing, and tenancy; the SDK lease only connects one authorized socket to one
+surface. See [Web integration](/guide/web).
 
 ## Electron window policy
 

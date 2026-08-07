@@ -16,7 +16,7 @@ Every SDK provider follows the same contract:
 - injection-key descriptions begin with `codex-app-sdk-`;
 - optional configuration has a safe SDK default;
 - providers are scoped to the current Vue tree, never global mutable state;
-- public provider types are exported from `codex-app-sdk/vue`;
+- public provider types are exported from `@codex-app-sdk/vue`;
 - an explicit component prop takes precedence when the component exposes one.
 
 Use a provider for app-wide or subtree-wide configuration. Use a prop for a
@@ -29,7 +29,7 @@ markup in a specific location.
 import {
   provideCodexChatTranslate,
   type CodexChatTranslate,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 
 const translate: CodexChatTranslate = (key, params) =>
   productI18n.t(key, params);
@@ -46,7 +46,7 @@ Raw tool input and output remain inaccessible by default. Enable the disclosure
 UI for one trusted component tree:
 
 ```ts
-import { provideCodexToolCallDetails } from 'codex-app-sdk/vue';
+import { provideCodexToolCallDetails } from '@codex-app-sdk/vue';
 
 provideCodexToolCallDetails(true);
 ```
@@ -62,7 +62,7 @@ to customize their icon or title while leaving grouping, diffs, actions,
 streaming, and detail disclosure SDK-owned:
 
 ```ts
-import { provideCodexToolPresentation } from 'codex-app-sdk/vue';
+import { provideCodexToolPresentation } from '@codex-app-sdk/vue';
 import BrowserIcon from './BrowserIcon.vue';
 
 provideCodexToolPresentation(({ kind, metadata }) => {

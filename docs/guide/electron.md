@@ -11,7 +11,7 @@ application or deliberately composing a custom IPC layer.
 ## Complete bridge
 
 ```ts
-import { registerCodexElectronMain } from 'codex-app-sdk/electron';
+import { registerCodexElectronMain } from '@codex-app-sdk/electron';
 
 const unregister = registerCodexElectronMain({
   clipboard,
@@ -45,7 +45,7 @@ Call the returned function before destroying the integration.
 
 ```ts
 import { contextBridge, ipcRenderer } from 'electron';
-import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
+import { exposeCodexElectronPreload } from '@codex-app-sdk/electron/preload';
 
 exposeCodexElectronPreload(contextBridge, ipcRenderer);
 ```

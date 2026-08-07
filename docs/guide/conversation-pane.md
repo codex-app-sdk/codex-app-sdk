@@ -10,7 +10,7 @@ This is the recommended path for a new Codex application:
 
 ```vue
 <script setup lang="ts">
-import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
+import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 
 const surface = useCodexSurface(window.codexSurface);
 </script>
@@ -35,7 +35,7 @@ import {
   createCodexConversationPaneController,
   type CodexConversationPaneActions,
   type CodexConversationPaneState,
-} from 'codex-app-sdk/vue';
+} from '@codex-app-sdk/vue';
 
 const state: CodexConversationPaneState = {
   identity: {

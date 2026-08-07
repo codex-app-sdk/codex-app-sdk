@@ -13,7 +13,7 @@ instead.
 Add `src/main/notes-service.ts`:
 
 ```ts
-import type { CodexAppBackendModule } from 'codex-app-sdk/node';
+import type { CodexAppBackendModule } from '@codex-app-sdk/backend';
 
 export type Note = {
   id: string;
@@ -69,7 +69,7 @@ ipcMain.handle('notes:list', () => notes.list());
 ```ts
 // src/main/preload.ts
 import { contextBridge, ipcRenderer } from 'electron';
-import { exposeCodexElectronPreload } from 'codex-app-sdk/electron/preload';
+import { exposeCodexElectronPreload } from '@codex-app-sdk/electron/preload';
 
 exposeCodexElectronPreload(contextBridge, ipcRenderer);
 contextBridge.exposeInMainWorld('notes', {

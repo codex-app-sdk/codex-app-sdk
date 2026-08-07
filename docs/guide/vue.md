@@ -7,7 +7,7 @@ used as one bound pane or as a library of independently reusable components.
 
 ```vue
 <script setup lang="ts">
-import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
+import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 
 const surface = useCodexSurface(window.codexSurface);
 </script>

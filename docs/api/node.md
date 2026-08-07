@@ -7,7 +7,7 @@ import {
   CodexSurface,
   createCodexAppBackend,
   createCodexSurface,
-} from 'codex-app-sdk/node';
+} from '@codex-app-sdk/backend';
 ```
 
 ## `createCodexSurface(options?)`
@@ -282,7 +282,7 @@ type CodexConversation = {
 };
 ```
 
-Fork types are protocol-free and exported from `codex-app-sdk/node`:
+Fork types are protocol-free and exported from `@codex-app-sdk/backend`:
 
 ```ts
 type ForkCodexConversationOptions = CreateCodexConversationOptions;

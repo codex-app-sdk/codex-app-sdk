@@ -20,7 +20,7 @@ type CodexElectronMainOptions = {
 
 ### `exposeCodexElectronPreload(contextBridge, ipcRenderer)`
 
-Available from `codex-app-sdk/electron/preload`. Exposes both renderer APIs and
+Available from `@codex-app-sdk/electron/preload`. Exposes both renderer APIs and
 returns them as `CodexElectronRendererApis`.
 
 ## Surface IPC
@@ -53,7 +53,7 @@ type CodexNativeMainOptions = {
 };
 ```
 
-`CodexNativeRendererApi.readImagePreview?(path)` lazily requests a bounded,
+`CodexNativeRendererApi.readImagePreview?(reference)` lazily requests a bounded,
 non-SVG local image as a renderer-safe data URL. It returns `null` when the file
 is missing, unsupported, or larger than `maxImagePreviewBytes` (8 MiB by
 default). The optional method keeps custom/older preload implementations

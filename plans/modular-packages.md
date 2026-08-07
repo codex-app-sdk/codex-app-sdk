@@ -1,6 +1,6 @@
 # Modular packages and web host
 
-Status: implementation in progress
+Status: complete
 
 ## Goal
 
@@ -22,7 +22,7 @@ Use five publishable packages representing four logical layers:
 | `@codex-app-sdk/backend` | App-server protocol/client, transports, `CodexSurface`, and `CodexAppBackend` | Node.js |
 | `@codex-app-sdk/vue` | Vue composables, conversation UI, and styles | Vue and browser APIs |
 | `@codex-app-sdk/electron` | Main/preload/renderer bindings and Electron host-capability implementations | Electron, backend, core |
-| `@codex-app-sdk/web` | Browser client and server-side surface binding | Core on the client; backend on the server |
+| `@codex-app-sdk/web` | Browser client and server-side surface binding | Core only; the host supplies the authorized backend surface |
 
 The dependency direction is:
 
@@ -40,8 +40,9 @@ migration. Its current subpaths re-export from the new packages:
 - `codex-app-sdk/vue` and `codex-app-sdk/styles.css` -> `@codex-app-sdk/vue`
 - `codex-app-sdk/electron` and `codex-app-sdk/electron/preload` -> `@codex-app-sdk/electron`
 
-Package names are working names. Confirm npm scope/publication naming before the
-first release; do not let that decision block the internal dependency split.
+The scoped package names are the current publication contract. The root
+`codex-app-sdk` package remains the documented compatibility facade; formal
+deprecation, if desired, is a later major-release decision.
 
 ## Boundary decisions
 
@@ -200,12 +201,14 @@ Commit: `feat: extract electron adapter package`
 
 ### Phase 5: Add the web adapter
 
+Status: complete
+
 - Define the versioned WebSocket envelope using the shared renderer operations.
 - Implement request correlation, cancellation/closure behavior, snapshot and
   event subscriptions, reconnect resynchronization, and bounded payload errors.
 - Implement the server binder around a host-authorized surface/session factory.
-- Add origin/authentication hooks and conservative defaults; never silently
-  expose a surface to an unauthenticated connection.
+- Require a host authorization/session-lease callback; keep origin, cookie, and
+  HTTP-upgrade policy in the embedding server.
 - Implement opaque attachment upload/reference resolution as a narrow host
   extension point.
 - Add transport tests covering malformed requests, unauthorized sessions,
@@ -217,9 +220,11 @@ Validation:
 - Web client browser-safe bundle test.
 - Web package typecheck and build.
 
-Commit: `feat: add web surface adapter`
+Commits: `feat: add web surface transport`, `feat: add Express web sample`
 
 ### Phase 6: Add a web application target
+
+Status: complete
 
 - Extend `create-codex-app` with an explicit `electron` or `web` target.
 - Update the existing Electron scaffold to consume explicit packages while
@@ -238,9 +243,11 @@ Validation:
 - Build and typecheck one freshly generated application per target.
 - Web sample tests/typecheck/build.
 
-Commit: `feat: add web application scaffold`
+Commit: `feat: scaffold modular desktop and web apps`
 
 ### Phase 7: Documentation, compatibility, and release hardening
+
+Status: complete
 
 - Update README package discovery and desktop/web starting paths.
 - Update architecture, installation, scaffolding, backend, Vue provider, and API
@@ -249,8 +256,8 @@ Commit: `feat: add web application scaffold`
   sessions and attachments.
 - Verify package file lists, declarations, CSS/assets, export maps, and clean
   consumer installs.
-- Decide whether legacy facade exports are merely documented as compatibility or
-  formally deprecated for a later major release.
+- Document legacy facade exports as compatibility paths; reserve any formal
+  deprecation for a later major release.
 
 Validation:
 
@@ -280,7 +287,8 @@ Pause for review after:
 - Electron applications retain current behavior through explicit packages and
   compatibility exports.
 - A generated web application can connect to an authorized backend session,
-  stream a conversation, handle approvals, reconnect, and upload attachments
+  stream a conversation, handle approvals, and reconnect. Hosts can add their
+  own authenticated upload endpoint and resolve opaque attachment references
   without exposing arbitrary paths.
 - Public APIs and security boundaries are documented.
 - Full selected repository validation passes with no unexplained failures.
@@ -292,3 +300,17 @@ Pause for review after:
 Append durable lessons here as phases complete. Focus on dependency-boundary,
 transport, packaging, testing, and migration patterns rather than a list of
 files changed.
+
+- One shared bridge-operation inventory and validator lets Electron IPC and
+  WebSockets expose identical renderer behavior without duplicating protocol
+  policy.
+- Website authentication belongs before the WebSocket binder. A required,
+  connection-scoped lease is narrow enough for one local demo backend and for a
+  production per-user runner pool without turning the SDK into a user system.
+- Reconnect must reject in-flight mutations and resynchronize from a fresh
+  snapshot; automatic mutation replay would create ambiguous duplicate work.
+- Attachment bytes and lifetimes are transport-host policy. The reusable SDK
+  boundary is an opaque renderer reference plus a lease-owned trusted resolver.
+- Building generated Electron and web projects against local workspace package
+  outputs catches structural package and adapter typing mistakes that template
+  string assertions cannot.

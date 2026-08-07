@@ -1,6 +1,6 @@
 # Surface contracts
 
-`codex-app-sdk/surface` contains framework-neutral serializable contracts shared
+`@codex-app-sdk/core/surface` contains framework-neutral serializable contracts shared
 by Node, Electron IPC, and renderers.
 
 ## `CodexSurfaceSnapshot`

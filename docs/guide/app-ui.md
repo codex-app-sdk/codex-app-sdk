@@ -13,7 +13,7 @@ then compose ordinary Vue components around them:
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
-import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
+import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 import ProjectInspector from './components/ProjectInspector.vue';
 
 const surface = useCodexSurface(window.codexSurface);

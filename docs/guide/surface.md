@@ -11,7 +11,7 @@ without the scaffold or without backend modules.
 ```ts
 import path from 'node:path';
 import { app } from 'electron';
-import { createCodexSurface } from 'codex-app-sdk/node';
+import { createCodexSurface } from '@codex-app-sdk/backend';
 
 const surface = createCodexSurface({
   clientInfo: {

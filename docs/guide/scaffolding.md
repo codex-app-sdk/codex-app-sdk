@@ -1,7 +1,8 @@
 # Scaffold an application
 
-`create-codex-app` generates a small, runnable Electron + Vue application that
-uses the SDK's recommended runtime boundaries.
+`create-codex-app` generates a small, runnable application using the SDK's
+recommended modular boundaries. Electron + Vue is the backward-compatible
+default; `--target web` generates an Express + `ws` + Vue application.
 
 ```bash
 npm create codex-app@latest my-codex-app
@@ -13,6 +14,12 @@ The equivalent direct executable form is:
 
 ```bash
 npx create-codex-app@latest my-codex-app
+```
+
+Generate the web target with:
+
+```bash
+npx create-codex-app@latest my-codex-web --target web
 ```
 
 ::: warning Package publication pending
@@ -31,9 +38,10 @@ npm run dev
 The generated project is the default starting point for a Codex application:
 
 1. Run it before making changes and confirm Codex discovery and authentication.
-2. Update `src/renderer/App.vue` and `styles.css` with the product shell,
-   navigation, and branding.
-3. Configure the shared SDK backend in `src/main/index.ts`.
+2. Update `src/renderer/App.vue` (Electron) or `src/client/App.vue` (web) and
+   `styles.css` with the product shell, navigation, and branding.
+3. Configure the shared SDK backend in `src/main/index.ts` (Electron) or the
+   session acquisition seam in `src/server/index.ts` (web).
 4. Add app-owned backend modules or MCP servers next to that backend when the
    product needs capabilities beyond the Codex conversation surface.
 5. Keep the typed preload boundary narrow; expose additional host APIs only for
@@ -57,6 +65,7 @@ npm create codex-app@latest my-codex-app -- --no-install
 | `[directory]` | Target directory. The CLI prompts for it in an interactive terminal when omitted. |
 | `--no-install` | Generate files without installing dependencies. |
 | `--package-manager npm` | Select `npm`, `pnpm`, `yarn`, or `bun`. The invoking package manager is detected by default. |
+| `--target electron` | Generate `electron` (default) or `web`. |
 | `--help` | Print usage and options. |
 | `--version` | Print the initializer version. |
 
@@ -74,6 +83,7 @@ import { scaffoldProject } from 'create-codex-app';
 const project = await scaffoldProject({
   cwd: '/absolute/parent/directory',
   directory: 'my-codex-app',
+  target: 'web',
 });
 ```
 
@@ -81,7 +91,7 @@ The function applies the same naming, template substitution, and non-empty
 directory protections as the CLI. Dependency installation remains the caller's
 responsibility in this form.
 
-## Generated application
+## Generated Electron application
 
 ```text
 my-codex-app/
@@ -121,6 +131,35 @@ important when a host configures a separate `codexHome` for the generated app.
 This gives a new application a credible working shell and conversation system
 while leaving its navigation, branding, product data, and additional backend
 modules app-owned.
+
+## Generated web application
+
+```text
+my-codex-web/
+├── src/
+│   ├── client/
+│   │   ├── App.vue
+│   │   ├── index.html
+│   │   ├── main.ts
+│   │   └── styles.css
+│   └── server/
+│       └── index.ts
+├── package.json
+├── tsconfig.json
+├── tsconfig.server.json
+└── vite.config.ts
+```
+
+The web renderer contains only `createCodexWebSurfaceClient()`,
+`useCodexSurface()`, the shared `CodexConversationSidebar`, and the stock pane.
+Express serves the browser bundle and authenticates the upgrade; `ws` accepts
+the socket; `@codex-app-sdk/web` owns framing, validation, action correlation,
+snapshots, events, and reconnect.
+
+The template's `authenticateSiteRequest()` returns one fixed local demo user,
+and `acquireCodexSession()` returns the default backend. Replace those functions
+with real website authentication and an isolated per-user backend/process pool.
+See [Web integration](/guide/web) before deploying it.
 
 ## Next steps
 

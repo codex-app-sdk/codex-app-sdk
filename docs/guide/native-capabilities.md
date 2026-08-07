@@ -5,19 +5,20 @@ needs. Applications should not reimplement these in each sample.
 
 ## Capability API
 
-`window.codexAppSdkNative` exposes:
+Electron exposes `window.codexAppSdkNative`; other hosts can inject the same
+platform-neutral `CodexHostCapabilities` contract into the Vue tree:
 
 ```ts
-type CodexNativeRendererApi = {
+type CodexHostCapabilities = {
   capabilities: {
     attachments: boolean;
     clipboard: boolean;
     externalLinks: boolean;
     transcription: boolean;
   };
-  pickAttachments(): Promise<CodexNativeAttachment[]>;
-  ingestAttachments(files: readonly CodexNativeAttachmentInput[]): Promise<CodexNativeAttachment[]>;
-  readImagePreview?(path: string): Promise<string | null>;
+  pickAttachments(): Promise<CodexHostAttachment[]>;
+  ingestAttachments(files: readonly CodexHostAttachmentInput[]): Promise<CodexHostAttachment[]>;
+  readImagePreview?(reference: string): Promise<string | null>;
   copyToClipboard(content: CodexNativeClipboardContent): Promise<void>;
   openExternal(href: string): Promise<void>;
   transcribeAudio(audio: ArrayBuffer, options?: { locale?: string; live?: boolean }): Promise<CodexSpeechTranscriptionResult>;
@@ -44,6 +45,11 @@ Override limits in the main-process `native` options.
 Browser `File` objects cannot be sent as trusted filesystem paths. The Vue
 ingestion helper transfers their bytes through validated IPC, writes them to a
 private temporary directory, and returns serializable attachment records.
+
+Those records contain an opaque `reference`, never the trusted local path.
+Electron resolves the reference inside its integration-scoped registry only
+when a surface action is invoked. Web hosts use the same boundary with their own
+authenticated upload endpoint and lease-owned resolver.
 
 Pasted files live in the operating system's temporary directory so app-server's
 historical `localImage` paths remain usable across an application restart. The
