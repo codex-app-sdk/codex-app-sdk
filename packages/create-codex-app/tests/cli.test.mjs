@@ -35,6 +35,7 @@ test('creates a complete app without retaining template tokens', async (t) => {
   const app = await readFile(join(project.path, 'src/renderer/App.vue'), 'utf8');
   const main = await readFile(join(project.path, 'src/main/index.ts'), 'utf8');
   const styles = await readFile(join(project.path, 'src/renderer/styles.css'), 'utf8');
+  const viteEnvironment = await readFile(join(project.path, 'src/renderer/vite-env.d.ts'), 'utf8');
 
   assert.equal(project.packageName, 'my-codex-app');
   assert.equal(project.displayName, 'My Codex App');
@@ -64,6 +65,8 @@ test('creates a complete app without retaining template tokens', async (t) => {
   assert.match(main, /createCodexAppBackend/);
   assert.match(main, /from '@codex-app-sdk\/backend'/);
   assert.match(main, /from '@codex-app-sdk\/electron'/);
+  assert.match(viteEnvironment, /from '@codex-app-sdk\/electron'/);
+  assert.doesNotMatch(viteEnvironment, /from 'codex-app-sdk\//);
   assert.match(main, /vibrancy: 'menu'/);
   assert.match(main, /titleBarStyle: 'hiddenInset'/);
   assert.match(main, /void app\.whenReady\(\)\.then/);
