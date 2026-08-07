@@ -155,18 +155,26 @@ describe('ChatComposer', () => {
     }]);
   });
 
-  it('caps the growing editor at three composer lines', async () => {
+  it('grows the editor and caps it at twelve visible composer lines', async () => {
     const wrapper = mountComposer();
     const richEditor = editor(wrapper).element;
     Object.defineProperty(richEditor, 'scrollHeight', {
       configurable: true,
-      value: 240,
+      value: 280,
     });
 
-    await setEditorValue(wrapper, 'one\ntwo\nthree\nfour\nfive');
+    await setEditorValue(wrapper, Array.from({ length: 11 }, (_, index) => `line ${index + 1}`).join('\n'));
+    await nextTick();
+    expect(richEditor.style.height).toBe('280px');
+
+    Object.defineProperty(richEditor, 'scrollHeight', {
+      configurable: true,
+      value: 400,
+    });
+    await setEditorValue(wrapper, Array.from({ length: 13 }, (_, index) => `line ${index + 1}`).join('\n'));
     await nextTick();
 
-    expect(richEditor.style.height).toBe('88px');
+    expect(richEditor.style.height).toBe('304px');
   });
 
   it('interrupts from the shared send button while Codex is working without a draft', async () => {

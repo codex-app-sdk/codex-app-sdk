@@ -40,6 +40,8 @@ file catalog, normally backed by a conversation with a working directory.
 Suggestion menus consume navigation keys before composer shortcuts. Newline
 insertion preserves the caret even when it splits text in the middle of a line,
 and the editor scrolls immediately when the new line exceeds its visible height.
+The composer grows upward with multiline content until twelve lines are visible,
+then keeps that height and scrolls internally.
 
 When `queuedPromptId` is supplied and the composer is empty, `Cmd+Enter` emits
 `steerQueuedPrompt` for that queued item. It does not create an empty steer.

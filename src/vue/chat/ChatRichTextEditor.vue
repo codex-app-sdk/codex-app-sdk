@@ -43,7 +43,7 @@ const props = withDefaults(defineProps<{
   ariaLabel: 'Prompt',
   disabled: false,
   files: () => [],
-  maxHeight: 88,
+  maxHeight: 304,
   placeholder: '',
   plugins: () => [],
   skills: () => [],
@@ -428,7 +428,7 @@ defineExpose<CodexRichTextEditorExpose>({
   flex: 1 1 auto;
   min-width: 0;
   min-height: var(--chat-composer-line-height, var(--line-height-24));
-  max-height: var(--chat-composer-input-max-height, 88px);
+  max-height: var(--chat-composer-input-max-height, 304px);
   padding: var(--space-4) 0;
   overflow-y: auto;
   scrollbar-width: none;
