@@ -99,6 +99,8 @@ test('creates a thin Express web target against the modular packages', async (t)
   ]);
   assert.match(app, /createCodexWebSurfaceClient/);
   assert.match(app, /CodexConversationPane/);
+  assert.match(app, /CodexConversationSidebar/);
+  assert.match(app, /@create="surface\.createConversation\(\)"/);
   assert.doesNotMatch(app, /JSON\.parse|requestId|addEventListener/);
   assert.match(server, /bindCodexWebSocket/);
   assert.match(server, /authenticateSiteRequest/);

@@ -68,7 +68,7 @@ describe('Codex web transport', () => {
       name: 'notes.md',
       mimeType: 'text/markdown',
     }));
-    const authorize = vi.fn(async (context: { userId: string }) => ({
+    const authorize = vi.fn(async (_context: { userId: string }) => ({
       surface: surface.target,
       resolveAttachment,
       release,

@@ -62,9 +62,12 @@ function acquireCodexSession({ siteUser }: WebSessionContext) {
 }
 
 async function shutdown(): Promise<void> {
-  webSocketServer.close();
-  httpServer.close();
-  await backend.close();
+  for (const client of webSocketServer.clients) client.terminate();
+  await Promise.all([
+    new Promise<void>((resolve) => webSocketServer.close(() => resolve())),
+    new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve())),
+    backend.close(),
+  ]);
 }
 
 process.once('SIGINT', () => { void shutdown(); });
