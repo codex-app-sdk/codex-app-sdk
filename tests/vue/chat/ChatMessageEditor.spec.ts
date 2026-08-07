@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatMessageEditor from '../../../src/vue/chat/ChatMessageEditor.vue';
+import ChatMessageEditor from '../../../packages/vue/src/chat/ChatMessageEditor.vue';
 
 function mountEditor(content = 'Old prompt') {
   return mount(ChatMessageEditor, {

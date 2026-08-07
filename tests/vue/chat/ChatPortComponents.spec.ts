@@ -3,15 +3,15 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
 import { describe, expect, it } from 'vitest';
-import ChatComposerShelf from '../../../src/vue/chat/ChatComposerShelf.vue';
-import ChatQueuedPrompts from '../../../src/vue/chat/ChatQueuedPrompts.vue';
-import ChatAnimatedDiffStat from '../../../src/vue/chat/ChatAnimatedDiffStat.vue';
-import ChatToolConfirmation from '../../../src/vue/chat/ChatToolConfirmation.vue';
-import ChatToolUserInputRequest from '../../../src/vue/chat/ChatToolUserInputRequest.vue';
-import ChatToolCall from '../../../src/vue/chat/ChatToolCall.vue';
-import ChatToolGroup from '../../../src/vue/chat/ChatToolGroup.vue';
-import { provideCodexToolCallDetails } from '../../../src/vue/chat/tool-call-details';
-import type { MessageToolCall } from '../../../src/vue/chat/types';
+import ChatComposerShelf from '../../../packages/vue/src/chat/ChatComposerShelf.vue';
+import ChatQueuedPrompts from '../../../packages/vue/src/chat/ChatQueuedPrompts.vue';
+import ChatAnimatedDiffStat from '../../../packages/vue/src/chat/ChatAnimatedDiffStat.vue';
+import ChatToolConfirmation from '../../../packages/vue/src/chat/ChatToolConfirmation.vue';
+import ChatToolUserInputRequest from '../../../packages/vue/src/chat/ChatToolUserInputRequest.vue';
+import ChatToolCall from '../../../packages/vue/src/chat/ChatToolCall.vue';
+import ChatToolGroup from '../../../packages/vue/src/chat/ChatToolGroup.vue';
+import { provideCodexToolCallDetails } from '../../../packages/vue/src/chat/tool-call-details';
+import type { MessageToolCall } from '../../../packages/vue/src/chat/types';
 
 const completedTool: MessageToolCall = {
   args: { command: 'npm test' },

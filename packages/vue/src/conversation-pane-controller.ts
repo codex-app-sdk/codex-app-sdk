@@ -17,7 +17,7 @@ import type { Message } from './chat/types';
 import type { CodexMessageImageOpenHandler } from './chat/message-image';
 import type { CodexComposerState } from './composer-state';
 import type { QueuedChatPrompt } from './chat/queued-prompts';
-import type { CodexNativeAttachment } from '../native/types';
+import type { CodexNativeAttachment } from '@codex-app-sdk/core/native';
 import type {
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
@@ -26,7 +26,7 @@ import type {
   SendCodexMessageOptions,
   SurfaceMessage,
   UpdateCodexConversationSettings,
-} from '../surface/types';
+} from '@codex-app-sdk/core/surface';
 
 export type CodexConversationPaneIdentityState = {
   conversationKey?: string | number | null;

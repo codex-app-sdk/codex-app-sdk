@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import CodexScrollToBottom from '../../src/vue/components/CodexScrollToBottom.vue';
+import CodexScrollToBottom from '../../packages/vue/src/components/CodexScrollToBottom.vue';
 
 describe('CodexScrollToBottom', () => {
   it('renders an accessible circular arrow control and emits click', async () => {

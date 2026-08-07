@@ -1,6 +1,7 @@
 import { renderMarkdown } from './message-markdown'
 import { stripMessageContext } from './message-blocks'
-import { getCodexNativeRendererApi } from '../native-capabilities'
+import type { CodexHostCapabilities } from '@codex-app-sdk/core/native'
+import { getCodexGlobalHostCapabilities } from '../native-capabilities'
 
 const toolTagRegex = /<tool\s+(id|index)="[^"]*"><\/tool>/g
 const followUpTagRegex = /<follow-up>[\s\S]*?<\/follow-up>/g
@@ -21,12 +22,14 @@ export function copyableMessageHtml(content: string) {
   return renderMarkdown(stripMessageMarkup(content)).trim()
 }
 
-export async function copyMessageToClipboard(content: string) {
+export async function copyMessageToClipboard(
+  content: string,
+  hostCapabilities: CodexHostCapabilities | undefined = getCodexGlobalHostCapabilities(),
+) {
   const plainText = copyableMessageText(content)
   const html = copyableMessageHtml(content)
-  const nativeApi = getCodexNativeRendererApi()
-  if (nativeApi) {
-    await nativeApi.copyToClipboard({
+  if (hostCapabilities) {
+    await hostCapabilities.copyToClipboard({
       text: plainText,
       ...(html ? { html } : {}),
     })

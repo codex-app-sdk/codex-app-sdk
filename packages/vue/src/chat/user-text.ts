@@ -1,4 +1,4 @@
-import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../surface/types';
+import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 import { skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';
 

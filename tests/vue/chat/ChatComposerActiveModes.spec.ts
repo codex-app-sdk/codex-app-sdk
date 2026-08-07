@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatComposerActiveModes from '../../../src/vue/chat/ChatComposerActiveModes.vue';
+import ChatComposerActiveModes from '../../../packages/vue/src/chat/ChatComposerActiveModes.vue';
 
 describe('ChatComposerActiveModes', () => {
   it('renders and removes active plan mode through its public event', async () => {

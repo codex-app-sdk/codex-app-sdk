@@ -5,7 +5,7 @@ import type {
   CodexSurfaceSnapshot,
   CreateCodexRendererConversationOptions,
 } from '../../src/surface';
-import { useCodexSurface } from '../../src/vue';
+import { useCodexSurface } from '../../packages/vue/src';
 
 describe('useCodexSurface', () => {
   it('keeps Vue state synchronized with actions and pushed snapshots', async () => {

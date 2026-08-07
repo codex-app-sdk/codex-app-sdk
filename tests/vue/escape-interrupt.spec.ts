@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CodexConversationPane } from '../../src/vue'
+import { CodexConversationPane } from '../../packages/vue/src'
 
 describe('conversation Escape interruption', () => {
   afterEach(() => {

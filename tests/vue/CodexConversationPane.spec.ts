@@ -15,9 +15,9 @@ import {
   type CodexConversationPaneState,
   type CodexSurfaceController,
   type SurfaceMessage,
-} from '../../src/vue';
+} from '../../packages/vue/src';
 import type { CodexSurfaceSnapshot } from '../../src/surface';
-import type { Message } from '../../src/vue/chat/types';
+import type { Message } from '../../packages/vue/src/chat/types';
 
 const messages: SurfaceMessage[] = [{
   id: 'assistant-1',

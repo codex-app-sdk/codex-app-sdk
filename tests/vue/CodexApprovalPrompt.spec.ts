@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { CodexApprovalPrompt } from '../../src/vue';
+import { CodexApprovalPrompt } from '../../packages/vue/src';
 
 const approval = {
   id: 'approval-1',

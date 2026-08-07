@@ -1,3 +1,1 @@
-@import 'katex/dist/katex.min.css';
-@import './chat-theme.css';
-@import './base.css';
+@import '@codex-app-sdk/vue/styles.css';

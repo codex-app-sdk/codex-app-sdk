@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BrowserAudioRecorder, isBrowserAudioRecordingSupported } from '../../../src/vue/audio/browser-audio-recorder';
+import { BrowserAudioRecorder, isBrowserAudioRecordingSupported } from '../../../packages/vue/src/audio/browser-audio-recorder';
 
 describe('BrowserAudioRecorder', () => {
   afterEach(() => {

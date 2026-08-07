@@ -42,7 +42,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { getCodexNativeRendererApi } from '../native-capabilities'
+import { useCodexHostCapabilities } from '../native-capabilities'
 import { PaperclipIcon, PhotoIcon } from '../icons/app-icons'
 import ChatImageLightbox from './ChatImageLightbox.vue'
 import type { CodexMessageImageOpenHandler } from './message-image'
@@ -52,6 +52,8 @@ const props = defineProps<{
   attachment: MessageAttachment
   openImage?: CodexMessageImageOpenHandler
 }>()
+
+const hostCapabilities = useCodexHostCapabilities()
 
 const previewFailed = ref(false)
 const nativePreviewSource = ref<string>()
@@ -77,7 +79,7 @@ watch(
     const request = ++previewRequest
     nativePreviewSource.value = undefined
     if (kind !== 'image' || !path || isSafeImageSource(url)) return
-    const readImagePreview = getCodexNativeRendererApi()?.readImagePreview
+    const readImagePreview = hostCapabilities?.readImagePreview
     if (!readImagePreview) return
     try {
       const source = await readImagePreview(path)

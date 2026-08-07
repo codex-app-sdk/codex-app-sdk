@@ -24,7 +24,7 @@ export type CodexNativeClipboardContent = {
   html?: string;
 };
 
-export type CodexNativeRendererApi = {
+export type CodexHostCapabilities = {
   capabilities: {
     attachments: boolean;
     clipboard: boolean;
@@ -41,5 +41,8 @@ export type CodexNativeRendererApi = {
     options?: { locale?: string; live?: boolean },
   ): Promise<CodexSpeechTranscriptionResult>;
 };
+
+/** @deprecated Use the platform-neutral `CodexHostCapabilities` name. */
+export type CodexNativeRendererApi = CodexHostCapabilities;
 
 export const codexNativeRendererGlobal = 'codexAppSdkNative';

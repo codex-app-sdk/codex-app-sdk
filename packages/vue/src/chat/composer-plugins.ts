@@ -1,4 +1,4 @@
-import type { CodexSurfacePlugin } from '../../surface/types';
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { filterComposerSearchItems } from './composer-search';
 
 export function filterComposerPlugins(

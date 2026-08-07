@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CodexConversationPane,
   type CodexNativeAttachment,
-} from '../../src/vue';
+} from '../../packages/vue/src';
 
 describe('CodexConversationPane composer attachment actions', () => {
   it('renders the scoped slot once per attachment immediately before remove', () => {

@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatContextUsageIndicator from '../../../src/vue/chat/ChatContextUsageIndicator.vue';
+import ChatContextUsageIndicator from '../../../packages/vue/src/chat/ChatContextUsageIndicator.vue';
 
 describe('ChatContextUsageIndicator', () => {
   it('renders a context occupation circle with token detail', () => {

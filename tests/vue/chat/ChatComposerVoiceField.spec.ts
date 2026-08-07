@@ -2,8 +2,8 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatComposerWaveform from '../../../src/vue/chat/ChatComposerWaveform.vue';
-import ChatComposerVoiceField from '../../../src/vue/chat/ChatComposerVoiceField.vue';
+import ChatComposerWaveform from '../../../packages/vue/src/chat/ChatComposerWaveform.vue';
+import ChatComposerVoiceField from '../../../packages/vue/src/chat/ChatComposerVoiceField.vue';
 
 describe('ChatComposerVoiceField', () => {
   it('mounts the waveform while recording', () => {

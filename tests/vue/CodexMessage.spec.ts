@@ -3,9 +3,9 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
-import ChatCompactionMessage from '../../src/vue/chat/ChatCompactionMessage.vue';
-import CodexMessage from '../../src/vue/components/CodexMessage.vue';
-import ChatMessageEditor from '../../src/vue/chat/ChatMessageEditor.vue';
+import ChatCompactionMessage from '../../packages/vue/src/chat/ChatCompactionMessage.vue';
+import CodexMessage from '../../packages/vue/src/components/CodexMessage.vue';
+import ChatMessageEditor from '../../packages/vue/src/chat/ChatMessageEditor.vue';
 
 const clipboardWriteText = vi.fn();
 

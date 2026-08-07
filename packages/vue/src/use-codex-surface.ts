@@ -13,7 +13,7 @@ import type {
   SendCodexMessageOptions,
   StartCodexReviewOptions,
   UpdateCodexConversationSettings,
-} from '../surface/types';
+} from '@codex-app-sdk/core/surface';
 
 const initialState: CodexSurfaceSnapshot = {
   status: 'idle',

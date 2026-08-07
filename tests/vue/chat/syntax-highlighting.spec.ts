@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { languageForFilePath, renderCodeBlock } from '../../../src/vue/chat/syntax-highlighting';
+import { languageForFilePath, renderCodeBlock } from '../../../packages/vue/src/chat/syntax-highlighting';
 
 describe('syntax highlighting', () => {
   it.each([

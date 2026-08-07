@@ -4,7 +4,7 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import ChatRichTextEditor, {
   type CodexRichTextEditorExpose,
-} from '../../../src/vue/chat/ChatRichTextEditor.vue';
+} from '../../../packages/vue/src/chat/ChatRichTextEditor.vue';
 
 describe('ChatRichTextEditor leading empty line', () => {
   it('restores offset zero before the leading line break', () => {

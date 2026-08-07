@@ -3,18 +3,18 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import ChatAttachmentBlock from '../../../src/vue/chat/ChatAttachmentBlock.vue';
-import ChatComposerSlashMenu from '../../../src/vue/chat/ChatComposerSlashMenu.vue';
-import ChatFoldTransition from '../../../src/vue/chat/ChatFoldTransition.vue';
-import ChatFollowUps from '../../../src/vue/chat/ChatFollowUps.vue';
-import ChatGoal from '../../../src/vue/chat/ChatGoal.vue';
-import ChatIconButton from '../../../src/vue/chat/ChatIconButton.vue';
-import ChatImageLightbox from '../../../src/vue/chat/ChatImageLightbox.vue';
-import ChatMediaBlock from '../../../src/vue/chat/ChatMediaBlock.vue';
-import ChatMermaidBlock from '../../../src/vue/chat/ChatMermaidBlock.vue';
-import ChatMessageActions from '../../../src/vue/chat/ChatMessageActions.vue';
-import ChatQueuedPrompt from '../../../src/vue/chat/ChatQueuedPrompt.vue';
-import ChatTurnGitInfo from '../../../src/vue/chat/ChatTurnGitInfo.vue';
+import ChatAttachmentBlock from '../../../packages/vue/src/chat/ChatAttachmentBlock.vue';
+import ChatComposerSlashMenu from '../../../packages/vue/src/chat/ChatComposerSlashMenu.vue';
+import ChatFoldTransition from '../../../packages/vue/src/chat/ChatFoldTransition.vue';
+import ChatFollowUps from '../../../packages/vue/src/chat/ChatFollowUps.vue';
+import ChatGoal from '../../../packages/vue/src/chat/ChatGoal.vue';
+import ChatIconButton from '../../../packages/vue/src/chat/ChatIconButton.vue';
+import ChatImageLightbox from '../../../packages/vue/src/chat/ChatImageLightbox.vue';
+import ChatMediaBlock from '../../../packages/vue/src/chat/ChatMediaBlock.vue';
+import ChatMermaidBlock from '../../../packages/vue/src/chat/ChatMermaidBlock.vue';
+import ChatMessageActions from '../../../packages/vue/src/chat/ChatMessageActions.vue';
+import ChatQueuedPrompt from '../../../packages/vue/src/chat/ChatQueuedPrompt.vue';
+import ChatTurnGitInfo from '../../../packages/vue/src/chat/ChatTurnGitInfo.vue';
 
 describe('public conversation leaf components', () => {
   afterEach(() => {

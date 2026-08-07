@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
-import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../surface/types';
+import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 import { parseCodexUserText, type CodexUserTextToken } from './user-text';
 
 const props = withDefaults(defineProps<{

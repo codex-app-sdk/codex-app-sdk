@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import CodexConversationHistoryLoader from '../../src/vue/components/CodexConversationHistoryLoader.vue';
+import CodexConversationHistoryLoader from '../../packages/vue/src/components/CodexConversationHistoryLoader.vue';
 
 describe('CodexConversationHistoryLoader', () => {
   it('renders an accessible themed transcript skeleton in isolation', () => {

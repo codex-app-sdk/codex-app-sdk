@@ -3,8 +3,8 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import ChatToolGroup from '../../../src/vue/chat/ChatToolGroup.vue';
-import type { MessageToolCall } from '../../../src/vue/chat/types';
+import ChatToolGroup from '../../../packages/vue/src/chat/ChatToolGroup.vue';
+import type { MessageToolCall } from '../../../packages/vue/src/chat/types';
 
 const completedTool: MessageToolCall = {
   args: { command: 'npm test' },

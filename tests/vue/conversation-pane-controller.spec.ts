@@ -7,7 +7,7 @@ import {
   resolveCodexConversationPaneValue,
   type CodexConversationPaneActions,
   type CodexConversationPaneState,
-} from '../../src/vue';
+} from '../../packages/vue/src';
 import type { SurfaceMessage } from '../../src/surface';
 
 function message(id: string): SurfaceMessage {

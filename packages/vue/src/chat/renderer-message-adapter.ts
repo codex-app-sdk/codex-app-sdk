@@ -1,4 +1,4 @@
-import type { SurfaceMessage, SurfaceMessagePart } from '../../surface/types';
+import type { SurfaceMessage, SurfaceMessagePart } from '@codex-app-sdk/core/surface';
 import type { Message, MessagePart, MessageToolCall, ToolExecutionState } from './types';
 
 export type ChatMessageInput = Message | SurfaceMessage;

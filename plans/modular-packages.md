@@ -144,6 +144,8 @@ Commit: `feat: extract backend runtime package`
 
 ### Phase 3: Extract and make the Vue kit host-agnostic
 
+Status: complete
+
 - Move Vue components, composables, assets, and CSS into
   `@codex-app-sdk/vue`.
 - Add `provideCodexHostCapabilities` and `useCodexHostCapabilities` following

@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mount } from '@vue/test-utils';
+import { defineComponent, h } from 'vue';
 import type { CodexNativeAttachment, CodexNativeRendererApi } from '../../src/native/types';
 import {
   getCodexNativeRendererApi,
   ingestCodexAttachments,
   pickCodexAttachments,
-} from '../../src/vue/native-capabilities';
+  provideCodexHostCapabilities,
+  useCodexHostCapabilities,
+} from '../../packages/vue/src/native-capabilities';
 
 describe('native renderer capabilities', () => {
   afterEach(() => {
@@ -18,6 +22,29 @@ describe('native renderer capabilities', () => {
     const bridge = { pickAttachments: vi.fn() } as unknown as CodexNativeRendererApi;
     Object.defineProperty(window, 'codexAppSdkNative', { configurable: true, value: bridge });
     expect(getCodexNativeRendererApi()).toBe(bridge);
+  });
+
+  it('scopes host capabilities to the current Vue tree', () => {
+    const globalBridge = { capabilities: { attachments: false } } as unknown as CodexNativeRendererApi;
+    const scopedBridge = { capabilities: { attachments: true } } as unknown as CodexNativeRendererApi;
+    Object.defineProperty(window, 'codexAppSdkNative', { configurable: true, value: globalBridge });
+    let resolved: CodexNativeRendererApi | undefined;
+    const Child = defineComponent({
+      setup() {
+        resolved = useCodexHostCapabilities();
+        return () => h('span');
+      },
+    });
+    const Parent = defineComponent({
+      setup() {
+        provideCodexHostCapabilities(scopedBridge);
+        return () => h(Child);
+      },
+    });
+
+    mount(Parent);
+
+    expect(resolved).toBe(scopedBridge);
   });
 
   it('picks attachments through an override, native bridge, or empty fallback', async () => {

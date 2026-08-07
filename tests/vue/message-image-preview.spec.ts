@@ -7,7 +7,7 @@ import {
   CodexMessage,
   createCodexConversationPaneController,
   type CodexChatMessage,
-} from '../../src/vue'
+} from '../../packages/vue/src'
 
 const imageUrl = 'data:image/png;base64,cG5n'
 const messages: CodexChatMessage[] = [

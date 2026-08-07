@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { filterFileSearchItems } from '../../../src/vue/chat/file-search';
+import { filterFileSearchItems } from '../../../packages/vue/src/chat/file-search';
 
 describe('filterFileSearchItems', () => {
   const files = [

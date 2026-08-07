@@ -2,10 +2,10 @@
 
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import ChatMessageBlock from '../../../src/vue/chat/ChatMessageBlock.vue';
-import ChatToolCall from '../../../src/vue/chat/ChatToolCall.vue';
-import ChatToolGroup from '../../../src/vue/chat/ChatToolGroup.vue';
-import type { MessageBlock } from '../../../src/vue/chat/message-blocks';
+import ChatMessageBlock from '../../../packages/vue/src/chat/ChatMessageBlock.vue';
+import ChatToolCall from '../../../packages/vue/src/chat/ChatToolCall.vue';
+import ChatToolGroup from '../../../packages/vue/src/chat/ChatToolGroup.vue';
+import type { MessageBlock } from '../../../packages/vue/src/chat/message-blocks';
 
 afterEach(() => {
   document.body.innerHTML = '';

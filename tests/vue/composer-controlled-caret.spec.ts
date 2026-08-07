@@ -3,9 +3,9 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h, nextTick, ref } from 'vue';
 import { describe, expect, it } from 'vitest';
-import ChatRichTextEditor from '../../src/vue/chat/ChatRichTextEditor.vue';
-import type { CodexComposerState } from '../../src/vue/composer-state';
-import CodexComposer from '../../src/vue/components/CodexComposer.vue';
+import ChatRichTextEditor from '../../packages/vue/src/chat/ChatRichTextEditor.vue';
+import type { CodexComposerState } from '../../packages/vue/src/composer-state';
+import CodexComposer from '../../packages/vue/src/components/CodexComposer.vue';
 
 describe('controlled composer caret', () => {
   it('does not rebuild the editor when native caret movement echoes through controlled state', async () => {

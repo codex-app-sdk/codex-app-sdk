@@ -28,7 +28,7 @@ import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfaceRequestedPermission,
-} from '../../surface/types';
+} from '@codex-app-sdk/core/surface';
 
 const props = withDefaults(defineProps<{
   approval: CodexSurfaceApproval;

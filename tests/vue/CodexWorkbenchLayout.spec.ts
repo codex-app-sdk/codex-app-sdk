@@ -3,7 +3,7 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import CodexWorkbenchLayout from '../../src/vue/components/CodexWorkbenchLayout.vue';
+import CodexWorkbenchLayout from '../../packages/vue/src/components/CodexWorkbenchLayout.vue';
 
 describe('CodexWorkbenchLayout', () => {
   afterEach(() => {

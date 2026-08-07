@@ -66,7 +66,7 @@ import ChatUserText from './ChatUserText.vue'
 import { renderMarkdown } from './message-markdown'
 import type { MessageBlock } from './message-blocks'
 import type { ClientRequestResponse, CodexConversationLink } from './contracts'
-import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../surface/types'
+import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface'
 import type { CodexMessageImageOpenHandler } from './message-image'
 
 defineSlots<{

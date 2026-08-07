@@ -7,7 +7,7 @@ import {
   renderTaskItem,
   renderUserText,
   safeMarkdownHref,
-} from '../../../src/vue/chat/message-markdown';
+} from '../../../packages/vue/src/chat/message-markdown';
 
 describe('message markdown rendering', () => {
   it('renders task lists in chat messages', () => {

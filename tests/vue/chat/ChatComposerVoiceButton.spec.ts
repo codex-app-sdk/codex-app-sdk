@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatComposerVoiceButton from '../../../src/vue/chat/ChatComposerVoiceButton.vue';
+import ChatComposerVoiceButton from '../../../packages/vue/src/chat/ChatComposerVoiceButton.vue';
 
 describe('ChatComposerVoiceButton', () => {
   it('renders its recording interface and emits toggles', async () => {

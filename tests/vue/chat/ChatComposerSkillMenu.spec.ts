@@ -3,8 +3,8 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ChatComposerSkillMenu from '../../../src/vue/chat/ChatComposerSkillMenu.vue';
-import type { CodexSkillSummary } from '../../../src/vue/chat/contracts';
+import ChatComposerSkillMenu from '../../../packages/vue/src/chat/ChatComposerSkillMenu.vue';
+import type { CodexSkillSummary } from '../../../packages/vue/src/chat/contracts';
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 

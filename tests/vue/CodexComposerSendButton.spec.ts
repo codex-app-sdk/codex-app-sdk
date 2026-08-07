@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { CodexComposerSendButton } from '../../src/vue';
+import { CodexComposerSendButton } from '../../packages/vue/src';
 
 describe('CodexComposerSendButton', () => {
   it('renders submit and busy states and emits clicks', async () => {

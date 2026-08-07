@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
+const vueSourceRoot = path.join(packageRoot, 'packages/vue/src');
 const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules']);
 const inspectedExtensions = new Set(['.css', '.json', '.md', '.mjs', '.ts', '.vue']);
 
@@ -33,6 +34,18 @@ describe('package boundary', () => {
     expect(violations).toStrictEqual([]);
   });
 
+  it('keeps the Vue package independent from backend and host adapters', async () => {
+    const files = await sourceFiles(vueSourceRoot);
+    const violations: string[] = [];
+    for (const file of files) {
+      const content = await readFile(file, 'utf8');
+      if (/from\s+['"](?:node:|electron|@codex-app-sdk\/(?:backend|electron|web))/.test(content)) {
+        violations.push(path.relative(packageRoot, file));
+      }
+    }
+    expect(violations).toStrictEqual([]);
+  });
+
   it('keeps the preload entry renderer-only while exposing custom IPC composition', async () => {
     const preload = await readFile(path.join(packageRoot, 'src/electron/preload.ts'), 'utf8');
 
@@ -45,7 +58,7 @@ describe('package boundary', () => {
   });
 
   it('mirrors every public Vue component with one isolated test file', async () => {
-    const componentNames = (await readdir(path.join(packageRoot, 'src/vue/components')))
+    const componentNames = (await readdir(path.join(vueSourceRoot, 'components')))
       .filter((name) => name.endsWith('.vue'))
       .map((name) => name.replace(/\.vue$/, '.spec.ts'))
       .sort();
@@ -57,12 +70,12 @@ describe('package boundary', () => {
   });
 
   it('exports and directly mounts every generic conversation component', async () => {
-    const vueIndex = await readFile(path.join(packageRoot, 'src/vue/index.ts'), 'utf8');
+    const vueIndex = await readFile(path.join(vueSourceRoot, 'index.ts'), 'utf8');
     const exports = [...vueIndex.matchAll(
       /export \{ default as (\w+) \} from '(\.\/(?:components|chat)\/([^']+\.vue))';/g,
     )].map((match) => ({ publicName: match[1]!, source: match[2]!, sourceName: path.basename(match[3]!, '.vue') }));
     const componentSources = (await Promise.all(['components', 'chat'].map(async (directory) => (
-      (await readdir(path.join(packageRoot, `src/vue/${directory}`)))
+      (await readdir(path.join(vueSourceRoot, directory)))
         .filter((name) => name.endsWith('.vue'))
         .map((name) => `./${directory}/${name}`)
     )))).flat().sort();
@@ -81,7 +94,7 @@ describe('package boundary', () => {
   });
 
   it('names every Vue injection key with the SDK prefix', async () => {
-    const files = await sourceFiles(path.join(packageRoot, 'src/vue'));
+    const files = await sourceFiles(vueSourceRoot);
     const keys: Array<{ file: string; name: string }> = [];
     for (const file of files) {
       const content = await readFile(file, 'utf8');
@@ -96,12 +109,12 @@ describe('package boundary', () => {
 
   it('ships the complete conversation theme without resetting the host application', async () => {
     const [entrypoint, base, theme, viteConfig, vueBuildEntry, packageManifest, bundleVerifier] = await Promise.all([
-      readFile(path.join(packageRoot, 'src/vue/styles.css'), 'utf8'),
-      readFile(path.join(packageRoot, 'src/vue/base.css'), 'utf8'),
-      readFile(path.join(packageRoot, 'src/vue/chat-theme.css'), 'utf8'),
-      readFile(path.join(packageRoot, 'vite.config.ts'), 'utf8'),
-      readFile(path.join(packageRoot, 'scripts/vue-entry.mjs'), 'utf8'),
-      readFile(path.join(packageRoot, 'package.json'), 'utf8'),
+      readFile(path.join(vueSourceRoot, 'styles.css'), 'utf8'),
+      readFile(path.join(vueSourceRoot, 'base.css'), 'utf8'),
+      readFile(path.join(vueSourceRoot, 'chat-theme.css'), 'utf8'),
+      readFile(path.join(packageRoot, 'packages/vue/vite.config.ts'), 'utf8'),
+      readFile(path.join(packageRoot, 'packages/vue/scripts/vue-entry.mjs'), 'utf8'),
+      readFile(path.join(packageRoot, 'packages/vue/package.json'), 'utf8'),
       readFile(path.join(packageRoot, 'scripts/verify-package-css.mjs'), 'utf8'),
     ]);
 
@@ -121,9 +134,9 @@ describe('package boundary', () => {
     expect(theme).toContain('--chat-composer-control-size: var(--codex-composer-control-size');
     expect(theme).toContain('--chat-message-action-control-size: var(--codex-message-action-control-size');
     expect(viteConfig).toContain("new URL('./scripts/vue-entry.mjs'");
-    expect(vueBuildEntry).toContain("import '../src/vue/styles.css';");
-    expect(JSON.parse(packageManifest).scripts.build).toContain('node scripts/verify-package-css.mjs');
-    expect(JSON.parse(packageManifest).scripts.build).toContain('node scripts/package-katex-assets.mjs');
+    expect(vueBuildEntry).toContain("import '../src/styles.css';");
+    expect(JSON.parse(packageManifest).scripts.build).toContain('scripts/verify-package-css.mjs');
+    expect(JSON.parse(packageManifest).scripts.build).toContain('scripts/package-katex-assets.mjs');
     expect(bundleVerifier).toContain("'@media (prefers-color-scheme:dark)'");
     expect(bundleVerifier).toContain("'--font-size-15:15px'");
     expect(bundleVerifier).toContain("'--codex-message-font-size'");

@@ -3,7 +3,7 @@
 import { mount } from '@vue/test-utils';
 import { markRaw } from 'vue';
 import { describe, expect, it } from 'vitest';
-import ChatToolCallTitle from '../../../src/vue/chat/ChatToolCallTitle.vue';
+import ChatToolCallTitle from '../../../packages/vue/src/chat/ChatToolCallTitle.vue';
 
 describe('ChatToolCallTitle', () => {
   it('renders running titles with line diffs and a host icon', () => {

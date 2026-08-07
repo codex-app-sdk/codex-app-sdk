@@ -138,7 +138,7 @@ import { useCodexChatTranslate } from '../chat/chat-i18n'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
-import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '../../surface/types'
+import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '@codex-app-sdk/core/surface'
 import type { MessageBlock } from '../chat/message-blocks'
 import type { CodexMessageImage, CodexMessageImageOpenHandler } from '../chat/message-image'
 import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
@@ -148,6 +148,7 @@ import ChatMessageEditor from '../chat/ChatMessageEditor.vue'
 import { computeMessageBlocks, stripMessageContext } from '../chat/message-blocks'
 import { copyMessageToClipboard } from '../chat/message-actions'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
+import { useCodexHostCapabilities } from '../native-capabilities'
 
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
@@ -208,6 +209,8 @@ const emit = defineEmits<{
   'retry-message': [index: number]
   'send-follow-up': [prompt: string]
 }>()
+
+const hostCapabilities = useCodexHostCapabilities()
 
 const t = useCodexChatTranslate()
 const chatMessage = computed(() => chatMessageFromInput(props.message))
@@ -299,7 +302,7 @@ function openImage(image: CodexMessageImage) {
 }
 
 async function copyMessage() {
-  await copyMessageToClipboard(chatMessage.value.content)
+  await copyMessageToClipboard(chatMessage.value.content, hostCapabilities)
   copied.value = true
   emit('copy-message', props.index)
 

@@ -35,7 +35,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
-import type { CodexSurfacePlugin } from '../../surface/types';
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { PlugIcon } from '../icons/app-icons';
 import { pluginDescription, pluginDisplayName } from './composer-plugins';
 

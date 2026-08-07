@@ -1,5 +1,5 @@
-import type { CodexSpeechTranscriptionResult as NativeSpeechTranscriptionResult } from '../../native/types';
-import type { CodexSurfaceServiceTier } from '../../surface/types';
+import type { CodexSpeechTranscriptionResult as NativeSpeechTranscriptionResult } from '@codex-app-sdk/core/native';
+import type { CodexSurfaceServiceTier } from '@codex-app-sdk/core/surface';
 
 export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
 

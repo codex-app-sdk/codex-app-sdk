@@ -130,7 +130,7 @@
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapabilities, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription, CodexConversationPresentation, ReasoningEffort } from '../chat/contracts';
-import type { CodexSurfacePlugin } from '../../surface/types';
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands } from '../chat/codex-commands';
@@ -148,7 +148,7 @@ import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../chat/Chat
 import { useChatComposerSuggestions } from '../chat/use-chat-composer-suggestions';
 import { useChatComposerVoice } from '../chat/use-chat-composer-voice';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
-import { getCodexNativeRendererApi } from '../native-capabilities';
+import { useCodexHostCapabilities } from '../native-capabilities';
 import type { CodexComposerState } from '../composer-state';
 import { normalizeCodexComposerState } from '../composer-state';
 
@@ -199,6 +199,8 @@ const emit = defineEmits<{
   'update:serviceTier': [serviceTier: string | null];
 }>();
 
+const hostCapabilities = useCodexHostCapabilities();
+
 const prompt = ref('');
 const editorEl = ref<CodexRichTextEditorExpose | null>(null);
 const caretPosition = ref(0);
@@ -211,7 +213,7 @@ const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCap
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
 const voiceVisible = computed(() => (
   effectivePresentation.value.composer.voice
-  && Boolean(props.transcribeAudio || getCodexNativeRendererApi()?.capabilities.transcription)
+  && Boolean(props.transcribeAudio || hostCapabilities?.capabilities.transcription)
 ));
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));

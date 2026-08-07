@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { CodexConversationPane, CodexMessage, type SurfaceMessage } from '../../src/vue';
+import { CodexConversationPane, CodexMessage, type SurfaceMessage } from '../../packages/vue/src';
 
 const messages: SurfaceMessage[] = [
   {

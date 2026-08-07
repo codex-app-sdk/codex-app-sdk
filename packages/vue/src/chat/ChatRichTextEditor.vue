@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { h, nextTick, onBeforeUnmount, onMounted, ref, render, watch } from 'vue';
 import type { CodexFileSearchItem, CodexSkillSummary } from './contracts';
-import type { CodexSurfacePlugin } from '../../surface/types';
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import ChatMentionChip from './ChatMentionChip.vue';
 import { skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';

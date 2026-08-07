@@ -8,7 +8,7 @@ import {
   createCodexConversationPaneController,
   type CodexConversationPaneState,
   type SurfaceMessage,
-} from '../../src/vue';
+} from '../../packages/vue/src';
 
 const assistantMessage: SurfaceMessage = {
   id: 'assistant-fork',

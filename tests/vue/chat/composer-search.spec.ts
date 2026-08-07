@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import type { CodexCommandSummary, CodexSkillSummary } from '../../../src/vue/chat/contracts';
+import type { CodexCommandSummary, CodexSkillSummary } from '../../../packages/vue/src/chat/contracts';
 import {
   commandDescription,
   commandDisplayName,
   filterComposerCommands,
   findActiveCommandSlash,
-} from '../../../src/vue/chat/composer-commands';
+} from '../../../packages/vue/src/chat/composer-commands';
 import {
   filterComposerSkills,
   findActiveSkillSlash,
@@ -15,7 +15,7 @@ import {
   promptSkillInputsFromText,
   skillDescription,
   skillDisplayName,
-} from '../../../src/vue/chat/composer-skills';
+} from '../../../packages/vue/src/chat/composer-skills';
 
 describe('composer search ranking', () => {
   it('ranks skill id matches before name matches and description matches', () => {

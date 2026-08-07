@@ -3,9 +3,9 @@
 import { effectScope } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexNativeRendererApi } from '../../../src/native/types';
-import type { BrowserAudioRecorder, RecordedAudio } from '../../../src/vue/audio/browser-audio-recorder';
-import { useCodexComposerVoice } from '../../../src/vue';
-import { useChatComposerVoice } from '../../../src/vue/chat/use-chat-composer-voice';
+import type { BrowserAudioRecorder, RecordedAudio } from '../../../packages/vue/src/audio/browser-audio-recorder';
+import { useCodexComposerVoice } from '../../../packages/vue/src';
+import { useChatComposerVoice } from '../../../packages/vue/src/chat/use-chat-composer-voice';
 
 const recording: RecordedAudio = {
   blob: new Blob(['audio'], { type: 'audio/webm' }),

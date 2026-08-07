@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { surfaceMessageToChatMessage } from '../../../src/vue/chat/renderer-message-adapter';
+import { surfaceMessageToChatMessage } from '../../../packages/vue/src/chat/renderer-message-adapter';
 import type { SurfaceMessage } from '../../../src/surface/types';
 
 describe('renderer message adapter', () => {

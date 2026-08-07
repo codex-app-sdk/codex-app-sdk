@@ -4,11 +4,11 @@ import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CodexSurfacePlugin } from '../../../src/surface';
-import type { CodexFileSearchItem, CodexSkillSummary } from '../../../src/vue/chat/contracts';
-import ChatComposerAtMentionMenu from '../../../src/vue/chat/ChatComposerAtMentionMenu.vue';
-import ChatComposerFileMentionMenu from '../../../src/vue/chat/ChatComposerFileMentionMenu.vue';
-import ChatComposerPluginMenu from '../../../src/vue/chat/ChatComposerPluginMenu.vue';
-import ChatComposerSkillMenu from '../../../src/vue/chat/ChatComposerSkillMenu.vue';
+import type { CodexFileSearchItem, CodexSkillSummary } from '../../../packages/vue/src/chat/contracts';
+import ChatComposerAtMentionMenu from '../../../packages/vue/src/chat/ChatComposerAtMentionMenu.vue';
+import ChatComposerFileMentionMenu from '../../../packages/vue/src/chat/ChatComposerFileMentionMenu.vue';
+import ChatComposerPluginMenu from '../../../packages/vue/src/chat/ChatComposerPluginMenu.vue';
+import ChatComposerSkillMenu from '../../../packages/vue/src/chat/ChatComposerSkillMenu.vue';
 
 const plugin: CodexSurfacePlugin = {
   id: 'gmail@remote', name: 'gmail', displayName: 'Gmail',

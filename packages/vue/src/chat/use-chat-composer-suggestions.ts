@@ -4,7 +4,7 @@ import type {
   CodexCommandSummary,
   CodexSkillSummary,
 } from './contracts'
-import type { CodexSurfacePlugin } from '../../surface/types'
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface'
 import { findActiveFileMention, findActivePluginMention } from './composer-mentions'
 import { filterFileSearchItems } from './file-search'
 import { filterComposerCommands, findActiveCommandSlash } from './composer-commands'

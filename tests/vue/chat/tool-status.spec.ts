@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { getToolDisplayTitle, getToolDisplayTitleParts, getToolFallbackTitle, getToolGroupLineDiff, getToolLineDiff, parseToolStatusDescriptor, registerCodexToolTitlePresenter } from '../../../src/vue/chat/tool-status';
-import type { MessageToolCall } from '../../../src/vue/chat/types';
+import { getToolDisplayTitle, getToolDisplayTitleParts, getToolFallbackTitle, getToolGroupLineDiff, getToolLineDiff, parseToolStatusDescriptor, registerCodexToolTitlePresenter } from '../../../packages/vue/src/chat/tool-status';
+import type { MessageToolCall } from '../../../packages/vue/src/chat/types';
 
 describe('tool status helpers', () => {
   it('parses valid status descriptors and rejects invalid values', () => {

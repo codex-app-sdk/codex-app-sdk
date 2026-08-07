@@ -3,13 +3,13 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
-import CodexComposer from '../../src/vue/components/CodexComposer.vue';
-import CodexComposerPluginMenu from '../../src/vue/chat/ChatComposerPluginMenu.vue';
-import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../src/vue/chat/ChatRichTextEditor.vue';
-import { codexCommands } from '../../src/vue/chat/codex-commands';
-import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../../src/vue/chat/contracts';
+import CodexComposer from '../../packages/vue/src/components/CodexComposer.vue';
+import CodexComposerPluginMenu from '../../packages/vue/src/chat/ChatComposerPluginMenu.vue';
+import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../packages/vue/src/chat/ChatRichTextEditor.vue';
+import { codexCommands } from '../../packages/vue/src/chat/codex-commands';
+import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../../packages/vue/src/chat/contracts';
 import type { CodexSurfacePlugin } from '../../src/surface';
-import type { CodexComposerState } from '../../src/vue/composer-state';
+import type { CodexComposerState } from '../../packages/vue/src/composer-state';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),

@@ -2,9 +2,9 @@
 
 import { nextTick, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexFileSearchItem, CodexCommandSummary, CodexSkillSummary } from '../../../src/vue/chat/contracts';
+import type { CodexFileSearchItem, CodexCommandSummary, CodexSkillSummary } from '../../../packages/vue/src/chat/contracts';
 import type { CodexSurfacePlugin } from '../../../src/surface';
-import { useChatComposerSuggestions } from '../../../src/vue/chat/use-chat-composer-suggestions';
+import { useChatComposerSuggestions } from '../../../packages/vue/src/chat/use-chat-composer-suggestions';
 
 const files: CodexFileSearchItem[] = [
   { name: 'alpha.ts', path: 'src/alpha.ts' },

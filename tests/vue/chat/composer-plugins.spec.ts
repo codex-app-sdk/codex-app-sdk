@@ -6,8 +6,8 @@ import {
   pluginDisplayName,
   pluginInsertText,
   pluginMatchesMention,
-} from '../../../src/vue/chat/composer-plugins';
-import { isApprovalPreset } from '../../../src/vue/chat/approval-presets';
+} from '../../../packages/vue/src/chat/composer-plugins';
+import { isApprovalPreset } from '../../../packages/vue/src/chat/approval-presets';
 
 const plugins: CodexSurfacePlugin[] = [
   { id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', shortDescription: 'Read mail', enabled: true },

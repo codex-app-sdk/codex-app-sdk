@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatComposerActionMenu from '../../../src/vue/chat/ChatComposerActionMenu.vue';
+import ChatComposerActionMenu from '../../../packages/vue/src/chat/ChatComposerActionMenu.vue';
 
 describe('ChatComposerActionMenu', () => {
   it('closes when clicking outside the menu', async () => {

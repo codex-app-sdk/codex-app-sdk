@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixWebmDuration from 'fix-webm-duration';
-import { prepareAppleSpeechAudio, transcribeRecordedAudio } from '../../../src/vue/audio/apple-speech-transcription';
+import { prepareAppleSpeechAudio, transcribeRecordedAudio } from '../../../packages/vue/src/audio/apple-speech-transcription';
 
 vi.mock('fix-webm-duration', () => ({
   default: vi.fn(async (blob: Blob) => blob),

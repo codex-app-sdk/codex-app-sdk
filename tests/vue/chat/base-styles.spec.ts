@@ -3,9 +3,9 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { renderMarkdown } from '../../../src/vue/chat/message-markdown';
+import { renderMarkdown } from '../../../packages/vue/src/chat/message-markdown';
 
-const baseStyles = await readFile(path.resolve('src/vue/base.css'), 'utf8');
+const baseStyles = await readFile(path.resolve('packages/vue/src/base.css'), 'utf8');
 
 beforeEach(() => {
   document.head.innerHTML = `<style>${baseStyles}</style>`;

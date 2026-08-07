@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatCompactionMessage from '../../../src/vue/chat/ChatCompactionMessage.vue';
+import ChatCompactionMessage from '../../../packages/vue/src/chat/ChatCompactionMessage.vue';
 
 describe('ChatCompactionMessage', () => {
   it('renders a running compaction with shimmer copy', () => {

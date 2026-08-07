@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { applyCodexTheme } from '../../src/vue/codex-theme';
+import { applyCodexTheme } from '../../packages/vue/src/codex-theme';
 
 describe('applyCodexTheme', () => {
   it('applies an optional theme contract without taking ownership of the app shell', () => {

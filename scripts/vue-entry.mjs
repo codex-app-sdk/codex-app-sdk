@@ -1,3 +1,3 @@
-import '../src/vue/styles.css';
+import '../packages/vue/src/styles.css';
 
-export * from '../src/vue/index.ts';
+export * from '../packages/vue/src/index.ts';

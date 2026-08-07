@@ -7,7 +7,7 @@ import {
   copyableMessageText,
   copyMessageToClipboard,
   stripMessageMarkup,
-} from '../../../src/vue/chat/message-actions';
+} from '../../../packages/vue/src/chat/message-actions';
 
 describe('message actions', () => {
   afterEach(() => {

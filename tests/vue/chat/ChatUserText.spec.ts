@@ -2,8 +2,8 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatUserText from '../../../src/vue/chat/ChatUserText.vue';
-import { parseCodexUserText } from '../../../src/vue/chat/user-text';
+import ChatUserText from '../../../packages/vue/src/chat/ChatUserText.vue';
+import { parseCodexUserText } from '../../../packages/vue/src/chat/user-text';
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '../../../src/surface';
 
 const gmail: CodexSurfacePlugin = {

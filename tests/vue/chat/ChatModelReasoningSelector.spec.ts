@@ -2,8 +2,8 @@
 
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import ChatModelReasoningSelector from '../../../src/vue/chat/ChatModelReasoningSelector.vue';
-import type { CodexModelOption, ReasoningEffort } from '../../../src/vue/chat/contracts';
+import ChatModelReasoningSelector from '../../../packages/vue/src/chat/ChatModelReasoningSelector.vue';
+import type { CodexModelOption, ReasoningEffort } from '../../../packages/vue/src/chat/contracts';
 
 type SelectorProps = {
   disabled?: boolean;

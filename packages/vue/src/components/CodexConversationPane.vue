@@ -215,8 +215,8 @@ import type {
   CodexSurfacePlugin,
   SurfaceMessage,
   SendCodexMessageOptions,
-} from '../../surface/types';
-import type { CodexNativeAttachment } from '../../native/types';
+} from '@codex-app-sdk/core/surface';
+import type { CodexNativeAttachment } from '@codex-app-sdk/core/native';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import type {
   CodexConversationPaneActions,
@@ -255,9 +255,9 @@ import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands } from '../chat/codex-commands';
 import { codexConversationLinkFromHref } from '../chat/conversation-links';
 import {
-  getCodexNativeRendererApi,
   ingestCodexAttachments,
   pickCodexAttachments,
+  useCodexHostCapabilities,
   type CodexAttachmentIngester,
   type CodexAttachmentPicker,
 } from '../native-capabilities';
@@ -434,6 +434,8 @@ const emit = defineEmits<{
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
   'update:serviceTier': [serviceTier: string | null];
 }>();
+
+const hostCapabilities = useCodexHostCapabilities();
 
 const draftRevision = ref(0);
 const composer = ref<{ focus(): void } | null>(null);
@@ -777,8 +779,7 @@ function handleConversationLink(link: CodexConversationLink): void {
     return;
   }
   if (link.kind === 'external') {
-    const nativeApi = getCodexNativeRendererApi();
-    if (nativeApi) void nativeApi.openExternal(link.href).catch(setLocalError);
+    if (hostCapabilities) void hostCapabilities.openExternal(link.href).catch(setLocalError);
     else window.open(link.href, '_blank', 'noopener,noreferrer');
   }
 }
@@ -805,7 +806,7 @@ async function selectAttachments(): Promise<void> {
   if (!effectiveController.value) emit('attach');
   if (!effectiveAttachEnabled.value) return;
   try {
-    appendAttachments(await pickCodexAttachments(props.pickAttachments));
+    appendAttachments(await pickCodexAttachments(props.pickAttachments, hostCapabilities));
   } catch (error) {
     setLocalError(error);
   }
@@ -848,7 +849,7 @@ function clipboardFiles(event: ClipboardEvent): File[] {
 async function ingestFiles(files: readonly File[]): Promise<void> {
   if (!effectiveAttachEnabled.value) return;
   try {
-    appendAttachments(await ingestCodexAttachments(files, props.ingestAttachments));
+    appendAttachments(await ingestCodexAttachments(files, props.ingestAttachments, hostCapabilities));
   } catch (error) {
     setLocalError(error);
   }

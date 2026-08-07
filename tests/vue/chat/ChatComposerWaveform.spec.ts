@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ChatComposerWaveform from '../../../src/vue/chat/ChatComposerWaveform.vue';
+import ChatComposerWaveform from '../../../packages/vue/src/chat/ChatComposerWaveform.vue';
 
 type WaveformAudioRecorder = {
   getAnalyser(): AnalyserNode | null;

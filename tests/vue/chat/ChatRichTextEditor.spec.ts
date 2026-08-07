@@ -3,9 +3,9 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import ChatMentionChip from '../../../src/vue/chat/ChatMentionChip.vue';
-import ChatComposerAtMentionMenu from '../../../src/vue/chat/ChatComposerAtMentionMenu.vue';
-import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../../src/vue/chat/ChatRichTextEditor.vue';
+import ChatMentionChip from '../../../packages/vue/src/chat/ChatMentionChip.vue';
+import ChatComposerAtMentionMenu from '../../../packages/vue/src/chat/ChatComposerAtMentionMenu.vue';
+import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../../packages/vue/src/chat/ChatRichTextEditor.vue';
 
 const skill = {
   name: 'Commit-Push (cp)',

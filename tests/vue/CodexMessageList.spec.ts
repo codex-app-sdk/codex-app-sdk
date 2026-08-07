@@ -3,9 +3,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { toRaw } from 'vue';
-import CodexMessageList from '../../src/vue/components/CodexMessageList.vue';
-import CodexMessage from '../../src/vue/components/CodexMessage.vue';
-import type { Message } from '../../src/vue/chat/types';
+import CodexMessageList from '../../packages/vue/src/components/CodexMessageList.vue';
+import CodexMessage from '../../packages/vue/src/components/CodexMessage.vue';
+import type { Message } from '../../packages/vue/src/chat/types';
 import type { SurfaceMessage } from '../../src/surface/types';
 
 const messages: Message[] = [

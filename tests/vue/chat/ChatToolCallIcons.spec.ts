@@ -3,10 +3,10 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
 import { describe, expect, it } from 'vitest';
-import ChatToolCall from '../../../src/vue/chat/ChatToolCall.vue';
-import ChatToolIcon from '../../../src/vue/chat/ChatToolIcon.vue';
-import { provideCodexToolPresentation } from '../../../src/vue/chat/tool-presentation';
-import type { MessageToolCall } from '../../../src/vue/chat/types';
+import ChatToolCall from '../../../packages/vue/src/chat/ChatToolCall.vue';
+import ChatToolIcon from '../../../packages/vue/src/chat/ChatToolIcon.vue';
+import { provideCodexToolPresentation } from '../../../packages/vue/src/chat/tool-presentation';
+import type { MessageToolCall } from '../../../packages/vue/src/chat/types';
 
 const actions = [
   ['create', 'pencil'],

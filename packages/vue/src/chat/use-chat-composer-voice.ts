@@ -6,7 +6,7 @@ import {
   type RecordedAudio,
 } from '../audio/browser-audio-recorder'
 import { transcribeRecordedAudio } from '../audio/apple-speech-transcription'
-import { getCodexNativeRendererApi } from '../native-capabilities'
+import { useCodexHostCapabilities } from '../native-capabilities'
 
 export type CodexComposerVoiceOptions = {
   isDisabled: () => boolean
@@ -40,23 +40,22 @@ type ChatComposerVoiceDependencies = {
   transcribe: (recording: RecordedAudio) => Promise<CodexSpeechTranscriptionResult>
 }
 
-const defaultDependencies: ChatComposerVoiceDependencies = {
-  canTranscribe: () => getCodexNativeRendererApi()?.capabilities.transcription === true,
-  createRecorder: () => new BrowserAudioRecorder(),
-  isRecordingSupported: isBrowserAudioRecordingSupported,
-  transcribe: (recording) => transcribeRecordedAudio(recording, {
-    transcribeAppleSpeech: async (audioData, options) => {
-      const nativeApi = getCodexNativeRendererApi()
-      if (!nativeApi) return { error: 'Speech transcription is not available.', text: '' }
-      return nativeApi.transcribeAudio(audioData, options)
-    },
-  }),
-}
-
 export function useChatComposerVoice(
   options: CodexComposerVoiceOptions,
   dependencyOverrides: Partial<ChatComposerVoiceDependencies> = {},
 ) {
+  const hostCapabilities = useCodexHostCapabilities()
+  const defaultDependencies: ChatComposerVoiceDependencies = {
+    canTranscribe: () => hostCapabilities?.capabilities.transcription === true,
+    createRecorder: () => new BrowserAudioRecorder(),
+    isRecordingSupported: isBrowserAudioRecordingSupported,
+    transcribe: (recording) => transcribeRecordedAudio(recording, {
+      transcribeAppleSpeech: async (audioData, transcriptionOptions) => {
+        if (!hostCapabilities) return { error: 'Speech transcription is not available.', text: '' }
+        return hostCapabilities.transcribeAudio(audioData, transcriptionOptions)
+      },
+    }),
+  }
   const providedTranscription = options.transcribeAudio
     ? {
         canTranscribe: () => true,

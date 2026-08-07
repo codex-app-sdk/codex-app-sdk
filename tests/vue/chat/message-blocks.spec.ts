@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { computeMessageBlocks, groupToolBlocks, stripMessageContext } from '../../../src/vue/chat/message-blocks';
-import type { Message, MessageToolCall } from '../../../src/vue/chat/types';
+import { computeMessageBlocks, groupToolBlocks, stripMessageContext } from '../../../packages/vue/src/chat/message-blocks';
+import type { Message, MessageToolCall } from '../../../packages/vue/src/chat/types';
 
 const completedTool: MessageToolCall = {
   args: { command: 'npm test' },

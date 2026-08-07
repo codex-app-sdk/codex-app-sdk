@@ -71,7 +71,7 @@ import type {
   CodexSurfacePlugin,
   CodexSurfaceSkill,
   SurfaceMessage,
-} from '../../surface/types'
+} from '@codex-app-sdk/core/surface'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'

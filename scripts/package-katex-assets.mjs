@@ -1,10 +1,15 @@
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const distCssPath = fileURLToPath(new URL('../dist/codex-app-sdk.css', import.meta.url));
+const distCssPath = process.argv[2]
+  ? path.resolve(process.cwd(), process.argv[2])
+  : fileURLToPath(new URL('../dist/codex-app-sdk.css', import.meta.url));
 const katexCssPath = fileURLToPath(new URL('../node_modules/katex/dist/katex.min.css', import.meta.url));
 const katexFontsPath = fileURLToPath(new URL('../node_modules/katex/dist/fonts', import.meta.url));
-const distFontsPath = fileURLToPath(new URL('../dist/fonts', import.meta.url));
+const distFontsPath = process.argv[3]
+  ? path.resolve(process.cwd(), process.argv[3])
+  : fileURLToPath(new URL('../dist/fonts', import.meta.url));
 
 const [builtCss, katexCss] = await Promise.all([
   readFile(distCssPath, 'utf8'),

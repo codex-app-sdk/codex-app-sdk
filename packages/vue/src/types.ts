@@ -8,4 +8,4 @@ export type {
   SurfaceMessageStatusPart,
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,
-} from '../surface/types';
+} from '@codex-app-sdk/core/surface';

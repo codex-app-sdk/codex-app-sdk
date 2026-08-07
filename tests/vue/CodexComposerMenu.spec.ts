@@ -3,7 +3,7 @@
 import { mount } from '@vue/test-utils';
 import { h } from 'vue';
 import { describe, expect, it } from 'vitest';
-import { CodexComposerMenu, type CodexComposerMenuItem } from '../../src/vue';
+import { CodexComposerMenu, type CodexComposerMenuItem } from '../../packages/vue/src';
 
 describe('CodexComposerMenu', () => {
   const items: CodexComposerMenuItem<{ source: string }>[] = [
