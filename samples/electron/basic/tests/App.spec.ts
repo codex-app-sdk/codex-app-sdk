@@ -24,14 +24,14 @@ describe('basic sample App', () => {
     expect(wrapper.text()).not.toContain('This sample asks before protected tool calls');
     expect(wrapper.findAll('[aria-label="Status: active"]')).toHaveLength(2);
 
-    const conversationItems = wrapper.findAll('.conversation-sidebar__select');
+    const conversationItems = wrapper.findAll('.codex-conversation-sidebar__select');
     expect(conversationItems.every((item) => item.attributes('disabled') === undefined)).toBe(true);
     await conversationItems[1]!.trigger('click');
     await flushPromises();
     expect(api.selectConversation).toHaveBeenCalledWith('thread-2');
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await wrapper.findAll('.conversation-sidebar__delete')[1]!.trigger('click');
+    await wrapper.findAll('.codex-conversation-sidebar__delete')[1]!.trigger('click');
     await flushPromises();
     expect(api.deleteConversation).toHaveBeenCalledWith('thread-2');
 

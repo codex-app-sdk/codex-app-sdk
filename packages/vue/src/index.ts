@@ -2,6 +2,7 @@ export { default as CodexComposer } from './components/CodexComposer.vue';
 export type { CodexComposerState } from './composer-state';
 export { default as CodexApprovalPrompt } from './components/CodexApprovalPrompt.vue';
 export { default as CodexConversationPane } from './components/CodexConversationPane.vue';
+export { default as CodexConversationSidebar } from './components/CodexConversationSidebar.vue';
 export {
   createCodexConversationPaneController,
   type CodexConversationPaneActions,

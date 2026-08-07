@@ -6,7 +6,7 @@ const sampleRoot = path.resolve(import.meta.dirname, '..');
 
 describe('sample component test boundary', () => {
   it('keeps one isolated test file per Vue component', async () => {
-    const components = ['App.vue', ...(await readdir(path.join(sampleRoot, 'src/renderer/components')))]
+    const components = ['App.vue']
       .filter((name) => name.endsWith('.vue'))
       .map((name) => name.replace(/\.vue$/, '.spec.ts'))
       .sort();

@@ -1,11 +1,24 @@
 <template>
   <main class="web-app">
+    <CodexConversationSidebar
+      :active-conversation-id="surface.state.activeConversationId"
+      :conversations="surface.state.conversations"
+      :create-disabled="surface.state.status !== 'ready'"
+      :loading="surface.state.status === 'connecting'"
+      @create="surface.createConversation()"
+      @delete="surface.deleteConversation($event)"
+      @select="surface.selectConversation($event)"
+    />
     <CodexConversationPane :surface="surface" autofocus />
   </main>
 </template>
 
 <script setup lang="ts">
-import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
+import {
+  CodexConversationPane,
+  CodexConversationSidebar,
+  useCodexSurface,
+} from '@codex-app-sdk/vue';
 import {
   createCodexBrowserWebSocketPort,
   createCodexWebSurfaceClient,

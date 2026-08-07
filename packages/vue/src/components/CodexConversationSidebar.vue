@@ -1,39 +1,44 @@
 <template>
-  <aside class="conversation-sidebar" aria-label="Conversations">
-    <div class="conversation-sidebar__header">
-      <span class="conversation-sidebar__brand">Codex</span>
-      <button class="conversation-sidebar__new" type="button" :disabled="createDisabled" @click="emit('create')">
+  <aside class="codex-conversation-sidebar" aria-label="Conversations">
+    <div class="codex-conversation-sidebar__header">
+      <span class="codex-conversation-sidebar__brand">{{ brand }}</span>
+      <button
+        class="codex-conversation-sidebar__new"
+        type="button"
+        :disabled="createDisabled"
+        @click="emit('create')"
+      >
         <span aria-hidden="true">＋</span>
         New thread
       </button>
     </div>
-    <p v-if="conversations.length === 0" class="conversation-sidebar__empty">
+    <p v-if="conversations.length === 0" class="codex-conversation-sidebar__empty">
       {{ loading ? 'Loading threads…' : 'No conversations yet' }}
     </p>
-    <nav v-else class="conversation-sidebar__list">
+    <nav v-else class="codex-conversation-sidebar__list">
       <div
         v-for="conversation in conversations"
         :key="conversation.id"
-        class="conversation-sidebar__item"
-        :class="{ 'conversation-sidebar__item--active': conversation.id === activeConversationId }"
+        class="codex-conversation-sidebar__item"
+        :class="{ 'codex-conversation-sidebar__item--active': conversation.id === activeConversationId }"
       >
         <button
-          class="conversation-sidebar__select"
+          class="codex-conversation-sidebar__select"
           type="button"
           :aria-current="conversation.id === activeConversationId ? 'page' : undefined"
           @click="emit('select', conversation.id)"
         >
           <span
-            class="conversation-sidebar__status"
-            :class="`conversation-sidebar__status--${conversation.status}`"
+            class="codex-conversation-sidebar__status"
+            :class="`codex-conversation-sidebar__status--${conversation.status}`"
             :aria-label="`Status: ${conversation.status}`"
             :title="conversation.status"
           />
-          <span class="conversation-sidebar__title">{{ conversation.title }}</span>
-          <span class="conversation-sidebar__time">{{ relativeTime(conversation.updatedAt) }}</span>
+          <span class="codex-conversation-sidebar__title">{{ conversation.title }}</span>
+          <span class="codex-conversation-sidebar__time">{{ relativeTime(conversation.updatedAt) }}</span>
         </button>
         <button
-          class="conversation-sidebar__delete"
+          class="codex-conversation-sidebar__delete"
           type="button"
           :aria-label="`Delete ${conversation.title}`"
           title="Delete thread"
@@ -49,15 +54,17 @@
 </template>
 
 <script setup lang="ts">
-import type { CodexConversationSummary } from '@codex-app-sdk/core';
+import type { CodexConversationSummary } from '@codex-app-sdk/core/surface';
 
 withDefaults(defineProps<{
   activeConversationId?: string | null;
+  brand?: string;
   conversations: readonly CodexConversationSummary[];
   createDisabled?: boolean;
   loading?: boolean;
 }>(), {
   activeConversationId: null,
+  brand: 'Codex',
   createDisabled: false,
   loading: false,
 });
@@ -72,8 +79,7 @@ function confirmDelete(conversation: CodexConversationSummary): void {
   const confirmed = window.confirm(
     `Delete "${conversation.title}"? This permanently deletes the thread and cannot be undone.`,
   );
-  if (!confirmed) return;
-  emit('delete', conversation.id);
+  if (confirmed) emit('delete', conversation.id);
 }
 
 function relativeTime(value: string): string {
@@ -81,13 +87,12 @@ function relativeTime(value: string): string {
   if (elapsedMinutes < 1) return 'now';
   if (elapsedMinutes < 60) return `${elapsedMinutes}m`;
   const hours = Math.floor(elapsedMinutes / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
+  return hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
 }
 </script>
 
 <style scoped>
-.conversation-sidebar {
+.codex-conversation-sidebar {
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -96,13 +101,13 @@ function relativeTime(value: string): string {
   background: #f1f1ee;
 }
 
-.conversation-sidebar__header {
+.codex-conversation-sidebar__header {
   display: grid;
   gap: 14px;
   padding: 24px 14px 12px;
 }
 
-.conversation-sidebar__brand {
+.codex-conversation-sidebar__brand {
   padding-left: 8px;
   color: #1f201e;
   font-size: 18px;
@@ -110,9 +115,9 @@ function relativeTime(value: string): string {
   letter-spacing: -0.02em;
 }
 
-.conversation-sidebar__new,
-.conversation-sidebar__select,
-.conversation-sidebar__delete {
+.codex-conversation-sidebar__new,
+.codex-conversation-sidebar__select,
+.codex-conversation-sidebar__delete {
   width: 100%;
   border: 0;
   color: #2a2b29;
@@ -121,21 +126,21 @@ function relativeTime(value: string): string {
   cursor: pointer;
 }
 
-.conversation-sidebar__new {
+.codex-conversation-sidebar__new {
   border-radius: 9px;
   padding: 9px 10px;
   font-weight: 600;
   text-align: left;
 }
 
-.conversation-sidebar__new:hover,
-.conversation-sidebar__item:hover,
-.conversation-sidebar__item:focus-within,
-.conversation-sidebar__item--active {
+.codex-conversation-sidebar__new:hover,
+.codex-conversation-sidebar__item:hover,
+.codex-conversation-sidebar__item:focus-within,
+.codex-conversation-sidebar__item--active {
   background: #e2e2dd;
 }
 
-.conversation-sidebar__list {
+.codex-conversation-sidebar__list {
   display: flex;
   min-height: 0;
   padding: 2px 8px 12px;
@@ -144,12 +149,12 @@ function relativeTime(value: string): string {
   gap: 2px;
 }
 
-.conversation-sidebar__item {
+.codex-conversation-sidebar__item {
   position: relative;
   border-radius: 9px;
 }
 
-.conversation-sidebar__select {
+.codex-conversation-sidebar__select {
   display: grid;
   min-width: 0;
   grid-template-columns: 8px minmax(0, 1fr) 34px;
@@ -160,43 +165,43 @@ function relativeTime(value: string): string {
   text-align: left;
 }
 
-.conversation-sidebar__select:focus-visible,
-.conversation-sidebar__delete:focus-visible {
+.codex-conversation-sidebar__select:focus-visible,
+.codex-conversation-sidebar__delete:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: -2px;
 }
 
-.conversation-sidebar__status {
+.codex-conversation-sidebar__status {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: #a0a099;
 }
 
-.conversation-sidebar__status--active {
+.codex-conversation-sidebar__status--active {
   background: #3b82f6;
   box-shadow: 0 0 0 3px rgb(59 130 246 / 14%);
 }
 
-.conversation-sidebar__status--error {
+.codex-conversation-sidebar__status--error {
   background: #c2413b;
 }
 
-.conversation-sidebar__title {
+.codex-conversation-sidebar__title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
 }
 
-.conversation-sidebar__time {
+.codex-conversation-sidebar__time {
   justify-self: end;
   color: #85857e;
   font-size: 12px;
   pointer-events: none;
 }
 
-.conversation-sidebar__delete {
+.codex-conversation-sidebar__delete {
   position: absolute;
   z-index: 1;
   top: 50%;
@@ -213,7 +218,7 @@ function relativeTime(value: string): string {
   transform: translateY(-50%);
 }
 
-.conversation-sidebar__delete svg {
+.codex-conversation-sidebar__delete svg {
   width: 16px;
   height: 16px;
   stroke: currentColor;
@@ -222,25 +227,25 @@ function relativeTime(value: string): string {
   stroke-width: 1.75;
 }
 
-.conversation-sidebar__item:hover .conversation-sidebar__time,
-.conversation-sidebar__item:focus-within .conversation-sidebar__time {
+.codex-conversation-sidebar__item:hover .codex-conversation-sidebar__time,
+.codex-conversation-sidebar__item:focus-within .codex-conversation-sidebar__time {
   opacity: 0;
 }
 
-.conversation-sidebar__item:hover .conversation-sidebar__delete,
-.conversation-sidebar__item:focus-within .conversation-sidebar__delete,
-.conversation-sidebar__delete:focus-visible {
+.codex-conversation-sidebar__item:hover .codex-conversation-sidebar__delete,
+.codex-conversation-sidebar__item:focus-within .codex-conversation-sidebar__delete,
+.codex-conversation-sidebar__delete:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
 
-.conversation-sidebar__delete:hover,
-.conversation-sidebar__delete:focus-visible {
+.codex-conversation-sidebar__delete:hover,
+.codex-conversation-sidebar__delete:focus-visible {
   color: #b42318;
   background: rgb(180 35 24 / 10%);
 }
 
-.conversation-sidebar__empty {
+.codex-conversation-sidebar__empty {
   padding: 8px 18px;
   color: #85857e;
   font-size: 13px;

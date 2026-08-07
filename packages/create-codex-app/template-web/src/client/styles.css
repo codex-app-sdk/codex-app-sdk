@@ -12,5 +12,12 @@ body {
 }
 
 .web-app {
+  display: grid;
   min-width: 320px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+@media (max-width: 760px) {
+  .web-app { grid-template-columns: 210px minmax(0, 1fr); }
 }
