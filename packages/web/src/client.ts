@@ -16,6 +16,7 @@ import {
 } from './protocol';
 import {
   codexWebSocketText,
+  defaultCodexWebSocketMaximumMessageBytes,
   positiveWebSocketLimit,
   type CodexWebSocketClose,
   type CodexWebSocketPort,
@@ -64,7 +65,6 @@ export class CodexWebSocketTransportError extends Error {
   }
 }
 
-const defaultMaximumMessageBytes = 16 * 1024 * 1024;
 const defaultRequestTimeoutMs = 60_000;
 
 export function createCodexWebSurfaceClient(
@@ -122,7 +122,7 @@ class ClientTransport {
     this.#createSocket = options.createSocket;
     this.#maxMessageBytes = positiveWebSocketLimit(
       options.maxMessageBytes,
-      defaultMaximumMessageBytes,
+      defaultCodexWebSocketMaximumMessageBytes,
       'Codex WebSocket message byte limit',
     );
     this.#requestTimeoutMs = positiveWebSocketLimit(

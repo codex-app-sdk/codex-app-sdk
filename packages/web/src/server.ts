@@ -13,6 +13,7 @@ import {
 } from './protocol';
 import {
   codexWebSocketText,
+  defaultCodexWebSocketMaximumMessageBytes,
   positiveWebSocketLimit,
   type CodexWebSocketClose,
   type CodexWebSocketPort,
@@ -54,8 +55,6 @@ export type CodexNodeWebSocketLike = {
   on(event: 'close', listener: (code: number, reason: unknown) => void): unknown;
   on(event: 'error', listener: (error: unknown) => void): unknown;
 };
-
-const defaultMaximumMessageBytes = 16 * 1024 * 1024;
 
 /**
  * Binds an established socket to a required host authorization callback.
@@ -100,7 +99,7 @@ class ServerBinding<Context> implements CodexWebSocketBinding {
     this.#authorize = options.authorize;
     this.#maxMessageBytes = positiveWebSocketLimit(
       options.maxMessageBytes,
-      defaultMaximumMessageBytes,
+      defaultCodexWebSocketMaximumMessageBytes,
       'Codex WebSocket message byte limit',
     );
     this.#unsubscribers.push(

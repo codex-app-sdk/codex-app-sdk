@@ -23,6 +23,10 @@ type CreateCodexWebSurfaceClientOptions = {
 };
 ```
 
+`maxMessageBytes` defaults to 64 MiB. Configure both endpoints consistently
+when a host needs a different ceiling; intermediary platform limits may still
+be lower.
+
 Connection states are `closed`, `connecting`, `disconnected`, and `ready`.
 `connect()` resolves the authoritative ready snapshot. Unexpected eligible
 closures use bounded exponential reconnect when enabled. In-flight operations

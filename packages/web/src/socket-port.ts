@@ -13,6 +13,8 @@ export type CodexWebSocketPort = {
   onError?(listener: (error: unknown) => void): () => void;
 };
 
+export const defaultCodexWebSocketMaximumMessageBytes = 64 * 1024 * 1024;
+
 export function codexWebSocketText(data: unknown, maximumBytes: number): string {
   let value: string;
   if (typeof data === 'string') {

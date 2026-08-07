@@ -120,6 +120,27 @@ describe('Codex web transport', () => {
     expect(release).toHaveBeenCalledWith(expect.objectContaining({ reason: 'socket_closed' }));
   });
 
+  it('accepts snapshots beyond the former 16 MiB ceiling by default', async () => {
+    const [browserSocket, serverSocket] = memorySocketPair();
+    const largeSnapshot = {
+      ...snapshot,
+      error: 'x'.repeat(16 * 1024 * 1024),
+    };
+    const surface = fakeSurface(largeSnapshot);
+    const binding = bindCodexWebSocket({
+      socket: serverSocket,
+      context: undefined,
+      authorize: () => ({ surface: surface.target }),
+    });
+    const client = createCodexWebSurfaceClient({ createSocket: () => browserSocket });
+
+    const connected = await client.connect();
+    await binding.ready;
+    expect(connected.error).toHaveLength(16 * 1024 * 1024);
+    expect(client.getConnectionState()).toBe('ready');
+    client.disconnect();
+  });
+
   it('rejects unauthorized upgrades before exposing a surface', async () => {
     const [browserSocket, serverSocket] = memorySocketPair();
     const authorize = vi.fn(async () => null);
