@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { CodexConversationPane, useCodexSurface } from 'codex-app-sdk/vue';
+import { CodexConversationPane, useCodexSurface } from '@codex-app-sdk/vue';
 
 const surface = useCodexSurface(window.codexSurface);
 const localSignInError = ref<string | null>(null);

@@ -14,8 +14,10 @@ import { createInterface } from 'node:readline/promises';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const templateRoot = join(packageRoot, 'template');
+const webTemplateRoot = join(packageRoot, 'template-web');
 const packageMetadata = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
 const packageManagers = new Set(['npm', 'pnpm', 'yarn', 'bun']);
+const targets = new Set(['electron', 'web']);
 
 export async function run(
   argv = process.argv.slice(2),
@@ -40,6 +42,7 @@ export async function run(
       cwd: options.cwd,
       directory,
       templateDirectory: options.templateDirectory,
+      target: parsed.target,
     });
 
     if (parsed.install) {
@@ -58,6 +61,7 @@ export function parseArguments(argv) {
   let packageManager;
   let install = true;
   let help = false;
+  let target = 'electron';
   let version = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -85,15 +89,32 @@ export function parseArguments(argv) {
       validatePackageManager(packageManager);
       continue;
     }
+    if (argument === '--target') {
+      target = argv[index + 1];
+      index += 1;
+      validateTarget(target);
+      continue;
+    }
+    if (argument.startsWith('--target=')) {
+      target = argument.slice('--target='.length);
+      validateTarget(target);
+      continue;
+    }
     if (argument.startsWith('-')) throw new Error(`Unknown option '${argument}'`);
     if (directory) throw new Error('Only one project directory may be provided');
     directory = argument;
   }
 
-  return { directory, help, install, packageManager, version };
+  return { directory, help, install, packageManager, target, version };
 }
 
-export async function scaffoldProject({ cwd = process.cwd(), directory, templateDirectory = templateRoot }) {
+export async function scaffoldProject({
+  cwd = process.cwd(),
+  directory,
+  target: targetKind = 'electron',
+  templateDirectory,
+}) {
+  validateTarget(targetKind);
   const requestedDirectory = directory.trim();
   if (!requestedDirectory) throw new Error('Project directory cannot be empty');
   const target = resolve(cwd, requestedDirectory);
@@ -102,10 +123,11 @@ export async function scaffoldProject({ cwd = process.cwd(), directory, template
     displayName: displayNameForDirectory(directoryName),
     packageName: packageNameForDirectory(directoryName),
     path: target,
+    target: targetKind,
   };
   await assertEmptyTarget(target);
   await mkdir(target, { recursive: true });
-  await cp(templateDirectory, target, { recursive: true });
+  await cp(templateDirectory ?? templateForTarget(targetKind), target, { recursive: true });
 
   const gitignore = join(target, '_gitignore');
   await rename(gitignore, join(target, '.gitignore'));
@@ -123,6 +145,16 @@ function validatePackageManager(value) {
   if (!packageManagers.has(value)) {
     throw new Error(`Unsupported package manager '${value ?? ''}'. Use npm, pnpm, yarn, or bun.`);
   }
+}
+
+function validateTarget(value) {
+  if (!targets.has(value)) {
+    throw new Error(`Unsupported target '${value ?? ''}'. Use electron or web.`);
+  }
+}
+
+function templateForTarget(target) {
+  return target === 'web' ? webTemplateRoot : templateRoot;
 }
 
 async function assertEmptyTarget(target) {
@@ -209,5 +241,5 @@ function successMessage(project, packageManager, installed, cwd = process.cwd())
 }
 
 function helpText() {
-  return `create-codex-app ${packageMetadata.version}\n\nUsage:\n  create-codex-app [directory] [options]\n\nOptions:\n  --no-install                   Skip dependency installation\n  --package-manager <manager>    npm, pnpm, yarn, or bun\n  -h, --help                     Show this help\n  -v, --version                  Show the version\n`;
+  return `create-codex-app ${packageMetadata.version}\n\nUsage:\n  create-codex-app [directory] [options]\n\nOptions:\n  --no-install                   Skip dependency installation\n  --package-manager <manager>    npm, pnpm, yarn, or bun\n  --target <target>              electron (default) or web\n  -h, --help                     Show this help\n  -v, --version                  Show the version\n`;
 }

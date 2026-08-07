@@ -27,7 +27,7 @@ export default defineConfig(({ command, mode }) => ({
             outDir: mainOutDir,
             emptyOutDir: command === 'build',
             lib: { entry: mainEntry, fileName: () => 'main.js' },
-            rolldownOptions: { external: command === 'build' ? [/^codex-app-sdk\//] : [] },
+            rolldownOptions: { external: command === 'build' ? [/^@codex-app-sdk\//] : [] },
           },
         },
       },

@@ -1,0 +1,16 @@
+html,
+body,
+#app,
+.web-app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f7f7f5;
+}
+
+.web-app {
+  min-width: 320px;
+}

@@ -10,8 +10,8 @@ import {
 } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { registerCodexElectronMain } from 'codex-app-sdk/electron';
-import { createCodexAppBackend, type CodexAppBackend } from 'codex-app-sdk/node';
+import { createCodexAppBackend, type CodexAppBackend } from '@codex-app-sdk/backend';
+import { registerCodexElectronMain } from '@codex-app-sdk/electron';
 
 const bundleDirectory = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | null = null;
