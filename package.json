@@ -14,7 +14,8 @@
   "homepage": "https://nbonamy.github.io/codex-app-sdk/",
   "workspaces": [
     "packages/*",
-    "samples/*"
+    "samples/*",
+    "samples/electron/*"
   ],
   "sideEffects": [
     "**/*.css"
@@ -77,6 +78,7 @@
     "sample:build": "npm run build -w @codex-app-sdk/basic-sample",
     "sample:start": "npm run start -w @codex-app-sdk/basic-sample",
     "sample:test": "npm run test -w @codex-app-sdk/basic-sample",
+    "sample:typecheck": "npm run typecheck -w @codex-app-sdk/basic-sample",
     "lab:build": "npm run build -w @codex-app-sdk/component-lab",
     "lab:dev": "npm run dev -w @codex-app-sdk/component-lab",
     "lab:test": "npm run test -w @codex-app-sdk/component-lab",

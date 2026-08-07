@@ -1,0 +1,21 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "paths": {
+      "@codex-app-sdk/electron/preload": ["../../../packages/electron/src/preload.ts"],
+      "@codex-app-sdk/electron": ["../../../packages/electron/src/index.ts"],
+      "@codex-app-sdk/backend": ["../../../packages/backend/src/index.ts"],
+      "@codex-app-sdk/core": ["../../../packages/core/src/index.ts"],
+      "@codex-app-sdk/vue": ["../../../packages/vue/src/index.ts"]
+    },
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "tests/**/*.ts",
+    "vite*.config.ts",
+    "vitest.config.ts"
+  ]
+}

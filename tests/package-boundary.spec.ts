@@ -46,6 +46,33 @@ describe('package boundary', () => {
     expect(violations).toStrictEqual([]);
   });
 
+  it('builds Electron samples against the explicit modular packages', async () => {
+    const sampleRoot = path.join(packageRoot, 'samples/electron');
+    const files = await sourceFiles(sampleRoot);
+    const compatibilityImports: string[] = [];
+    for (const file of files) {
+      const content = await readFile(file, 'utf8');
+      if (/from\s+['"]codex-app-sdk(?:\/|['"])|import\s+['"]codex-app-sdk\//.test(content)) {
+        compatibilityImports.push(path.relative(packageRoot, file));
+      }
+    }
+
+    expect(compatibilityImports).toStrictEqual([]);
+    for (const sample of ['basic', 'spark', 'relay']) {
+      const packageJson = JSON.parse(await readFile(
+        path.join(sampleRoot, sample, 'package.json'),
+        'utf8',
+      )) as { dependencies: Record<string, string> };
+      expect(Object.keys(packageJson.dependencies)).toEqual(expect.arrayContaining([
+        '@codex-app-sdk/backend',
+        '@codex-app-sdk/core',
+        '@codex-app-sdk/electron',
+        '@codex-app-sdk/vue',
+      ]));
+      expect(packageJson.dependencies).not.toHaveProperty('codex-app-sdk');
+    }
+  });
+
   it('keeps the preload entry renderer-only while exposing custom IPC composition', async () => {
     const preload = await readFile(path.join(packageRoot, 'packages/electron/src/preload.ts'), 'utf8');
     const compatibilityEntry = await readFile(path.join(packageRoot, 'src/electron/preload.ts'), 'utf8');

@@ -24,7 +24,7 @@ It demonstrates:
 - a trusted main-process `CodexAppBackend` that owns the shared surface.
 
 ```bash
-cd samples/basic
+cd samples/electron/basic
 npm run dev
 ```
 

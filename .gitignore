@@ -6,5 +6,8 @@ docs/.vitepress/dist/
 samples/*/dist-main/
 samples/*/dist-mcp/
 samples/*/dist-renderer/
+samples/electron/*/dist-main/
+samples/electron/*/dist-mcp/
+samples/electron/*/dist-renderer/
 *.log
 .DS_Store
