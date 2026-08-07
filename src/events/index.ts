@@ -1,2 +1,1 @@
-export { TypedEventBus, type EventListener } from './typed-event-bus';
-
+export { TypedEventBus, type EventListener } from '@codex-app-sdk/core/events';

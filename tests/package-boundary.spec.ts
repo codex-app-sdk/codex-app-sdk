@@ -8,6 +8,18 @@ const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules'])
 const inspectedExtensions = new Set(['.css', '.json', '.md', '.mjs', '.ts', '.vue']);
 
 describe('package boundary', () => {
+  it('keeps core independent from platform and protocol packages', async () => {
+    const files = await sourceFiles(path.join(packageRoot, 'packages/core/src'));
+    const violations: string[] = [];
+    for (const file of files) {
+      const content = await readFile(file, 'utf8');
+      if (/from\s+['"](?:node:|electron|vue|@codex-app-sdk\/(?:backend|electron|vue|web)|[^'"]*codex\/generated)/.test(content)) {
+        violations.push(path.relative(packageRoot, file));
+      }
+    }
+    expect(violations).toStrictEqual([]);
+  });
+
   it('keeps native, Electron, Node, and surface layers independent from Vue', async () => {
     const files = (await Promise.all(['src/native', 'src/electron', 'src/node', 'src/surface']
       .map((root) => sourceFiles(path.join(packageRoot, root))))).flat();

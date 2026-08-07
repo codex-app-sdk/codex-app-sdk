@@ -64,8 +64,8 @@
     "schema:generate": "node scripts/generate-codex-schema.mjs",
     "rpc:generate": "node scripts/generate-json-rpc-inventory.mjs",
     "rpc:check": "node scripts/generate-json-rpc-inventory.mjs --check",
-    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/package-katex-assets.mjs && node scripts/verify-package-css.mjs && node scripts/verify-native-assets.mjs",
-    "typecheck": "vue-tsc --noEmit",
+    "build": "npm run build -w @codex-app-sdk/core && vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/package-katex-assets.mjs && node scripts/verify-package-css.mjs && node scripts/verify-native-assets.mjs",
+    "typecheck": "npm run typecheck -w @codex-app-sdk/core && vue-tsc --noEmit",
     "lint": "npm run typecheck",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -95,6 +95,7 @@
     "prepare": "npm run build"
   },
   "dependencies": {
+    "@codex-app-sdk/core": "0.1.0",
     "@shikijs/langs": "^4.2.0",
     "@shikijs/themes": "^4.2.0",
     "@tabler/icons-vue": "^3.44.0",

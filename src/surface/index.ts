@@ -82,4 +82,4 @@ export type {
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
   UpdateCodexConversationSettings,
-} from './types';
+} from '@codex-app-sdk/core/surface';
