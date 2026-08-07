@@ -166,21 +166,22 @@ Commit: `feat: make vue kit host agnostic`
 
 ### Phase 4: Extract the Electron adapter
 
+Status: complete
+
 - Move typed IPC, surface IPC, preload, native operations, and Electron
   integration into `@codex-app-sdk/electron`.
 - Rebuild Electron bindings on the shared operation definitions and validation.
 - Implement the Vue host-capability contract from the preload API.
 - Keep Electron as an appropriate peer dependency rather than a dependency of
   core, backend, or Vue.
-- Update Electron samples and the existing scaffold to consume explicit
-  packages while retaining compatibility coverage.
+- Move the Electron samples under `samples/electron` and update them to consume
+  explicit packages while retaining compatibility coverage.
 
 Validation:
 
 - Electron IPC/preload/native tests.
 - Basic, Spark, and Relay sample typechecks/tests/builds affected by import
   changes.
-- Scaffold generation tests and a generated Electron application build.
 
 Commit: `feat: extract electron adapter package`
 
@@ -208,6 +209,8 @@ Commit: `feat: add web surface adapter`
 ### Phase 6: Add a web application target
 
 - Extend `create-codex-app` with an explicit `electron` or `web` target.
+- Update the existing Electron scaffold to consume explicit packages while
+  retaining compatibility coverage.
 - Keep web host policy minimal: show where the application supplies session
   authorization and workspace creation without embedding product-specific auth
   or infrastructure.
