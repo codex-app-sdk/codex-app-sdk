@@ -5,10 +5,36 @@ import { describe, expect, it } from 'vitest';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const vueSourceRoot = path.join(packageRoot, 'packages/vue/src');
+const sdkPackages = ['core', 'backend', 'vue', 'electron', 'web'] as const;
 const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules']);
 const inspectedExtensions = new Set(['.css', '.json', '.md', '.mjs', '.ts', '.vue']);
 
 describe('package boundary', () => {
+  it('gives every SDK package owned source, tests, and quality gates', async () => {
+    for (const packageName of sdkPackages) {
+      const workspaceRoot = path.join(packageRoot, 'packages', packageName);
+      const manifest = JSON.parse(await readFile(path.join(workspaceRoot, 'package.json'), 'utf8')) as {
+        scripts?: Record<string, string>;
+      };
+      const source = await sourceFiles(path.join(workspaceRoot, 'src'));
+      const tests = await sourceFiles(path.join(workspaceRoot, 'tests'));
+
+      expect(source.length, `${packageName} source`).toBeGreaterThan(0);
+      expect(tests.some((file) => file.endsWith('.spec.ts')), `${packageName} tests`).toBe(true);
+      expect(manifest.scripts, `${packageName} scripts`).toEqual(expect.objectContaining({
+        build: expect.any(String),
+        check: expect.any(String),
+        lint: expect.any(String),
+        test: expect.any(String),
+        'test:coverage': expect.any(String),
+        typecheck: expect.any(String),
+      }));
+      await expect(readFile(path.join(workspaceRoot, 'vitest.config.ts'), 'utf8')).resolves.toContain(
+        "include: ['tests/**/*.spec.ts']",
+      );
+    }
+  });
+
   it('keeps core independent from platform and protocol packages', async () => {
     const files = await sourceFiles(path.join(packageRoot, 'packages/core/src'));
     const violations: string[] = [];
@@ -142,7 +168,7 @@ describe('package boundary', () => {
       .filter((name) => name.endsWith('.vue'))
       .map((name) => name.replace(/\.vue$/, '.spec.ts'))
       .sort();
-    const testNames = (await readdir(path.join(packageRoot, 'tests/vue')))
+    const testNames = (await readdir(path.join(packageRoot, 'packages/vue/tests')))
       .filter((name) => /^[A-Z].*\.spec\.ts$/.test(name))
       .sort();
 
@@ -162,7 +188,7 @@ describe('package boundary', () => {
 
     expect(exports.map((entry) => entry.source).sort()).toStrictEqual(componentSources);
 
-    const testContents = (await sourceFiles(path.join(packageRoot, 'tests/vue')))
+    const testContents = (await sourceFiles(path.join(packageRoot, 'packages/vue/tests')))
       .filter((file) => file.endsWith('.spec.ts'))
       .map((file) => readFile(file, 'utf8'));
     const joinedTests = (await Promise.all(testContents)).join('\n');

@@ -28,6 +28,10 @@
   },
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
+    "check": "npm run lint && npm test && npm run build",
+    "lint": "tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

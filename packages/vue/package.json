@@ -20,6 +20,10 @@
   },
   "scripts": {
     "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node ../../scripts/package-katex-assets.mjs dist/styles.css dist/fonts && node ../../scripts/verify-package-css.mjs dist/styles.css dist/index.d.ts dist/fonts",
+    "check": "npm run lint && npm test && npm run build",
+    "lint": "vue-tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "vue-tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

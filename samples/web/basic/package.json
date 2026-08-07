@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build && tsc -p tsconfig.server.json",
+    "dev": "node scripts/dev.mjs",
     "start": "npm run build && node dist/server/index.js",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"
   },

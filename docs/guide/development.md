@@ -9,6 +9,25 @@ npm run typecheck
 npm run build
 ```
 
+Each SDK workspace owns its source, tests, Vitest configuration, typecheck,
+lint, coverage, and build commands. Run the complete gate for one package with:
+
+```bash
+npm run check -w @codex-app-sdk/core
+npm run check -w @codex-app-sdk/backend
+npm run check -w @codex-app-sdk/vue
+npm run check -w @codex-app-sdk/electron
+npm run check -w @codex-app-sdk/web
+```
+
+The root commands orchestrate the five package gates and then check the legacy
+`codex-app-sdk` compatibility facade. For local applications, use:
+
+```bash
+npm run electron:dev
+npm run web:dev
+```
+
 Sample gates:
 
 ```bash

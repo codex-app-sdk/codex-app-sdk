@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   sdk:
-    name: SDK
+    name: SDK packages and compatibility facade
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,14 +34,23 @@ jobs:
       - name: Check generated RPC inventory
         run: npm run rpc:check
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Check core package
+        run: npm run check -w @codex-app-sdk/core
 
-      - name: Build package
-        run: npm run build
+      - name: Check backend package
+        run: npm run check -w @codex-app-sdk/backend
 
-      - name: Test
-        run: npm test
+      - name: Check Vue package
+        run: npm run check -w @codex-app-sdk/vue
+
+      - name: Check Electron package
+        run: npm run check -w @codex-app-sdk/electron
+
+      - name: Check web package
+        run: npm run check -w @codex-app-sdk/web
+
+      - name: Check compatibility facade
+        run: npm run lint:compat && npm run test:compat && npm run build:compat
 
   docs:
     name: Documentation
@@ -81,11 +90,14 @@ jobs:
       - name: Build SDK dependency
         run: npm run build
 
-      - name: Typecheck workspaces
-        run: npm run typecheck --workspaces --if-present
+      - name: Check scaffolder
+        run: npm run create:app:test
 
-      - name: Test workspaces
-        run: npm run test --workspaces --if-present
+      - name: Check component lab
+        run: npm run lab:typecheck && npm run lab:test && npm run lab:build
 
-      - name: Build workspaces
-        run: npm run build --workspaces --if-present
+      - name: Check Electron samples
+        run: npm run sample:typecheck && npm run sample:test && npm run sample:build && npm run spark:typecheck && npm run spark:test && npm run spark:build && npm run relay:typecheck && npm run relay:test && npm run relay:build
+
+      - name: Check web sample
+        run: npm run web-sample:typecheck && npm run web-sample:build
