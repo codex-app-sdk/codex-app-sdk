@@ -217,7 +217,8 @@ The exported renderer-safe types are `CodexMessageImage`,
 `CodexToolIcon` accepts a `toolCall` and optional resolved `presentation`. It
 uses the same icon chain as stock tool rows: a host icon, a built-in Codex
 action icon, a stable kind fallback, then the generic tool icon. Only an
-explicit `presentation.icon` value of `null` suppresses the icon.
+explicit `presentation.icon` value of `null` suppresses the icon. Image
+generation uses the photo icon and human-readable activity titles by default.
 
 `CodexScrollToBottom` is also rendered by `CodexMessageList` whenever the
 transcript is scrolled away from the bottom. It accepts an optional accessible

@@ -69,6 +69,24 @@ describe('tool status helpers', () => {
     expect(getToolFallbackTitle({ ...tool, done: true, state: 'completed' })).toBe('Ran npm test');
   });
 
+  it('formats image-generation activity without exposing its protocol name', () => {
+    const tool: MessageToolCall = {
+      args: undefined,
+      done: false,
+      function: 'image_generation',
+      id: 'image-generation',
+      kind: 'dynamic',
+      result: undefined,
+      state: 'running',
+      status: 'running',
+    };
+
+    expect(getToolDisplayTitle(tool, undefined)).toBe('Generating image');
+    expect(getToolDisplayTitle({ ...tool, done: true, state: 'completed' }, undefined)).toBe('Generated image');
+    expect(getToolDisplayTitle({ ...tool, done: true, state: 'error' }, undefined)).toBe('Failed generating image');
+    expect(getToolDisplayTitle({ ...tool, done: true, state: 'canceled' }, undefined)).toBe('Stopped generating image');
+  });
+
   it('formats Codex file creation and deletion titles', () => {
     const tool: MessageToolCall = {
       args: undefined,

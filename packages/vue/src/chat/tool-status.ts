@@ -1,6 +1,6 @@
 import type { CodexConversationFileAction, CodexConversationLink } from './contracts';
 import { codexConversationLinkFromHref } from './conversation-links';
-import { getMessageToolCallName, type MessageToolCall, type ToolStatusDescriptor } from './types';
+import { getMessageToolCallName, isImageGenerationToolCall, type MessageToolCall, type ToolStatusDescriptor } from './types';
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
 
@@ -83,6 +83,10 @@ export function getToolDisplayTitle(
   for (const presenter of toolTitlePresenters) {
     const title = presenter({ descriptor, toolCall, translate: t });
     if (title) return title;
+  }
+
+  if (isImageGenerationToolCall(toolCall)) {
+    return t(`chat.tool.imageGeneration.${imageGenerationPhase(toolCall)}`);
   }
 
   if (descriptor?.source === 'codex' && isCodexToolAction(descriptor.action)) {
@@ -291,6 +295,12 @@ function commandPhase(phase: string) {
   return 'running';
 }
 
+function imageGenerationPhase(toolCall: MessageToolCall): 'running' | 'completed' | 'failed' | 'canceled' {
+  if (toolCall.state === 'error') return 'failed';
+  if (toolCall.state === 'canceled') return 'canceled';
+  return !toolCall.done && toolCall.state !== 'completed' ? 'running' : 'completed';
+}
+
 function isCodexToolAction(action: string): action is 'create' | 'delete' | 'edit' | 'explore' | 'list' | 'plan' | 'read' | 'run' | 'search' {
   return action === 'create' || action === 'delete' || action === 'edit' || action === 'explore' || action === 'list' || action === 'plan' || action === 'read' || action === 'run' || action === 'search';
 }
@@ -330,6 +340,10 @@ export function defaultToolTranslate(key: string, params?: Record<string, unknow
     'chat.tool.command.search.running': 'Searching {target}',
     'chat.tool.fallback.completed': 'Ran {name}',
     'chat.tool.fallback.running': 'Running {name}',
+    'chat.tool.imageGeneration.canceled': 'Stopped generating image',
+    'chat.tool.imageGeneration.completed': 'Generated image',
+    'chat.tool.imageGeneration.failed': 'Failed generating image',
+    'chat.tool.imageGeneration.running': 'Generating image',
   };
 
   return (templates[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));

@@ -100,6 +100,9 @@ Every tool gets an icon through a consistent fallback chain:
 Command-shaped tools use the terminal icon whether their title says `Running`,
 `Ran`, or a localized equivalent. Explore/search tools use a folder or search
 icon and include a useful target when the app-server supplies one.
+Image generation uses the photo icon and activity labels such as
+`Generating image` and `Generated image`. A host presentation resolver can
+still replace either default.
 
 Customize app-owned MCP or dynamic tools once for a Vue subtree:
 

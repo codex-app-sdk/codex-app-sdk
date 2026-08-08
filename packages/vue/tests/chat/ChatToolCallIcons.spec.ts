@@ -58,6 +58,27 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('svg').classes()).toContain('tabler-icon-world-search');
   });
 
+  it('renders a dedicated image-generation icon and activity title', () => {
+    const wrapper = mount(ChatToolCall, {
+      props: {
+        summaryOnly: true,
+        toolCall: {
+          args: { revisedPrompt: 'A paper sculpture' },
+          done: false,
+          function: 'image_generation',
+          id: 'image-generation-icon',
+          kind: 'dynamic',
+          result: undefined,
+          state: 'running',
+          status: 'running',
+        },
+      },
+    });
+
+    expect(wrapper.get('.chat-tool-call__title').text()).toBe('Generating image');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-photo');
+  });
+
   it.each(actions)('renders an icon for the %s action', (action, iconName) => {
     const toolCall: MessageToolCall = {
       args: undefined,

@@ -29,6 +29,10 @@ export function getMessageToolCallName(toolCall: MessageToolCall) {
   return toolCall.function;
 }
 
+export function isImageGenerationToolCall(toolCall: MessageToolCall): boolean {
+  return toolCall.kind === 'imageGeneration' || toolCall.function === 'image_generation';
+}
+
 export function getMessageToolCallArgs(toolCall: MessageToolCall) {
   return toolCall.args;
 }

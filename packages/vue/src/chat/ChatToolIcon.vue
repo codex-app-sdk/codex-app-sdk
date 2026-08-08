@@ -14,6 +14,7 @@ import {
   FolderIcon,
   ListDetailsIcon,
   PencilIcon,
+  PhotoIcon,
   SearchIcon,
   Terminal2Icon,
   ToolIcon,
@@ -22,7 +23,7 @@ import {
 } from '../icons/app-icons'
 import type { CodexToolPresentation } from './tool-presentation'
 import { parseToolStatusDescriptor } from './tool-status'
-import type { MessageToolCall } from './types'
+import { isImageGenerationToolCall, type MessageToolCall } from './types'
 
 const props = defineProps<{
   presentation?: CodexToolPresentation
@@ -33,6 +34,7 @@ const resolvedIcon = computed<Component | undefined>(() => {
   if (props.presentation?.icon === null) return undefined
   if (props.presentation?.icon) return props.presentation.icon
 
+  if (isImageGenerationToolCall(props.toolCall)) return PhotoIcon
   if (props.toolCall.kind === 'webSearch') return WorldSearchIcon
 
   const descriptor = parseToolStatusDescriptor(props.toolCall.status)
