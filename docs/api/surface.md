@@ -44,6 +44,10 @@ type CodexSurfaceSnapshot = {
 `CodexConversationSnapshot` adds a non-null conversation ID, `activeTurnId`, and
 all known turn IDs.
 
+Conversation summaries include optional `sessionId`, `parentConversationId`,
+`agentNickname`, and `agentRole` fields for hosts that present app-server
+sub-agent trees. Root conversations omit the parent and agent-specific fields.
+
 Models may advertise service tiers through `serviceTiers` and
 `defaultServiceTier`. The selected tier is exposed as `selectedServiceTier`;
 `serviceTier: null` clears it. The app-server's reserved `default` tier remains

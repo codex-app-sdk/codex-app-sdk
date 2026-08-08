@@ -84,6 +84,14 @@ export type SurfaceMessage = {
 
 export type CodexConversationSummary = {
   id: string;
+  /** Session tree shared by a root conversation and its sub-agents. */
+  sessionId?: string;
+  /** Parent conversation when this summary represents a sub-agent. */
+  parentConversationId?: string;
+  /** App-server-assigned sub-agent nickname, when present. */
+  agentNickname?: string;
+  /** App-server-assigned sub-agent role, when present. */
+  agentRole?: string;
   title: string;
   preview: string;
   cwd: string;
@@ -459,6 +467,38 @@ export type CodexSurfacePlanStep = {
   step: string;
   status: CodexSurfacePlanStepStatus;
 };
+export type CodexSurfaceSubagentItemLifecycle = 'started' | 'completed';
+export type CodexSurfaceSubagentTool = 'spawnAgent' | 'sendInput' | 'resumeAgent' | 'wait' | 'closeAgent';
+export type CodexSurfaceSubagentToolCallStatus = 'inProgress' | 'completed' | 'failed';
+export type CodexSurfaceSubagentStatus =
+  | 'pendingInit'
+  | 'running'
+  | 'interrupted'
+  | 'completed'
+  | 'errored'
+  | 'shutdown'
+  | 'notFound';
+export type CodexSurfaceSubagentState = {
+  status: CodexSurfaceSubagentStatus;
+  message: string | null;
+};
+export type CodexSurfaceSubagentToolCall = {
+  id: string;
+  tool: CodexSurfaceSubagentTool;
+  status: CodexSurfaceSubagentToolCallStatus;
+  senderConversationId: string;
+  receiverConversationIds: readonly string[];
+  prompt: string | null;
+  model: string | null;
+  reasoningEffort: string | null;
+  agentStates: Readonly<Record<string, CodexSurfaceSubagentState>>;
+};
+export type CodexSurfaceSubagentActivity = {
+  id: string;
+  kind: 'started' | 'interacted' | 'interrupted';
+  agentConversationId: string;
+  agentPath: string;
+};
 export type CodexSurfaceTurnError = {
   message: string;
   additionalDetails: string | null;
@@ -688,6 +728,14 @@ export type CodexSurfaceEvent =
     action: CodexSurfaceFileActivityAction;
     status: CodexSurfaceFileActivityStatus;
   }>
+  | CodexTurnEventEnvelope<'subagent.toolCallChanged', {
+    lifecycle: CodexSurfaceSubagentItemLifecycle;
+    toolCall: CodexSurfaceSubagentToolCall;
+  }>
+  | CodexTurnEventEnvelope<'subagent.activity', {
+    lifecycle: CodexSurfaceSubagentItemLifecycle;
+    activity: CodexSurfaceSubagentActivity;
+  }>
   | CodexTurnEventEnvelope<'plan.delta', {
     itemId: string;
     delta: string;
@@ -730,6 +778,7 @@ export type CodexSurfaceEvent =
 
 export type CodexConversationEvent = Extract<CodexSurfaceEvent, { conversationId: string }>;
 export type CodexRealtimeEvent = Extract<CodexConversationEvent, { type: `realtime.${string}` }>;
+export type CodexSubagentEvent = Extract<CodexConversationEvent, { type: `subagent.${string}` }>;
 
 export type ListCodexConversationsOptions = {
   archived?: boolean;

@@ -24,6 +24,10 @@ export function threadToSummary(thread: v2.Thread): CodexConversationSummary {
   const preview = thread.preview.trim();
   return {
     id: thread.id,
+    ...(thread.sessionId ? { sessionId: thread.sessionId } : {}),
+    ...(thread.parentThreadId ? { parentConversationId: thread.parentThreadId } : {}),
+    ...(thread.agentNickname ? { agentNickname: thread.agentNickname } : {}),
+    ...(thread.agentRole ? { agentRole: thread.agentRole } : {}),
     title: thread.name?.trim() || preview.split('\n')[0]?.trim() || 'Untitled conversation',
     preview,
     cwd: thread.cwd,

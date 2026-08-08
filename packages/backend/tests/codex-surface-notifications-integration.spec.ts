@@ -5,6 +5,68 @@ import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { FakeTransport, createSurface, lastRequest, lastResponse, requestsFor, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('emits headless sub-agent events without adding standard message UI', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-subagent', startedAtMs: 1,
+        item: {
+          type: 'collabAgentToolCall', id: 'collab-1', tool: 'spawnAgent', status: 'inProgress',
+          senderThreadId: 'thread-existing', receiverThreadIds: ['thread-child'], prompt: 'Inspect tests',
+          model: 'gpt-5', reasoningEffort: 'high',
+          agentsStates: { 'thread-child': { status: 'running', message: null } },
+        },
+      },
+    });
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-subagent', completedAtMs: 2,
+        item: {
+          type: 'subAgentActivity', id: 'activity-1', kind: 'interacted',
+          agentThreadId: 'thread-child', agentPath: '/root/scout',
+        },
+      },
+    });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'subagent.toolCallChanged',
+        conversationId: 'thread-existing',
+        turnId: 'turn-subagent',
+        payload: {
+          lifecycle: 'started',
+          toolCall: {
+            id: 'collab-1', tool: 'spawnAgent', status: 'inProgress',
+            senderConversationId: 'thread-existing', receiverConversationIds: ['thread-child'],
+            prompt: 'Inspect tests', model: 'gpt-5', reasoningEffort: 'high',
+            agentStates: { 'thread-child': { status: 'running', message: null } },
+          },
+        },
+      }),
+      expect.objectContaining({
+        type: 'subagent.activity',
+        conversationId: 'thread-existing',
+        turnId: 'turn-subagent',
+        payload: {
+          lifecycle: 'completed',
+          activity: {
+            id: 'activity-1', kind: 'interacted',
+            agentConversationId: 'thread-child', agentPath: '/root/scout',
+          },
+        },
+      }),
+    ]));
+    expect(surface.getSnapshot().messages.flatMap((message) => message.parts)).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'collab-1' })]),
+    );
+  });
+
   it('renders and resolves MCP confirmations that are not associated with a turn', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();

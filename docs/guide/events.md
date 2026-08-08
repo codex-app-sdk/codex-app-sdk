@@ -35,6 +35,7 @@ The matching snapshot mutation is applied before the event is emitted.
 | Turns | start/complete/error, interruption, context compaction |
 | Tools | start/progress/complete, confirmations, user input |
 | File activity | read, edit, and create paths for host-owned navigation |
+| Sub-agents | collaboration tool calls and agent activity for host-owned presentation |
 | Plans and goals | plan updates, goal set/clear/status |
 | Queues and diffs | queued prompts, git diff updates |
 | Usage | context usage and account rate limits |
@@ -76,6 +77,8 @@ Vue scope disposal automatically unregisters the underlying renderer listeners.
 - Trigger business refreshes or analytics from semantic events.
 - Use `file.activity` to reveal or focus the full path in an app-owned sidebar;
   the SDK reports the operation but does not own file navigation.
+- Use `subagent.*` to maintain an app-owned agent tree or workspace. The SDK
+  exposes typed activity but deliberately provides no standard sub-agent UI.
 - Use `remoteControl.statusChanged` when app-owned native behavior depends on
   whether Codex remote control is disabled, connecting, connected, or errored.
 - Never rebuild full conversation state by replaying events.

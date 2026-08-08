@@ -29,6 +29,7 @@ import {
   upsertAssistantToolPart,
 } from './codex-surface-message-state';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
+import { surfaceSubagentToolCall } from './codex-surface-subagents';
 import {
   codexToolPartFileActivities,
   shouldForwardCommandExecutionOutput,
@@ -295,6 +296,37 @@ export class CodexSurfaceItemsController {
           payload: { itemId: params.item.id },
         });
       }
+      return;
+    }
+
+    if (params.item.type === 'collabAgentToolCall') {
+      this.host.emitEvent('notification', {
+        type: 'subagent.toolCallChanged',
+        conversationId: params.threadId,
+        turnId: params.turnId,
+        payload: {
+          lifecycle: completed ? 'completed' : 'started',
+          toolCall: surfaceSubagentToolCall(params.item),
+        },
+      });
+      return;
+    }
+
+    if (params.item.type === 'subAgentActivity') {
+      this.host.emitEvent('notification', {
+        type: 'subagent.activity',
+        conversationId: params.threadId,
+        turnId: params.turnId,
+        payload: {
+          lifecycle: completed ? 'completed' : 'started',
+          activity: {
+            id: params.item.id,
+            kind: params.item.kind,
+            agentConversationId: params.item.agentThreadId,
+            agentPath: params.item.agentPath,
+          },
+        },
+      });
       return;
     }
 

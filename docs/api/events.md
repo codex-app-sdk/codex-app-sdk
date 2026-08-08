@@ -53,6 +53,7 @@ Event families cover:
 - `turn.*`
 - `tool.*`
 - `file.activity`
+- `subagent.*`
 - `approval.*`
 - `clientRequest.*`
 
@@ -87,6 +88,29 @@ type FileActivityEvent = {
 directory. `action` describes the operation, and `status` can be emitted more
 than once as a tool progresses. Delete operations do not produce this event;
 hosts that need delete notifications should use the underlying tool events.
+
+## Sub-agent events
+
+`subagent.toolCallChanged` and `subagent.activity` expose app-server collaboration
+items to hosts without adding a standard SDK rendering. This keeps agent-tree and
+workspace presentation application-owned while avoiding generated protocol types
+in host UI code.
+
+Tool-call events include the operation, lifecycle/status, sender and receiver
+conversation IDs, spawn options, and last-known agent states. Activity events
+include the activity kind, agent conversation ID, and agent path. Conversation
+summaries additionally expose `sessionId`, `parentConversationId`,
+`agentNickname`, and `agentRole` when app-server supplies them.
+
+`CodexSubagentEvent` extracts these variants for app-owned routing:
+
+```ts
+const handleSubagentEvent = (event: CodexSubagentEvent) => {
+  if (event.type === 'subagent.toolCallChanged') {
+    updateAgentTree(event.payload.toolCall, event.payload.lifecycle);
+  }
+};
+```
 
 ## `CodexConversationEvent`
 

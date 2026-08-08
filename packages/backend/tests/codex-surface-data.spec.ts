@@ -31,6 +31,23 @@ describe('Codex surface data codecs', () => {
       .toMatchObject({ title: 'Untitled conversation', status: 'idle' });
   });
 
+  it('projects sub-agent thread identity without exposing protocol field names', () => {
+    expect(threadToSummary(thread({
+      sessionId: 'session-1',
+      parentThreadId: 'thread-parent',
+      agentNickname: 'Scout',
+      agentRole: 'researcher',
+    }))).toMatchObject({
+      sessionId: 'session-1',
+      parentConversationId: 'thread-parent',
+      agentNickname: 'Scout',
+      agentRole: 'researcher',
+    });
+    expect(threadToSummary(thread({
+      sessionId: '', parentThreadId: null, agentNickname: null, agentRole: null,
+    }))).not.toHaveProperty('parentConversationId');
+  });
+
   it('upserts one conversation and sorts the result by recency', () => {
     const old = summary('same', '2026-01-01T00:00:01.000Z');
     const other = summary('other', '2026-01-01T00:00:03.000Z');
