@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { surfaceMessageToChatMessage } from '../../src/chat/renderer-message-adapter';
+import { chatMessageFromInput, surfaceMessageToChatMessage } from '../../src/chat/renderer-message-adapter';
 import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
 
 describe('renderer message adapter', () => {
@@ -176,6 +176,50 @@ describe('renderer message adapter', () => {
         status: 'failed',
       },
     ]);
+  });
+
+  it('settles stale running tools when their surface message is terminal', () => {
+    const rendererMessage: SurfaceMessage = {
+      id: 'assistant-interrupted',
+      parts: [{
+        type: 'tool',
+        id: 'tool-read',
+        kind: 'command',
+        title: 'cat README.md',
+        status: 'running',
+        statusText: JSON.stringify({ source: 'codex', action: 'read', phase: 'running' }),
+      }],
+      role: 'assistant',
+      status: 'complete',
+    };
+
+    expect(surfaceMessageToChatMessage(rendererMessage).toolCalls?.[0]).toMatchObject({
+      done: true,
+      state: 'error',
+      status: JSON.stringify({ source: 'codex', action: 'read', phase: 'failed' }),
+    });
+  });
+
+  it('settles stale running tools in terminal compatibility messages', () => {
+    const message = chatMessageFromInput({
+      role: 'assistant',
+      content: '',
+      streaming: false,
+      toolCalls: [{
+        args: undefined,
+        function: 'image_generation',
+        id: 'tool-image',
+        state: 'running',
+        status: 'Running image_generation',
+        result: undefined,
+      }],
+    });
+
+    expect(message.toolCalls?.[0]).toMatchObject({
+      done: true,
+      state: 'error',
+      status: 'failed',
+    });
   });
 
   it('prefers structuredContent over the MCP model-facing placeholder result', () => {

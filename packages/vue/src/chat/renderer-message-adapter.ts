@@ -8,7 +8,9 @@ export function chatMessagesFromInputs(messages: readonly ChatMessageInput[]): M
 }
 
 export function chatMessageFromInput(message: ChatMessageInput): Message {
-  return 'content' in message ? message : surfaceMessageToChatMessage(message);
+  return settleTerminalMessageToolCalls(
+    'content' in message ? message : surfaceMessageToChatMessage(message),
+  );
 }
 
 export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
@@ -37,7 +39,7 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
     }
   }
 
-  return {
+  return settleTerminalMessageToolCalls({
     content: contentParts.join('\n\n'),
     createdAt: message.createdAt,
     id: message.id,
@@ -47,7 +49,52 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
     toolCalls,
     ...(message.kind === 'compaction' ? { compactionStatus: message.status === 'streaming' ? 'running' : 'completed' } : {}),
     type: message.kind === 'compaction' ? 'compaction' : message.kind === 'steer' ? 'steer' : 'text',
+  });
+}
+
+function settleTerminalMessageToolCalls(message: Message): Message {
+  if (message.streaming === true) return message;
+
+  const settledCalls = new Map<MessageToolCall, MessageToolCall>();
+  let changed = false;
+  const settle = (toolCall: MessageToolCall): MessageToolCall => {
+    const cached = settledCalls.get(toolCall);
+    if (cached) return cached;
+    if (toolCall.done === true && toolCall.state !== 'running') {
+      settledCalls.set(toolCall, toolCall);
+      return toolCall;
+    }
+
+    changed = true;
+    const settled = {
+      ...toolCall,
+      done: true,
+      ...(toolCall.state === 'running' ? {
+        state: 'error' as const,
+        status: terminalToolStatus(toolCall.status),
+      } : {}),
+    };
+    settledCalls.set(toolCall, settled);
+    return settled;
   };
+
+  const toolCalls = message.toolCalls?.map(settle);
+  const parts = message.parts?.map((part) => (
+    part.type === 'tool' ? { ...part, toolCall: settle(part.toolCall) } : part
+  ));
+  return changed ? { ...message, parts, toolCalls } : message;
+}
+
+function terminalToolStatus(status: string | undefined): string {
+  if (status?.trim().startsWith('{')) {
+    try {
+      const descriptor: unknown = JSON.parse(status);
+      if (isRecord(descriptor)) return JSON.stringify({ ...descriptor, phase: 'failed' });
+    } catch {
+      // A stale running label is less useful than a stable terminal fallback.
+    }
+  }
+  return 'failed';
 }
 
 function rendererToolPartToToolCall(message: SurfaceMessage, part: Extract<SurfaceMessagePart, { type: 'tool' }>, index: number): MessageToolCall {

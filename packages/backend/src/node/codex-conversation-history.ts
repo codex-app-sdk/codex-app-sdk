@@ -10,6 +10,7 @@ import type {
   SurfaceMessagePart,
 } from '@codex-app-sdk/core/surface';
 import { codexThreadItemToToolPart } from './codex-tool-part-adapter';
+import { finalizeTurnToolParts } from './codex-surface-message-state';
 
 export { codexThreadItemToToolPart as codexItemToToolPart } from './codex-tool-part-adapter';
 
@@ -149,7 +150,9 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
   }
 
   flushAssistantMessage();
-  return messages;
+  return turn.status === 'inProgress'
+    ? messages
+    : finalizeTurnToolParts(messages, turn.id, turn.status);
 }
 
 export function codexItemToSurfaceMessage(
@@ -194,7 +197,7 @@ export function codexItemToSurfaceMessage(
   if (toolPart) parts.push(toolPart);
   const mediaPart = codexItemToMediaPart(item);
   if (mediaPart) parts.push(mediaPart);
-  return parts.length > 0 ? {
+  const message: SurfaceMessage | null = parts.length > 0 ? {
     id: `assistant-${item.id}`,
     role: 'assistant',
     status: surfaceMessageStatus(turn.status),
@@ -203,6 +206,8 @@ export function codexItemToSurfaceMessage(
     createdAt,
     metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
   } : null;
+  if (!message || turn.status === 'inProgress') return message;
+  return finalizeTurnToolParts([message], turn.id, turn.status)[0] ?? null;
 }
 
 export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart | null {

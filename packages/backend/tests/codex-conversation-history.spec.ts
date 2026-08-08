@@ -106,6 +106,39 @@ describe('codexThreadToSurfaceMessages', () => {
     })).toBeNull();
   });
 
+  it('settles stale running tool items in terminal history messages', () => {
+    const runningCommand = {
+      type: 'commandExecution',
+      id: 'command-interrupted',
+      command: 'npm test',
+      cwd: '/tmp/project',
+      status: 'inProgress',
+      commandActions: [{ type: 'run', command: 'npm test' }],
+      aggregatedOutput: '',
+      exitCode: null,
+      durationMs: null,
+    } as unknown as v2.ThreadItem;
+
+    expect(codexItemToSurfaceMessage('thread', {
+      id: 'turn-interrupted', status: 'interrupted', startedAt: 1,
+    }, runningCommand)).toMatchObject({
+      status: 'complete',
+      parts: [{ type: 'tool', status: 'failed' }],
+    });
+
+    const [message] = codexTurnToSurfaceMessages('thread', {
+      id: 'turn-interrupted',
+      status: 'interrupted',
+      startedAt: 1,
+      completedAt: 2,
+      items: [runningCommand],
+    } as unknown as v2.Turn);
+    expect(message).toMatchObject({
+      status: 'complete',
+      parts: [{ type: 'tool', status: 'failed' }],
+    });
+  });
+
   it('preserves bounded data previews while rematerializing local image history', () => {
     const turn = {
       id: 'turn', status: 'completed', startedAt: 1, completedAt: 2,

@@ -12,6 +12,10 @@ completed assistant message keeps its actions visible; older messages use the
 normal hover/focus treatment. A currently streaming assistant message does not
 show actions.
 
+Terminal assistant messages also settle any stale running tool parts. This
+keeps interrupted or restored turns from displaying activity indefinitely when
+app-server history still reports an in-progress item.
+
 While a turn is accepted but no assistant row exists yet, the list renders a
 `Thinking` shimmer. It disappears when the first assistant content is
 materialized. A completed assistant message whose text is empty and which has

@@ -86,6 +86,8 @@ type SurfaceMessage = {
 - tool calls and tool groups.
 
 This is the stable renderer model for both restored and live conversations.
+When a message is terminal (`complete` or `error`), SDK adapters settle any
+stale `running` tool parts rather than exposing a nested streaming state.
 
 ## History state
 
