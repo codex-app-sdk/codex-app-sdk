@@ -18,7 +18,12 @@
         <ChatIconButton :label="fullscreenLabel" @click="openFullscreen">
           <Maximize2 />
         </ChatIconButton>
-        <ChatIconButton :href="media.url" download :label="downloadLabel">
+        <ChatIconButton
+          :download="downloadName"
+          :href="media.url"
+          :label="downloadLabel"
+          @click.stop
+        >
           <Download />
         </ChatIconButton>
         <ChatIconButton v-if="media.prompt" :label="promptLabel" @click="toggleDetails">
@@ -44,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Download, Info, Maximize2 } from '../icons/app-icons'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatImageLightbox from './ChatImageLightbox.vue'
@@ -65,6 +70,7 @@ const promptLabel = 'Prompt'
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
 const rootElement = ref<HTMLElement | null>(null)
+const downloadName = computed(() => mediaDownloadName(props.media))
 
 async function openFullscreen() {
   const image = {
@@ -85,6 +91,20 @@ function closeFullscreen() {
 
 function toggleDetails() {
   detailsOpen.value = !detailsOpen.value
+}
+
+function mediaDownloadName(media: MessageMedia): string {
+  const baseName = (media.title?.trim() || media.alt?.trim() || 'generated-image')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+  if (/\.[a-z\d]{2,5}$/i.test(baseName)) return baseName
+  const extension = {
+    'image/avif': 'avif',
+    'image/gif': 'gif',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+  }[media.mimeType ?? '']
+  return extension ? `${baseName}.${extension}` : baseName
 }
 
 </script>

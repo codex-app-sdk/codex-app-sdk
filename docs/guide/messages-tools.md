@@ -21,7 +21,8 @@ no other visible content renders a muted italic `Empty response` fallback.
 
 Clicking an image attachment or generated assistant image opens the SDK
 fullscreen lightbox by default. The overlay closes from its close control, the
-backdrop, or Escape.
+backdrop, or Escape. Generated-image footer controls open the same fullscreen
+behavior and download the renderer-safe image source with a useful filename.
 
 Controlled applications can replace that behavior with `actions.openImage`:
 

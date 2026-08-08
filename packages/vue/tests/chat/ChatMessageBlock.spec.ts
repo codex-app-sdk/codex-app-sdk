@@ -311,9 +311,9 @@ describe('ChatMessageBlock', () => {
       },
     });
 
-    expect(wrapper.find('[aria-label="Download media"]').attributes('download')).toBe('');
+    expect(wrapper.find('[aria-label="Download media"]').attributes('download')).toBe('A bright product photo');
 
-    await wrapper.find('.chat-media-block__image-button').trigger('click');
+    await wrapper.find('.chat-media-block__actions [aria-label="Open fullscreen"]').trigger('click');
 
     const fullscreenImage = document.body.querySelector('.chat-media-block__fullscreen-image');
     expect(fullscreenImage?.getAttribute('src')).toBe('/artifacts/image.png');

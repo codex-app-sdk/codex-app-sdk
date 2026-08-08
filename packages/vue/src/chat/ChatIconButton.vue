@@ -9,7 +9,7 @@
     }"
     :aria-disabled="disabled ? 'true' : undefined"
     :disabled="href ? undefined : disabled"
-    :download="download ? '' : undefined"
+    :download="typeof download === 'string' ? download : download ? '' : undefined"
     :href="disabled ? undefined : href"
     :rel="rel"
     :target="target"
@@ -26,7 +26,7 @@ defineProps<{
   bordered?: boolean
   danger?: boolean
   disabled?: boolean
-  download?: boolean
+  download?: boolean | string
   href?: string
   label: string
   rel?: string

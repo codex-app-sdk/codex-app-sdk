@@ -207,6 +207,10 @@ click when it returns `void` or `true`; return `false` to use the stock lightbox
 The exported renderer-safe types are `CodexMessageImage`,
 `CodexMessageImageContext`, and `CodexMessageImageOpenHandler`.
 
+`CodexMediaBlock` owns its generated-image footer actions: fullscreen delegates
+to the same overridable image-opening contract, while download uses browser
+download behavior without entering the conversation-link routing path.
+
 ### Tools and conversation state
 
 `CodexToolCall`, `CodexToolCallTitle`, `CodexToolIcon`, `CodexToolGroup`,

@@ -53,9 +53,26 @@ describe('conversation message image previews', () => {
     await wrapper.vm.$nextTick()
     expect(document.body.querySelector('.chat-image-lightbox')).toBeNull()
 
-    await wrapper.get('.chat-media-block__image-button').trigger('click')
+    await wrapper.get('.chat-media-block__actions [aria-label="Open fullscreen"]').trigger('click')
     await flushPromises()
     expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('alt')).toBe('Generated result')
+  })
+
+  it('lets generated-media downloads bypass conversation link interception', () => {
+    const wrapper = mount(CodexConversationPane, { props: { messages } })
+    const download = wrapper.get('.chat-media-block__actions [aria-label="Download media"]')
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    const preventTestNavigation = vi.fn((clickEvent: Event) => clickEvent.preventDefault())
+    download.element.addEventListener('click', preventTestNavigation)
+
+    download.element.dispatchEvent(event)
+
+    expect(preventTestNavigation).toHaveBeenCalledOnce()
+    expect(download.attributes()).toMatchObject({
+      download: 'Result.png',
+      href: imageUrl,
+    })
+    expect(wrapper.emitted('openLink')).toBeUndefined()
   })
 
   it('keeps the SDK lightbox active when CodexMessage is mounted without an image handler', async () => {
@@ -86,6 +103,13 @@ describe('conversation message image previews', () => {
         src: imageUrl,
       }),
       expect.objectContaining({ index: 0, message: expect.objectContaining({ id: 'user-image' }) }),
+    )
+
+    await wrapper.get('.chat-media-block__actions [aria-label="Open fullscreen"]').trigger('click')
+    await flushPromises()
+    expect(openImage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'media', src: imageUrl, title: 'Result' }),
+      expect.objectContaining({ index: 1, message: expect.objectContaining({ id: 'assistant-image' }) }),
     )
     expect(document.body.querySelector('.chat-image-lightbox')).toBeNull()
   })
