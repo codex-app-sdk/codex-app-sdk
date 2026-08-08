@@ -100,8 +100,8 @@ import {
   type SurfaceMessage,
   type SurfaceMessagePart,
   type TurnGitDiff,
-} from 'codex-app-sdk/vue';
-import type { CodexSurfacePlugin } from 'codex-app-sdk/surface';
+} from '@codex-app-sdk/vue';
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 
 type Scenario = {
   id: string;

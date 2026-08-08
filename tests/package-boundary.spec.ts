@@ -39,6 +39,13 @@ describe('package boundary', () => {
     expect(manifest.scripts.typecheck).toBe('npm run typecheck:sdk && npm run typecheck:workspaces');
     expect(manifest.scripts.lint).toBe('npm run lint:sdk && npm run lint:workspaces');
     expect(manifest.scripts['build:all']).toBe('npm run build:sdk && npm run build:workspaces');
+    expect(manifest.scripts['build:web']).toBe(
+      'npm run build -w @codex-app-sdk/core'
+      + ' && npm run build -w @codex-app-sdk/backend'
+      + ' && npm run build -w @codex-app-sdk/vue'
+      + ' && npm run build -w @codex-app-sdk/web'
+      + ' && npm run build -w @codex-app-sdk/basic-web-sample',
+    );
 
     for (const workspace of sdkWorkspaces) {
       expect(manifest.scripts['check:packages']).toContain(`-w ${workspace}`);
@@ -125,6 +132,28 @@ describe('package boundary', () => {
       }
     }
     expect(violations).toStrictEqual([]);
+  });
+
+  it('keeps the component lab browser-only and on explicit renderer packages', async () => {
+    const labRoot = path.join(packageRoot, 'samples/component-lab');
+    const manifest = JSON.parse(await readFile(path.join(labRoot, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>;
+    };
+    const files = await sourceFiles(labRoot);
+    const compatibilityImports: string[] = [];
+    for (const file of files) {
+      const content = await readFile(file, 'utf8');
+      if (/from\s+['"]codex-app-sdk(?:\/|['"])|import\s+['"]codex-app-sdk\//.test(content)) {
+        compatibilityImports.push(path.relative(packageRoot, file));
+      }
+    }
+
+    expect(manifest.dependencies).toEqual({
+      '@codex-app-sdk/core': '0.1.0',
+      '@codex-app-sdk/vue': '0.1.0',
+      vue: '^3.5.0',
+    });
+    expect(compatibilityImports).toStrictEqual([]);
   });
 
   it('keeps the web transport independent from HTTP frameworks and WebSocket implementations', async () => {

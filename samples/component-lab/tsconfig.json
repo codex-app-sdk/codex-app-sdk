@@ -3,8 +3,9 @@
   "compilerOptions": {
     "skipLibCheck": true,
     "paths": {
-      "codex-app-sdk/surface": ["../../src/surface/index.ts"],
-      "codex-app-sdk/vue": ["../../src/vue/index.ts"]
+      "@codex-app-sdk/core/native": ["../../packages/core/src/native.ts"],
+      "@codex-app-sdk/core/surface": ["../../packages/core/src/surface.ts"],
+      "@codex-app-sdk/vue": ["../../packages/vue/src/index.ts"]
     },
     "types": ["node", "vite/client", "vitest/globals"]
   },

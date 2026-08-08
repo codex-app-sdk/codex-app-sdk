@@ -73,7 +73,7 @@
     "build:relay": "npm run build -w @codex-app-sdk/relay-sample",
     "build:sdk": "npm run build:packages && npm run build:compat",
     "build:spark": "npm run build -w @codex-app-sdk/spark-sample",
-    "build:web": "npm run build -w @codex-app-sdk/basic-web-sample",
+    "build:web": "npm run build -w @codex-app-sdk/core && npm run build -w @codex-app-sdk/backend && npm run build -w @codex-app-sdk/vue && npm run build -w @codex-app-sdk/web && npm run build -w @codex-app-sdk/basic-web-sample",
     "build:workspaces": "npm run build -w @codex-app-sdk/component-lab && npm run build -w @codex-app-sdk/basic-sample && npm run build -w @codex-app-sdk/spark-sample && npm run build -w @codex-app-sdk/relay-sample && npm run build -w @codex-app-sdk/basic-web-sample",
     "check": "npm run check:sdk && npm run check:workspaces:owned && npm run build:docs",
     "check:compat": "npm run lint:compat && npm run test:compat && npm run build:compat",
