@@ -105,6 +105,21 @@ describe('CodexMessage', () => {
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
   });
 
+  it('renders a muted italic fallback for an empty completed assistant response', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-empty',
+        role: 'assistant',
+        status: 'complete',
+        parts: [{ type: 'text', text: '', itemId: 'agent-empty' }],
+      },
+    });
+
+    expect(wrapper.get('.chat-message__empty-response').text()).toBe('Empty response');
+    expect(wrapper.get('.chat-message__empty-response').element.tagName).toBe('SPAN');
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+  });
+
   it('applies the SDK base markdown styles to rendered messages', () => {
     const wrapper = mountMessage({
       message: { role: 'assistant', content: 'Hello **world**' },

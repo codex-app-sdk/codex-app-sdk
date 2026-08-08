@@ -290,6 +290,10 @@ but the app-server has not yet materialized its first assistant row.
 Message actions remain visible on the latest completed assistant message. Older
 message rows keep the hover/focus visibility behavior.
 
+`CodexMessage` renders `Empty response` in muted italic text when a completed
+assistant message contains no renderable content. Empty streaming messages keep
+the normal `Thinking` presentation instead.
+
 File-operation targets in read, edit, and create tool titles are interactive
 targets when the SDK can resolve an absolute path from the tool input. Clicking
 a target emits the existing `CodexConversationPane` `openLink` event and does

@@ -43,7 +43,7 @@
           </slot>
         </template>
       </div>
-      <div v-if="isEditing || stackBlocks.length > 0 || showThinkingIndicator || showStreamingDot" class="chat-message__stack">
+      <div v-if="isEditing || stackBlocks.length > 0 || showEmptyResponse || showThinkingIndicator || showStreamingDot" class="chat-message__stack">
         <ChatMessageEditor
           v-if="isEditing"
           :cancel-label="t('chat.actions.cancel')"
@@ -81,6 +81,9 @@
               </ChatMessageBlock>
             </slot>
           </template>
+          <span v-if="showEmptyResponse" class="chat-message__empty-response">
+            {{ t('chat.message.emptyResponse') }}
+          </span>
           <slot v-if="showThinkingIndicator" name="thinking" :index="index" :message="chatMessage">
             <span
               class="chat-message__thinking codex-text-shimmer"
@@ -215,7 +218,8 @@ const hostCapabilities = useCodexHostCapabilities()
 const t = useCodexChatTranslate()
 const chatMessage = computed(() => chatMessageFromInput(props.message))
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
-const blocks = computed(() => computeMessageBlocks(chatMessage.value).filter((block) => (
+const allBlocks = computed(() => computeMessageBlocks(chatMessage.value))
+const blocks = computed(() => allBlocks.value.filter((block) => (
   effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
 )))
 const indexedBlocks = computed(() => blocks.value.map((block, blockIndex) => ({ block, blockIndex })))
@@ -249,6 +253,11 @@ const canEdit = computed(() => props.canEditMessage && effectivePresentation.val
 const canFork = computed(() => props.canForkMessage && effectivePresentation.value.messages.actions.fork)
 const canRetry = computed(() => props.canRetryMessage && effectivePresentation.value.messages.actions.retry)
 const hasVisibleAssistantActivity = computed(() => blocks.value.some(isVisibleAssistantBlock))
+const showEmptyResponse = computed(() => (
+  chatMessage.value.role === 'assistant' &&
+  chatMessage.value.streaming !== true &&
+  allBlocks.value.length === 0
+))
 const showThinkingIndicator = computed(() => (
   chatMessage.value.role === 'assistant' &&
   chatMessage.value.streaming === true &&
@@ -423,6 +432,11 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: var(--space-4);
   max-width: 100%;
+}
+
+.chat-message__empty-response {
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .chat-message__attachments {

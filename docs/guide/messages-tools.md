@@ -14,7 +14,8 @@ show actions.
 
 While a turn is accepted but no assistant row exists yet, the list renders a
 `Thinking` shimmer. It disappears when the first assistant content is
-materialized.
+materialized. A completed assistant message whose text is empty and which has
+no other visible content renders a muted italic `Empty response` fallback.
 
 ## Image previews
 

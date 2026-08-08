@@ -27,6 +27,7 @@ const templates: Record<string, string> = {
   'chat.files.empty': 'No matching files',
   'chat.files.hint': 'Start typing to search files in this project.',
   'chat.files.title': 'Files',
+  'chat.message.emptyResponse': 'Empty response',
   'chat.skills.empty': 'No matching skills',
   'chat.skills.title': 'Skills',
 };
