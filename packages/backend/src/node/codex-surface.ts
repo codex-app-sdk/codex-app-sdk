@@ -544,6 +544,11 @@ export class CodexSurface {
     return this.conversations.list(options);
   }
 
+  /** Reads one conversation's metadata without loading its turns or runtime. */
+  async readConversationSummary(conversationId: string): Promise<CodexConversationSummary> {
+    return this.conversations.readSummary(conversationId);
+  }
+
   async archiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot> {
     return this.conversations.archive(conversationId);
   }

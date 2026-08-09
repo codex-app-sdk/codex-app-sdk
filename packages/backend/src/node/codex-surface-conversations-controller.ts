@@ -83,6 +83,20 @@ export class CodexSurfaceConversationsController {
     return structuredClone(await this.requestConversations(options));
   }
 
+  async readSummary(conversationId: string): Promise<CodexConversationSummary> {
+    const threadId = normalizedConversationId(conversationId);
+    await this.host.ensureConnected();
+    const response: v2.ThreadReadResponse = await this.client.request('thread/read', {
+      threadId,
+      includeTurns: false,
+    });
+    if (response.thread.id !== threadId) {
+      throw new Error(`Codex thread/read returned '${response.thread.id}' for requested thread '${threadId}'`);
+    }
+    const summary = this.summaryWithKnownTurnCount(response.thread);
+    return structuredClone(summary);
+  }
+
   async archive(conversationId: string): Promise<CodexSurfaceSnapshot> {
     const threadId = normalizedConversationId(conversationId);
     await this.host.ensureConnected();

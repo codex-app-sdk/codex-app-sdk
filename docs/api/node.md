@@ -211,8 +211,14 @@ status polling. See [Remote control and device pairing](/guide/remote-control).
 
 - `refreshConversations()`
 - `listConversations(options?)`
+- `readConversationSummary(conversationId)`
 - `listModels(options?)`
 - `listSkills(options?)`
+
+`readConversationSummary()` performs `thread/read` with `includeTurns: false`
+and returns metadata for one known conversation. It does not load turns, create
+a conversation runtime, change the conversation catalog, or emit surface
+events.
 
 ### Conversation lifecycle
 
