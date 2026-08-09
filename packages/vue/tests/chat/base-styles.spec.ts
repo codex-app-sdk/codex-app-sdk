@@ -97,4 +97,8 @@ describe('base conversation styles', () => {
     expect(tokenFont).toBe(codeFont);
     expect(tokenFont).not.toBe(themeFont);
   });
+
+  it('does not draw a browser focus outline around scrollable code blocks', () => {
+    expect(baseStyles).toMatch(/\.codex-markdown pre \{[\s\S]*?outline: none;/);
+  });
 });

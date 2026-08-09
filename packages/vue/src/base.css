@@ -185,6 +185,7 @@
 .codex-markdown pre {
   margin: 14px 0;
   overflow: auto;
+  outline: none;
   border: 0;
   border-radius: var(--radius-lg);
   padding: var(--space-4);
