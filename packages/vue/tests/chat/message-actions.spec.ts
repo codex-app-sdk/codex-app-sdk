@@ -6,6 +6,7 @@ import {
   copyableMessageHtml,
   copyableMessageText,
   copyMessageToClipboard,
+  copyTextToClipboard,
   stripMessageMarkup,
 } from '../../src/chat/message-actions';
 
@@ -108,5 +109,16 @@ describe('message actions', () => {
 
     await copyMessageToClipboard('A **plain** message');
     expect(writeText).toHaveBeenCalledWith('A plain message');
+  });
+
+  it('copies code as plain text through native host capabilities', async () => {
+    const copyToClipboard = vi.fn(async () => undefined);
+
+    await copyTextToClipboard(
+      'const value = 1;',
+      { copyToClipboard } as unknown as CodexNativeRendererApi,
+    );
+
+    expect(copyToClipboard).toHaveBeenCalledWith({ text: 'const value = 1;' });
   });
 });

@@ -9,6 +9,7 @@ import type { MessageBlock } from '../../src/chat/message-blocks';
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -53,6 +54,32 @@ describe('ChatMessageBlock', () => {
     expect(wrapper.find('table').exists()).toBe(true);
     expect(wrapper.find('th').text()).toBe('Name');
     expect(wrapper.find('pre code').text()).toContain('const ok = true');
+    expect(wrapper.get('[data-chat-code-copy]').attributes('aria-label')).toBe('Copy code');
+  });
+
+  it('copies assistant code and temporarily confirms completion', async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const wrapper = mount(ChatMessageBlock, {
+      props: { block: { type: 'text', content: '```sh\nnpm test\n```' } },
+    });
+    const button = wrapper.get<HTMLButtonElement>('[data-chat-code-copy]');
+
+    await button.trigger('click');
+    await Promise.resolve();
+
+    expect(writeText).toHaveBeenCalledWith('npm test');
+    expect(button.attributes('aria-label')).toBe('Code copied');
+    expect(button.attributes('data-copied')).toBe('true');
+    expect(wrapper.find('.chat-code-block__check-icon').exists()).toBe(true);
+
+    vi.advanceTimersByTime(2_000);
+    expect(button.attributes('aria-label')).toBe('Copy code');
+    expect(button.attributes('data-copied')).toBeUndefined();
   });
 
   it('emits follow-up prompts from follow-up blocks', async () => {

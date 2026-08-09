@@ -24,6 +24,8 @@ const templates: Record<string, string> = {
   'chat.contextUsage.usedAndLeft': '{used}% used ({left}% left)',
   'chat.contextUsage.tokensUsed': '{used} / {window} tokens used',
   'chat.commands.title': 'Commands',
+  'chat.code.copied': 'Code copied',
+  'chat.code.copy': 'Copy code',
   'chat.files.empty': 'No matching files',
   'chat.files.hint': 'Start typing to search files in this project.',
   'chat.files.title': 'Files',

@@ -10,7 +10,8 @@
   <slot v-else-if="block.type === 'text'" name="text" :block="block" :content="block.content" :user="false">
     <div
       class="codex-chat-theme chat-message-block chat-message-block--text codex-markdown"
-      v-html="renderMarkdown(block.content)"
+      v-html="renderMarkdown(block.content, { codeCopyLabel: t('chat.code.copy') })"
+      @click="copyCodeBlock"
     />
   </slot>
   <slot v-else-if="block.type === 'mermaid'" name="mermaid" :block="block" :code="block.code">
@@ -56,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { onBeforeUnmount } from 'vue'
 import ChatAttachmentBlock from './ChatAttachmentBlock.vue'
 import ChatFollowUps from './ChatFollowUps.vue'
 import ChatMediaBlock from './ChatMediaBlock.vue'
@@ -64,10 +66,13 @@ import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import ChatUserText from './ChatUserText.vue'
 import { renderMarkdown } from './message-markdown'
+import { copyTextToClipboard } from './message-actions'
+import { useCodexChatTranslate } from './chat-i18n'
 import type { MessageBlock } from './message-blocks'
 import type { ClientRequestResponse, CodexConversationLink } from './contracts'
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface'
 import type { CodexMessageImageOpenHandler } from './message-image'
+import { useCodexHostCapabilities } from '../native-capabilities'
 
 defineSlots<{
   attachment(props: {
@@ -102,6 +107,36 @@ const emit = defineEmits<{
   'open-link': [link: CodexConversationLink]
   'send-follow-up': [prompt: string]
 }>()
+
+const t = useCodexChatTranslate()
+const hostCapabilities = useCodexHostCapabilities()
+const copyResetTimers = new Map<HTMLButtonElement, ReturnType<typeof setTimeout>>()
+
+async function copyCodeBlock(event: MouseEvent) {
+  const target = event.target instanceof Element ? event.target : null
+  const button = target?.closest<HTMLButtonElement>('[data-chat-code-copy]')
+  if (!button || !(event.currentTarget instanceof HTMLElement) || !event.currentTarget.contains(button)) return
+  const code = button.closest('.chat-code-block')?.querySelector('pre code')?.textContent
+  if (code === undefined) return
+
+  await copyTextToClipboard(code, hostCapabilities)
+  button.dataset.copied = 'true'
+  button.setAttribute('aria-label', t('chat.code.copied'))
+  button.title = t('chat.code.copied')
+  const previousTimer = copyResetTimers.get(button)
+  if (previousTimer) clearTimeout(previousTimer)
+  copyResetTimers.set(button, setTimeout(() => {
+    button.removeAttribute('data-copied')
+    button.setAttribute('aria-label', t('chat.code.copy'))
+    button.title = t('chat.code.copy')
+    copyResetTimers.delete(button)
+  }, 2_000))
+}
+
+onBeforeUnmount(() => {
+  for (const timer of copyResetTimers.values()) clearTimeout(timer)
+  copyResetTimers.clear()
+})
 </script>
 
 <style scoped>

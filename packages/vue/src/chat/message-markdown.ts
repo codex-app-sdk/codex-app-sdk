@@ -105,14 +105,28 @@ markdown.use({
   ],
 })
 
-export function renderMarkdown(content: string) {
-  return markdown.parse(content) as string
+export function renderMarkdown(
+  content: string,
+  options: { codeCopyLabel?: string } = {},
+) {
+  const html = markdown.parse(content) as string
+  return options.codeCopyLabel ? addCodeCopyControls(html, options.codeCopyLabel) : html
 }
 
 export function renderUserText(content: string) {
   return `<p>${escapeHtml(content)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\n/g, '<br>')}</p>`
+}
+
+function addCodeCopyControls(html: string, label: string): string {
+  const button = [
+    `<button class="chat-code-block__copy" type="button" data-chat-code-copy aria-label="${escapeAttribute(label)}" title="${escapeAttribute(label)}">`,
+    '<svg class="chat-code-block__copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8m-2 0a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M16 6V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>',
+    '<svg class="chat-code-block__check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>',
+    '</button>',
+  ].join('')
+  return html.replace(/(<pre\b[\s\S]*?<\/pre>)/g, `<div class="chat-code-block">${button}$1</div>`)
 }
 
 function isAbsoluteHttpUrl(value: string) {

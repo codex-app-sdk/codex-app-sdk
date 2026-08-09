@@ -191,6 +191,63 @@
   background: var(--color-surface-low);
 }
 
+.codex-markdown .chat-code-block {
+  position: relative;
+  margin: 14px 0;
+}
+
+.codex-markdown .chat-code-block pre {
+  margin: 0;
+  padding-right: calc(var(--space-4) + 32px);
+}
+
+.codex-markdown .chat-code-block__copy {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 0;
+  background: var(--color-surface-low);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.codex-markdown .chat-code-block__copy:hover,
+.codex-markdown .chat-code-block__copy:focus-visible {
+  background: var(--color-surface-high);
+  color: var(--color-text);
+}
+
+.codex-markdown .chat-code-block__copy:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.codex-markdown :where(.chat-code-block__copy-icon, .chat-code-block__check-icon) {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.codex-markdown .chat-code-block__check-icon,
+.codex-markdown .chat-code-block__copy[data-copied] .chat-code-block__copy-icon {
+  display: none;
+}
+
+.codex-markdown .chat-code-block__copy[data-copied] .chat-code-block__check-icon {
+  display: block;
+}
+
 .codex-markdown pre code {
   padding: 0;
   background: transparent;

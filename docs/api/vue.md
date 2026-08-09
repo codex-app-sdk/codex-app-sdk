@@ -211,6 +211,9 @@ The exported renderer-safe types are `CodexMessageImage`,
 to the same overridable image-opening contract, while download uses browser
 download behavior without entering the conversation-link routing path.
 
+Assistant Markdown rendered by `CodexMessageBlock` adds a copy control to each
+fenced code block and shows a check confirmation for two seconds after copying.
+
 ### Tools and conversation state
 
 `CodexToolCall`, `CodexToolCallTitle`, `CodexToolIcon`, `CodexToolGroup`,

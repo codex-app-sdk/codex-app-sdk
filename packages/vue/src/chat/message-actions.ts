@@ -51,6 +51,17 @@ export async function copyMessageToClipboard(
   await clipboard.writeText(plainText)
 }
 
+export async function copyTextToClipboard(
+  text: string,
+  hostCapabilities: CodexHostCapabilities | undefined = getCodexGlobalHostCapabilities(),
+) {
+  if (hostCapabilities) {
+    await hostCapabilities.copyToClipboard({ text })
+    return
+  }
+  await navigator.clipboard.writeText(text)
+}
+
 function markdownToText(content: string) {
   const html = renderMarkdown(content).replace(breakTagRegex, '\n')
   const template = document.createElement('template')
