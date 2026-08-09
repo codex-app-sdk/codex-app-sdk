@@ -14,7 +14,7 @@ export type CodexElectronAttachmentRegistration = {
   previewUrl?: string;
 };
 
-type RegisteredAttachment = Omit<CodexElectronAttachmentRegistration, 'previewUrl' | 'size'>;
+type RegisteredAttachment = Omit<CodexElectronAttachmentRegistration, 'size'>;
 
 /** Keeps trusted local paths out of the renderer and scopes references to one Electron integration. */
 export class CodexElectronAttachmentRegistry {
@@ -27,6 +27,7 @@ export class CodexElectronAttachmentRegistry {
       path: input.path,
       name: input.name,
       mimeType: input.mimeType,
+      ...(input.previewUrl === undefined ? {} : { previewUrl: input.previewUrl }),
     });
     return {
       id: reference,
@@ -49,6 +50,9 @@ export class CodexElectronAttachmentRegistry {
       path: registered.path,
       name: registered.name,
       mimeType: registered.mimeType,
+      ...(registered.type === 'image' && registered.previewUrl
+        ? { previewUrl: registered.previewUrl }
+        : {}),
     };
   }
 

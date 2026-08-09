@@ -152,12 +152,12 @@ export function registerCodexNativeIpc(
     },
     [channels.readImagePreview]: async (_event, value) => {
       const reference = nonEmptyString(value, 'Image preview attachment reference');
-      const filePath = attachments.path(reference);
+      const filePath = managedTemporaryAttachmentPath(reference) ?? attachments.path(reference);
       const mimeType = mimeTypeForPath(filePath);
       if (!mimeType.startsWith('image/') || mimeType === 'image/svg+xml') return null;
       let metadata;
       try {
-        metadata = await fs.stat(filePath);
+        metadata = await fs.lstat(filePath);
       } catch (error) {
         if (isMissingFileError(error)) return null;
         throw error;
@@ -306,6 +306,16 @@ function isMissingFileError(error: unknown): boolean {
 function safeFileName(value: string): string {
   const name = path.basename(value).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   return name || 'attachment';
+}
+
+function managedTemporaryAttachmentPath(value: string): string | null {
+  if (!path.isAbsolute(value)) return null;
+  const resolved = path.resolve(value);
+  const directory = path.dirname(resolved);
+  if (path.dirname(directory) !== path.resolve(os.tmpdir())) return null;
+  return /^codex-app-sdk-attachments-[a-z\d_-]+$/i.test(path.basename(directory))
+    ? resolved
+    : null;
 }
 
 function positiveByteLimit(value: number | undefined, fallback: number, label: string): number {

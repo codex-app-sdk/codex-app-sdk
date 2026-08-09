@@ -310,6 +310,9 @@ function resolvedAttachment(
     type: 'image',
     ...common,
     ...(source.detail === undefined ? {} : { detail: source.detail }),
+    ...(attachment.previewUrl === undefined
+      ? {}
+      : { previewUrl: imagePreviewUrl(attachment.previewUrl) }),
   } : { type: 'file', ...common };
 }
 
@@ -410,6 +413,14 @@ function displayString(value: unknown, label: string): string {
   const result = nonEmptyString(value, label);
   if (result.length > 1_024) throw new RangeError(`${label} is too long`);
   return result;
+}
+function imagePreviewUrl(value: unknown): string {
+  if (typeof value !== 'string'
+    || value.length > 16 * 1024 * 1024
+    || !/^data:image\/(?:avif|bmp|gif|heic|heif|jpe?g|png|webp);base64,[a-z\d+/]+={0,2}$/i.test(value)) {
+    throw new TypeError('Resolved message attachment preview must be a bounded image data URL');
+  }
+  return value;
 }
 function isJsonValue(value: unknown, seen = new Set<object>()): value is CodexSurfaceJsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;

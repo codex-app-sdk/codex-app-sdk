@@ -113,6 +113,28 @@ describe('Codex surface bridge message options', () => {
     });
   });
 
+  it('preserves safe host-resolved image previews', async () => {
+    const { sendMessage, target } = targetWithSend();
+    await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', [
+      'prompt',
+      { attachments: [{ type: 'image', reference: 'image:pasted' }] },
+    ], {
+      resolveAttachment: async () => ({
+        type: 'image',
+        path: '/resolved.png',
+        previewUrl: 'data:image/png;base64,cG5n',
+      }),
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith('prompt', {
+      attachments: [{
+        type: 'image',
+        path: '/resolved.png',
+        previewUrl: 'data:image/png;base64,cG5n',
+      }],
+    });
+  });
+
   it.each([
     [async (): Promise<unknown> => null, 'Resolved message attachment must be an object'],
     [async (): Promise<unknown> => ({ type: 'image', path: '/image.png' }), 'Resolved message attachment type does not match'],
@@ -125,6 +147,18 @@ describe('Codex surface bridge message options', () => {
       { attachments: [{ type: 'file', reference: 'file:1' }] },
       message,
       resolver as CodexSurfaceBridgeAttachmentResolver,
+    );
+  });
+
+  it('rejects unsafe host-resolved image previews', async () => {
+    await expectMessageRejected(
+      { attachments: [{ type: 'image', reference: 'image:1' }] },
+      'Resolved message attachment preview must be a bounded image data URL',
+      async () => ({
+        type: 'image',
+        path: '/image.png',
+        previewUrl: 'https://example.com/image.png',
+      }),
     );
   });
 });

@@ -60,6 +60,13 @@ describe('Codex native Electron bridge', () => {
     expect(picked[0]?.previewUrl).toBe('data:image/png;base64,cG5n');
     expect(picked[0]).not.toHaveProperty('path');
     expect(picked[0]?.reference).toMatch(/^electron-attachment:/);
+    expect(attachments.resolve({
+      type: 'image', reference: picked[0]?.reference as string,
+    })).toMatchObject({
+      type: 'image',
+      path: imagePath,
+      previewUrl: 'data:image/png;base64,cG5n',
+    });
 
     await main.call('codex-native:copy-to-clipboard', { text: 'Done', html: '<p>Done</p>' });
     expect(clipboard.write).toHaveBeenCalledWith({ text: 'Done', html: '<p>Done</p>' });
@@ -109,6 +116,34 @@ describe('Codex native Electron bridge', () => {
       type: 'file', reference: ingested[0]?.reference as string,
     })).toThrow('Attachment reference is invalid or expired');
     await expect(access(ingestedPath)).resolves.toBeUndefined();
+  });
+
+  it('restores previews for SDK-ingested images after the attachment registry resets', async () => {
+    const main = new FakeMainPort();
+    const attachments = new CodexElectronAttachmentRegistry();
+    const dispose = registerCodexNativeIpc({
+      clipboard: { write: vi.fn() },
+      dialog: { showOpenDialog: vi.fn(async () => ({ canceled: true, filePaths: [] })) },
+      ipcMain: main,
+      shell: { openExternal: vi.fn(async () => undefined) },
+    }, {}, attachments);
+    const [ingested] = await main.call('codex-native:ingest-attachments', [{
+      name: 'pasted.png',
+      mimeType: 'image/png',
+      data: new TextEncoder().encode('png').buffer,
+    }]) as Array<Record<string, unknown>>;
+    const ingestedPath = attachments.resolve({
+      type: 'image', reference: ingested?.reference as string,
+    }).path;
+
+    attachments.clear();
+
+    await expect(main.call('codex-native:read-image-preview', ingestedPath)).resolves.toBe(
+      'data:image/png;base64,cG5n',
+    );
+    await expect(main.call('codex-native:read-image-preview', path.join(os.tmpdir(), 'private.png')))
+      .rejects.toThrow('Attachment reference is invalid or expired');
+    dispose();
   });
 
   it('creates and exposes a typed preload API', async () => {

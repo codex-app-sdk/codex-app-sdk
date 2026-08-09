@@ -59,10 +59,10 @@ The stock conversation pane wires both image paste and drag/drop.
 
 Optimistic image messages carry a bounded data preview through the renderer-safe
 surface contract. If app-server history later rematerializes the same attachment
-as a local path, the SDK preserves that preview. After a restart,
-`ChatAttachmentBlock` lazily asks the native bridge for a bounded image-only data
-preview instead of navigating the renderer to a blocked `file://` URL. Missing,
-oversized, unsupported, or already-reclaimed files remain file chips.
+as a local path, the SDK preserves that preview. After a restart, SDK-ingested
+temporary images are reopened only from the SDK-owned attachment directory and
+returned as bounded image-only data previews. Missing, oversized, unsupported,
+or already-reclaimed files remain file chips.
 
 ## Clipboard
 

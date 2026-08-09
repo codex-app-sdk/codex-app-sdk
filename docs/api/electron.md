@@ -79,9 +79,9 @@ The helpers validate method names, argument shapes at the integration boundary,
 listener cleanup, and request/event typing.
 
 The native attachment bridge carries bounded renderer-safe image previews. It
-does not expose local `file://` image sources to the renderer; restored local
-images are read on demand through the native bridge, while missing or reclaimed
-files fall back to a file chip.
+does not expose local `file://` image sources to the renderer; restored
+SDK-ingested temporary images are read on demand through the native bridge,
+while missing or reclaimed files fall back to a file chip.
 
 Official remote-control pairing is intentionally a Node `CodexSurface` facade,
 not a default renderer IPC method. Hosts that expose pairing UI should define a
