@@ -89,7 +89,7 @@ export function getToolDisplayTitle(
     return t(`chat.tool.imageGeneration.${imageGenerationPhase(toolCall)}`);
   }
 
-  if (descriptor?.source === 'codex' && isCodexToolAction(descriptor.action)) {
+  if (descriptor && isSemanticToolAction(descriptor.action)) {
     const phase = commandPhase(descriptor.phase);
     if (descriptor.action === 'plan') {
       const operation = descriptor.params?.operation === 'update' ? 'update' : 'write';
@@ -114,7 +114,7 @@ export function getToolDisplayTitleParts(
 ): { prefix?: string; target?: string; title: string } {
   const title = getToolDisplayTitle(toolCall, descriptor, t);
   if (
-    descriptor?.source !== 'codex'
+    !descriptor
     || !['create', 'delete', 'edit', 'read'].includes(descriptor.action)
   ) {
     return { title };
@@ -139,7 +139,7 @@ export function getToolDisplayTargetParts(
   target?: string,
 ): CodexToolDisplayTargetPart[] | undefined {
   if (
-    descriptor?.source !== 'codex'
+    !descriptor
     || !['create', 'edit', 'read'].includes(descriptor.action)
   ) {
     return undefined;
@@ -301,7 +301,7 @@ function imageGenerationPhase(toolCall: MessageToolCall): 'running' | 'completed
   return !toolCall.done && toolCall.state !== 'completed' ? 'running' : 'completed';
 }
 
-function isCodexToolAction(action: string): action is 'create' | 'delete' | 'edit' | 'explore' | 'list' | 'plan' | 'read' | 'run' | 'search' {
+function isSemanticToolAction(action: string): action is 'create' | 'delete' | 'edit' | 'explore' | 'list' | 'plan' | 'read' | 'run' | 'search' {
   return action === 'create' || action === 'delete' || action === 'edit' || action === 'explore' || action === 'list' || action === 'plan' || action === 'read' || action === 'run' || action === 'search';
 }
 

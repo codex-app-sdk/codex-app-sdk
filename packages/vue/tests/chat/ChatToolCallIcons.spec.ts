@@ -99,6 +99,40 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain(`tabler-icon-${iconName}`);
   });
 
+  it('renders provider-neutral semantic actions with the same native presentation', async () => {
+    const toolCall: MessageToolCall = {
+      args: {
+        path: '/workspace/project/README.md',
+        cwd: '/workspace/project',
+      },
+      done: true,
+      function: 'Read',
+      id: 'claude-read-file',
+      result: '# Project',
+      state: 'completed',
+      status: JSON.stringify({
+        action: 'read',
+        phase: 'completed',
+        source: 'claude',
+        params: { target: 'README.md' },
+      }),
+    };
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    expect(wrapper.get('.chat-tool-call__title').text()).toContain('Read README.md');
+    expect(wrapper.get('.chat-tool-call__title svg').classes()).toContain('tabler-icon-file-text');
+    await wrapper.get('.chat-tool-call__title-target--link').trigger('click');
+    expect(wrapper.emitted('open-link')).toEqual([[
+      {
+        action: 'read',
+        filepath: '/workspace/project/README.md',
+        href: '/workspace/project/README.md',
+        kind: 'file',
+        path: '/workspace/project/README.md',
+      },
+    ]]);
+  });
+
   it.each([
     ['an app-specific descriptor', JSON.stringify({ action: 'delegate', phase: 'completed', source: 'claw' })],
     ['an unknown Codex action', JSON.stringify({ action: 'custom', phase: 'completed', source: 'codex' })],

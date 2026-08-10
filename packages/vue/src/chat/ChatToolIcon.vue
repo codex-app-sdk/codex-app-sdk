@@ -38,7 +38,7 @@ const resolvedIcon = computed<Component | undefined>(() => {
   if (props.toolCall.kind === 'webSearch') return WorldSearchIcon
 
   const descriptor = parseToolStatusDescriptor(props.toolCall.status)
-  if (descriptor?.source === 'codex') {
+  if (descriptor) {
     switch (descriptor.action) {
       case 'create': return PencilIcon
       case 'delete': return Trash2Icon
