@@ -65,6 +65,7 @@
           v-if="effectivePresentation.composer.actionMenu"
           :attach-enabled="attachEnabled"
           :disabled="disabled"
+          :leading-menu-items="leadingMenuItems"
           :items="menuItems"
           :approval-preset="approvalPreset"
           :approval-presets="effectiveCodexCapabilities.approvalPresets ?? []"
@@ -167,6 +168,7 @@ const props = defineProps<{
   composerState?: CodexComposerState;
   isSending: boolean;
   interruptArmed?: boolean;
+  leadingMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];

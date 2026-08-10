@@ -55,6 +55,8 @@ export type CodexConversationPaneComposerState = {
   state?: CodexComposerState;
   attachments?: readonly CodexHostAttachment[];
   placeholder?: string;
+  /** Host actions rendered after Approval and before Plan mode. */
+  leadingMenuItems?: readonly CodexComposerMenuItem[];
   menuItems?: readonly CodexComposerMenuItem[];
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;

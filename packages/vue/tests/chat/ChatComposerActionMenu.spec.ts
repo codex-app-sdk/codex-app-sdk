@@ -108,6 +108,34 @@ describe('ChatComposerActionMenu', () => {
     ]]);
   });
 
+  it('renders leading host actions after Approval and before Plan mode', async () => {
+    const wrapper = mountMenu({
+      approvalPreset: 'ask-for-approval',
+      approvalPresets: ['ask-for-approval'],
+      leadingMenuItems: [{
+        id: 'permissions',
+        type: 'custom',
+        label: 'Permissions',
+        payload: { source: 'host' },
+      }],
+      items: [{ id: 'refresh', type: 'custom', label: 'Refresh', payload: { source: 'host' } }],
+      showApprovalMenu: true,
+      showPlanMode: true,
+    });
+
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+
+    const menu = wrapper.get('.chat-composer-action-menu').element;
+    const labels = Array.from(menu.children).flatMap((child) => {
+      const button = child instanceof HTMLButtonElement
+        ? child
+        : child.querySelector(':scope > button');
+      const label = button?.querySelector('.codex-composer-menu-list__label')?.textContent?.trim();
+      return label ? [label] : [];
+    });
+    expect(labels).toStrictEqual(['Approval', 'Permissions', 'Plan mode', 'Refresh']);
+  });
+
   it('enables attachment selection only when the host supports it', async () => {
     const wrapper = mountMenu({ attachEnabled: true });
 
@@ -140,6 +168,7 @@ function mountMenu(props: Partial<{
   approvalPresets: ('ask-for-approval' | 'approve-for-me' | 'full-access')[];
   attachEnabled: boolean;
   disabled: boolean;
+  leadingMenuItems: { id: string; type: 'custom'; label: string; payload: { source: string } }[];
   items: { id: string; type: 'custom'; label: string; payload: { source: string } }[];
   planMode: boolean;
   showApprovalMenu: boolean;

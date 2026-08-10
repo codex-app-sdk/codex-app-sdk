@@ -37,7 +37,7 @@ const paneState = computed(() => ({
     identity: { conversationKey, messages, busy, disabled, error },
     history: { hasOlder, loading, loadingOlder },
     thread: { approvals, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
-    composer: { state, attachments, placeholder, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
+    composer: { state, attachments, placeholder, leadingMenuItems, menuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
     catalogs: { files, models, commands, skills, plugins, modelCatalogStatus, skillCatalogStatus },
     capabilities,
     policy: { actionsDisabled, attachEnabled, canDeleteMessage, canEditMessage, canForkMessage, canRetryMessage, followUpsDisabled },
@@ -75,6 +75,11 @@ state groups are `identity`, `history`, `thread`, `composer`, `catalogs`,
 settings, history, message actions, approvals, goals, queue operations, and
 client responses. Every action may return `void` or `Promise<void>`; rejected
 promises are surfaced through the pane error UI.
+
+`composer.leadingMenuItems` renders host actions after the built-in Approval
+item and before Plan mode. `composer.menuItems` remains the trailing extension
+point after Plan mode. The equivalent granular pane prop is
+`leading-menu-items`.
 
 `onMessageCopied(index)` is a post-action notification: the SDK always performs
 the clipboard write and copied-state feedback first. Omitting this hook does not

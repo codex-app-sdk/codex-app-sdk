@@ -46,6 +46,7 @@ type ComposerMenuAction =
 const props = withDefaults(defineProps<{
   attachEnabled?: boolean;
   disabled?: boolean;
+  leadingMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   items?: readonly CodexComposerMenuItem<Payload>[];
   approvalPreset?: ApprovalPreset | null;
   approvalPresets?: readonly ApprovalPreset[];
@@ -55,6 +56,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   attachEnabled: false,
   disabled: false,
+  leadingMenuItems: () => [],
   items: () => [],
   approvalPreset: null,
   approvalPresets: () => [],
@@ -92,6 +94,8 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
       })),
     });
   }
+
+  items.push(...props.leadingMenuItems);
 
   if (props.showPlanMode) {
     items.push({

@@ -54,6 +54,7 @@ const state: CodexConversationPaneState = {
   composer: {
     get state() { return drafts.value[activeConversationId.value]; },
     get attachments() { return attachments.value[activeConversationId.value]; },
+    get leadingMenuItems() { return providerMenuItems.value; },
     get selectedModelId() { return settings.value.modelId; },
     get selectedReasoningEffort() { return settings.value.reasoningEffort; },
     get selectedServiceTier() { return settings.value.serviceTier; },
@@ -118,6 +119,11 @@ The adapter is intentionally a controlled-view boundary. It does not create a
 
 Only `identity.messages` is required beyond the `identity` object itself. Omit
 an optional group or leaf when that capability is not present.
+
+Use `composer.leadingMenuItems` for host actions that belong beside the built-in
+Codex controls. They render after Approval and before Plan mode. Existing
+`composer.menuItems` remain after Plan mode; both collections use
+`CodexComposerMenuItem` and dispatch through `actions.menuSelect`.
 
 ## Action groups
 

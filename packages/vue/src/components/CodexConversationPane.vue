@@ -124,6 +124,7 @@
             :plugins="effectivePlugins"
             :queued-prompt-id="effectiveQueuedPrompts[0]?.id ?? null"
             :is-sending="effectiveBusy"
+            :leading-menu-items="effectiveLeadingMenuItems"
             :menu-items="effectiveMenuItems"
             :model-catalog-status="effectiveModelCatalogStatus"
             :models="effectiveModels"
@@ -310,6 +311,7 @@ const props = withDefaults(defineProps<{
   initialMessageBatchSize?: number;
   loadingOlderHistory?: boolean;
   messageBatchSize?: number;
+  leadingMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   messages?: readonly (Message | SurfaceMessage)[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -353,6 +355,7 @@ const props = withDefaults(defineProps<{
   historyLoading: undefined,
   lazyMessages: undefined,
   initialMessageBatchSize: 50,
+  leadingMenuItems: () => [],
   messageBatchSize: 25,
   menuItems: () => [],
   modelValue: '',
@@ -615,6 +618,10 @@ const effectiveCommands = computed(() => controlledValue(
 const effectiveFiles = computed(() => controlledValue(
   (state) => state.catalogs?.files ?? [],
   () => props.files,
+));
+const effectiveLeadingMenuItems = computed(() => controlledValue(
+  (state) => state.composer?.leadingMenuItems ?? [],
+  () => props.leadingMenuItems,
 ));
 const effectiveMenuItems = computed(() => controlledValue(
   (state) => state.composer?.menuItems ?? [],
