@@ -140,6 +140,11 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   left: 100%;
 }
 
+.codex-composer-menu-list__submenu-list--bottom-aligned {
+  top: auto;
+  bottom: 0;
+}
+
 .codex-composer-menu-list__submenu-list--wide {
   width: 360px;
   max-width: min(360px, calc(100vw - 24px));

@@ -28,6 +28,7 @@ describe('CodexComposerMenuList', () => {
       id: 'approval',
       type: 'submenu',
       label: 'Approval',
+      submenuAlignment: 'bottom',
       items: [{
         id: 'approval:user',
         type: 'radio',
@@ -48,6 +49,8 @@ describe('CodexComposerMenuList', () => {
     expect(wrapper.find('[role="separator"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Provided by the host application');
     expect(wrapper.text()).toContain('Ask first');
+    expect(wrapper.get('.codex-composer-menu-list__submenu-list').classes())
+      .toContain('codex-composer-menu-list__submenu-list--bottom-aligned');
     expect(wrapper.get('.codex-composer-menu-list__switch').classes())
       .toContain('codex-composer-menu-list__switch--checked');
 

@@ -138,6 +138,9 @@ function renderItem(
           openSubmenus,
           [
             'codex-composer-menu-list codex-composer-menu-list__submenu-list',
+            item.submenuAlignment === 'bottom'
+              ? 'codex-composer-menu-list__submenu-list--bottom-aligned'
+              : '',
             item.submenuWidth === 'wide' ? 'codex-composer-menu-list__submenu-list--wide' : '',
           ].filter(Boolean).join(' '),
         )

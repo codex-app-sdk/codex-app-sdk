@@ -44,6 +44,7 @@ export type CodexComposerMenuHeadingItem = {
 export type CodexComposerMenuSubmenuItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
   type: 'submenu';
   items: readonly CodexComposerMenuItem<Payload>[];
+  submenuAlignment?: 'top' | 'bottom';
   submenuWidth?: 'default' | 'wide';
 };
 

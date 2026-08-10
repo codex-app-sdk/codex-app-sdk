@@ -112,6 +112,7 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
     label: 'Model',
     type: 'submenu',
     value: selectedModel.value ? compactModelLabel(selectedModel.value.displayName) : undefined,
+    submenuAlignment: 'bottom',
     submenuWidth: 'wide',
     items: props.models.map((model) => ({
       checked: model.id === selectedModel.value?.id,
@@ -129,6 +130,7 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
       label: 'Reasoning',
       type: 'submenu',
       value: effectiveReasoningEffort.value ? effortLabel(effectiveReasoningEffort.value) : undefined,
+      submenuAlignment: 'bottom',
       submenuWidth: 'wide',
       items: reasoningEfforts.value.map((effort) => ({
         checked: effort.reasoningEffort === effectiveReasoningEffort.value,

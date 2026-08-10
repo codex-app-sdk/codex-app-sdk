@@ -140,6 +140,10 @@ describe('ChatModelReasoningSelector', () => {
     expect(wrapper.findAll('[data-submenu-id]')).toHaveLength(2);
     expect(wrapper.get('[data-submenu-id="model"] > button').attributes('aria-expanded')).toBe('false');
     expect(wrapper.get('[data-submenu-id="reasoning"] > button').attributes('aria-expanded')).toBe('false');
+    for (const submenuId of ['model', 'reasoning']) {
+      expect(wrapper.get(`[data-submenu-id="${submenuId}"] > .codex-composer-menu-list__submenu-list`).classes())
+        .toContain('codex-composer-menu-list__submenu-list--bottom-aligned');
+    }
     await wrapper.get('[data-submenu-id="model"] > button').trigger('click');
     expect(wrapper.get('[data-submenu-id="model"] > button').attributes('aria-expanded')).toBe('true');
     expect(wrapper.findAll('[data-submenu-id="model"] [role="menuitemradio"]')).toHaveLength(2);
