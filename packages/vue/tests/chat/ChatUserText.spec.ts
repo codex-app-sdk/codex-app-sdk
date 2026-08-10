@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import ChatUserText from '../../src/chat/ChatUserText.vue';
 import { parseCodexUserText } from '../../src/chat/user-text';
+import { SparklesIcon } from '../../src/icons/app-icons';
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 
 const gmail: CodexSurfacePlugin = {
@@ -46,7 +47,7 @@ describe('ChatUserText', () => {
     const skill = wrapper.get('.chat-user-text__mention--skill');
     expect(skill.text()).toBe('Update Bank Balance Sheet');
     expect(skill.attributes('title')).toBe('Update balances in the workbook');
-    expect(skill.find('svg').exists()).toBe(true);
+    expect(skill.findComponent(SparklesIcon).exists()).toBe(true);
     expect(wrapper.find('a').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('plugin://');
     expect(wrapper.text()).not.toContain('/Users/nbonamy');

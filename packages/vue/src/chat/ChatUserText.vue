@@ -58,22 +58,7 @@
               <path d="M12 16v5" />
               <path d="M9 21h6" />
             </svg>
-            <svg
-              v-else
-              class="chat-user-text__mention-icon"
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.9"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="m12 2 8 4.5v11L12 22l-8-4.5v-11z" />
-              <path d="m4 6.5 8 4.5 8-4.5" />
-              <path d="M12 11v11" />
-              <path d="m8 8.75 8-4.5" />
-            </svg>
+            <SparklesIcon v-else class="chat-user-text__mention-icon" aria-hidden="true" />
           </span>
           <span class="chat-user-text__mention-label">{{ token.displayName }}</span>
         </span>
@@ -85,6 +70,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
+import { SparklesIcon } from '../icons/app-icons';
 import { parseCodexUserText, type CodexUserTextToken } from './user-text';
 
 const props = withDefaults(defineProps<{
