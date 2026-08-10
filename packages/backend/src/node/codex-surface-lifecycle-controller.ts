@@ -166,6 +166,7 @@ export class CodexSurfaceLifecycleController {
       ...(this.extensions.hasDynamicTools() ? { dynamicTools: this.extensions.dynamicToolSpecs() } : {}),
       ...settings,
       ...(requestedServiceTier === undefined ? {} : { serviceTier: requestedServiceTier }),
+      ...(options.threadSource === undefined ? {} : { threadSource: options.threadSource }),
       serviceName: 'codex_app_sdk',
     });
     const selection = sessionSelection(response, state.models, state);

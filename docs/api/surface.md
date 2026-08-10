@@ -109,7 +109,9 @@ independent; see [History and performance](/guide/history).
 ### `CreateCodexConversationOptions`
 
 Trusted Node creation options include model, reasoning, service tier, raw permission/approval
-modes, preset, cwd, base/developer instructions, and config.
+modes, preset, cwd, base/developer instructions, config, and `threadSource`.
+`threadSource` is passed unchanged to app-server's `thread/start` request, for
+example `{ threadSource: 'user' }`.
 
 ### `CreateCodexRendererConversationOptions`
 

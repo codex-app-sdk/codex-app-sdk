@@ -806,6 +806,7 @@ export type CreateCodexConversationOptions = {
   reasoningEffort?: string;
   serviceTier?: string | null;
   permissionMode?: CodexSurfacePermissionMode;
+  threadSource?: string;
 };
 
 export type CreateCodexRendererConversationOptions = Pick<

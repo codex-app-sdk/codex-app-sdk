@@ -50,6 +50,17 @@ describe('CodexSurface', () => {
     expect(lastRequest(fresh.transport, 'turn/start')).toMatchObject({ params: { threadId: 'thread-existing' } });
   });
 
+  it('passes a host thread source to thread/start', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+
+    await surface.createConversation({ threadSource: 'user' });
+
+    expect(lastRequest(transport, 'thread/start')).toMatchObject({
+      params: { threadSource: 'user' },
+    });
+  });
+
   it('applies host conversation defaults to explicit and automatic thread creation', async () => {
     const responses = {
       'model/list': () => ({
