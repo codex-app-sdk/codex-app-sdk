@@ -81,6 +81,7 @@ import { CodexSurfaceNotificationsController } from './codex-surface-notificatio
 import { CodexSurfaceRuntimeController } from './codex-surface-runtime-controller';
 import { CodexSurfaceConnectionController } from './codex-surface-connection-controller';
 import { CodexSurfaceForkController } from './codex-surface-fork-controller';
+import { CodexMarkdownImageHydrator } from './codex-markdown-images';
 
 export type {
   CodexAppServerTransportOptions,
@@ -143,6 +144,7 @@ export class CodexSurface {
   private readonly forks: CodexSurfaceForkController;
   private readonly notifications: CodexSurfaceNotificationsController;
   private readonly runtimeState: CodexSurfaceRuntimeController;
+  private readonly markdownImages: CodexMarkdownImageHydrator;
   private readonly connection: CodexSurfaceConnectionController;
   private readonly unsubscribeDisconnect: () => void;
   private readonly unsubscribeNotification: () => void;
@@ -150,6 +152,7 @@ export class CodexSurface {
   private readonly unsubscribeMcpElicitationRequests: () => void;
   private readonly unsubscribeServerRequestPolicies: () => void;
   private eventSequence = 0;
+  private readonly pendingMarkdownImageHydrations = new Set<string>();
   private closed = false;
   private state: CodexSurfaceSnapshot = initialSurfaceSnapshot(initialAuthentication());
 
@@ -165,6 +168,7 @@ export class CodexSurface {
         ? new CodexAppServerUnixSocketTransport(transportOptions)
         : new CodexAppServerStdioTransport(transportOptions),
     );
+    this.markdownImages = new CodexMarkdownImageHydrator(this.client);
     this.authentication = new CodexSurfaceAuthenticationController(this.client, {
       bootstrapSurfaceData: (force) => this.connection.bootstrapSurfaceData(force),
       clearAuthenticatedSurfaceData: () => this.connection.clearAuthenticatedSurfaceData(),
@@ -885,7 +889,9 @@ export class CodexSurface {
   }
 
   private createRuntime(threadId: string, patch: ThreadRuntimePatch = {}): ThreadRuntimeState {
-    return this.runtimeState.create(threadId, patch);
+    const runtime = this.runtimeState.create(threadId, patch);
+    if (patch.messages) this.scheduleMarkdownImageHydration(threadId, patch.messages);
+    return runtime;
   }
 
   private requireRuntime(threadId: string): ThreadRuntimeState {
@@ -908,6 +914,44 @@ export class CodexSurface {
 
   private patchRuntime(threadId: string, patch: ThreadRuntimePatch): void {
     this.runtimeState.patch(threadId, patch);
+    if (patch.messages) this.scheduleMarkdownImageHydration(threadId, patch.messages);
+  }
+
+  private scheduleMarkdownImageHydration(
+    threadId: string,
+    messages: readonly SurfaceMessage[],
+  ): void {
+    const cwd = this.runtimeState.get(threadId)?.cwd;
+    for (const message of messages) {
+      if (message.role !== 'assistant' || message.status === 'streaming') continue;
+      message.parts.forEach((part, partIndex) => {
+        if (part.type !== 'text' || !part.text.includes('![')) return;
+        const key = `${threadId}\u0000${message.id}\u0000${part.itemId ?? partIndex}\u0000${part.text}`;
+        if (this.pendingMarkdownImageHydrations.has(key)) return;
+        this.pendingMarkdownImageHydrations.add(key);
+        void this.markdownImages.hydrate(part.text, cwd).then((hydratedText) => {
+          if (this.closed || hydratedText === part.text) return;
+          const runtime = this.runtimeState.get(threadId);
+          if (!runtime) return;
+          const messageIndex = runtime.messages.findIndex((candidate) => candidate.id === message.id);
+          const currentMessage = runtime.messages[messageIndex];
+          const currentPart = currentMessage?.parts[partIndex];
+          if (!currentMessage || currentPart?.type !== 'text' || currentPart.text !== part.text) return;
+          const nextParts = [...currentMessage.parts];
+          nextParts.splice(partIndex, 1, { ...currentPart, text: hydratedText });
+          const hydratedMessage = { ...currentMessage, parts: nextParts };
+          const nextMessages = [...runtime.messages];
+          nextMessages.splice(messageIndex, 1, hydratedMessage);
+          this.runtimeState.patch(threadId, { messages: nextMessages });
+          if (hydratedMessage.turnId) this.emitEvent('lifecycle', {
+            type: 'message.updated',
+            conversationId: threadId,
+            turnId: hydratedMessage.turnId,
+            payload: { message: structuredClone(hydratedMessage) },
+          });
+        }).finally(() => this.pendingMarkdownImageHydrations.delete(key));
+      });
+    }
   }
 
   private emitSurfaceStatus(origin: CodexSurfaceEventOrigin): void {

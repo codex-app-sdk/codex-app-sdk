@@ -223,7 +223,7 @@ export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart 
     ? candidatePath
     : null;
   const result = typeof item.result === 'string' ? item.result.trim() : '';
-  const inlineImage = imageDataUrl(result);
+  const inlineImage = codexImageDataUrl(result);
   const url = inlineImage?.url ?? (savedPath ? pathToFileURL(savedPath).href : undefined);
   if (!url) return null;
 
@@ -343,7 +343,7 @@ function mimeTypeForSource(source: string): string | undefined {
   } as Record<string, string>)[extension];
 }
 
-function imageDataUrl(result: string): { url: string; mimeType: string } | null {
+export function codexImageDataUrl(result: string): { url: string; mimeType: string } | null {
   if (!result) return null;
   const dataUrlMatch = /^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/=\s]+)$/i.exec(result);
   const compact = (dataUrlMatch?.[1] ?? result).replace(/\s+/g, '');

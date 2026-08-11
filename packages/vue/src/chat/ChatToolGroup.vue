@@ -257,6 +257,7 @@ function hasToolDetails(toolCall: MessageToolCall) {
 <style scoped>
 .chat-tool-group {
   width: 100%;
+  min-width: 0;
   padding: var(--space-1) 0;
   color: var(--color-text-muted);
 }
@@ -298,12 +299,14 @@ function hasToolDetails(toolCall: MessageToolCall) {
 
 .chat-tool-group__active {
   flex: 1 1 auto;
+  min-width: 0;
 }
 
 .chat-tool-group__running {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
   padding-top: var(--space-2);
 }
 
@@ -314,6 +317,7 @@ function hasToolDetails(toolCall: MessageToolCall) {
 
 .chat-tool-group__running-item-content {
   min-height: var(--line-height-20);
+  min-width: 0;
 }
 
 .chat-tool-group-running-leave-active {
@@ -360,6 +364,7 @@ function hasToolDetails(toolCall: MessageToolCall) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
   padding-top: var(--space-2);
 }
 

@@ -278,4 +278,22 @@ describe('message block computation', () => {
       toolCall: imageTool,
     });
   });
+
+  it('projects hydrated Markdown data URLs as renderer media', () => {
+    const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: `![Current Music album play bar](${dataUrl})`,
+    })).toStrictEqual([{
+      type: 'media',
+      media: {
+        alt: 'Current Music album play bar',
+        prompt: undefined,
+        title: 'Current Music album play bar',
+        url: dataUrl,
+      },
+      toolCall: undefined,
+    }]);
+  });
 });

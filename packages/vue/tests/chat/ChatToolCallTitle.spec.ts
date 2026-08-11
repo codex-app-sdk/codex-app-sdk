@@ -39,6 +39,7 @@ describe('ChatToolCallTitle', () => {
     const wrapper = mount(ChatToolCallTitle, { props: { title: 'searched files' } });
 
     expect(wrapper.text()).toContain('searched files');
+    expect(wrapper.get('.chat-tool-call__title-content').text()).toBe('searched files');
     expect(wrapper.find('.chat-tool-call__diff').exists()).toBe(false);
   });
 
@@ -52,6 +53,7 @@ describe('ChatToolCallTitle', () => {
     });
 
     expect(wrapper.get('.chat-tool-call__title-text').text()).toBe('Read README.md');
+    expect(wrapper.get('.chat-tool-call__title-content').text()).toBe('Read README.md');
     expect(wrapper.get('.chat-tool-call__title-target').text()).toBe('README.md');
   });
 

@@ -10,7 +10,10 @@
       :presentation="toolPresentation"
       :tool-call="toolCall"
     />
-    <span v-if="titlePrefix && titleTarget" class="chat-tool-call__title-text">
+    <span
+      v-if="titlePrefix && titleTarget"
+      class="chat-tool-call__title-content chat-tool-call__title-text"
+    >
       <span>{{ titlePrefix }}</span>{{ ' ' }}<span class="chat-tool-call__title-target-list">
         <template v-if="titleTargetParts?.length">
           <template v-for="(part, index) in titleTargetParts" :key="`${part.label}-${index}`">
@@ -35,9 +38,9 @@
         <span v-else class="chat-tool-call__title-target">{{ titleTarget }}</span>
       </span>
     </span>
-    <template v-else>
+    <span v-else class="chat-tool-call__title-content">
       {{ title }}
-    </template>
+    </span>
   </span>
   <span v-if="lineDiff" class="codex-chat-theme chat-tool-call__diff" aria-label="Line changes">
     <ChatAnimatedDiffStat
@@ -91,12 +94,12 @@ const emit = defineEmits<{
 
 .chat-tool-call__title {
   display: inline-flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: var(--space-3);
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: var(--font-size-15);
   line-height: var(--line-height-20);
   font-weight: var(--font-weight-light);
@@ -112,9 +115,14 @@ const emit = defineEmits<{
   color: var(--color-text-muted);
 }
 
-.chat-tool-call__title-text {
-  display: inline;
+.chat-tool-call__title-content {
+  display: block;
+  flex: 1 1 auto;
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-tool-call__title-target-list {
@@ -128,11 +136,8 @@ const emit = defineEmits<{
 
 .chat-tool-call__title-target {
   display: inline;
-  min-width: 0;
-  overflow: hidden;
   color: var(--color-secondary);
   font-weight: var(--font-weight-regular);
-  text-overflow: ellipsis;
 }
 
 .chat-tool-call__title-target--link {

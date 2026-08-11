@@ -181,8 +181,12 @@ When no safe preview survives—for example after an app restart—the renderer
 falls back to a file chip instead of attempting a blocked local-resource load.
 
 Generated images are validated, MIME-sniffed, and bounded before becoming data
-URLs. Markdown, syntax highlighting, KaTeX, and Mermaid rendering share the
-same message block pipeline.
+URLs. Completed assistant Markdown images that reference app-server-local image
+files are also read through app-server, validated, bounded, and replaced with
+renderer-safe data URLs. This keeps restored images working in both Electron
+and Web surfaces without exposing a backend filesystem URL to the renderer.
+Markdown, syntax highlighting, KaTeX, and Mermaid rendering share the same
+message block pipeline.
 
 See [Vue providers](/guide/vue-providers),
 [Presentation and theming](/guide/presentation), and [Event API](/api/events).
