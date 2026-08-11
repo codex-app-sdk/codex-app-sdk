@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { sdkSourceAliases } from '../vite.sdk-aliases';
+import { sdkSourceAliases } from '../../../vite.sdk-aliases';
 
 const sampleRoot = path.resolve(import.meta.dirname, '..');
 

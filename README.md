@@ -108,6 +108,10 @@ For an existing application, follow the
 | [Relay](./samples/electron/relay) | Logistics operations UI backed by an app-owned MCP server | `npm run dev:relay` |
 | [Basic web](./samples/web/basic) | The Basic shell over a thin Express/`ws` host | `npm run dev:web` |
 
+The development commands resolve the five SDK packages directly from source.
+They do not require `npm run build` first, and renderer changes under
+`packages/vue` hot-reload through Vite.
+
 The samples are product demonstrations, not templates for child safety or a
 production logistics backend. See the
 [sample guide](https://nbonamy.github.io/codex-app-sdk/guide/samples) for the

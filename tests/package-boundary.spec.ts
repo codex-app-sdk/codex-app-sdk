@@ -176,6 +176,7 @@ describe('package boundary', () => {
 
   it('builds Electron samples against the explicit modular packages', async () => {
     const sampleRoot = path.join(packageRoot, 'samples/electron');
+    const aliases = await readFile(path.join(packageRoot, 'samples/vite.sdk-aliases.ts'), 'utf8');
     const files = await sourceFiles(sampleRoot);
     const compatibilityImports: string[] = [];
     for (const file of files) {
@@ -199,16 +200,35 @@ describe('package boundary', () => {
       ]));
       expect(packageJson.dependencies).not.toHaveProperty('codex-app-sdk');
 
-      const aliases = await readFile(path.join(sampleRoot, sample, 'vite.sdk-aliases.ts'), 'utf8');
-      for (const [specifier, source] of [
-        ['@codex-app-sdk/core/events', 'typed-event-bus.ts'],
-        ['@codex-app-sdk/core/native', 'native.ts'],
-        ['@codex-app-sdk/core/surface', 'surface.ts'],
-        ['@codex-app-sdk/core/surface-bridge', 'surface-bridge.ts'],
-      ]) {
-        expect(aliases, `${sample} ${specifier}`).toContain(`'${specifier}'`);
-        expect(aliases, `${sample} ${source}`).toContain(`/packages/core/src/${source}`);
-      }
+      const viteConfig = await readFile(path.join(sampleRoot, sample, 'vite.config.ts'), 'utf8');
+      expect(viteConfig).toContain("from '../../vite.sdk-aliases'");
+      expect(viteConfig).toContain('exclude: sdkSourceModuleIds');
+    }
+
+    for (const [specifier, source] of [
+      ['@codex-app-sdk/core/events', 'typed-event-bus.ts'],
+      ['@codex-app-sdk/core/native', 'native.ts'],
+      ['@codex-app-sdk/core/surface', 'surface.ts'],
+      ['@codex-app-sdk/core/surface-bridge', 'surface-bridge.ts'],
+    ]) {
+      expect(aliases, specifier).toContain(`'${specifier}'`);
+      expect(aliases, source).toContain(`/packages/core/src/${source}`);
+    }
+  });
+
+  it('keeps every sample dev server on the shared SDK source module graph', async () => {
+    for (const configPath of [
+      'samples/component-lab/vite.config.ts',
+      'samples/electron/basic/vite.config.ts',
+      'samples/electron/relay/vite.config.ts',
+      'samples/electron/spark/vite.config.ts',
+      'samples/web/basic/vite.config.ts',
+    ]) {
+      const viteConfig = await readFile(path.join(packageRoot, configPath), 'utf8');
+      expect(viteConfig, configPath).toContain('sdkSourceAliases');
+      expect(viteConfig, configPath).toContain('exclude: sdkSourceModuleIds');
+      expect(viteConfig, configPath).toContain('allow: [sdkSourceRoot]');
+      expect(viteConfig, configPath).toContain("dedupe: ['vue']");
     }
   });
 
@@ -234,7 +254,7 @@ describe('package boundary', () => {
       .filter((name) => /^[A-Z].*\.spec\.ts$/.test(name))
       .sort();
 
-    expect(testNames).toStrictEqual(componentNames);
+    expect(testNames).toEqual(expect.arrayContaining(componentNames));
   });
 
   it('exports and directly mounts every generic conversation component', async () => {

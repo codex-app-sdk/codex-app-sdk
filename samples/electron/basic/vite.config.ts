@@ -2,7 +2,7 @@ import { fileURLToPath, URL } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 import electron from 'vite-plugin-electron/simple';
-import { sdkSourceAliases } from './vite.sdk-aliases';
+import { sdkSourceAliases, sdkSourceModuleIds, sdkSourceRoot } from '../../vite.sdk-aliases';
 
 const sampleRoot = fileURLToPath(new URL('.', import.meta.url));
 const mainEntry = fileURLToPath(new URL('./src/main/index.ts', import.meta.url));
@@ -19,6 +19,7 @@ export default defineConfig(({ command, mode }) => {
     base: './',
     root: rendererRoot,
     cacheDir: fileURLToPath(new URL('./node_modules/.vite', import.meta.url)),
+    optimizeDeps: useSdkSources ? { exclude: sdkSourceModuleIds } : undefined,
     plugins: [
       vue(),
       orchestrateElectron && electron({
@@ -70,8 +71,14 @@ export default defineConfig(({ command, mode }) => {
         '@': rendererRoot,
         ...(useSdkSources ? sdkSourceAliases : {}),
       },
+      dedupe: ['vue'],
     },
-    server: { host: '127.0.0.1', port: 5173, strictPort: true },
+    server: {
+      host: '127.0.0.1',
+      port: 5173,
+      strictPort: true,
+      fs: { allow: [sdkSourceRoot] },
+    },
     build: { outDir: rendererOutDir, emptyOutDir: true },
   };
 });

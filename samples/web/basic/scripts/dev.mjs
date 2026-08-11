@@ -2,7 +2,9 @@ import { spawn } from 'node:child_process';
 
 const children = [
   spawn('vite', [], { stdio: 'inherit' }),
-  spawn(process.execPath, ['src/server/index.ts'], { stdio: 'inherit' }),
+  spawn('tsx', ['watch', '--clear-screen=false', '--tsconfig', 'tsconfig.dev-server.json', 'src/server/index.ts'], {
+    stdio: 'inherit',
+  }),
 ];
 
 let stopping = false;

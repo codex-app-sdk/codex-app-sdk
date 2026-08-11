@@ -9,6 +9,10 @@ For a new application, start with the [project scaffolder](/guide/scaffolding)
 and update the generated shell. Use these samples as focused references for a
 particular product shape or integration pattern, not as alternative templates.
 
+All sample `dev` commands consume SDK source directly. A prior SDK build is not
+required; Vue SDK changes hot-reload in the browser or Electron renderer, and
+the Basic Web server restarts for backend or transport changes.
+
 ## Basic: multi-thread client
 
 **Shape:** shared `CodexConversationSidebar` + stock `CodexConversationPane`.

@@ -8,7 +8,7 @@ describe('Spark sample SDK customization boundary', () => {
   it('uses a dev-server port that does not collide with Codex Claw', () => {
     const viteConfig = readFileSync(resolve(import.meta.dirname, '../vite.config.ts'), 'utf8');
 
-    expect(viteConfig).toContain("server: { host: '127.0.0.1', port: 5177, strictPort: true }");
+    expect(viteConfig).toMatch(/server:\s*\{[^}]*host:\s*'127\.0\.0\.1',[^}]*port:\s*5177,[^}]*strictPort:\s*true,/s);
     expect(viteConfig).not.toContain('port: 5174');
   });
 

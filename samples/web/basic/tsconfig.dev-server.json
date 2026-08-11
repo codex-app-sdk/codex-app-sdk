@@ -1,16 +1,15 @@
 {
-  "extends": "../../../tsconfig.json",
+  "extends": "./tsconfig.server.json",
   "compilerOptions": {
-    "skipLibCheck": true,
+    "noEmit": true,
     "paths": {
+      "@codex-app-sdk/backend": ["../../../packages/backend/src/index.ts"],
       "@codex-app-sdk/core": ["../../../packages/core/src/index.ts"],
+      "@codex-app-sdk/core/events": ["../../../packages/core/src/typed-event-bus.ts"],
       "@codex-app-sdk/core/native": ["../../../packages/core/src/native.ts"],
       "@codex-app-sdk/core/surface": ["../../../packages/core/src/surface.ts"],
       "@codex-app-sdk/core/surface-bridge": ["../../../packages/core/src/surface-bridge.ts"],
-      "@codex-app-sdk/vue": ["../../../packages/vue/src/index.ts"],
-      "@codex-app-sdk/web/client": ["../../../packages/web/src/client.ts"]
-    },
-    "types": ["vite/client"]
-  },
-  "include": ["src/client/**/*.ts", "src/client/**/*.vue", "vite.config.ts"]
+      "@codex-app-sdk/web/server": ["../../../packages/web/src/server.ts"]
+    }
+  }
 }

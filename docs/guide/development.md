@@ -52,6 +52,11 @@ npm run build:web
 npm run check:web
 ```
 
+The `dev:*` commands use the SDK source tree directly; do not build the SDK
+first. Vite keeps renderer SDK modules in its live module graph for HMR, while
+the Basic Web server restarts when its backend or transport source changes.
+Production `build:*` and `start:*` commands continue to consume package output.
+
 Root shortcuts consistently use `verb:target`. The other sample applications
 keep the same convention:
 

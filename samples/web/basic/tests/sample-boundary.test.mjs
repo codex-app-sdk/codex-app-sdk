@@ -33,8 +33,10 @@ test('uses the public web transport without reimplementing its protocol', async 
   assert.match(server, /acquireCodexSession/);
   assert.match(viteConfig, /['"]\/codex['"]/);
   assert.match(viteConfig, /ws:\s*true/);
+  assert.match(viteConfig, /sdkSourceAliases/);
+  assert.match(viteConfig, /exclude:\s*sdkSourceModuleIds/);
   assert.match(devRunner, /spawn\('vite'/);
-  assert.match(devRunner, /spawn\(process\.execPath, \['src\/server\/index\.ts'\]/);
+  assert.match(devRunner, /spawn\('tsx', \['watch'/);
   assert.deepEqual(
     Object.keys(manifest.dependencies).sort(),
     [
