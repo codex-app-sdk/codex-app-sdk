@@ -246,6 +246,12 @@ export class CodexSurfaceConversationsController {
     return load;
   }
 
+  async waitForHistoryEmission(threadId: string): Promise<void> {
+    const load = this.historyLoads.get(threadId);
+    if (!load) return;
+    await load.then(() => undefined, () => undefined);
+  }
+
   private async emitHistoryChunks(threadId: string, messages: readonly SurfaceMessage[]): Promise<void> {
     for (let index = messages.length; index > 0;) {
       const start = Math.max(0, index - HISTORY_MESSAGE_BATCH_SIZE);

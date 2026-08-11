@@ -929,7 +929,7 @@ export class CodexSurface {
         const key = `${threadId}\u0000${message.id}\u0000${part.itemId ?? partIndex}\u0000${part.text}`;
         if (this.pendingMarkdownImageHydrations.has(key)) return;
         this.pendingMarkdownImageHydrations.add(key);
-        void this.markdownImages.hydrate(part.text, cwd).then((hydratedText) => {
+        void this.markdownImages.hydrate(part.text, cwd).then(async (hydratedText) => {
           if (this.closed || hydratedText === part.text) return;
           const runtime = this.runtimeState.get(threadId);
           if (!runtime) return;
@@ -943,11 +943,18 @@ export class CodexSurface {
           const nextMessages = [...runtime.messages];
           nextMessages.splice(messageIndex, 1, hydratedMessage);
           this.runtimeState.patch(threadId, { messages: nextMessages });
-          if (hydratedMessage.turnId) this.emitEvent('lifecycle', {
+
+          await this.conversations.waitForHistoryEmission(threadId);
+          if (this.closed) return;
+          const currentRuntime = this.runtimeState.get(threadId);
+          const publishedMessage = currentRuntime?.messages.find((candidate) => candidate.id === message.id);
+          const publishedPart = publishedMessage?.parts[partIndex];
+          if (!publishedMessage || publishedPart?.type !== 'text' || publishedPart.text !== hydratedText) return;
+          if (publishedMessage.turnId) this.emitEvent('lifecycle', {
             type: 'message.updated',
             conversationId: threadId,
-            turnId: hydratedMessage.turnId,
-            payload: { message: structuredClone(hydratedMessage) },
+            turnId: publishedMessage.turnId,
+            payload: { message: structuredClone(publishedMessage) },
           });
         }).finally(() => this.pendingMarkdownImageHydrations.delete(key));
       });

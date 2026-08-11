@@ -223,10 +223,15 @@ export class CodexSurfaceRuntimeController {
     origin: CodexSurfaceEventOrigin,
   ): void {
     if (messages.length === 0) return;
+    const currentMessages = new Map(
+      this.require(threadId).messages.map((message) => [message.id, message]),
+    );
     this.host.emitEvent(origin, {
       type: 'conversation.historyPrepended',
       conversationId: threadId,
-      payload: { messages: structuredClone(messages) },
+      payload: {
+        messages: structuredClone(messages.map((message) => currentMessages.get(message.id) ?? message)),
+      },
     });
   }
 

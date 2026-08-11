@@ -233,6 +233,25 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it('requests older server history one viewport before reaching the top', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { hasOlderMessages: true, messages: makeMessages(10) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_200 });
+
+    scrollEl.scrollTop = 301;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toBeUndefined();
+
+    scrollEl.scrollTop = 300;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+    wrapper.unmount();
+  });
+
   it('transforms only the mounted lazy batch and preserves absolute indexes', () => {
     const allMessages = makeMessages(75);
     const transformMessage = vi.fn((message: Message | SurfaceMessage, index: number) => ({

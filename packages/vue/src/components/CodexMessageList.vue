@@ -289,15 +289,17 @@ watch(() => [effectiveRenderStrategy.value, effectiveInitialMessageBatchSize.val
 
 function handleScroll(): void {
   updateStickiness()
-  if (effectiveRenderStrategy.value === 'lazy' && isNearTop() && renderStartIndex.value <= 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
+  if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange() && renderStartIndex.value <= 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
     emit('load-older-messages')
-  } else if (effectiveRenderStrategy.value === 'lazy' && isNearTop()) {
+  } else if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange()) {
     void loadOlderMessages()
   }
 }
 
-function isNearTop(): boolean {
-  return (scrollElement.value?.scrollTop ?? 0) <= props.bottomThreshold
+function isWithinTopPrefetchRange(): boolean {
+  const target = scrollElement.value
+  if (!target) return false
+  return target.scrollTop <= target.clientHeight
 }
 
 async function loadOlderMessages(): Promise<void> {

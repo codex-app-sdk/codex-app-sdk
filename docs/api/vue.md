@@ -255,11 +255,11 @@ message:
 `initialMessageBatchSize` defaults to `50`, `messageBatchSize` defaults to `25`,
 and `renderStrategy` defaults to `lazy`.
 Lazy mode initially mounts the newest batch, prepends one batch when the user
-scrolls upward to the top, preserves the visible scroll anchor, and keeps bottom-follow
-behavior for new messages. The current tail, including an active streaming
-assistant row, is always included; stale historical streaming markers do not
-expand the window. Changing `conversationKey` resets the window to the newest
-batch.
+scrolls within one viewport of the top, preserves the visible scroll anchor,
+and keeps bottom-follow behavior for new messages. The current tail, including
+an active streaming assistant row, is always included; stale historical
+streaming markers do not expand the window. Changing `conversationKey` resets
+the window to the newest batch.
 The host still supplies the complete message array; no pagination or backend
 contract is required.
 
@@ -271,16 +271,16 @@ configure `renderStrategy` on `CodexConversationPane` to select the DOM policy
 when the host controls the message array. These are independent, so all four
 combinations are valid:
 
-- `lazy` (the default) loads the newest page and requests older pages only
-  when the user reaches the top;
+- `lazy` (the default) loads the newest page and prefetches older pages when
+  the user scrolls within one viewport of the top;
 - `eager` hydrates all pages progressively;
 - `renderStrategy="lazy"` mounts only the visible message batch;
 - `renderStrategy="eager"` mounts every supplied message.
 
 The pane exposes `hasOlderHistory` and `loadingOlderHistory` for hosts that own
-the page request, and emits `loadOlderHistory` when the top of the list needs
-another page. Returning to the bottom collapses lazy rendering back to the
-newest batch without discarding the loaded messages.
+the page request, and emits `loadOlderHistory` one viewport before the top of
+the list needs another page. Returning to the bottom collapses lazy rendering
+back to the newest batch without discarding the loaded messages.
 
 Both components also accept an optional typed `transformMessage` callback:
 

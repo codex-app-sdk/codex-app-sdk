@@ -94,8 +94,8 @@ Vue rendering is lazy by default even if the host supplies a long message array:
 Lazy rendering:
 
 - mounts the newest batch first;
-- reveals older mounted batches only after genuine upward navigation near the
-  top;
+- reveals older mounted batches and requests the next history page after
+  genuine upward navigation comes within one viewport of the top;
 - preserves the visible message anchor when older messages are prepended;
 - keeps bottom-follow and the scroll-to-bottom control working;
 - keeps the current tail/active streaming row mounted;
