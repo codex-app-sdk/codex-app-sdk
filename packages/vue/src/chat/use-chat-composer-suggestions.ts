@@ -61,7 +61,12 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   ))
   const activeSkillSlash = computed(() => findActiveSkillTrigger(options.prompt.value, options.caretPosition.value, '$'))
   const activePluginMention = computed(() => findActivePluginMention(options.prompt.value, options.caretPosition.value))
-  const visibleSkills = computed(() => filterComposerSkills([...options.skills()], activeSkillSlash.value?.query ?? ''))
+  const visibleSkills = computed(() => filterComposerSkills(
+    [...options.skills()],
+    activeSkillSlash.value?.query ?? '',
+    -1,
+    options.plugins?.() ?? [],
+  ))
   const skillMenuVisible = computed(() => (
     skillMenuOpen.value &&
     options.skillsEnabled() &&

@@ -19,6 +19,7 @@
     <ChatComposerSkillMenu
       v-if="skillMenuVisible"
       :active-index="activeSkillIndex"
+      :plugins="plugins"
       :visible-skills="visibleSkills"
       @select="selectSkill"
     />

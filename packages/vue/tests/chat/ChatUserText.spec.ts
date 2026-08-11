@@ -70,6 +70,31 @@ describe('ChatUserText', () => {
     expect(wrapper.text()).not.toContain('@gmail');
   });
 
+  it('uses a plugin namespace instead of an opaque app id for contributed skills', () => {
+    const dropbox: CodexSurfacePlugin = {
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052@openai-curated-remote',
+      name: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      displayName: 'Dropbox',
+      enabled: true,
+    };
+    const cleanup: CodexSurfaceSkill = {
+      name: 'app-69b31dc2110c8191b8b47dc98fe5a052:clean-up-dropbox-content',
+      path: '/plugins/dropbox/skills/clean-up-dropbox-content/SKILL.md',
+      enabled: true,
+    };
+    const wrapper = mount(ChatUserText, {
+      props: {
+        content: 'Use $clean-up-dropbox-content',
+        plugins: [dropbox],
+        skills: [cleanup],
+      },
+    });
+
+    expect(wrapper.get('.chat-user-text__mention--skill').text())
+      .toBe('dropbox:clean-up-dropbox-content');
+    expect(wrapper.text()).not.toContain(dropbox.name);
+  });
+
   it('matches display names and parenthesized skill aliases case-insensitively', () => {
     const commitPush: CodexSurfaceSkill = {
       name: 'Commit-Push (cp)',

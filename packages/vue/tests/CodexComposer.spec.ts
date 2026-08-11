@@ -454,6 +454,31 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('$frontend-design ');
   });
 
+  it('shows the canonical plugin namespace for contributed skills', async () => {
+    const dropbox = {
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052@openai-curated-remote',
+      name: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      displayName: 'Dropbox',
+      enabled: true,
+    } satisfies CodexSurfacePlugin;
+    const wrapper = mountComposer({
+      plugins: [dropbox],
+      skills: [{
+        name: `${dropbox.name}:clean-up-dropbox-content`,
+        description: 'Clean up Dropbox content.',
+        path: '/plugins/dropbox/skills/clean-up-dropbox-content/SKILL.md',
+        enabled: true,
+      }],
+    });
+
+    await setEditorValue(wrapper, '$clean');
+    await editor(wrapper).trigger('keyup');
+
+    expect(wrapper.get('.chat-composer-skill-menu__name').text())
+      .toBe('dropbox:clean-up-dropbox-content');
+    expect(wrapper.text()).not.toContain(dropbox.name);
+  });
+
   it('opens a combined at-mention menu and inserts the canonical plugin name', async () => {
     const wrapper = mountComposer({ plugins });
 

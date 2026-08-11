@@ -380,6 +380,10 @@ rendering recognized names as compact mention chips.
 
 `CodexComposer` uses the same catalog-backed chip renderer while editing. It
 keeps `$skill`, `@plugin`, and `@path` as the canonical submitted prompt text. Slash-prefixed text remains reserved for commands. Plugin and file results share the `@` suggestion menu; files appear only when the host supplies a thread/CWD-backed file catalog.
+For plugin-contributed skills whose fallback name starts with an opaque plugin
+ID, the skill picker and user-message chip replace that prefix with the matching
+plugin catalog name (for example, `dropbox:find-dropbox-content`). The original
+skill name and path remain unchanged for prompt submission.
 
 ### Customization
 

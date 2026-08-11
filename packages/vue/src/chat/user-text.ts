@@ -1,5 +1,5 @@
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
-import { skillMatchesMention } from './composer-skills';
+import { skillDisplayName, skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';
 
 export type CodexUserTextToken =
@@ -69,7 +69,7 @@ function bareMentionToken(
     if (skill) {
       return {
         type: 'skill-mention',
-        displayName: skill.displayName || skill.name,
+        displayName: skillDisplayName(skill, plugins),
         href: skill.path,
         label: `${trigger}${name}`,
         skill,
@@ -119,7 +119,9 @@ function mentionToken(
     const skill = skills.find((candidate) => candidate.path === skillPath);
     return {
       type: 'skill-mention',
-      displayName: skill?.displayName || humanizeMentionName(skill?.name || mentionName, 'Skill'),
+      displayName: skill
+        ? skillDisplayName(skill, plugins)
+        : humanizeMentionName(mentionName, 'Skill'),
       href,
       label,
       ...(skill ? { skill } : {}),

@@ -147,6 +147,23 @@ describe('composer search ranking', () => {
     expect(skillDescription(skill({ shortDescription: undefined, description: 'Run checks.' }))).toBe('Run checks.');
     expect(skillDescription(skill({ shortDescription: undefined, description: undefined }))).toBe('');
 
+    const pluginSkill = skill({
+      name: 'app-69b31dc2110c8191b8b47dc98fe5a052:clean-up-dropbox-content',
+    });
+    expect(skillDisplayName(pluginSkill, [{
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052@openai-curated-remote',
+      name: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      displayName: 'Dropbox',
+      enabled: true,
+    }])).toBe('dropbox:clean-up-dropbox-content');
+    expect(skillDisplayName(pluginSkill)).toBe(pluginSkill.name);
+    expect(filterComposerSkills([pluginSkill], 'dropbox', -1, [{
+      id: 'app-69b31dc2110c8191b8b47dc98fe5a052@openai-curated-remote',
+      name: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+      displayName: 'Dropbox',
+      enabled: true,
+    }])).toStrictEqual([pluginSkill]);
+
     const namedCommand = command({ name: 'review', displayName: 'Review changes', description: 'Inspect the diff.' });
     expect(commandDisplayName(namedCommand)).toBe('Review changes');
     expect(commandDescription(namedCommand)).toBe('Inspect the diff.');

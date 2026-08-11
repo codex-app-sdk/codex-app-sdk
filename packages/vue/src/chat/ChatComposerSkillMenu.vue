@@ -24,7 +24,7 @@
         <SparklesIcon />
       </span>
       <span class="chat-composer-skill-menu__main">
-        <span class="chat-composer-skill-menu__name">{{ skillDisplayName(skill) }}</span>
+        <span class="chat-composer-skill-menu__name">{{ skillDisplayName(skill, plugins ?? []) }}</span>
         <span class="chat-composer-skill-menu__description">{{ skillDescription(skill) }}</span>
       </span>
     </button>
@@ -40,12 +40,14 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { useCodexChatTranslate } from './chat-i18n';
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import type { CodexSkillSummary } from './contracts';
 import { skillDescription, skillDisplayName } from './composer-skills';
 import { SparklesIcon } from '../icons/app-icons';
 
 const props = defineProps<{
   activeIndex: number;
+  plugins?: readonly CodexSurfacePlugin[];
   visibleSkills: CodexSkillSummary[];
 }>();
 

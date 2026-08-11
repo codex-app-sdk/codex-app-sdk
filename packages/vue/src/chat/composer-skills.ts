@@ -1,3 +1,4 @@
+import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import type { CodexSkillSummary, PromptSkillInput } from './contracts';
 import { filterComposerSearchItems } from './composer-search';
 
@@ -38,16 +39,39 @@ export function findActiveSkillSlash(value: string, caretPosition: number): Acti
   return findActiveSkillTrigger(value, caretPosition, '/');
 }
 
-export function filterComposerSkills(skills: CodexSkillSummary[], query: string, maxResults = -1): CodexSkillSummary[] {
+export function filterComposerSkills(
+  skills: CodexSkillSummary[],
+  query: string,
+  maxResults = -1,
+  plugins: readonly CodexSurfacePlugin[] = [],
+): CodexSkillSummary[] {
   return filterComposerSearchItems(skills, query, [
     { values: (skill) => [skill.id] },
-    { values: (skill) => [skill.name, skill.displayName] },
+    { values: (skill) => [skill.name, skill.displayName, skillDisplayName(skill, plugins)] },
     { values: (skill) => [skill.shortDescription, skill.description] },
   ], maxResults);
 }
 
-export function skillDisplayName(skill: CodexSkillSummary): string {
-  return skill.displayName || skill.name;
+export function skillDisplayName(
+  skill: CodexSkillSummary,
+  plugins: readonly CodexSurfacePlugin[] = [],
+): string {
+  if (skill.displayName) return skill.displayName;
+  const separator = skill.name.indexOf(':');
+  if (separator <= 0 || separator === skill.name.length - 1) return skill.name;
+  const pluginId = skill.name.slice(0, separator);
+  const plugin = plugins.find((candidate) => (
+    candidate.id === pluginId
+    || candidate.name === pluginId
+    || candidate.id.startsWith(`${pluginId}@`)
+  ));
+  if (!plugin) return skill.name;
+  const namespace = plugin.displayName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z\d]+/g, '-')
+    .replace(/^-|-$/g, '') || plugin.name;
+  return `${namespace}:${skill.name.slice(separator + 1)}`;
 }
 
 export function skillDescription(skill: CodexSkillSummary): string {

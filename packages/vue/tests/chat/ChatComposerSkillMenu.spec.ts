@@ -44,6 +44,30 @@ describe('ChatComposerSkillMenu', () => {
 
     expect(scrolledElements.at(-1)?.textContent).toContain('Skill 6');
   });
+
+  it('replaces an opaque plugin id with the canonical plugin namespace', () => {
+    const wrapper = mount(ChatComposerSkillMenu, {
+      props: {
+        activeIndex: 0,
+        plugins: [{
+          id: 'app-69b31dc2110c8191b8b47dc98fe5a052@openai-curated-remote',
+          name: 'app-69b31dc2110c8191b8b47dc98fe5a052',
+          displayName: 'Dropbox',
+          enabled: true,
+        }],
+        visibleSkills: [{
+          name: 'app-69b31dc2110c8191b8b47dc98fe5a052:clean-up-dropbox-content',
+          description: 'Clean up Dropbox content.',
+          path: '/plugins/dropbox/skills/clean-up-dropbox-content/SKILL.md',
+          enabled: true,
+        }],
+      },
+    });
+
+    expect(wrapper.get('.chat-composer-skill-menu__name').text())
+      .toBe('dropbox:clean-up-dropbox-content');
+    expect(wrapper.text()).not.toContain('app-69b31dc2110c8191b8b47dc98fe5a052');
+  });
 });
 
 function createSkills(count: number): CodexSkillSummary[] {
