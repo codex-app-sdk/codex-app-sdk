@@ -242,8 +242,38 @@ button {
   color: #d54132;
 }
 
-.relay-account {
+.operations-board__controls {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.relay-reset {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  color: #596477;
+  background: #fff;
+  border: 1px solid #d7dce3;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.relay-reset:hover:not(:disabled) {
+  color: #253044;
+  background: #f2f4f7;
+}
+
+.relay-reset:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.relay-account {
   display: grid;
   min-width: 150px;
   padding: 7px 10px;

@@ -45,6 +45,9 @@ describe('OperationsBoard', () => {
       'compare-recovery',
       snapshot.shipments[0],
     ]]);
+
+    await wrapper.get('.relay-reset').trigger('click');
+    expect(wrapper.emitted('reset')).toStrictEqual([[]]);
   });
 
   it('disables every contextual action while a prompt is being submitted', () => {
@@ -57,6 +60,22 @@ describe('OperationsBoard', () => {
       },
     });
 
+    expect(wrapper.findAll('.shipment-actions button').map((button) => button.attributes('disabled')))
+      .toStrictEqual(['', '', '']);
+  });
+
+  it('shows reset progress while the demo is being reseeded', () => {
+    const snapshot = relayOperationsSnapshot();
+    const wrapper = mount(OperationsBoard, {
+      props: {
+        resetPending: true,
+        selectedShipment: snapshot.shipments[0]!,
+        snapshot,
+      },
+    });
+
+    expect(wrapper.get('.relay-reset').text()).toBe('Resetting…');
+    expect(wrapper.get('.relay-reset').attributes('disabled')).toBe('');
     expect(wrapper.findAll('.shipment-actions button').map((button) => button.attributes('disabled')))
       .toStrictEqual(['', '', '']);
   });

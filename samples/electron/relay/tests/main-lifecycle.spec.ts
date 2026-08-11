@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RELAY_SNAPSHOT_CHANNEL } from '../src/shared/relay-contracts';
+import { RELAY_RESET_CHANNEL, RELAY_SNAPSHOT_CHANNEL } from '../src/shared/relay-contracts';
 import { relayOperationsSnapshot } from './fakes';
 
 const mocks = vi.hoisted(() => {
@@ -42,9 +42,13 @@ const mocks = vi.hoisted(() => {
 
   const surface = { close: vi.fn(async () => undefined) };
   const readRelayState = vi.fn(async (_statePath: string) => relayOperationsSnapshot());
+  const resetRelayState = vi.fn(async (_statePath: string) => relayOperationsSnapshot());
   const backend = {
     close: vi.fn(async () => undefined),
-    module: vi.fn(() => ({ readSnapshot: () => readRelayState('/tmp/relay-user-data/relay-operations.json') })),
+    module: vi.fn(() => ({
+      readSnapshot: () => readRelayState('/tmp/relay-user-data/relay-operations.json'),
+      resetDemo: () => resetRelayState('/tmp/relay-user-data/relay-operations.json'),
+    })),
     surface,
   };
   return {
@@ -68,6 +72,7 @@ const mocks = vi.hoisted(() => {
     },
     mkdir: vi.fn(async () => undefined),
     readRelayState,
+    resetRelayState,
     registerCodexElectronMain: vi.fn(() => vi.fn()),
     reset() {
       appHandlers.clear();
@@ -99,6 +104,7 @@ vi.mock('@codex-app-sdk/backend', () => ({
 vi.mock('../src/mcp/relay-store', () => ({
   initializeRelayState: mocks.initializeRelayState,
   readRelayState: mocks.readRelayState,
+  resetRelayState: mocks.resetRelayState,
 }));
 
 describe('Relay sample main lifecycle', () => {
@@ -158,13 +164,16 @@ describe('Relay sample main lifecycle', () => {
       .toContain('Never call rebook_shipment until the user explicitly approves');
   });
 
-  it('exposes only the read-only Relay snapshot through app-owned IPC', async () => {
+  it('exposes typed read and reset operations through app-owned IPC', async () => {
     await import('../src/main/index');
     await vi.waitFor(() => expect(mocks.ipcHandlers.has(RELAY_SNAPSHOT_CHANNEL)).toBe(true));
 
     await expect(mocks.ipcHandlers.get(RELAY_SNAPSHOT_CHANNEL)!())
       .resolves.toMatchObject({ revision: 1, metrics: { critical: 1 } });
     expect(mocks.readRelayState).toHaveBeenCalledWith('/tmp/relay-user-data/relay-operations.json');
+    await expect(mocks.ipcHandlers.get(RELAY_RESET_CHANNEL)!())
+      .resolves.toMatchObject({ revision: 1, metrics: { critical: 1 } });
+    expect(mocks.resetRelayState).toHaveBeenCalledWith('/tmp/relay-user-data/relay-operations.json');
   });
 
   it('reuses one surface on reopen and removes both SDK and app IPC before quit', async () => {
@@ -179,6 +188,7 @@ describe('Relay sample main lifecycle', () => {
     mocks.appHandlers.get('before-quit')?.();
     expect(mocks.registerCodexElectronMain.mock.results[0]?.value).toHaveBeenCalledOnce();
     expect(mocks.ipcMain.removeHandler).toHaveBeenCalledWith(RELAY_SNAPSHOT_CHANNEL);
+    expect(mocks.ipcMain.removeHandler).toHaveBeenCalledWith(RELAY_RESET_CHANNEL);
     expect(mocks.backend.close).toHaveBeenCalledOnce();
   });
 

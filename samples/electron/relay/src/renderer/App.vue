@@ -23,9 +23,11 @@
     <OperationsBoard
       :account-label="accountLabel"
       :action-pending="actionPending"
+      :reset-pending="resetPending"
       :selected-shipment="selectedShipment"
       :snapshot="operationsSnapshot"
       @action="sendBusinessAction"
+      @reset="resetDemo"
       @select="selectedShipmentId = $event"
       @sign-out="signOut"
     />
@@ -66,6 +68,7 @@ const actionError = ref<string | null>(null);
 const openingSignIn = ref(false);
 const signingOut = ref(false);
 const actionPending = ref(false);
+const resetPending = ref(false);
 let creatingConversation: Promise<void> | null = null;
 let removeEventListener: (() => void) | null = null;
 
@@ -165,6 +168,23 @@ async function sendBusinessAction(action: RelayAction, shipment: RelayShipment):
     actionError.value = `Relay could not send the ${shipment.id} action to the conversation. Please try again.`;
   } finally {
     actionPending.value = false;
+  }
+}
+
+async function resetDemo(): Promise<void> {
+  if (resetPending.value || actionPending.value) return;
+  actionError.value = null;
+  resetPending.value = true;
+  try {
+    const snapshot = await window.relayOperations.resetDemo();
+    operationsSnapshot.value = snapshot;
+    selectedShipmentId.value = snapshot.shipments.find((shipment) => shipment.status === 'critical')?.id
+      ?? snapshot.shipments[0]?.id
+      ?? null;
+  } catch {
+    actionError.value = 'Relay could not reset the demo data. Please try again.';
+  } finally {
+    resetPending.value = false;
   }
 }
 

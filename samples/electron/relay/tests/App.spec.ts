@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexNativeRendererApi } from '@codex-app-sdk/electron';
 import App from '../src/renderer/App.vue';
-import { relayOperationsSnapshot, fakeSurfaceApi, surfaceSnapshot } from './fakes';
+import { fakeRelayOperationsApi, relayOperationsSnapshot, fakeSurfaceApi, surfaceSnapshot } from './fakes';
 
 describe('Relay App', () => {
   afterEach(() => {
@@ -15,7 +15,7 @@ describe('Relay App', () => {
     const api = fakeSurfaceApi();
     window.codexSurface = api;
     window.codexAppSdkNative = fakeNativeApi();
-    window.relayOperations = { getSnapshot: vi.fn(async () => relayOperationsSnapshot()) };
+    window.relayOperations = fakeRelayOperationsApi();
 
     const wrapper = mount(App);
     await flushPromises();
@@ -40,7 +40,7 @@ describe('Relay App', () => {
     const api = fakeSurfaceApi();
     window.codexSurface = api;
     window.codexAppSdkNative = fakeNativeApi();
-    window.relayOperations = { getSnapshot: vi.fn(async () => relayOperationsSnapshot()) };
+    window.relayOperations = fakeRelayOperationsApi();
     const wrapper = mount(App);
     await flushPromises();
 
@@ -63,7 +63,7 @@ describe('Relay App', () => {
     const api = fakeSurfaceApi(empty);
     window.codexSurface = api;
     window.codexAppSdkNative = fakeNativeApi();
-    window.relayOperations = { getSnapshot: vi.fn(async () => relayOperationsSnapshot()) };
+    window.relayOperations = fakeRelayOperationsApi();
 
     mount(App);
     await flushPromises();
@@ -88,7 +88,7 @@ describe('Relay App', () => {
       .mockResolvedValueOnce(after);
     window.codexSurface = api;
     window.codexAppSdkNative = fakeNativeApi();
-    window.relayOperations = { getSnapshot };
+    window.relayOperations = { ...fakeRelayOperationsApi(), getSnapshot };
     const wrapper = mount(App);
     await flushPromises();
 
@@ -132,7 +132,7 @@ describe('Relay App', () => {
     const native = fakeNativeApi();
     window.codexSurface = api;
     window.codexAppSdkNative = native;
-    window.relayOperations = { getSnapshot: vi.fn(async () => relayOperationsSnapshot()) };
+    window.relayOperations = fakeRelayOperationsApi();
     const wrapper = mount(App);
     await flushPromises();
 
@@ -143,6 +143,33 @@ describe('Relay App', () => {
 
     expect(api.startChatGptLogin).toHaveBeenCalledOnce();
     expect(native.openExternal).toHaveBeenCalledWith('https://auth.example.test/relay');
+  });
+
+  it('replaces updated shipment state with the seeded demo snapshot', async () => {
+    const api = fakeSurfaceApi();
+    const updated = relayOperationsSnapshot();
+    updated.revision = 2;
+    updated.shipments[0] = {
+      ...updated.shipments[0]!,
+      status: 'on-track',
+      etaDeltaMinutes: 0,
+      selectedRecoveryOptionId: 'expedited-air',
+    };
+    const relayOperations = fakeRelayOperationsApi();
+    relayOperations.getSnapshot.mockResolvedValueOnce(updated);
+    window.codexSurface = api;
+    window.codexAppSdkNative = fakeNativeApi();
+    window.relayOperations = relayOperations;
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.get('.shipment-badge--delay').text()).toBe('On time');
+    await wrapper.get('.relay-reset').trigger('click');
+    await flushPromises();
+
+    expect(relayOperations.resetDemo).toHaveBeenCalledOnce();
+    expect(wrapper.get('.shipment-badge--delay').text()).toBe('ETA +6h');
+    expect(wrapper.get('.exception-queue__heading').text()).toContain('revision 1');
   });
 });
 

@@ -61,6 +61,13 @@ export function relayOperationsSnapshot() {
   return relaySnapshot(createRelaySeedState());
 }
 
+export function fakeRelayOperationsApi() {
+  return {
+    getSnapshot: vi.fn(async () => relayOperationsSnapshot()),
+    resetDemo: vi.fn(async () => relayOperationsSnapshot()),
+  };
+}
+
 export function fakeSurfaceApi(snapshot = surfaceSnapshot()) {
   let stateListener: ((nextSnapshot: CodexSurfaceSnapshot) => void) | undefined;
   let eventListener: ((event: CodexSurfaceEvent) => void) | undefined;

@@ -23,10 +23,20 @@
       </div>
     </dl>
 
-    <button v-if="accountLabel" class="relay-account" type="button" @click="emit('sign-out')">
-      <span>{{ accountLabel }}</span>
-      <small>Sign out</small>
-    </button>
+    <div class="operations-board__controls">
+      <button
+        class="relay-reset"
+        type="button"
+        :disabled="resetPending || actionPending"
+        @click="emit('reset')"
+      >
+        {{ resetPending ? 'Resetting…' : 'Reset demo' }}
+      </button>
+      <button v-if="accountLabel" class="relay-account" type="button" @click="emit('sign-out')">
+        <span>{{ accountLabel }}</span>
+        <small>Sign out</small>
+      </button>
+    </div>
   </header>
 
   <section class="operations-board__workspace" aria-label="Relay dispatch desk">
@@ -127,13 +137,13 @@
       </section>
 
       <div class="shipment-actions" aria-label="Ask Relay about this shipment">
-        <button type="button" :disabled="actionPending" @click="emit('action', 'investigate', selectedShipment)">
+        <button type="button" :disabled="actionPending || resetPending" @click="emit('action', 'investigate', selectedShipment)">
           {{ selectedShipment.status === 'on-track' ? 'Review recovery' : 'Investigate delay' }}
         </button>
-        <button type="button" :disabled="actionPending" @click="emit('action', 'compare-recovery', selectedShipment)">
+        <button type="button" :disabled="actionPending || resetPending" @click="emit('action', 'compare-recovery', selectedShipment)">
           Compare recovery
         </button>
-        <button type="button" :disabled="actionPending" @click="emit('action', 'draft-update', selectedShipment)">
+        <button type="button" :disabled="actionPending || resetPending" @click="emit('action', 'draft-update', selectedShipment)">
           Draft update
         </button>
       </div>
@@ -152,12 +162,14 @@ import type {
 defineProps<{
   accountLabel?: string;
   actionPending?: boolean;
+  resetPending?: boolean;
   selectedShipment: RelayShipment;
   snapshot: RelaySnapshot;
 }>();
 
 const emit = defineEmits<{
   action: [action: RelayAction, shipment: RelayShipment];
+  reset: [];
   select: [shipmentId: string];
   'sign-out': [];
 }>();

@@ -47,6 +47,16 @@ export function updateRelayState(
   return operation;
 }
 
+export function resetRelayState(statePath: string): Promise<RelaySnapshot> {
+  const operation = operationTail.then(async () => {
+    const state = createRelaySeedState();
+    await writeRelayState(statePath, state);
+    return relaySnapshot(state);
+  });
+  operationTail = operation.then(() => undefined, () => undefined);
+  return operation;
+}
+
 export async function writeRelayState(statePath: string, state: RelayState): Promise<void> {
   const temporaryPath = `${statePath}.${process.pid}.tmp`;
   try {

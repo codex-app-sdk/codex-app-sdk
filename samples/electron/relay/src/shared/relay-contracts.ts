@@ -54,9 +54,11 @@ export type RelaySnapshot = RelayState & {
 
 export type RelayOperationsRendererApi = {
   getSnapshot(): Promise<RelaySnapshot>;
+  resetDemo(): Promise<RelaySnapshot>;
 };
 
 export const RELAY_SNAPSHOT_CHANNEL = 'relay-operations:get-snapshot';
+export const RELAY_RESET_CHANNEL = 'relay-operations:reset-demo';
 
 export function relaySnapshot(state: RelayState): RelaySnapshot {
   const atRisk = state.shipments.filter((shipment) => shipment.status === 'at-risk').length;

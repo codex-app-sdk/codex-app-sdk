@@ -71,7 +71,8 @@ export default defineConfig(({ command, mode }) => {
         ...(useSdkSources ? sdkSourceAliases : {}),
       },
     },
-    server: { host: '127.0.0.1', port: 5174, strictPort: true },
+    // Codex Claw uses 5174 in development, so Spark needs its own fixed port.
+    server: { host: '127.0.0.1', port: 5177, strictPort: true },
     build: { outDir: rendererOutDir, emptyOutDir: true },
   };
 });

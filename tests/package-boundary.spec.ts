@@ -198,6 +198,17 @@ describe('package boundary', () => {
         '@codex-app-sdk/vue',
       ]));
       expect(packageJson.dependencies).not.toHaveProperty('codex-app-sdk');
+
+      const aliases = await readFile(path.join(sampleRoot, sample, 'vite.sdk-aliases.ts'), 'utf8');
+      for (const [specifier, source] of [
+        ['@codex-app-sdk/core/events', 'typed-event-bus.ts'],
+        ['@codex-app-sdk/core/native', 'native.ts'],
+        ['@codex-app-sdk/core/surface', 'surface.ts'],
+        ['@codex-app-sdk/core/surface-bridge', 'surface-bridge.ts'],
+      ]) {
+        expect(aliases, `${sample} ${specifier}`).toContain(`'${specifier}'`);
+        expect(aliases, `${sample} ${source}`).toContain(`/packages/core/src/${source}`);
+      }
     }
   });
 

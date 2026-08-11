@@ -28,6 +28,10 @@ Relay starts its own app-server process and gives that process the dedicated
 `~/.codex-relay` `CODEX_HOME`; it never connects to or modifies normal
 `~/.codex` conversations.
 
+Use **Reset demo** in the header to restore the seeded shipment state after a
+recovery has been booked. This resets the operations fixture while leaving the
+Relay conversation available for comparison and follow-up questions.
+
 ## MCP tools
 
 - `list_exceptions`

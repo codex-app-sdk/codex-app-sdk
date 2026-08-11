@@ -5,6 +5,13 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('Spark sample SDK customization boundary', () => {
+  it('uses a dev-server port that does not collide with Codex Claw', () => {
+    const viteConfig = readFileSync(resolve(import.meta.dirname, '../vite.config.ts'), 'utf8');
+
+    expect(viteConfig).toContain("server: { host: '127.0.0.1', port: 5177, strictPort: true }");
+    expect(viteConfig).not.toContain('port: 5174');
+  });
+
   it('reuses the default pane and styles it only through host classes and public tokens', () => {
     const app = readFileSync(resolve(import.meta.dirname, '../src/renderer/App.vue'), 'utf8');
     const styles = readFileSync(resolve(import.meta.dirname, '../src/renderer/styles.css'), 'utf8');

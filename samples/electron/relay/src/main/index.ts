@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type WebContents } from 'electron';
 import { registerCodexElectronMain } from '@codex-app-sdk/electron';
 import { createCodexAppBackend, type CodexAppBackend } from '@codex-app-sdk/backend';
-import { initializeRelayState, readRelayState } from '../mcp/relay-store';
-import { RELAY_SNAPSHOT_CHANNEL } from '../shared/relay-contracts';
+import { initializeRelayState, readRelayState, resetRelayState } from '../mcp/relay-store';
+import { RELAY_RESET_CHANNEL, RELAY_SNAPSHOT_CHANNEL } from '../shared/relay-contracts';
 
 const bundleDirectory = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow: BrowserWindow | null = null;
@@ -99,11 +99,17 @@ app.whenReady().then(async () => {
     },
     modules: [{
       id: 'relay.operations',
-      create: () => ({ readSnapshot: () => readRelayState(statePath) }),
+      create: () => ({
+        readSnapshot: () => readRelayState(statePath),
+        resetDemo: () => resetRelayState(statePath),
+      }),
     }],
   });
   backend = sdkBackend;
-  const relayOperations = sdkBackend.module<{ readSnapshot: () => ReturnType<typeof readRelayState> }>('relay.operations');
+  const relayOperations = sdkBackend.module<{
+    readSnapshot: () => ReturnType<typeof readRelayState>;
+    resetDemo: () => ReturnType<typeof resetRelayState>;
+  }>('relay.operations');
   unregisterSdk = registerCodexElectronMain({
     clipboard,
     dialog,
@@ -114,6 +120,7 @@ app.whenReady().then(async () => {
   });
   if (!relayIpcRegistered) {
     ipcMain.handle(RELAY_SNAPSHOT_CHANNEL, () => relayOperations.readSnapshot());
+    ipcMain.handle(RELAY_RESET_CHANNEL, () => relayOperations.resetDemo());
     relayIpcRegistered = true;
   }
   await createWindow();
@@ -151,6 +158,7 @@ app.on('before-quit', () => {
   unregisterSdk = null;
   if (relayIpcRegistered) {
     ipcMain.removeHandler(RELAY_SNAPSHOT_CHANNEL);
+    ipcMain.removeHandler(RELAY_RESET_CHANNEL);
     relayIpcRegistered = false;
   }
   void backend?.close().catch(() => undefined);
