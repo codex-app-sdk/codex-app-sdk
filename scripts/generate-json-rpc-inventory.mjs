@@ -15,7 +15,7 @@ const schemaVersion = (await read(`${backendSource}/codex/schema-version.ts`)).m
   /codexSchemaCliVersion\s*=\s*['"]([^'"]+)['"]/,
 )?.[1]
   ?? 'unknown';
-const productionFiles = (await sourceFiles(join(root, 'src'))).sort();
+const productionFiles = (await sourceFiles(join(root, backendSource))).sort();
 const productionSources = await Promise.all(productionFiles.map(async (path) => ({
   path,
   text: await readFile(path, 'utf8'),

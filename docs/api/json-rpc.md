@@ -22,55 +22,55 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Client → app-server requests | 130 | 1 | 0 | 0 | 129 |
+| Client → app-server requests | 130 | 45 | 0 | 0 | 85 |
 | App-server → client notifications | 72 | 39 | 0 | 30 | 3 |
-| App-server → client requests | 11 | 0 | 2 | 0 | 9 |
+| App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
 ## Client → app-server requests
 
 | Method | Status | Implementation |
 | --- | --- | --- |
 | `initialize` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
-| `thread/start` | Typed client only | — |
-| `thread/resume` | Typed client only | — |
-| `thread/fork` | Typed client only | — |
-| `thread/archive` | Typed client only | — |
-| `thread/delete` | Typed client only | — |
-| `thread/unsubscribe` | Typed client only | — |
+| `thread/start` | High-level SDK | `packages/backend/src/node/codex-surface-lifecycle-controller.ts`<br>`packages/backend/src/node/codex-surface-text-generation-controller.ts` |
+| `thread/resume` | High-level SDK | `packages/backend/src/node/codex-surface-lifecycle-controller.ts` |
+| `thread/fork` | High-level SDK | `packages/backend/src/node/codex-surface-fork-controller.ts` |
+| `thread/archive` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts` |
+| `thread/delete` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-text-generation-controller.ts` |
+| `thread/unsubscribe` | High-level SDK | `packages/backend/src/node/codex-surface-text-generation-controller.ts` |
 | `thread/increment_elicitation` | Typed client only | — |
 | `thread/decrement_elicitation` | Typed client only | — |
-| `thread/name/set` | Typed client only | — |
-| `thread/goal/set` | Typed client only | — |
-| `thread/goal/get` | Typed client only | — |
-| `thread/goal/clear` | Typed client only | — |
+| `thread/name/set` | High-level SDK | `packages/backend/src/node/codex-surface-conversation-settings-controller.ts` |
+| `thread/goal/set` | High-level SDK | `packages/backend/src/node/codex-surface-conversation-settings-controller.ts` |
+| `thread/goal/get` | High-level SDK | `packages/backend/src/node/codex-surface-fork-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts` |
+| `thread/goal/clear` | High-level SDK | `packages/backend/src/node/codex-surface-conversation-settings-controller.ts` |
 | `thread/metadata/update` | Typed client only | — |
-| `thread/settings/update` | Typed client only | — |
+| `thread/settings/update` | High-level SDK | `packages/backend/src/node/codex-surface-conversation-settings-controller.ts`<br>`packages/backend/src/node/codex-surface-fork-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts` |
 | `thread/memoryMode/set` | Typed client only | — |
 | `memory/reset` | Typed client only | — |
-| `thread/unarchive` | Typed client only | — |
-| `thread/compact/start` | Typed client only | — |
+| `thread/unarchive` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts` |
+| `thread/compact/start` | High-level SDK | `packages/backend/src/node/codex-surface-turn-actions-controller.ts` |
 | `thread/shellCommand` | Typed client only | — |
 | `thread/approveGuardianDeniedAction` | Typed client only | — |
 | `thread/backgroundTerminals/clean` | Typed client only | — |
 | `thread/backgroundTerminals/list` | Typed client only | — |
 | `thread/backgroundTerminals/terminate` | Typed client only | — |
-| `thread/rollback` | Typed client only | — |
-| `thread/list` | Typed client only | — |
+| `thread/rollback` | High-level SDK | `packages/backend/src/node/codex-surface-turn-actions-controller.ts` |
+| `thread/list` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts` |
 | `thread/search` | Typed client only | — |
 | `thread/searchOccurrences` | Typed client only | — |
 | `thread/loaded/list` | Typed client only | — |
-| `thread/read` | Typed client only | — |
-| `thread/turns/list` | Typed client only | — |
+| `thread/read` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts` |
+| `thread/turns/list` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-fork-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts`<br>`packages/backend/src/node/codex-surface-prompt-history.ts` |
 | `thread/items/list` | Typed client only | — |
 | `thread/inject_items` | Typed client only | — |
-| `skills/list` | Typed client only | — |
+| `skills/list` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
 | `skills/extraRoots/set` | Typed client only | — |
 | `hooks/list` | Typed client only | — |
 | `marketplace/add` | Typed client only | — |
 | `marketplace/remove` | Typed client only | — |
 | `marketplace/upgrade` | Typed client only | — |
 | `plugin/list` | Typed client only | — |
-| `plugin/installed` | Typed client only | — |
+| `plugin/installed` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
 | `plugin/read` | Typed client only | — |
 | `plugin/skill/read` | Typed client only | — |
 | `plugin/share/save` | Typed client only | — |
@@ -81,7 +81,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `app/read` | Typed client only | — |
 | `app/list` | Typed client only | — |
 | `app/installed` | Typed client only | — |
-| `fs/readFile` | Typed client only | — |
+| `fs/readFile` | High-level SDK | `packages/backend/src/node/codex-markdown-images.ts`<br>`packages/backend/src/node/codex-surface-catalog-controller.ts` |
 | `fs/writeFile` | Typed client only | — |
 | `fs/createDirectory` | Typed client only | — |
 | `fs/getMetadata` | Typed client only | — |
@@ -93,28 +93,28 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `skills/config/write` | Typed client only | — |
 | `plugin/install` | Typed client only | — |
 | `plugin/uninstall` | Typed client only | — |
-| `turn/start` | Typed client only | — |
-| `turn/steer` | Typed client only | — |
-| `turn/interrupt` | Typed client only | — |
-| `thread/realtime/start` | Typed client only | — |
-| `thread/realtime/appendAudio` | Typed client only | — |
-| `thread/realtime/appendText` | Typed client only | — |
-| `thread/realtime/appendSpeech` | Typed client only | — |
-| `thread/realtime/stop` | Typed client only | — |
+| `turn/start` | High-level SDK | `packages/backend/src/node/codex-surface-messages-controller.ts`<br>`packages/backend/src/node/codex-surface-text-generation-controller.ts` |
+| `turn/steer` | High-level SDK | `packages/backend/src/node/codex-surface-messages-controller.ts` |
+| `turn/interrupt` | High-level SDK | `packages/backend/src/node/codex-surface-text-generation-controller.ts`<br>`packages/backend/src/node/codex-surface-turn-actions-controller.ts` |
+| `thread/realtime/start` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
+| `thread/realtime/appendAudio` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
+| `thread/realtime/appendText` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
+| `thread/realtime/appendSpeech` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
+| `thread/realtime/stop` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
 | `thread/realtime/listVoices` | Typed client only | — |
-| `review/start` | Typed client only | — |
-| `model/list` | Typed client only | — |
+| `review/start` | High-level SDK | `packages/backend/src/node/codex-surface-turn-actions-controller.ts` |
+| `model/list` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
 | `modelProvider/capabilities/read` | Typed client only | — |
 | `experimentalFeature/list` | Typed client only | — |
-| `permissionProfile/list` | Typed client only | — |
+| `permissionProfile/list` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
 | `experimentalFeature/enablement/set` | Typed client only | — |
-| `remoteControl/enable` | Typed client only | — |
-| `remoteControl/disable` | Typed client only | — |
-| `remoteControl/status/read` | Typed client only | — |
-| `remoteControl/pairing/start` | Typed client only | — |
-| `remoteControl/pairing/status` | Typed client only | — |
-| `remoteControl/client/list` | Typed client only | — |
-| `remoteControl/client/revoke` | Typed client only | — |
+| `remoteControl/enable` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
+| `remoteControl/disable` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
+| `remoteControl/status/read` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
+| `remoteControl/pairing/start` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
+| `remoteControl/pairing/status` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
+| `remoteControl/client/list` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
+| `remoteControl/client/revoke` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
 | `collaborationMode/list` | Typed client only | — |
 | `mock/experimentalMethod` | Typed client only | — |
 | `environment/add` | Typed client only | — |
@@ -127,10 +127,10 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `mcpServer/tool/call` | Typed client only | — |
 | `windowsSandbox/setupStart` | Typed client only | — |
 | `windowsSandbox/readiness` | Typed client only | — |
-| `account/login/start` | Typed client only | — |
-| `account/login/cancel` | Typed client only | — |
-| `account/logout` | Typed client only | — |
-| `account/rateLimits/read` | Typed client only | — |
+| `account/login/start` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
+| `account/login/cancel` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
+| `account/logout` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
+| `account/rateLimits/read` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
 | `account/rateLimitResetCredit/consume` | Typed client only | — |
 | `account/usage/read` | Typed client only | — |
 | `account/workspaceMessages/read` | Typed client only | — |
@@ -151,8 +151,8 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `externalAgentConfig/import/readHistories` | Typed client only | — |
 | `config/value/write` | Typed client only | — |
 | `config/batchWrite` | Typed client only | — |
-| `configRequirements/read` | Typed client only | — |
-| `account/read` | Typed client only | — |
+| `configRequirements/read` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts`<br>`packages/backend/src/node/codex-surface-connection-controller.ts` |
+| `account/read` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
 | `getConversationSummary` | Typed client only | — |
 | `gitDiffToRemote` | Typed client only | — |
 | `getAuthStatus` | Typed client only | — |
@@ -242,17 +242,17 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 | Method | Status | Implementation |
 | --- | --- | --- |
-| `item/commandExecution/requestApproval` | Typed client only | — |
-| `item/fileChange/requestApproval` | Typed client only | — |
-| `item/tool/requestUserInput` | Typed client only | — |
-| `mcpServer/elicitation/request` | Typed client only | — |
-| `item/permissions/requestApproval` | Typed client only | — |
-| `item/tool/call` | Typed client only | — |
-| `account/chatgptAuthTokens/refresh` | Host policy boundary | — |
-| `attestation/generate` | Host policy boundary | — |
-| `currentTime/read` | Typed client only | — |
-| `applyPatchApproval` | Typed client only | — |
-| `execCommandApproval` | Typed client only | — |
+| `item/commandExecution/requestApproval` | High-level SDK | `packages/backend/src/node/codex-approvals.ts` |
+| `item/fileChange/requestApproval` | High-level SDK | `packages/backend/src/node/codex-approvals.ts` |
+| `item/tool/requestUserInput` | High-level SDK | `packages/backend/src/node/codex-surface-client-requests-controller.ts`<br>`packages/backend/src/node/codex-surface.ts` |
+| `mcpServer/elicitation/request` | High-level SDK | `packages/backend/src/node/codex-surface-client-requests-controller.ts`<br>`packages/backend/src/node/codex-surface.ts` |
+| `item/permissions/requestApproval` | High-level SDK | `packages/backend/src/node/codex-approvals.ts` |
+| `item/tool/call` | High-level SDK | `packages/backend/src/node/codex-surface-extensions-controller.ts`<br>`packages/backend/src/node/codex-surface.ts` |
+| `account/chatgptAuthTokens/refresh` | Host policy boundary | `packages/backend/src/node/codex-surface.ts` |
+| `attestation/generate` | Host policy boundary | `packages/backend/src/node/codex-surface.ts` |
+| `currentTime/read` | High-level SDK | `packages/backend/src/node/codex-surface.ts` |
+| `applyPatchApproval` | High-level SDK | `packages/backend/src/node/codex-approvals.ts` |
+| `execCommandApproval` | High-level SDK | `packages/backend/src/node/codex-approvals.ts` |
 
 ::: tip Reading the inventory
 “Typed client only” is not necessarily a missing product feature. Many filesystem,
