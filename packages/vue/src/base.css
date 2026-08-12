@@ -256,6 +256,8 @@
   font-family: var(--font-family-mono);
   font-size: var(--code-font-size, var(--font-size-13));
   line-height: var(--line-height-20);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .codex-markdown blockquote {

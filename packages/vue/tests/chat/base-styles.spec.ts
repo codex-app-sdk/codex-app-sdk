@@ -101,4 +101,10 @@ describe('base conversation styles', () => {
   it('does not draw a browser focus outline around scrollable code blocks', () => {
     expect(baseStyles).toMatch(/\.codex-markdown pre \{[\s\S]*?outline: none;/);
   });
+
+  it('wraps long code lines while preserving whitespace and indentation', () => {
+    expect(baseStyles).toMatch(
+      /\.codex-markdown pre code \{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: pre-wrap;/,
+    );
+  });
 });
