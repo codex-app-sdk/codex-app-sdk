@@ -15,6 +15,7 @@ import type {
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from './composer-menu';
 import type { Message } from './chat/types';
 import type { CodexMessageImageOpenHandler } from './chat/message-image';
+import type { CodexConversationVisualization } from './chat/visualization';
 import type { CodexComposerState } from './composer-state';
 import type { QueuedChatPrompt } from './chat/queued-prompts';
 import type { CodexHostAttachment } from '@codex-app-sdk/core/native';
@@ -136,6 +137,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   menuSelect?: PaneAction<[item: CodexComposerMenuSelectableItem<Payload>]>;
   openImage?: CodexMessageImageOpenHandler;
   openLink?: PaneAction<[link: CodexConversationLink]>;
+  openVisualization?: PaneAction<[visualization: CodexConversationVisualization]>;
   quoteMessage?: PaneAction<[index: number]>;
   /** Loads bounded user-only prompt history for the active conversation. */
   readPromptHistory?: () => readonly string[] | Promise<readonly string[]>;

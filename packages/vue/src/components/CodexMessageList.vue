@@ -39,6 +39,7 @@
             @edit-message="emit('edit-message', $event)"
             @fork-message="emit('fork-message', $event)"
             @open-link="emit('open-link', $event)"
+            @open-visualization="emit('open-visualization', $event)"
             @quote-message="emit('quote-message', $event)"
             @retry-message="emit('retry-message', $event)"
             @send-follow-up="emit('send-follow-up', $event)"
@@ -76,6 +77,7 @@ import type { ClientRequestResponse, CodexConversationLink, CodexConversationPre
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
 import type { CodexMessageImageOpenHandler } from '../chat/message-image'
+import type { CodexConversationVisualization } from '../chat/visualization'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
 import CodexScrollToBottom from './CodexScrollToBottom.vue'
@@ -156,6 +158,7 @@ const emit = defineEmits<{
   'fork-message': [index: number]
   'load-older-messages': []
   'open-link': [link: CodexConversationLink]
+  'open-visualization': [visualization: CodexConversationVisualization]
   'quote-message': [index: number]
   'retry-message': [index: number]
   'send-follow-up': [prompt: string]

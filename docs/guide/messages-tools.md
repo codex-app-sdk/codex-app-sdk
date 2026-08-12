@@ -188,5 +188,12 @@ and Web surfaces without exposing a backend filesystem URL to the renderer.
 Markdown, syntax highlighting, KaTeX, and Mermaid rendering share the same
 message block pipeline.
 
+Codex visualization annotations render as a titled visualization row instead
+of leaking their private delimiters or JSON into assistant text. The SDK never
+executes or embeds the referenced HTML. Selecting the row calls the dedicated
+app-owned `openVisualization({ path, title })` action (or the equivalent direct
+prop/event), so a trusted host can ingest the artifact without treating its
+task-owned path as a generic conversation file link.
+
 See [Vue providers](/guide/vue-providers),
 [Presentation and theming](/guide/presentation), and [Event API](/api/events).

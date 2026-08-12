@@ -5,6 +5,7 @@ export type MessageBlock =
   | { type: 'text'; content: string }
   | { type: 'user-text'; content: string }
   | { type: 'mermaid'; code: string }
+  | { type: 'visualization'; path?: string; title: string }
   | { type: 'media'; media: MessageMedia; toolCall?: MessageToolCall }
   | { type: 'tool'; toolCall: MessageToolCall }
   | { type: 'tool-group'; toolCalls: MessageToolCall[] }
@@ -21,6 +22,7 @@ const contextTagRegex = /<context>[\s\S]*?<\/context>\s*/g
 const inAppBrowserContextTagRegex = /<in-app-browser-context(?:\s+[^>]*)?>[\s\S]*?<\/in-app-browser-context>\s*/g
 const ambientRequestHeadingRegex = /^[ \t]*## My request for Codex:[ \t]*(?:\r?\n|$)/m
 const followUpTagRegex = /<follow-up>([\s\S]*?)<\/follow-up>/g
+const visualizationAnnotationRegex = /\uE200visualize\uE202([\s\S]*?)\uE201/g
 const ungroupedToolNames = new Set([
   'ask_user_question',
 ])
@@ -109,6 +111,12 @@ function parseTextBlocks(rawContent: string, toolCalls: MessageToolCall[], ancho
 
     if (item.type === 'mermaid') {
       blocks.push({ type: 'mermaid', code: item.code })
+    } else if (item.type === 'visualization') {
+      blocks.push({
+        type: 'visualization',
+        title: item.title,
+        ...(item.path ? { path: item.path } : {}),
+      })
     } else if (item.type === 'tool') {
       const toolCall = findToolCall(item.kind, item.value, toolCalls)
       if (toolCall) {
@@ -360,6 +368,7 @@ function getToolCallParamString(toolCall: MessageToolCall | undefined, key: stri
 type SpecialBlock =
   | { type: 'tool'; start: number; end: number; kind: string; value: string }
   | { type: 'mermaid'; start: number; end: number; code: string }
+  | { type: 'visualization'; start: number; end: number; path?: string; title: string }
   | { type: 'media'; start: number; end: number; media: MessageMedia }
 
 function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[]) {
@@ -367,6 +376,19 @@ function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[]) {
 
   for (const block of findMermaidCodeBlocks(content)) {
     blocks.push(block)
+  }
+
+  for (const match of content.matchAll(visualizationAnnotationRegex)) {
+    const start = match.index ?? 0
+    if (isInsideCodeBlock(start, codeBlocks)) continue
+    const payload = visualizationPayload(match[1] ?? '')
+    blocks.push({
+      end: start + match[0].length,
+      start,
+      title: payload?.title ?? 'Visualization',
+      ...(payload?.path ? { path: payload.path } : {}),
+      type: 'visualization',
+    })
   }
 
   for (const match of content.matchAll(toolTagRegex)) {
@@ -415,6 +437,21 @@ function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[]) {
   }
 
   return blocks.sort((first, second) => first.start - second.start)
+}
+
+function visualizationPayload(value: string): { path?: string; title: string } | null {
+  try {
+    const payload = JSON.parse(value) as { path?: unknown; title?: unknown }
+    const title = typeof payload.title === 'string' && payload.title.trim()
+      ? payload.title.trim()
+      : 'Visualization'
+    const path = typeof payload.path === 'string' && payload.path.trim()
+      ? payload.path.trim()
+      : undefined
+    return { title, ...(path ? { path } : {}) }
+  } catch {
+    return null
+  }
 }
 
 function findMermaidCodeBlocks(content: string): SpecialBlock[] {

@@ -73,6 +73,7 @@ export { default as CodexToolIcon } from './chat/ChatToolIcon.vue';
 export { default as CodexToolUserInputRequest } from './chat/ChatToolUserInputRequest.vue';
 export { default as CodexTurnGitInfo } from './chat/ChatTurnGitInfo.vue';
 export { default as CodexUserText } from './chat/ChatUserText.vue';
+export { default as CodexVisualizationBlock } from './chat/ChatVisualizationBlock.vue';
 export { codexCapabilities } from './chat/codex-capabilities';
 export { codexCommands } from './chat/codex-commands';
 export {
@@ -118,6 +119,10 @@ export type {
   CodexMessageImageContext,
   CodexMessageImageOpenHandler,
 } from './chat/message-image';
+export type {
+  CodexConversationVisualization,
+  CodexConversationVisualizationOpenHandler,
+} from './chat/visualization';
 export { languageForFilePath, renderCodeBlock } from './chat/syntax-highlighting';
 export { registerCodexToolTitlePresenter } from './chat/tool-status';
 export type { CodexToolTitlePresenter, CodexToolTitlePresenterContext } from './chat/tool-status';

@@ -53,6 +53,7 @@ const controller = createCodexConversationPaneController({
     updateComposerState(next) { /* persist draft */ },
     updateAttachments(next) { /* persist attachments */ },
     updateSettings(settings) { /* apply settings */ },
+    openVisualization({ path, title }) { /* ingest and display the task-owned artifact */ },
   },
 });
 ```
@@ -202,7 +203,7 @@ delivered to `onTranscript`, or `false` when recording/transcription fails.
 
 `CodexMessageBlock`, `CodexUserText`, `CodexAttachmentBlock`, `CodexMediaBlock`,
 `CodexImageLightbox`,
-`CodexMermaidBlock`, `CodexCompactionMessage`, `CodexMessageActions`,
+`CodexMermaidBlock`, `CodexVisualizationBlock`, `CodexCompactionMessage`, `CodexMessageActions`,
 `CodexMessageEditor`, and `CodexFoldTransition`.
 
 Image attachments and media open `CodexImageLightbox` by default. Override
@@ -211,6 +212,13 @@ the controlled pane's `actions.openImage(image, context)`. The handler owns the
 click when it returns `void` or `true`; return `false` to use the stock lightbox.
 The exported renderer-safe types are `CodexMessageImage`,
 `CodexMessageImageContext`, and `CodexMessageImageOpenHandler`.
+
+Visualization annotations use a separate host contract because their
+task-owned HTML paths are not conversation files. Controlled panes receive
+`actions.openVisualization({ path, title })`; non-controller panes can use the
+`openVisualization` prop or event. The exported payload type is
+`CodexConversationVisualization`. The SDK does not execute or embed the HTML,
+and it never degrades visualization clicks to `openLink`.
 
 `CodexMediaBlock` owns its generated-image footer actions: fullscreen delegates
 to the same overridable image-opening contract, while download uses browser

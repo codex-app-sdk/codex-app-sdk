@@ -797,6 +797,61 @@ describe('CodexConversationPane', () => {
     expect(openConversationLink).toHaveBeenCalledWith(expected);
   });
 
+  it('delegates visualization artifacts through their dedicated host action', async () => {
+    const visualization = { path: '/tmp/backlog-icon-candidates.html', title: 'Backlog icon candidates' };
+    const openVisualization = vi.fn();
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages: [{
+          id: 'assistant-visualization',
+          role: 'assistant',
+          status: 'complete',
+          parts: [{
+            type: 'text',
+            text: `\uE200visualize\uE202${JSON.stringify(visualization)}\uE201`,
+          }],
+        }],
+        modelValue: '',
+        openVisualization,
+      },
+    });
+
+    await wrapper.get('.chat-visualization-block').trigger('click');
+
+    expect(wrapper.emitted('openVisualization')).toStrictEqual([[visualization]]);
+    expect(wrapper.emitted('openLink')).toBeUndefined();
+    expect(openVisualization).toHaveBeenCalledWith(visualization);
+  });
+
+  it('dispatches visualization artifacts through a controlled pane action', async () => {
+    const visualization = { path: '/tmp/diagram.html', title: 'Architecture diagram' };
+    const openVisualization = vi.fn();
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          messages: [{
+            id: 'assistant-controlled-visualization',
+            role: 'assistant',
+            status: 'complete',
+            parts: [{
+              type: 'text',
+              text: `\uE200visualize\uE202${JSON.stringify(visualization)}\uE201`,
+            }],
+          }],
+        },
+      },
+      actions: { openVisualization },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await wrapper.get('.chat-visualization-block').trigger('click');
+    await flushPromises();
+
+    expect(openVisualization).toHaveBeenCalledWith(visualization);
+    expect(wrapper.emitted('openVisualization')).toBeUndefined();
+    expect(wrapper.emitted('openLink')).toBeUndefined();
+  });
+
   it('emits an absolute file link with the operation when a tool target is clicked', async () => {
     const openConversationLink = vi.fn();
     const wrapper = mount(CodexConversationPane, {

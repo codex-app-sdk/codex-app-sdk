@@ -17,6 +17,13 @@
   <slot v-else-if="block.type === 'mermaid'" name="mermaid" :block="block" :code="block.code">
     <ChatMermaidBlock :code="block.code" />
   </slot>
+  <slot v-else-if="block.type === 'visualization'" name="visualization" :block="block">
+    <ChatVisualizationBlock
+      :path="block.path"
+      :title="block.title"
+      @open-visualization="emit('open-visualization', $event)"
+    />
+  </slot>
   <slot v-else-if="block.type === 'media'" name="media" :block="block" :media="block.media">
     <ChatMediaBlock :media="block.media" :open-image="openImage" />
   </slot>
@@ -65,6 +72,7 @@ import ChatMermaidBlock from './ChatMermaidBlock.vue'
 import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import ChatUserText from './ChatUserText.vue'
+import ChatVisualizationBlock from './ChatVisualizationBlock.vue'
 import { renderMarkdown } from './message-markdown'
 import { copyTextToClipboard } from './message-actions'
 import { useCodexChatTranslate } from './chat-i18n'
@@ -72,6 +80,7 @@ import type { MessageBlock } from './message-blocks'
 import type { ClientRequestResponse, CodexConversationLink } from './contracts'
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface'
 import type { CodexMessageImageOpenHandler } from './message-image'
+import type { CodexConversationVisualization } from './visualization'
 import { useCodexHostCapabilities } from '../native-capabilities'
 
 defineSlots<{
@@ -81,6 +90,7 @@ defineSlots<{
   }): unknown
   media(props: { block: Extract<MessageBlock, { type: 'media' }>; media: Extract<MessageBlock, { type: 'media' }>['media'] }): unknown
   mermaid(props: { block: Extract<MessageBlock, { type: 'mermaid' }>; code: string }): unknown
+  visualization(props: { block: Extract<MessageBlock, { type: 'visualization' }> }): unknown
   text(props: { block: Extract<MessageBlock, { type: 'text' | 'user-text' }>; content: string; user: boolean }): unknown
   tool(props: {
     block: Extract<MessageBlock, { type: 'tool' | 'tool-group' }>
@@ -105,6 +115,7 @@ const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
   'open-link': [link: CodexConversationLink]
+  'open-visualization': [visualization: CodexConversationVisualization]
   'send-follow-up': [prompt: string]
 }>()
 

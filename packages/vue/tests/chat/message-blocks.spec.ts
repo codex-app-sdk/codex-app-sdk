@@ -105,6 +105,25 @@ describe('message block computation', () => {
     expect(blocks.at(-1)).toStrictEqual({ type: 'follow-ups', prompts: ['Open the diff'] });
   });
 
+  it('projects Codex visualization annotations without leaking their delimiters or JSON', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        '\uE200visualize\uE202{"path":"/tmp/backlog.html","title":"Backlog candidates"}\uE201',
+        '',
+        'Choose one.',
+      ].join('\n'),
+    })).toStrictEqual([
+      { type: 'visualization', path: '/tmp/backlog.html', title: 'Backlog candidates' },
+      { type: 'text', content: '\n\nChoose one.' },
+    ]);
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '\uE200visualize\uE202not-json\uE201',
+    })).toStrictEqual([{ type: 'visualization', title: 'Visualization' }]);
+  });
+
   it('uses ordered message parts to place Codex tool calls between text chunks', () => {
     const blocks = computeMessageBlocks({
       role: 'assistant',

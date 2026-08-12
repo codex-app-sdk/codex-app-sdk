@@ -55,6 +55,7 @@
         @fork-message="forkMessage"
         @load-older-messages="loadOlderHistory"
         @open-link="handleConversationLink"
+        @open-visualization="handleVisualization"
         @quote-message="quoteMessage"
         @retry-message="retryMessage"
         @send-follow-up="sendFollowUp"
@@ -234,6 +235,10 @@ import type {
   CodexMessageImageContext,
   CodexMessageImageOpenHandler,
 } from '../chat/message-image';
+import type {
+  CodexConversationVisualization,
+  CodexConversationVisualizationOpenHandler,
+} from '../chat/visualization';
 import { stripMessageContext } from '../chat/message-blocks';
 import type { QueuedChatPrompt } from '../chat/queued-prompts';
 import { chatMessageFromInput } from '../chat/renderer-message-adapter';
@@ -321,6 +326,7 @@ const props = withDefaults(defineProps<{
   modelValue?: string;
   openImage?: CodexMessageImageOpenHandler;
   openConversationLink?: (link: CodexConversationLink) => void | Promise<void>;
+  openVisualization?: CodexConversationVisualizationOpenHandler;
   pickAttachments?: CodexAttachmentPicker;
   ingestAttachments?: CodexAttachmentIngester;
   placeholder?: string;
@@ -421,6 +427,7 @@ const emit = defineEmits<{
   interrupt: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
   openLink: [link: CodexConversationLink];
+  openVisualization: [visualization: CodexConversationVisualization];
   resolveApproval: [
     approvalId: string,
     decision: CodexSurfaceApprovalDecision,
@@ -864,6 +871,15 @@ function handleConversationLink(link: CodexConversationLink): void {
   if (link.kind === 'external') {
     if (hostCapabilities) void hostCapabilities.openExternal(link.href).catch(setLocalError);
     else window.open(link.href, '_blank', 'noopener,noreferrer');
+  }
+}
+
+function handleVisualization(visualization: CodexConversationVisualization): void {
+  if (dispatchControllerAction('openVisualization', visualization)) return;
+  if (effectiveController.value) return;
+  emit('openVisualization', visualization);
+  if (props.openVisualization) {
+    void Promise.resolve(props.openVisualization(visualization)).catch(setLocalError);
   }
 }
 

@@ -67,6 +67,7 @@
                 @cancel="emit('cancel')"
                 @client-response="emit('client-response', $event)"
                 @open-link="emit('open-link', $event)"
+                @open-visualization="emit('open-visualization', $event)"
                 @send-follow-up="emit('send-follow-up', $event)"
               >
                 <template v-if="$slots.attachment" #attachment="scope">
@@ -144,6 +145,7 @@ import type { Message } from '../chat/types'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '@codex-app-sdk/core/surface'
 import type { MessageBlock } from '../chat/message-blocks'
 import type { CodexMessageImage, CodexMessageImageOpenHandler } from '../chat/message-image'
+import type { CodexConversationVisualization } from '../chat/visualization'
 import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
 import ChatCompactionMessage from '../chat/ChatCompactionMessage.vue'
@@ -204,6 +206,7 @@ const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
   'open-link': [link: CodexConversationLink]
+  'open-visualization': [visualization: CodexConversationVisualization]
   'copy-message': [index: number]
   'delete-message': [index: number]
   'edit-message': [payload: { content: string; index: number }]

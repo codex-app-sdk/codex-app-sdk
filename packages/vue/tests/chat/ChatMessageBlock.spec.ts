@@ -19,6 +19,7 @@ describe('ChatMessageBlock', () => {
     [{ type: 'user-text', content: 'hello `user`' }, 'hello'],
     [{ type: 'text', content: '**assistant** text' }, 'assistant'],
     [{ type: 'mermaid', code: 'graph TD\n  A[Start] --> B[Done]' }, 'Start'],
+    [{ type: 'visualization', path: '/tmp/chart.html', title: 'Interactive chart' }, 'Interactive chart'],
     [{ type: 'media', media: { title: 'Chart', url: 'https://example.com/chart.png' } }, 'Chart'],
     [{ type: 'follow-ups', prompts: ['Run coverage'] }, 'Run coverage'],
   ] satisfies Array<[MessageBlock, string]>)('renders %s blocks', (block, expectedText) => {
@@ -91,6 +92,20 @@ describe('ChatMessageBlock', () => {
 
     await wrapper.get('button').trigger('click');
     expect(wrapper.emitted('send-follow-up')).toStrictEqual([['Continue']]);
+  });
+
+  it('routes visualization artifacts through the dedicated app-owned action', async () => {
+    const wrapper = mount(ChatMessageBlock, {
+      props: {
+        block: { type: 'visualization', path: '/tmp/backlog.html', title: 'Backlog candidates' },
+      },
+    });
+
+    await wrapper.get('button').trigger('click');
+    expect(wrapper.emitted('open-visualization')).toStrictEqual([[
+      { path: '/tmp/backlog.html', title: 'Backlog candidates' },
+    ]]);
+    expect(wrapper.emitted('open-link')).toBeUndefined();
   });
 
   it('renders single tools and tool groups', async () => {
