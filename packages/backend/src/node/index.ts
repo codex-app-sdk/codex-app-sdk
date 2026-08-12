@@ -39,7 +39,9 @@ export {
   type CodexSurfaceRemoteControlPairingStatus,
   type CodexSurfaceRemoteControlStatus,
   type CodexThreadStartExtension,
+  type CodexGeneratedText,
   type ForkCodexConversationOptions,
+  type GenerateCodexTextOptions,
   type ListCodexSkillsOptions,
 } from './codex-surface';
 export type {

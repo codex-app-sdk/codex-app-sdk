@@ -50,7 +50,9 @@ import type {
   CodexSurfaceRemoteControlPairing,
   CodexSurfaceRemoteControlPairingStatus,
   CodexSurfaceRemoteControlStatus,
+  CodexGeneratedText,
   ForkCodexConversationOptions,
+  GenerateCodexTextOptions,
   ListCodexSkillsOptions,
 } from './codex-surface-contracts';
 import {
@@ -85,6 +87,7 @@ import { CodexMarkdownImageHydrator } from './codex-markdown-images';
 import {
   readPromptHistory,
 } from './codex-surface-prompt-history';
+import { CodexSurfaceTextGenerationController } from './codex-surface-text-generation-controller';
 
 export type {
   CodexAppServerTransportOptions,
@@ -107,7 +110,9 @@ export type {
   CodexSurfaceRemoteControlPairingStatus,
   CodexSurfaceRemoteControlStatus,
   CodexThreadStartExtension,
+  CodexGeneratedText,
   ForkCodexConversationOptions,
+  GenerateCodexTextOptions,
   ListCodexSkillsOptions,
 } from './codex-surface-contracts';
 
@@ -149,6 +154,7 @@ export class CodexSurface {
   private readonly runtimeState: CodexSurfaceRuntimeController;
   private readonly markdownImages: CodexMarkdownImageHydrator;
   private readonly connection: CodexSurfaceConnectionController;
+  private readonly textGeneration: CodexSurfaceTextGenerationController;
   private readonly unsubscribeDisconnect: () => void;
   private readonly unsubscribeNotification: () => void;
   private readonly unsubscribeToolInputRequests: () => void;
@@ -437,8 +443,21 @@ export class CodexSurface {
         unknownNotification: (notification) => this.handleUnknownNotification(notification),
       },
     );
-    this.unsubscribeNotification = this.client.onNotification((notification) => this.notifications.handle(notification));
-    this.unsubscribeDisconnect = this.client.onDisconnect((error) => this.connection.handleDisconnect(error));
+    this.textGeneration = new CodexSurfaceTextGenerationController(
+      this.client,
+      options.cwd,
+      {
+        ensureConnected: () => this.ensureConnected(),
+        getSnapshot: () => this.getSnapshot(),
+      },
+    );
+    this.unsubscribeNotification = this.client.onNotification((notification) => {
+      if (!this.textGeneration.handleNotification(notification)) this.notifications.handle(notification);
+    });
+    this.unsubscribeDisconnect = this.client.onDisconnect((error) => {
+      this.textGeneration.close(error);
+      this.connection.handleDisconnect(error);
+    });
     this.unsubscribeToolInputRequests = this.client.onServerRequest(
       'item/tool/requestUserInput',
       (request, responder) => this.clientRequests.handleToolInputRequest(request, responder),
@@ -472,6 +491,11 @@ export class CodexSurface {
 
   connect(): Promise<CodexSurfaceSnapshot> {
     return this.connection.connect();
+  }
+
+  /** Runs one non-persisted Codex turn without changing visible surface state. */
+  generateText(prompt: string, options: GenerateCodexTextOptions = {}): Promise<CodexGeneratedText> {
+    return this.textGeneration.generate(prompt, options);
   }
 
   async refreshAccount(): Promise<CodexSurfaceSnapshot> {
@@ -879,6 +903,7 @@ export class CodexSurface {
     this.clientRequests.clear();
     this.items.reset();
     this.catalog.reset(false);
+    this.textGeneration.close();
     for (const runtime of this.runtimeState.values()) {
       runtime.activeTurnId = null;
       runtime.busy = false;

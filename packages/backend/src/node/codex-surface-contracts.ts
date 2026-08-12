@@ -25,6 +25,22 @@ import type { CodexMcpServerDefinition } from './codex-surface-mcp';
 import type { CodexAppServerStdioTransportOptions } from './codex-stdio-transport';
 import type { CodexAppServerUnixSocketTransportOptions } from './codex-unix-socket-transport';
 
+export type GenerateCodexTextOptions = {
+  baseInstructions?: string;
+  cwd?: string;
+  developerInstructions?: string;
+  model?: string;
+  outputSchema?: CodexSurfaceJsonValue;
+  reasoningEffort?: string;
+  serviceTier?: string | null;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+};
+
+export type CodexGeneratedText = {
+  text: string;
+};
+
 export type CodexDynamicToolContent =
   | { type: 'text'; text: string }
   | { type: 'image'; imageUrl: string };

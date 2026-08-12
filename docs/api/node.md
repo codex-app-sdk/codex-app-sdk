@@ -222,6 +222,7 @@ events.
 
 ### Conversation lifecycle
 
+- `generateText(prompt, options?)` — runs one read-only ephemeral Codex turn and returns `{ text }` without persisting or projecting a conversation into surface state.
 - `createConversation(options?, hostOptions?)`
 - `forkConversation(sourceId, options?, hostOptions?)` — forks through the latest completed turn and returns `{ conversationId, conversation, snapshot }` without selecting it.
 - `forkConversationAtMessage(sourceId, index, options?, hostOptions?)` — forks through an assistant message, or through the preceding assistant and resubmits a user message.
@@ -234,6 +235,31 @@ events.
 - `readConversationPromptHistory(id?)` — reads user prompts from one summary-only page of the 100 most recent turns.
 - `renameConversation(title)`
 - `conversation(id)`
+
+`generateText()` is intended for trusted, app-owned helpers such as drafting a
+commit message or structured metadata. It starts an app-server thread with
+`ephemeral: true`, `:read-only` permissions, no dynamic SDK tools or sticky
+environments, and automatic unsubscription. The turn is never added to the
+surface conversation catalog, selected, or emitted through surface events.
+
+```ts
+const result = await surface.generateText('Summarize these changes', {
+  cwd: '/Users/me/project',
+  developerInstructions: 'Return JSON only.',
+  outputSchema: {
+    type: 'object',
+    properties: { summary: { type: 'string' } },
+    required: ['summary'],
+    additionalProperties: false,
+  },
+  signal: abortController.signal,
+});
+```
+
+The result remains text even when `outputSchema` is supplied; the host owns
+JSON parsing and product-specific validation. Closing the surface, aborting the
+provided signal, or reaching `timeoutMs` interrupts the active turn and still
+unsubscribes the ephemeral thread.
 
 ### Active conversation actions
 
