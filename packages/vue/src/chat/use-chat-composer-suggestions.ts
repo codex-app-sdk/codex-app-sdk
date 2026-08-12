@@ -39,6 +39,8 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   const activeAtIndex = ref(0)
   const slashMenuOpen = ref(false)
   const activeSlashIndex = ref(0)
+  let dismissedSuggestionContext: string | null = null
+  let suggestionsSuspended = false
 
   const activeFileMention = computed(() => findActiveFileMention(options.prompt.value, options.caretPosition.value))
   const visibleFiles = computed(() => {
@@ -84,6 +86,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
   ))
   const atItemCount = computed(() => visiblePlugins.value.length + visibleFiles.value.length)
   const atMenuVisible = computed(() => (
+    (pluginMenuOpen.value || fileMenuOpen.value) &&
     activeFileMention.value !== null &&
     (atItemCount.value > 0 || fileMenuShowsHint.value) &&
     !inputDisabled()
@@ -160,6 +163,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     }
     if (event.key === 'Escape') {
       event.preventDefault()
+      dismissedSuggestionContext = suggestionContext()
       close()
       return true
     }
@@ -255,7 +259,33 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     slashMenuOpen.value = false
   }
 
+  function dismiss(): void {
+    dismissedSuggestionContext = suggestionContext()
+    close()
+  }
+
+  function suspend(): void {
+    suggestionsSuspended = true
+    close()
+  }
+
+  function resume(): void {
+    suggestionsSuspended = false
+  }
+
   function sync(): void {
+    if (suggestionsSuspended) {
+      close()
+      return
+    }
+    const context = suggestionContext()
+    if (dismissedSuggestionContext !== null) {
+      if (context === dismissedSuggestionContext) {
+        close()
+        return
+      }
+      dismissedSuggestionContext = null
+    }
     if (activeFileMention.value !== null) {
       pluginMenuOpen.value = true
       fileMenuOpen.value = true
@@ -279,6 +309,10 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     close()
   }
 
+  function suggestionContext(): string {
+    return `${options.prompt.value}\u0000${options.caretPosition.value}`
+  }
+
   function inputDisabled(): boolean {
     return options.disabled() && !options.isSending()
   }
@@ -292,6 +326,8 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     atMenuVisible,
     close,
     closeSoon,
+    dismiss,
+    resume,
     fileMenuShowsHint,
     fileMenuVisible,
     handleKeydown,
@@ -303,6 +339,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     skillMenuVisible,
     pluginMenuVisible,
     slashMenuVisible,
+    suspend,
     sync,
     updateCaretPosition,
     visibleFiles,

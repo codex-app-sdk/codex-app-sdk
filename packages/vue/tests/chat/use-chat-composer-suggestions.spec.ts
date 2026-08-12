@@ -98,11 +98,27 @@ describe('useChatComposerSuggestions', () => {
     expect(commandState.prompt.value).toBe('');
   });
 
-  it('closes an open menu with Escape', async () => {
-    const state = setup('$');
+  it('keeps an escaped menu dismissed until the prompt changes', async () => {
+    const state = setup('/');
     await nextTick();
-    expect(state.suggestions.skillMenuVisible.value).toBe(true);
+    expect(state.suggestions.slashMenuVisible.value).toBe(true);
     expect(state.suggestions.handleKeydown(key('Escape'))).toBe(true);
-    expect(state.suggestions.skillMenuVisible.value).toBe(false);
+    expect(state.suggestions.slashMenuVisible.value).toBe(false);
+
+    state.suggestions.sync();
+    expect(state.suggestions.slashMenuVisible.value).toBe(false);
+
+    state.prompt.value = '/c';
+    state.caretPosition.value = 2;
+    state.suggestions.sync();
+    expect(state.suggestions.slashMenuVisible.value).toBe(true);
+  });
+
+  it('closes the combined at-mention menu with Escape', async () => {
+    const state = setup('@ts', plugins);
+    await nextTick();
+    expect(state.suggestions.atMenuVisible.value).toBe(true);
+    expect(state.suggestions.handleKeydown(key('Escape'))).toBe(true);
+    expect(state.suggestions.atMenuVisible.value).toBe(false);
   });
 });

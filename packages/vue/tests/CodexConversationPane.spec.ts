@@ -27,6 +27,27 @@ const messages: SurfaceMessage[] = [{
 }];
 
 describe('CodexConversationPane', () => {
+  it('seeds prompt recall from existing user messages', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        conversationKey: 'thread-1',
+        messages: [
+          { id: 'user-1', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'First prompt' }] },
+          { id: 'assistant-1', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Done' }] },
+          { id: 'user-2', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Second prompt' }] },
+        ],
+        modelValue: '',
+      },
+    });
+
+    await composerEditor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(composerValue(wrapper)).toBe('Second prompt');
+    await composerEditor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(composerValue(wrapper)).toBe('First prompt');
+  });
+
   it('keeps the lazy window bounded across progressive prepends from a host', async () => {
     const makeMessages = (start: number, count: number): SurfaceMessage[] => Array.from({ length: count }, (_, offset) => ({
       id: `surface-${start + offset}`,
@@ -906,6 +927,10 @@ describe('CodexConversationPane', () => {
 
 function composerEditor(wrapper: VueWrapper) {
   return wrapper.get<HTMLElement>('.chat-rich-text-editor');
+}
+
+function composerValue(wrapper: VueWrapper): string {
+  return (wrapper.findComponent(CodexRichTextEditor).vm as unknown as CodexRichTextEditorExpose).readText();
 }
 
 async function setComposerText(wrapper: VueWrapper, value: string): Promise<void> {

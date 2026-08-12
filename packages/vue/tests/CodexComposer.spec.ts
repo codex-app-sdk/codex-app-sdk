@@ -24,6 +24,7 @@ type ChatComposerProps = {
   hasAttachments?: boolean;
   interruptArmed?: boolean;
   placeholder: string;
+  promptHistory?: readonly string[];
   queuedPromptId?: string | null;
 };
 
@@ -98,6 +99,66 @@ describe('ChatComposer', () => {
     await wrapper.get('.chat-composer__send').trigger('click');
 
     expect(wrapper.emitted('send')).toStrictEqual([['ship it']]);
+  });
+
+  it('recalls submitted prompts from an empty composer and exits navigation after an edit', async () => {
+    const wrapper = mountComposer();
+
+    await setEditorValue(wrapper, 'first prompt');
+    await wrapper.get('form').trigger('submit');
+    await setEditorValue(wrapper, 'second prompt');
+    await wrapper.get('form').trigger('submit');
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('second prompt');
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 13, end: 13 });
+
+    const echoedState = wrapper.emitted('update:composerState')?.at(-1)?.[0] as CodexComposerState;
+    await wrapper.setProps({ composerState: echoedState });
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('first prompt');
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 12, end: 12 });
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowDown' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('second prompt');
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowDown' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('');
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('second prompt');
+    await setEditorValue(wrapper, 'second prompt!');
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    expect(editorValue(wrapper)).toBe('second prompt!');
+  });
+
+  it('does not start prompt recall while the composer contains text', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'remember me');
+    await wrapper.get('form').trigger('submit');
+    await setEditorValue(wrapper, 'draft');
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+
+    expect(editorValue(wrapper)).toBe('draft');
+  });
+
+  it('does not open suggestions for a recalled skill prompt', async () => {
+    const wrapper = mountComposer({
+      promptHistory: ['$frontend-design'],
+      skills,
+    });
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('$frontend-design');
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
   });
 
   it('submits the attachment-only prompt sentinel', async () => {
@@ -452,6 +513,22 @@ describe('ChatComposer', () => {
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
     expect(editorValue(wrapper)).toBe('$frontend-design ');
+  });
+
+  it('does not reopen an escaped slash menu on the Escape keyup', async () => {
+    const wrapper = mountComposer({ commands: codexCommands });
+
+    await setEditorValue(wrapper, '/');
+    await editor(wrapper).trigger('keyup', { key: '/' });
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
+
+    await editor(wrapper).trigger('keydown', { key: 'Escape' });
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(false);
+    await editor(wrapper).trigger('keyup', { key: 'Escape' });
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(false);
+
+    await setEditorValue(wrapper, '/c');
+    expect(wrapper.find('.chat-composer-slash-menu').exists()).toBe(true);
   });
 
   it('shows the canonical plugin namespace for contributed skills', async () => {

@@ -136,6 +136,7 @@ import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands } from '../chat/codex-commands';
+import { createComposerPromptHistory } from '../chat/composer-prompt-history';
 import CodexComposerSendButton from './CodexComposerSendButton.vue';
 import ChatComposerActiveModes from '../chat/ChatComposerActiveModes.vue';
 import ChatComposerActionMenu from '../chat/ChatComposerActionMenu.vue';
@@ -164,6 +165,7 @@ const props = defineProps<{
   files?: readonly CodexFileSearchItem[];
   hasAttachments?: boolean;
   plugins?: readonly CodexSurfacePlugin[];
+  promptHistory?: readonly string[];
   capabilities?: CodexCapabilities;
   commands?: readonly CodexCommandSummary[];
   composerState?: CodexComposerState;
@@ -209,6 +211,15 @@ const editorEl = ref<CodexRichTextEditorExpose | null>(null);
 const caretPosition = ref(0);
 const selectionStart = ref(0);
 const selectionEnd = ref(0);
+const {
+  exit: exitPromptHistory,
+  recall: recallPrompt,
+  remember: rememberSubmittedPrompt,
+  seed: seedPromptHistory,
+} = createComposerPromptHistory({
+  apply: applyRecalledPrompt,
+  currentPrompt: () => prompt.value,
+});
 let restoringComposerState = false;
 let lastEmittedComposerState: CodexComposerState | null = null;
 let composerRestoreRevision = 0;
@@ -257,12 +268,14 @@ const {
 });
 
 watch(voiceError, (message) => emit('error', message));
+watch(() => props.promptHistory, (history) => seedPromptHistory(history ?? []), { immediate: true });
 const {
   activeAtIndex,
   activeSkillIndex,
   activeSlashIndex,
   close: closeComposerMenus,
   closeSoon: closeComposerMenusSoon,
+  resume: resumeComposerSuggestions,
   fileMenuShowsHint,
   atMenuVisible,
   handleKeydown: handleSuggestionKeydown,
@@ -273,6 +286,7 @@ const {
   selectSlashSkill,
   skillMenuVisible,
   slashMenuVisible,
+  suspend: suspendComposerSuggestions,
   sync: syncComposerMenus,
   updateCaretPosition,
   visibleFiles,
@@ -289,6 +303,7 @@ const {
   pluginsEnabled: () => true,
   isSending: () => props.isSending,
   onCommandSubmitted: (command) => {
+    rememberSubmittedPrompt(command);
     emit('send', command);
     void nextTick(resizeEditor);
   },
@@ -358,6 +373,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
     return;
   }
   const submittedPrompt = trimmed || '(no user instructions)';
+  if (trimmed) rememberSubmittedPrompt(submittedPrompt);
 
   prompt.value = '';
   selectionStart.value = 0;
@@ -399,11 +415,13 @@ async function insertTranscript(text: string): Promise<void> {
 }
 
 function setComposerText(value: string): void {
+  exitPromptHistory();
   restoreComposerState({ text: value, selectionStart: value.length, selectionEnd: value.length });
 }
 
 function restoreComposerState(state: CodexComposerState): void {
   const normalized = normalizeCodexComposerState(state);
+  if (!sameComposerState(normalized, lastEmittedComposerState)) exitPromptHistory();
   const revision = ++composerRestoreRevision;
   const currentSelection = editorEl.value?.getSelectionRange();
   if (editorEl.value
@@ -447,8 +465,22 @@ function restoreComposerState(state: CodexComposerState): void {
   });
 }
 
+function sameComposerState(left: CodexComposerState, right: CodexComposerState | null): boolean {
+  return Boolean(right
+    && left.text === right.text
+    && left.selectionStart === right.selectionStart
+    && left.selectionEnd === right.selectionEnd);
+}
+
 function handleEditorKeydown(event: KeyboardEvent): void {
   if (handleSuggestionKeydown(event)) {
+    return;
+  }
+
+  if (!event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
+    && (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+    && recallPrompt(event.key)) {
+    event.preventDefault();
     return;
   }
 
@@ -483,9 +515,24 @@ function handleEditorKeydown(event: KeyboardEvent): void {
 }
 
 function handleEditorInput(): void {
+  exitPromptHistory();
+  resumeComposerSuggestions();
   updateCaretPosition();
   resizeEditor();
   syncComposerMenus();
+}
+
+function applyRecalledPrompt(value: string): void {
+  const caret = value.length;
+  prompt.value = value;
+  selectionStart.value = caret;
+  selectionEnd.value = caret;
+  caretPosition.value = caret;
+  suspendComposerSuggestions();
+  void nextTick(() => {
+    editorEl.value?.setText(value, caret);
+    resizeEditor();
+  });
 }
 
 function handleCaretChange(range: { end: number; start: number }): void {
@@ -502,10 +549,7 @@ function emitComposerState(): void {
     selectionStart: selectionStart.value,
     selectionEnd: selectionEnd.value,
   });
-  if (lastEmittedComposerState
-    && lastEmittedComposerState.text === state.text
-    && lastEmittedComposerState.selectionStart === state.selectionStart
-    && lastEmittedComposerState.selectionEnd === state.selectionEnd) return;
+  if (sameComposerState(state, lastEmittedComposerState)) return;
   lastEmittedComposerState = state;
   emit('update:composerState', state);
 }

@@ -122,6 +122,7 @@
             :has-attachments="selectedAttachments.length > 0"
             :interrupt-armed="escapeInterruptArmed"
             :plugins="effectivePlugins"
+            :prompt-history="effectivePromptHistory"
             :queued-prompt-id="effectiveQueuedPrompts[0]?.id ?? null"
             :is-sending="effectiveBusy"
             :leading-menu-items="effectiveLeadingMenuItems"
@@ -483,6 +484,12 @@ const effectiveMessages = computed(() => controlledValue(
   (state) => state.identity.messages,
   () => props.messages ?? surfaceState.value?.messages ?? [],
 ));
+const effectivePromptHistory = computed(() => effectiveMessages.value.flatMap((message) => {
+  const chatMessage = chatMessageFromInput(message);
+  if (chatMessage.role !== 'user') return [];
+  const content = stripMessageContext(chatMessage.content);
+  return content && content !== '(no user instructions)' ? [content] : [];
+}));
 const effectiveAnsweredClientRequestIds = computed(() => controlledValue(
   (state) => state.thread?.answeredClientRequestIds,
   () => props.answeredClientRequestIds ?? props.surface?.answeredClientRequestIds,
