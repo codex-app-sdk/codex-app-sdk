@@ -5,6 +5,7 @@ import {
 } from '@codex-app-sdk/core/surface-bridge';
 import type {
   CodexConversationHistory,
+  CodexConversationPromptHistory,
   CodexConversationSummary,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
@@ -52,6 +53,7 @@ const channels = {
   listModels: 'codex-surface:list-models',
   logout: 'codex-surface:logout',
   readConversationHistory: 'codex-surface:read-conversation-history',
+  readConversationPromptHistory: 'codex-surface:read-conversation-prompt-history',
   loadOlderConversationHistory: 'codex-surface:load-older-conversation-history',
   refreshAccount: 'codex-surface:refresh-account',
   refreshConversations: 'codex-surface:refresh-conversations',
@@ -92,6 +94,9 @@ type SurfaceRequests = {
   [channels.listModels]: IpcRequest<[options?: ListCodexModelsOptions], CodexSurfaceModel[]>;
   [channels.logout]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.readConversationHistory]: IpcRequest<[conversationId?: string], CodexConversationHistory>;
+  [channels.readConversationPromptHistory]: IpcRequest<[
+    conversationId?: string,
+  ], CodexConversationPromptHistory>;
   [channels.loadOlderConversationHistory]: IpcRequest<[conversationId?: string], import('@codex-app-sdk/core/surface').CodexConversationHistoryPage>;
   [channels.refreshAccount]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.refreshConversations]: IpcRequest<[], CodexSurfaceSnapshot>;
@@ -165,6 +170,7 @@ export function registerCodexSurfaceIpc(
     [channels.listModels]: (_event, ...args) => invoke('listModels', args),
     [channels.logout]: (_event, ...args) => invoke('logout', args),
     [channels.readConversationHistory]: (_event, ...args) => invoke('readConversationHistory', args),
+    [channels.readConversationPromptHistory]: (_event, ...args) => invoke('readConversationPromptHistory', args),
     [channels.loadOlderConversationHistory]: (_event, ...args) => invoke('loadOlderConversationHistory', args),
     [channels.refreshAccount]: (_event, ...args) => invoke('refreshAccount', args),
     [channels.refreshConversations]: (_event, ...args) => invoke('refreshConversations', args),
@@ -213,6 +219,9 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     onEvent: (listener) => renderer.on(channels.event, listener),
     onStateChange: (listener) => renderer.on(channels.stateChanged, listener),
     readConversationHistory: (conversationId) => renderer.invoke(channels.readConversationHistory, conversationId),
+    readConversationPromptHistory: (conversationId) => (
+      renderer.invoke(channels.readConversationPromptHistory, conversationId)
+    ),
     loadOlderConversationHistory: (conversationId) => renderer.invoke(channels.loadOlderConversationHistory, conversationId),
     refreshAccount: () => renderer.invoke(channels.refreshAccount),
     refreshConversations: () => renderer.invoke(channels.refreshConversations),

@@ -457,6 +457,12 @@ export type CodexConversationHistoryPage = {
   hasOlder: boolean;
 };
 
+/** A bounded, chronological list of user prompts for composer recall. */
+export type CodexConversationPromptHistory = {
+  conversationId: string;
+  prompts: string[];
+};
+
 export type CodexSurfaceEventOrigin = 'action' | 'notification' | 'lifecycle';
 export type CodexSurfaceHistoryReason = 'fork' | 'load' | 'resume' | 'rollback' | 'resync';
 export type CodexSurfaceTurnStatus = 'completed' | 'interrupted' | 'failed' | 'inProgress';
@@ -899,6 +905,7 @@ export type CodexSurfaceApi = {
   unarchiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   selectConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   readConversationHistory(conversationId?: string): Promise<CodexConversationHistory>;
+  readConversationPromptHistory(conversationId?: string): Promise<CodexConversationPromptHistory>;
   loadOlderConversationHistory?(conversationId?: string): Promise<CodexConversationHistoryPage>;
   renameConversation(title: string): Promise<CodexSurfaceSnapshot>;
   updateConversationSettings(settings: UpdateCodexConversationSettings): Promise<CodexSurfaceSnapshot>;

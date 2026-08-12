@@ -71,6 +71,7 @@ describe('Codex surface bridge', () => {
       { operation: 'loadOlderConversationHistory', args: ['conversation-1'] },
       { operation: 'logout', args: [] },
       { operation: 'readConversationHistory', args: ['conversation-1'] },
+      { operation: 'readConversationPromptHistory', args: ['conversation-1'] },
       { operation: 'refreshAccount', args: [] },
       { operation: 'refreshConversations', args: [] },
       { operation: 'renameConversation', args: ['New title'] },
@@ -192,6 +193,7 @@ describe('Codex surface bridge', () => {
     await invokeCodexSurfaceBridgeOperation(target, 'listModels', []);
     await invokeCodexSurfaceBridgeOperation(target, 'loadOlderConversationHistory', []);
     await invokeCodexSurfaceBridgeOperation(target, 'readConversationHistory', []);
+    await invokeCodexSurfaceBridgeOperation(target, 'readConversationPromptHistory', []);
     await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', ['hello']);
     await invokeCodexSurfaceBridgeOperation(target, 'setGoal', ['goal']);
     await invokeCodexSurfaceBridgeOperation(target, 'startReview', []);

@@ -57,6 +57,9 @@ describe('createCodexConversationHandle', () => {
     expect(conversation.onStateChange(listener)).toBe('state-unsubscribe');
     expect(conversation.onEvent(listener)).toBe('event-unsubscribe');
     await expect(conversation.readHistory()).resolves.toStrictEqual({ turns: [] });
+    await expect(conversation.readPromptHistory()).resolves.toStrictEqual({
+      conversationId: 'thread-1', prompts: ['Hello'],
+    });
     await expect(conversation.startRealtime({ inputAudioFormat: 'pcm16' } as never)).resolves.toBe('session');
   });
 });
@@ -70,7 +73,9 @@ function operationSpies(snapshot: CodexConversationSnapshot): CodexConversationH
     getSnapshot: vi.fn(() => snapshot), interrupt: operation(), load: operation(),
     onEvent: vi.fn(() => 'event-unsubscribe' as never),
     onStateChange: vi.fn(() => 'state-unsubscribe' as never),
-    readHistory: vi.fn(async () => ({ turns: [] }) as never), rename: operation(),
+    readHistory: vi.fn(async () => ({ turns: [] }) as never),
+    readPromptHistory: vi.fn(async () => ({ conversationId: 'thread-1', prompts: ['Hello'] })),
+    rename: operation(),
     resolveApproval: operation(), respondToClientRequest: operation(), retryMessage: operation(),
     rollbackToTurn: operation(), select: operation(), sendMessage: operation(), setGoal: operation(),
     startRealtime: vi.fn(async () => 'session' as never), startReview: operation(), steerMessage: operation(),

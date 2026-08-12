@@ -231,6 +231,7 @@ events.
 - `unarchiveConversation(id)`
 - `deleteConversation(id)`
 - `readConversationHistory(id?)`
+- `readConversationPromptHistory(id?)` — reads user prompts from one summary-only page of the 100 most recent turns.
 - `renameConversation(title)`
 - `conversation(id)`
 
@@ -270,6 +271,7 @@ type CodexConversation = {
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;
+  readPromptHistory(): Promise<CodexConversationPromptHistory>;
   /** Loads the next older page and reports whether another page remains. */
   loadOlderHistory(): Promise<CodexConversationHistoryPage>;
   rename(title: string): Promise<CodexConversationSnapshot>;

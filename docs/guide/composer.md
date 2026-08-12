@@ -36,6 +36,7 @@ file catalog, normally backed by a conversation with a working directory.
 | `Shift+Enter` | Insert a newline at the current selection |
 | `Cmd+Enter` | Steer the active turn |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |
+| `Up` / `Down` in an empty composer | Navigate backward / forward through submitted prompts |
 | `Escape`, then `Escape` again within two seconds | Interrupt the active turn |
 
 Suggestion menus consume navigation keys before composer shortcuts. Newline
@@ -52,6 +53,23 @@ modified, repeated, already-handled, IME, and modal-dialog key events. If more
 than one pane is busy, the shortcut only applies when focus is inside one of
 them. Set `:escape-interrupt="false"` on `CodexConversationPane` when the host
 owns the shortcut.
+
+Prompt recall is bounded to 100 entries. A surface-bound pane loads one
+`thread/turns/list` page with `itemsView: 'summary'` when the conversation
+becomes active, then immediately retains only visible user prompt strings;
+assistant summaries and the raw response are not stored in renderer state.
+The result is cached per conversation and merged with the currently visible
+lazy-history page. An `Up` press made during the brief load is replayed when the
+prompts arrive. Editing a recalled prompt exits navigation.
+Recall only intercepts Up/Down while the selection is collapsed at the very
+end of the prompt. Moving the caret left or selecting text restores the
+editor's native vertical cursor movement.
+
+Controlled panes can either provide `composer.promptHistory` directly or
+implement `actions.readPromptHistory()`. The latter is invoked once on first
+activation of a conversation key and must resolve to chronological prompt
+strings. Standalone `CodexComposer` consumers can pass `promptHistory` and,
+when loading asynchronously, `promptHistoryLoading`.
 
 When `queuedPromptId` is supplied and the composer is empty, `Cmd+Enter` emits
 `steerQueuedPrompt` for that queued item. It does not create an empty steer.

@@ -82,6 +82,9 @@ import { CodexSurfaceRuntimeController } from './codex-surface-runtime-controlle
 import { CodexSurfaceConnectionController } from './codex-surface-connection-controller';
 import { CodexSurfaceForkController } from './codex-surface-fork-controller';
 import { CodexMarkdownImageHydrator } from './codex-markdown-images';
+import {
+  readPromptHistory,
+} from './codex-surface-prompt-history';
 
 export type {
   CodexAppServerTransportOptions,
@@ -659,6 +662,14 @@ export class CodexSurface {
     return this.lifecycle.readHistory(conversationId);
   }
 
+  /** Reads a bounded user-only prompt list without hydrating conversation history. */
+  async readConversationPromptHistory(
+    conversationId = this.state.activeConversationId ?? '',
+  ) {
+    await this.ensureConnected();
+    return readPromptHistory(this.client, conversationId);
+  }
+
   async loadOlderConversationHistory(
     conversationId = this.state.activeConversationId ?? '',
   ): Promise<CodexConversationHistoryPage> {
@@ -770,6 +781,7 @@ export class CodexSurface {
       onEvent: (listener) => this.onConversationEvent(id, listener),
       onStateChange: (listener) => this.onConversationStateChange(id, listener),
       readHistory: () => this.readConversationHistory(id),
+      readPromptHistory: () => this.readConversationPromptHistory(id),
       rename: (title) => this.conversationSettings.rename(id, title),
       resolveApproval: (approvalId, decision, scope = 'once') => (
         this.approvals.resolve(id, approvalId, decision, scope)

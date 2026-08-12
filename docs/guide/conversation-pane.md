@@ -130,7 +130,7 @@ Codex controls. They render after Approval and before Plan mode. Existing
 Controller actions cover:
 
 - submit, steer, interrupt, and queued-prompt steering;
-- composer state, attachments, settings, menu selection, and attachment picking;
+- composer state, attachments, prompt-history loading, settings, menu selection, and attachment picking;
 - older-history loading;
 - copy notification, quote, edit, retry, fork, and delete message behavior;
 - image opening, with the SDK fullscreen lightbox as the default fallback;
@@ -138,7 +138,8 @@ Controller actions cover:
 - goals, follow-ups, and queued-prompt deletion;
 - conversation-link navigation.
 
-Actions return `void | Promise<void>`. The pane can preserve pending/error UI
+Mutation actions return `void | Promise<void>`; `readPromptHistory` returns
+prompt strings synchronously or asynchronously. The pane can preserve pending/error UI
 until an asynchronous host action settles. `onMessageCopied` is only a
 post-action notification: `CodexMessage` performs the clipboard write and
 copied-state feedback itself.

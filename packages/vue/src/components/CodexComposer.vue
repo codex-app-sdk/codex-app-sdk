@@ -166,6 +166,7 @@ const props = defineProps<{
   hasAttachments?: boolean;
   plugins?: readonly CodexSurfacePlugin[];
   promptHistory?: readonly string[];
+  promptHistoryLoading?: boolean;
   capabilities?: CodexCapabilities;
   commands?: readonly CodexCommandSummary[];
   composerState?: CodexComposerState;
@@ -268,7 +269,14 @@ const {
 });
 
 watch(voiceError, (message) => emit('error', message));
-watch(() => props.promptHistory, (history) => seedPromptHistory(history ?? []), { immediate: true });
+let pendingPromptHistorySteps = 0;
+watch(() => [props.promptHistory, props.promptHistoryLoading] as const, ([history, loading]) => {
+  seedPromptHistory(history ?? []);
+  if (loading || pendingPromptHistorySteps === 0) return;
+  const steps = pendingPromptHistorySteps;
+  pendingPromptHistorySteps = 0;
+  for (let step = 0; step < steps; step += 1) recallPrompt('ArrowUp');
+}, { immediate: true });
 const {
   activeAtIndex,
   activeSkillIndex,
@@ -479,9 +487,16 @@ function handleEditorKeydown(event: KeyboardEvent): void {
 
   if (!event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
     && (event.key === 'ArrowUp' || event.key === 'ArrowDown')
-    && recallPrompt(event.key)) {
-    event.preventDefault();
-    return;
+    && caretIsAtPromptEnd()) {
+    if (recallPrompt(event.key)) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'ArrowUp' && props.promptHistoryLoading && prompt.value === '') {
+      pendingPromptHistorySteps += 1;
+      event.preventDefault();
+      return;
+    }
   }
 
   if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -514,7 +529,17 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   }
 }
 
+function caretIsAtPromptEnd(): boolean {
+  const selection = editorEl.value?.getSelectionRange();
+  return Boolean(
+    selection?.valid
+    && selection.start === selection.end
+    && selection.end === prompt.value.length,
+  );
+}
+
 function handleEditorInput(): void {
+  pendingPromptHistorySteps = 0;
   exitPromptHistory();
   resumeComposerSuggestions();
   updateCaretPosition();

@@ -48,6 +48,35 @@ describe('CodexConversationPane', () => {
     expect(composerValue(wrapper)).toBe('First prompt');
   });
 
+  it('loads bounded prompt history on activation and merges the visible lazy page', async () => {
+    const readPromptHistory = vi.fn(async () => ['First prompt', 'Second prompt']);
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: 'thread-1',
+          messages: [
+            { id: 'user-2', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Second prompt' }] },
+            { id: 'assistant-2', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Done' }] },
+            { id: 'user-3', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Third prompt' }] },
+          ],
+        },
+      },
+      actions: { readPromptHistory },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await vi.waitFor(() => expect(readPromptHistory).toHaveBeenCalledOnce());
+    await composerEditor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(composerValue(wrapper)).toBe('Third prompt');
+    await composerEditor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(composerValue(wrapper)).toBe('Second prompt');
+    await composerEditor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(composerValue(wrapper)).toBe('First prompt');
+  });
+
   it('keeps the lazy window bounded across progressive prepends from a host', async () => {
     const makeMessages = (start: number, count: number): SurfaceMessage[] => Array.from({ length: count }, (_, offset) => ({
       id: `surface-${start + offset}`,
@@ -471,6 +500,7 @@ describe('CodexConversationPane', () => {
 
     await vi.waitFor(() => expect(controller.connect).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(wrapper.text()).toContain('Bound controller message'));
+    await vi.waitFor(() => expect(controller.readConversationPromptHistory).toHaveBeenCalledWith('thread-bound'));
     await setComposerText(wrapper, '/goal ship the SDK');
     await wrapper.get('form').trigger('submit');
     expect(controller.sendMessage).toHaveBeenCalledWith('/goal ship the SDK', undefined);
@@ -1012,6 +1042,9 @@ function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurface
     listConversations: vi.fn(async () => []),
     readConversationHistory: vi.fn(async () => ({
       conversationId: 'thread-bound', messages: [], threadStatus: null,
+    })),
+    readConversationPromptHistory: vi.fn(async () => ({
+      conversationId: 'thread-bound', prompts: ['Earlier prompt'],
     })),
     refreshConversations: action,
     renameConversation: action,

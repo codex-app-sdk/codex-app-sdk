@@ -25,6 +25,7 @@ type ChatComposerProps = {
   interruptArmed?: boolean;
   placeholder: string;
   promptHistory?: readonly string[];
+  promptHistoryLoading?: boolean;
   queuedPromptId?: string | null;
 };
 
@@ -148,6 +149,38 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('draft');
   });
 
+  it('leaves arrow navigation to the editor when the caret is not at the prompt end', async () => {
+    const wrapper = mountComposer({ promptHistory: ['First prompt', 'Second prompt'] });
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('Second prompt');
+
+    richEditorVm(wrapper).setSelection(6, 6);
+    const up = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowUp' });
+    editor(wrapper).element.dispatchEvent(up);
+    expect(up.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('Second prompt');
+
+    const down = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowDown' });
+    editor(wrapper).element.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('Second prompt');
+  });
+
+  it('does not recall over a selected range at the prompt end', async () => {
+    const wrapper = mountComposer({ promptHistory: ['First prompt', 'Second prompt'] });
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+
+    richEditorVm(wrapper).setSelection(6, 13);
+    const up = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowUp' });
+    editor(wrapper).element.dispatchEvent(up);
+
+    expect(up.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('Second prompt');
+  });
+
   it('does not open suggestions for a recalled skill prompt', async () => {
     const wrapper = mountComposer({
       promptHistory: ['$frontend-design'],
@@ -159,6 +192,22 @@ describe('ChatComposer', () => {
 
     expect(editorValue(wrapper)).toBe('$frontend-design');
     expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
+  });
+
+  it('replays Up presses made while prompt history is loading', async () => {
+    const wrapper = mountComposer({ promptHistoryLoading: true });
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    expect(editorValue(wrapper)).toBe('');
+
+    await wrapper.setProps({
+      promptHistory: ['First prompt', 'Second prompt', 'Third prompt'],
+      promptHistoryLoading: false,
+    });
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('Second prompt');
   });
 
   it('submits the attachment-only prompt sentinel', async () => {

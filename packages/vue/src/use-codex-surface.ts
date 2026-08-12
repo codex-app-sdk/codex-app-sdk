@@ -1,6 +1,7 @@
 import { getCurrentScope, onScopeDispose, reactive, readonly, shallowRef } from 'vue';
 import type {
   CodexConversationHistory,
+  CodexConversationPromptHistory,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfaceClientRequestResponse,
@@ -118,6 +119,9 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     readConversationHistory: (conversationId?: string): Promise<CodexConversationHistory> => (
       api.readConversationHistory(conversationId)
     ),
+    readConversationPromptHistory: (
+      conversationId?: string,
+    ): Promise<CodexConversationPromptHistory> => api.readConversationPromptHistory(conversationId),
     loadOlderConversationHistory: (conversationId?: string) => (
       api.loadOlderConversationHistory
         ? api.loadOlderConversationHistory(conversationId)

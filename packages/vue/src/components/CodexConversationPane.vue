@@ -123,6 +123,7 @@
             :interrupt-armed="escapeInterruptArmed"
             :plugins="effectivePlugins"
             :prompt-history="effectivePromptHistory"
+            :prompt-history-loading="promptHistoryLoading"
             :queued-prompt-id="effectiveQueuedPrompts[0]?.id ?? null"
             :is-sending="effectiveBusy"
             :leading-menu-items="effectiveLeadingMenuItems"
@@ -323,6 +324,7 @@ const props = withDefaults(defineProps<{
   pickAttachments?: CodexAttachmentPicker;
   ingestAttachments?: CodexAttachmentIngester;
   placeholder?: string;
+  promptHistory?: readonly string[];
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
   plugins?: readonly CodexSurfacePlugin[];
@@ -480,16 +482,28 @@ const localComposerState = ref<CodexComposerState>(initialComposerState);
 const localDraft = ref(initialComposerState.text);
 const localError = ref<string | null>(null);
 const selectedAttachments = ref<CodexHostAttachment[]>([...effectiveAttachments.value]);
+const promptHistoryByConversation = new Map<string | number, readonly string[]>();
+const loadedPromptHistory = ref<readonly string[]>([]);
+const promptHistoryLoading = ref(false);
+let promptHistoryRequest = 0;
 const effectiveMessages = computed(() => controlledValue(
   (state) => state.identity.messages,
   () => props.messages ?? surfaceState.value?.messages ?? [],
 ));
-const effectivePromptHistory = computed(() => effectiveMessages.value.flatMap((message) => {
+const visiblePromptHistory = computed(() => effectiveMessages.value.flatMap((message) => {
   const chatMessage = chatMessageFromInput(message);
   if (chatMessage.role !== 'user') return [];
   const content = stripMessageContext(chatMessage.content);
   return content && content !== '(no user instructions)' ? [content] : [];
 }));
+const configuredPromptHistory = computed(() => controlledValue(
+  (state) => state.composer?.promptHistory,
+  () => props.promptHistory,
+));
+const effectivePromptHistory = computed(() => mergePromptHistories(
+  configuredPromptHistory.value ?? loadedPromptHistory.value,
+  visiblePromptHistory.value,
+));
 const effectiveAnsweredClientRequestIds = computed(() => controlledValue(
   (state) => state.thread?.answeredClientRequestIds,
   () => props.answeredClientRequestIds ?? props.surface?.answeredClientRequestIds,
@@ -709,7 +723,14 @@ watch(effectiveConversationKey, () => {
   localDraft.value = incoming.text;
   selectedAttachments.value = [...effectiveAttachments.value];
   draftRevision.value += 1;
-});
+}, { immediate: true });
+
+watch([
+  effectiveConversationKey,
+  () => surfaceState.value?.activeConversationId,
+  () => effectiveControllerActions.value?.readPromptHistory,
+  () => configuredPromptHistory.value !== undefined,
+], () => { void loadPromptHistory(); }, { immediate: true });
 
 watch(() => [surfaceState.value?.status, surfaceState.value?.error] as const, ([status, error]) => {
   if (status === 'ready' && error == null) localError.value = null;
@@ -720,6 +741,54 @@ onMounted(() => {
     void runSurfaceAction(() => props.surface!.connect());
   }
 });
+
+async function loadPromptHistory(): Promise<void> {
+  const request = ++promptHistoryRequest;
+  const key = effectiveConversationKey.value;
+  promptHistoryLoading.value = false;
+  loadedPromptHistory.value = [];
+  if (key === null || key === undefined || configuredPromptHistory.value !== undefined) return;
+
+  const cached = promptHistoryByConversation.get(key);
+  if (cached) {
+    loadedPromptHistory.value = cached;
+    return;
+  }
+
+  const controlledLoader = effectiveControllerActions.value?.readPromptHistory;
+  const surface = props.surface;
+  const conversationId = surfaceState.value?.activeConversationId;
+  if (!controlledLoader && (!surface || !conversationId)) return;
+
+  promptHistoryLoading.value = true;
+  try {
+    const prompts = controlledLoader
+      ? await controlledLoader()
+      : (await surface!.readConversationPromptHistory(conversationId!)).prompts;
+    if (request !== promptHistoryRequest || effectiveConversationKey.value !== key) return;
+    const bounded = [...prompts].slice(-100);
+    promptHistoryByConversation.set(key, bounded);
+    loadedPromptHistory.value = bounded;
+  } catch {
+    // Prompt recall is an optional enhancement; visible messages remain usable.
+  } finally {
+    if (request === promptHistoryRequest) promptHistoryLoading.value = false;
+  }
+}
+
+function mergePromptHistories(
+  older: readonly string[],
+  visible: readonly string[],
+): readonly string[] {
+  const maximumOverlap = Math.min(older.length, visible.length);
+  let overlap = maximumOverlap;
+  while (overlap > 0) {
+    const olderStart = older.length - overlap;
+    if (visible.slice(0, overlap).every((prompt, index) => prompt === older[olderStart + index])) break;
+    overlap -= 1;
+  }
+  return [...older, ...visible.slice(overlap)].slice(-100);
+}
 
 function submit(prompt: string): void {
   updateDraft('');

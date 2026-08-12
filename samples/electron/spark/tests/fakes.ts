@@ -80,6 +80,9 @@ export function fakeSurfaceApi(snapshot = surfaceSnapshot()) {
       messages: [],
       threadStatus: null,
     })),
+    readConversationPromptHistory: vi.fn(async (
+      conversationId = snapshot.activeConversationId ?? 'thread-1'
+    ) => ({ conversationId, prompts: [] })),
     refreshAccount: vi.fn(async () => snapshot),
     refreshConversations: vi.fn(async () => snapshot),
     renameConversation: vi.fn(async () => snapshot),

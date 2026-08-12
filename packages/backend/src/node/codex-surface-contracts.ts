@@ -3,6 +3,7 @@ import type {
   CodexConversationEvent,
   CodexConversationHistory,
   CodexConversationHistoryPage,
+  CodexConversationPromptHistory,
   CodexConversationLoadingStrategy,
   CodexConversationSnapshot,
   CodexRealtimeEvent,
@@ -128,6 +129,7 @@ export type CodexConversation = {
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;
+  readPromptHistory(): Promise<CodexConversationPromptHistory>;
   loadOlderHistory(): Promise<CodexConversationHistoryPage>;
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;

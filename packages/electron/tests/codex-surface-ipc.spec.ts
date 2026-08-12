@@ -52,6 +52,11 @@ const history = {
   hasOlder: false,
 };
 
+const promptHistory = {
+  conversationId: 'thread-1',
+  prompts: ['First prompt', 'Second prompt'],
+};
+
 const surfaceEvent: CodexSurfaceEvent = {
   seq: 1,
   occurredAt: '2026-07-18T12:00:00.000Z',
@@ -96,6 +101,7 @@ describe('Codex surface Electron bridge', () => {
       loadOlderConversationHistory: vi.fn(async () => history),
       logout: vi.fn(async () => snapshot),
       readConversationHistory: vi.fn(async () => history),
+      readConversationPromptHistory: vi.fn(async () => promptHistory),
       refreshAccount: vi.fn(async () => snapshot),
       refreshConversations: vi.fn(async () => snapshot),
       renameConversation: vi.fn(async () => snapshot),
@@ -143,6 +149,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:load-older-conversation-history',
       'codex-surface:logout',
       'codex-surface:read-conversation-history',
+      'codex-surface:read-conversation-prompt-history',
       'codex-surface:refresh-account',
       'codex-surface:refresh-conversations',
       'codex-surface:rename-conversation',
@@ -241,6 +248,8 @@ describe('Codex surface Electron bridge', () => {
     );
     await expect(main.call('codex-surface:read-conversation-history', 'thread-1')).resolves.toBe(history);
     await expect(main.call('codex-surface:read-conversation-history')).resolves.toBe(history);
+    await expect(main.call('codex-surface:read-conversation-prompt-history', 'thread-1')).resolves.toBe(promptHistory);
+    await expect(main.call('codex-surface:read-conversation-prompt-history')).resolves.toBe(promptHistory);
     await expect(main.call('codex-surface:refresh-conversations')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:rename-conversation', 'SDK parity')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:respond-to-client-request', {
@@ -491,6 +500,8 @@ describe('Codex surface Electron bridge', () => {
     expect(surface.startChatGptLogin).toHaveBeenCalledOnce();
     expect(surface.readConversationHistory).toHaveBeenNthCalledWith(1, 'thread-1');
     expect(surface.readConversationHistory).toHaveBeenNthCalledWith(2, undefined);
+    expect(surface.readConversationPromptHistory).toHaveBeenNthCalledWith(1, 'thread-1');
+    expect(surface.readConversationPromptHistory).toHaveBeenNthCalledWith(2, undefined);
     expect(surface.refreshConversations).toHaveBeenCalledOnce();
     expect(surface.renameConversation).toHaveBeenCalledWith('SDK parity');
     expect(surface.respondToClientRequest).toHaveBeenCalledWith({
@@ -560,6 +571,7 @@ describe('Codex surface Electron bridge', () => {
     await api.editMessage(1, 'Replacement');
     await api.forkMessage(4);
     await api.readConversationHistory('thread-2');
+    await api.readConversationPromptHistory('thread-2');
     await api.listConversations({ cwd: '/tmp/project', limit: 10 });
     await api.listModels({ includeHidden: true, forceReload: true });
     await api.logout();
@@ -601,6 +613,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:edit-message', 1, 'Replacement'],
       ['codex-surface:fork-message', 4],
       ['codex-surface:read-conversation-history', 'thread-2'],
+      ['codex-surface:read-conversation-prompt-history', 'thread-2'],
       ['codex-surface:list-conversations', { cwd: '/tmp/project', limit: 10 }],
       ['codex-surface:list-models', { includeHidden: true, forceReload: true }],
       ['codex-surface:logout'],

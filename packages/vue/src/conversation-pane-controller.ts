@@ -54,6 +54,8 @@ export type CodexConversationPaneThreadState = {
 export type CodexConversationPaneComposerState = {
   state?: CodexComposerState;
   attachments?: readonly CodexHostAttachment[];
+  /** Chronological user prompts available to Up/Down recall. */
+  promptHistory?: readonly string[];
   placeholder?: string;
   /** Host actions rendered after Approval and before Plan mode. */
   leadingMenuItems?: readonly CodexComposerMenuItem[];
@@ -135,6 +137,8 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   openImage?: CodexMessageImageOpenHandler;
   openLink?: PaneAction<[link: CodexConversationLink]>;
   quoteMessage?: PaneAction<[index: number]>;
+  /** Loads bounded user-only prompt history for the active conversation. */
+  readPromptHistory?: () => readonly string[] | Promise<readonly string[]>;
   resolveApproval?: PaneAction<[
     approvalId: string,
     decision: CodexSurfaceApprovalDecision,

@@ -211,6 +211,10 @@ function fakeApi(
       messages: [],
       threadStatus: null,
     })),
+    readConversationPromptHistory: vi.fn(async (conversationId = 'thread-1') => ({
+      conversationId,
+      prompts: [],
+    })),
     refreshAccount: vi.fn(async () => readySnapshot),
     refreshConversations: vi.fn(async () => readySnapshot),
     renameConversation: vi.fn(async () => readySnapshot),

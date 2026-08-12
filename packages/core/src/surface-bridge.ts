@@ -50,7 +50,7 @@ export const codexSurfaceBridgeOperations = [
   'createConversation', 'deleteConversation', 'deleteMessage', 'deleteQueuedPrompt',
   'editMessage', 'forkMessage', 'getSnapshot', 'interrupt', 'listConversations',
   'listModels', 'loadOlderConversationHistory', 'logout', 'readConversationHistory',
-  'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
+  'readConversationPromptHistory', 'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
   'resolveApproval', 'retryMessage', 'selectConversation', 'sendMessage', 'setGoal',
   'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
   'unarchiveConversation', 'updateConversationSettings',
@@ -65,7 +65,8 @@ export const codexSurfaceBridgeArities: Readonly<
   deleteConversation: [1, 1], deleteMessage: [1, 1], deleteQueuedPrompt: [1, 1],
   editMessage: [2, 2], forkMessage: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
   listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
-  logout: [0, 0], readConversationHistory: [0, 1], refreshAccount: [0, 0],
+  logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
+  refreshAccount: [0, 0],
   refreshConversations: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
   resolveApproval: [2, 3], retryMessage: [1, 1], selectConversation: [1, 1],
   sendMessage: [1, 2], setGoal: [1, 2], startChatGptLogin: [0, 0], startReview: [0, 1],
@@ -116,6 +117,9 @@ async function invokeValidated(
     case 'loadOlderConversationHistory': return target.loadOlderConversationHistory(optionalString(args[0], 'Conversation id'));
     case 'logout': return target.logout();
     case 'readConversationHistory': return target.readConversationHistory(optionalString(args[0], 'Conversation id'));
+    case 'readConversationPromptHistory': return target.readConversationPromptHistory(
+      optionalString(args[0], 'Conversation id'),
+    );
     case 'refreshAccount': return target.refreshAccount();
     case 'refreshConversations': return target.refreshConversations();
     case 'renameConversation': return target.renameConversation(nonEmptyString(args[0], 'Conversation title'));

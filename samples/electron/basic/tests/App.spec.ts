@@ -278,6 +278,10 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
       messages: [],
       threadStatus: null,
     })),
+    readConversationPromptHistory: vi.fn(async (conversationId = 'thread-1') => ({
+      conversationId,
+      prompts: [],
+    })),
     refreshAccount: vi.fn(async () => snapshot),
     refreshConversations: vi.fn(async () => snapshot),
     renameConversation: vi.fn(async () => snapshot),

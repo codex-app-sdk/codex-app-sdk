@@ -2,6 +2,7 @@ import type {
   CodexConversationEvent,
   CodexConversationHistory,
   CodexConversationHistoryPage,
+  CodexConversationPromptHistory,
   CodexConversationSnapshot,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
@@ -41,6 +42,7 @@ export type CodexConversationHandleOperations = {
   onEvent(listener: (event: CodexConversationEvent) => void): () => void;
   onStateChange(listener: (snapshot: CodexConversationSnapshot) => void): () => void;
   readHistory(): Promise<CodexConversationHistory>;
+  readPromptHistory(): Promise<CodexConversationPromptHistory>;
   loadOlderHistory?: () => Promise<CodexConversationHistoryPage>;
   rename(title: string): Promise<void>;
   resolveApproval(
@@ -76,6 +78,7 @@ export function createCodexConversationHandle(
     load: (options) => snapshotAfter(() => operations.load(options)),
     select: () => snapshotAfter(operations.select),
     readHistory: operations.readHistory,
+    readPromptHistory: operations.readPromptHistory,
     loadOlderHistory: operations.loadOlderHistory ?? (
       async () => ({ conversationId: id, messages: [], hasOlder: false })
     ),

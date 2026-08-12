@@ -94,7 +94,7 @@ const emit = defineEmits<{
 
 .chat-tool-call__title {
   display: inline-flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: var(--space-3);
   max-width: 100%;
