@@ -53,7 +53,7 @@ export const codexSurfaceBridgeOperations = [
   'readConversationPromptHistory', 'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
   'resolveApproval', 'retryMessage', 'selectConversation', 'sendMessage', 'setGoal',
   'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
-  'unarchiveConversation', 'updateConversationSettings',
+  'unarchiveConversation', 'updateConversationSettings', 'updateQueuedPrompt',
 ] as const satisfies readonly CodexSurfaceBridgeOperation[];
 
 const operationSet = new Set<string>(codexSurfaceBridgeOperations);
@@ -70,8 +70,8 @@ export const codexSurfaceBridgeArities: Readonly<
   refreshConversations: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
   resolveApproval: [2, 3], retryMessage: [1, 1], selectConversation: [1, 1],
   sendMessage: [1, 2], setGoal: [1, 2], startChatGptLogin: [0, 0], startReview: [0, 1],
-  steerMessage: [1, 2], steerQueuedPrompt: [1, 1], unarchiveConversation: [1, 1],
-  updateConversationSettings: [1, 1],
+  steerMessage: [1, 2], steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1],
+  updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 2],
 };
 
 export function isCodexSurfaceBridgeOperation(value: unknown): value is CodexSurfaceBridgeOperation {
@@ -140,9 +140,15 @@ async function invokeValidated(
       nonEmptyString(args[0], 'Steer prompt'),
       await sendOptions(args[1], options.resolveAttachment),
     );
-    case 'steerQueuedPrompt': return target.steerQueuedPrompt(nonEmptyString(args[0], 'Queued prompt id'));
+    case 'steerQueuedPrompt': return target.steerQueuedPrompt(
+      nonEmptyString(args[0], 'Queued prompt id'),
+      optionalString(args[1], 'Queued prompt'),
+    );
     case 'unarchiveConversation': return target.unarchiveConversation(nonEmptyString(args[0], 'Conversation id'));
     case 'updateConversationSettings': return target.updateConversationSettings(settings(args[0]));
+    case 'updateQueuedPrompt': return target.updateQueuedPrompt(
+      nonEmptyString(args[0], 'Queued prompt id'), nonEmptyString(args[1], 'Queued prompt'),
+    );
   }
 }
 

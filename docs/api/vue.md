@@ -177,6 +177,9 @@ queue. This enables submit with an otherwise empty prompt and emits the
 canonical `'(no user instructions)'` prompt. It also accepts
 `queuedPromptId`; when the composer is empty, Cmd/Ctrl+Enter emits
 `steerQueuedPrompt` for that queued item instead of submitting an empty steer.
+In `CodexConversationPane`, queued-prompt Edit loads the text into an empty
+composer. Enter dispatches `updateQueuedPrompt(promptId, prompt)`, while
+Cmd/Ctrl+Enter dispatches `steerQueuedPrompt(promptId, prompt)`.
 
 ## Leaf components
 

@@ -70,6 +70,7 @@ const channels = {
   steerQueuedPrompt: 'codex-surface:steer-queued-prompt',
   unarchiveConversation: 'codex-surface:unarchive-conversation',
   updateConversationSettings: 'codex-surface:update-conversation-settings',
+  updateQueuedPrompt: 'codex-surface:update-queued-prompt',
   stateChanged: 'codex-surface:state-changed',
   event: 'codex-surface:event',
 } as const;
@@ -117,9 +118,10 @@ type SurfaceRequests = {
     prompt: string,
     options?: CodexRendererSendMessageOptions,
   ], CodexSurfaceSnapshot>;
-  [channels.steerQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
+  [channels.steerQueuedPrompt]: IpcRequest<[promptId: string, prompt?: string], CodexSurfaceSnapshot>;
   [channels.unarchiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.updateConversationSettings]: IpcRequest<[settings: UpdateCodexConversationSettings], CodexSurfaceSnapshot>;
+  [channels.updateQueuedPrompt]: IpcRequest<[promptId: string, prompt: string], CodexSurfaceSnapshot>;
 };
 
 type SurfaceEvents = {
@@ -187,6 +189,7 @@ export function registerCodexSurfaceIpc(
     [channels.steerQueuedPrompt]: (_event, ...args) => invoke('steerQueuedPrompt', args),
     [channels.unarchiveConversation]: (_event, ...args) => invoke('unarchiveConversation', args),
     [channels.updateConversationSettings]: (_event, ...args) => invoke('updateConversationSettings', args),
+    [channels.updateQueuedPrompt]: (_event, ...args) => invoke('updateQueuedPrompt', args),
   });
   const unsubscribeState = surface.onStateChange((snapshot) => sender.send(channels.stateChanged, snapshot));
   const unsubscribeEvents = surface.onEvent((event) => sender.send(channels.event, event));
@@ -235,8 +238,9 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     startReview: (options) => renderer.invoke(channels.startReview, options),
     startChatGptLogin: () => renderer.invoke(channels.startChatGptLogin),
     steerMessage: (prompt, options) => renderer.invoke(channels.steerMessage, prompt, options),
-    steerQueuedPrompt: (promptId) => renderer.invoke(channels.steerQueuedPrompt, promptId),
+    steerQueuedPrompt: (promptId, prompt) => renderer.invoke(channels.steerQueuedPrompt, promptId, prompt),
     unarchiveConversation: (conversationId) => renderer.invoke(channels.unarchiveConversation, conversationId),
     updateConversationSettings: (settings) => renderer.invoke(channels.updateConversationSettings, settings),
+    updateQueuedPrompt: (promptId, prompt) => renderer.invoke(channels.updateQueuedPrompt, promptId, prompt),
   };
 }

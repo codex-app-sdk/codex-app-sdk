@@ -110,6 +110,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     deleteConversation: (conversationId: string) => run(() => api.deleteConversation(conversationId)),
     deleteMessage: (index: number) => run(() => api.deleteMessage(index)),
     deleteQueuedPrompt: (promptId: string) => run(() => api.deleteQueuedPrompt(promptId)),
+    updateQueuedPrompt: (promptId: string, prompt: string) => run(() => api.updateQueuedPrompt(promptId, prompt)),
     editMessage: (index: number, content: string) => run(() => api.editMessage(index, content)),
     forkMessage: (index: number) => run(() => api.forkMessage(index)),
     interrupt: () => run(() => api.interrupt()),
@@ -146,7 +147,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     startReview: (options?: StartCodexReviewOptions) => run(() => api.startReview(options)),
     startChatGptLogin: () => api.startChatGptLogin(),
     steerMessage: (prompt: string, options?: CodexRendererSendMessageOptions) => run(() => api.steerMessage(prompt, options)),
-    steerQueuedPrompt: (promptId: string) => run(() => api.steerQueuedPrompt(promptId)),
+    steerQueuedPrompt: (promptId: string, prompt?: string) => run(() => api.steerQueuedPrompt(promptId, prompt)),
     unarchiveConversation: (conversationId: string) => run(() => api.unarchiveConversation(conversationId)),
     updateConversationSettings: (settings: UpdateCodexConversationSettings) => (
       run(() => api.updateConversationSettings(settings))

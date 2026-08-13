@@ -919,7 +919,8 @@ export type CodexSurfaceApi = {
   forkMessage(index: number): Promise<CodexSurfaceSnapshot>;
   retryMessage(index: number): Promise<CodexSurfaceSnapshot>;
   deleteQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot>;
-  steerQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot>;
   respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<CodexSurfaceSnapshot>;
   resolveApproval(
     approvalId: string,

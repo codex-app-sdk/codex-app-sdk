@@ -74,6 +74,11 @@ when loading asynchronously, `promptHistoryLoading`.
 When `queuedPromptId` is supplied and the composer is empty, `Cmd+Enter` emits
 `steerQueuedPrompt` for that queued item. It does not create an empty steer.
 
+`CodexConversationPane` also renders an Edit action for each queued prompt.
+Editing is disabled while the composer contains a draft. A normal submit saves
+the edited text in the same queue position; Cmd/Ctrl+Enter steers the edited
+text immediately and removes the queued item.
+
 ## Controlled text and selection
 
 Use `composerState` for per-conversation draft persistence:

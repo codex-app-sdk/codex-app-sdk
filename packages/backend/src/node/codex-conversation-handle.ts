@@ -26,6 +26,7 @@ export type CodexConversationHandleOperations = {
   compact(): Promise<void>;
   deleteMessage(index: number): Promise<void>;
   deleteQueuedPrompt(promptId: string): Promise<void>;
+  updateQueuedPrompt(promptId: string, prompt: string): Promise<void>;
   editMessage(index: number, content: string): Promise<void>;
   fork(
     options?: ForkCodexConversationOptions,
@@ -59,7 +60,7 @@ export type CodexConversationHandleOperations = {
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   startReview(options?: StartCodexReviewOptions): Promise<void>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<void>;
-  steerQueuedPrompt(promptId: string): Promise<void>;
+  steerQueuedPrompt(promptId: string, prompt?: string): Promise<void>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<void>;
 };
 
@@ -95,7 +96,8 @@ export function createCodexConversationHandle(
     retryMessage: (index) => snapshotAfter(() => operations.retryMessage(index)),
     rollbackToTurn: (turnId) => snapshotAfter(() => operations.rollbackToTurn(turnId)),
     deleteQueuedPrompt: (promptId) => snapshotAfter(() => operations.deleteQueuedPrompt(promptId)),
-    steerQueuedPrompt: (promptId) => snapshotAfter(() => operations.steerQueuedPrompt(promptId)),
+    updateQueuedPrompt: (promptId, prompt) => snapshotAfter(() => operations.updateQueuedPrompt(promptId, prompt)),
+    steerQueuedPrompt: (promptId, prompt) => snapshotAfter(() => operations.steerQueuedPrompt(promptId, prompt)),
     respondToClientRequest: (response) => snapshotAfter(() => operations.respondToClientRequest(response)),
     resolveApproval: (approvalId, decision, scope) => snapshotAfter(
       () => operations.resolveApproval(approvalId, decision, scope),

@@ -494,6 +494,56 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('steer')).toBeUndefined();
   });
 
+  it('edits a queued prompt in place through a normal composer submit', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages,
+        modelValue: '',
+        queuedPrompts: [
+          { id: 'queued-1', text: 'Keep first' },
+          { id: 'queued-2', text: 'Original text' },
+        ],
+      },
+    });
+
+    await wrapper.findAll('[aria-label="Edit queued prompt"]')[1]!.trigger('click');
+    await setComposerText(wrapper, 'Replacement text');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('updateQueuedPrompt')).toStrictEqual([['queued-2', 'Replacement text']]);
+    expect(wrapper.emitted('submit')).toBeUndefined();
+  });
+
+  it('steers and removes the edited queue item with Cmd Enter', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        busy: true,
+        messages,
+        modelValue: '',
+        queuedPrompts: [{ id: 'queued-1', text: 'Original text' }],
+      },
+    });
+
+    await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
+    await setComposerText(wrapper, 'Edited steer');
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['queued-1', 'Edited steer']]);
+    expect(wrapper.emitted('steer')).toBeUndefined();
+  });
+
+  it('disables queue editing while the composer is not empty', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        messages,
+        modelValue: 'Existing draft',
+        queuedPrompts: [{ id: 'queued-1', text: 'Queued text' }],
+      },
+    });
+
+    expect(wrapper.get('[aria-label="Edit queued prompt"]').attributes('disabled')).toBeDefined();
+  });
+
   it('binds directly to a surface controller while preserving controlled mode overrides', async () => {
     const controller = fakeSurfaceController();
     const wrapper = mount(CodexConversationPane, { props: { surface: controller } });

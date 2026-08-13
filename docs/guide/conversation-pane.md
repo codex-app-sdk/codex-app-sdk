@@ -129,7 +129,7 @@ Codex controls. They render after Approval and before Plan mode. Existing
 
 Controller actions cover:
 
-- submit, steer, interrupt, and queued-prompt steering;
+- submit, steer, interrupt, and queued-prompt update/steering;
 - composer state, attachments, prompt-history loading, settings, menu selection, and attachment picking;
 - older-history loading;
 - copy notification, quote, edit, retry, fork, and delete message behavior;

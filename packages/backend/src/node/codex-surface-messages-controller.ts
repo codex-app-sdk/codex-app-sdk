@@ -312,21 +312,42 @@ export class CodexSurfaceMessagesController {
     this.host.patchRuntime(runtime.threadId, { queuedPrompts });
   }
 
-  async steerQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot> {
+  async updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.steerQueuedPromptForThread(threadId, promptId);
+    await this.updateQueuedPromptForThread(threadId, promptId, prompt);
     return this.host.getSnapshot();
   }
 
-  async steerQueuedPromptForThread(threadId: string, promptId: string): Promise<void> {
+  async updateQueuedPromptForThread(threadId: string, promptId: string, prompt: string): Promise<void> {
+    const runtime = await this.host.ensureThreadReady(threadId);
+    const text = prompt.trim();
+    if (!text) throw new Error('Cannot update a queued prompt with empty content');
+    let found = false;
+    const queuedPrompts = runtime.queuedPrompts.map((candidate) => {
+      if (candidate.id !== promptId) return candidate;
+      found = true;
+      return { ...candidate, text };
+    });
+    if (!found) throw new Error(`Unknown queued prompt '${promptId}'`);
+    this.host.patchRuntime(runtime.threadId, { queuedPrompts });
+  }
+
+  async steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot> {
+    const threadId = this.requiredActiveConversation();
+    await this.steerQueuedPromptForThread(threadId, promptId, prompt);
+    return this.host.getSnapshot();
+  }
+
+  async steerQueuedPromptForThread(threadId: string, promptId: string, replacement?: string): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     const prompt = runtime.queuedPrompts.find((candidate) => candidate.id === promptId);
     if (!prompt) throw new Error(`Unknown queued prompt '${promptId}'`);
     this.host.patchRuntime(runtime.threadId, {
       queuedPrompts: runtime.queuedPrompts.filter((candidate) => candidate.id !== promptId),
     });
-    if (runtime.busy) await this.steerForThread(threadId, prompt.text, prompt.options);
-    else await this.sendToThread(threadId, prompt.text, prompt.options);
+    const text = replacement ?? prompt.text;
+    if (runtime.busy) await this.steerForThread(threadId, text, prompt.options);
+    else await this.sendToThread(threadId, text, prompt.options);
   }
 
   async sendNextQueuedPrompt(threadId: string): Promise<void> {

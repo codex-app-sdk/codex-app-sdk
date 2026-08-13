@@ -40,6 +40,7 @@ describe('useCodexSurface', () => {
     await surface.deleteConversation('thread-delete');
     await surface.deleteMessage(2);
     await surface.deleteQueuedPrompt('queued-1');
+    await surface.updateQueuedPrompt('queued-2', 'Edited queue');
     await surface.editMessage(1, 'Replacement');
     await surface.forkMessage(4);
     await expect(surface.readConversationHistory('thread-1')).resolves.toStrictEqual({
@@ -66,7 +67,7 @@ describe('useCodexSurface', () => {
     expectTypeOf(surface.answeredClientRequestIds).toEqualTypeOf<ReadonlySet<string>>();
     await surface.resolveApproval('approval-1', 'approve', 'session');
     await surface.retryMessage(3);
-    await surface.steerQueuedPrompt('queued-2');
+    await surface.steerQueuedPrompt('queued-2', 'Edited steer');
 
     expect(api.onStateChange).toHaveBeenCalledOnce();
     expect(api.archiveConversation).toHaveBeenCalledWith('thread-archive');
@@ -76,6 +77,7 @@ describe('useCodexSurface', () => {
     expect(api.deleteConversation).toHaveBeenCalledWith('thread-delete');
     expect(api.deleteMessage).toHaveBeenCalledWith(2);
     expect(api.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
+    expect(api.updateQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited queue');
     expect(api.editMessage).toHaveBeenCalledWith(1, 'Replacement');
     expect(api.forkMessage).toHaveBeenCalledWith(4);
     expect(api.readConversationHistory).toHaveBeenCalledWith('thread-1');
@@ -97,7 +99,7 @@ describe('useCodexSurface', () => {
     expect(api.respondToClientRequest).toHaveBeenCalledWith({ id: 'question-1', payload: { answers: {} } });
     expect(api.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     expect(api.retryMessage).toHaveBeenCalledWith(3);
-    expect(api.steerQueuedPrompt).toHaveBeenCalledWith('queued-2');
+    expect(api.steerQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited steer');
     scope.stop();
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
@@ -197,6 +199,7 @@ function fakeApi(
     deleteConversation: vi.fn(async () => readySnapshot),
     deleteMessage: vi.fn(async () => readySnapshot),
     deleteQueuedPrompt: vi.fn(async () => readySnapshot),
+    updateQueuedPrompt: vi.fn(async () => readySnapshot),
     editMessage: vi.fn(async () => readySnapshot),
     forkMessage: vi.fn(async () => readySnapshot),
     getSnapshot: vi.fn(async () => readySnapshot),

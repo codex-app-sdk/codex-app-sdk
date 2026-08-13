@@ -766,8 +766,12 @@ export class CodexSurface {
     return this.messagesController.deleteQueuedPrompt(promptId);
   }
 
-  async steerQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot> {
-    return this.messagesController.steerQueuedPrompt(promptId);
+  async updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot> {
+    return this.messagesController.updateQueuedPrompt(promptId, prompt);
+  }
+
+  async steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot> {
+    return this.messagesController.steerQueuedPrompt(promptId, prompt);
   }
 
   async respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<CodexSurfaceSnapshot> {
@@ -793,6 +797,7 @@ export class CodexSurface {
       compact: () => this.turnActions.compactForThread(id),
       deleteMessage: (index) => this.turnActions.deleteMessageForThread(id, index),
       deleteQueuedPrompt: (promptId) => this.messagesController.deleteQueuedPromptForThread(id, promptId),
+      updateQueuedPrompt: (promptId, prompt) => this.messagesController.updateQueuedPromptForThread(id, promptId, prompt),
       editMessage: (index, content) => this.turnActions.editMessageForThread(id, index, content),
       fork: (options, hostOptions) => this.forkConversation(id, options, hostOptions),
       forkMessage: (index, options, hostOptions) => (
@@ -819,7 +824,7 @@ export class CodexSurface {
       startRealtime: (options) => this.startRealtimeForThread(id, options),
       startReview: (options) => this.turnActions.startReviewForThread(id, options),
       steerMessage: (prompt, options) => this.messagesController.steerForThread(id, prompt, options),
-      steerQueuedPrompt: (promptId) => this.messagesController.steerQueuedPromptForThread(id, promptId),
+      steerQueuedPrompt: (promptId, prompt) => this.messagesController.steerQueuedPromptForThread(id, promptId, prompt),
       updateSettings: (settings) => this.conversationSettings.updateForThread(id, settings),
     });
     this.conversationHandles.set(id, handle);

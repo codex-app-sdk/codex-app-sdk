@@ -100,9 +100,11 @@
             :goal="effectiveGoal"
             :presentation="effectivePresentation.shelf"
             :queued-prompts="effectiveQueuedPrompts"
+            :queued-prompt-edit-disabled="localDraft.length > 0"
             :turn-git-diff="effectiveTurnGitDiff"
             @clear-goal="clearGoal"
             @delete-queued-prompt="deleteQueuedPrompt"
+            @edit-queued-prompt="editQueuedPrompt"
             @edit-goal="editGoal"
             @steer-queued-prompt="steerQueuedPrompt"
           />
@@ -419,6 +421,7 @@ const emit = defineEmits<{
   clearGoal: [];
   deleteMessage: [index: number];
   deleteQueuedPrompt: [promptId: string];
+  updateQueuedPrompt: [promptId: string, prompt: string];
   editGoal: [];
   editMessage: [payload: { content: string; index: number }];
   forkMessage: [index: number];
@@ -439,7 +442,7 @@ const emit = defineEmits<{
   sendFollowUp: [prompt: string];
   submit: [prompt: string, options?: CodexRendererSendMessageOptions];
   steer: [prompt: string, options?: CodexRendererSendMessageOptions];
-  steerQueuedPrompt: [promptId: string];
+  steerQueuedPrompt: [promptId: string, prompt?: string];
   'update:modelId': [modelId: string];
   'update:composerState': [state: CodexComposerState];
   'update:modelValue': [value: string];
@@ -487,6 +490,7 @@ const initialComposerState = normalizeCodexComposerState(effectiveComposerState.
 ));
 const localComposerState = ref<CodexComposerState>(initialComposerState);
 const localDraft = ref(initialComposerState.text);
+const editingQueuedPromptId = ref<string | null>(null);
 const localError = ref<string | null>(null);
 const selectedAttachments = ref<CodexHostAttachment[]>([...effectiveAttachments.value]);
 const promptHistoryByConversation = new Map<string | number, readonly string[]>();
@@ -716,6 +720,7 @@ watch(effectiveAttachEnabled, (enabled) => {
 
 watch(effectiveConversationKey, () => {
   clearEscapeInterruptArm();
+  editingQueuedPromptId.value = null;
   localError.value = null;
   const incoming = normalizeCodexComposerState(effectiveComposerState.value ?? (
     effectiveController.value
@@ -731,6 +736,13 @@ watch(effectiveConversationKey, () => {
   selectedAttachments.value = [...effectiveAttachments.value];
   draftRevision.value += 1;
 }, { immediate: true });
+
+watch(effectiveQueuedPrompts, (prompts) => {
+  const editingId = editingQueuedPromptId.value;
+  if (editingId && !prompts.some((prompt) => prompt.id === editingId)) {
+    editingQueuedPromptId.value = null;
+  }
+});
 
 watch([
   effectiveConversationKey,
@@ -799,6 +811,13 @@ function mergePromptHistories(
 
 function submit(prompt: string): void {
   updateDraft('');
+  const queuedPromptId = editingQueuedPromptId.value;
+  if (queuedPromptId) {
+    editingQueuedPromptId.value = null;
+    updateQueuedPrompt(queuedPromptId, prompt);
+    replaceAttachments([]);
+    return;
+  }
   const options = sendOptionsForAttachments(selectedAttachments.value);
   if (dispatchControllerAction('submit', prompt, options)) {
     replaceAttachments([]);
@@ -1066,17 +1085,43 @@ function clearGoal(): void {
 }
 
 function deleteQueuedPrompt(promptId: string): void {
+  if (editingQueuedPromptId.value === promptId) editingQueuedPromptId.value = null;
   if (dispatchControllerAction('deleteQueuedPrompt', promptId)) return;
   if (effectiveController.value) return;
   emit('deleteQueuedPrompt', promptId);
   if (props.surface) void runSurfaceAction(() => props.surface!.deleteQueuedPrompt(promptId));
 }
 
-function steerQueuedPrompt(promptId: string): void {
-  if (dispatchControllerAction('steerQueuedPrompt', promptId)) return;
+function editQueuedPrompt(promptId: string): void {
+  if (localDraft.value.length > 0) return;
+  const prompt = effectiveQueuedPrompts.value.find((candidate) => candidate.id === promptId);
+  if (!prompt) return;
+  editingQueuedPromptId.value = promptId;
+  updateDraft(prompt.text);
+  composer.value?.focus();
+}
+
+function updateQueuedPrompt(promptId: string, prompt: string): void {
+  if (dispatchControllerAction('updateQueuedPrompt', promptId, prompt)) return;
   if (effectiveController.value) return;
-  emit('steerQueuedPrompt', promptId);
-  if (props.surface) void runSurfaceAction(() => props.surface!.steerQueuedPrompt(promptId));
+  emit('updateQueuedPrompt', promptId, prompt);
+  if (props.surface) void runSurfaceAction(() => props.surface!.updateQueuedPrompt(promptId, prompt));
+}
+
+function steerQueuedPrompt(promptId: string, prompt?: string): void {
+  if (editingQueuedPromptId.value === promptId) editingQueuedPromptId.value = null;
+  const dispatched = prompt === undefined
+    ? dispatchControllerAction('steerQueuedPrompt', promptId)
+    : dispatchControllerAction('steerQueuedPrompt', promptId, prompt);
+  if (dispatched) return;
+  if (effectiveController.value) return;
+  if (prompt === undefined) emit('steerQueuedPrompt', promptId);
+  else emit('steerQueuedPrompt', promptId, prompt);
+  if (props.surface) {
+    void runSurfaceAction(() => prompt === undefined
+      ? props.surface!.steerQueuedPrompt(promptId)
+      : props.surface!.steerQueuedPrompt(promptId, prompt));
+  }
 }
 
 function interrupt(): void {
@@ -1088,6 +1133,14 @@ function interrupt(): void {
 }
 
 function steer(prompt: string): void {
+  const queuedPromptId = editingQueuedPromptId.value;
+  if (queuedPromptId) {
+    updateDraft('');
+    editingQueuedPromptId.value = null;
+    steerQueuedPrompt(queuedPromptId, prompt);
+    replaceAttachments([]);
+    return;
+  }
   const options = sendOptionsForAttachments(selectedAttachments.value);
   if (dispatchControllerAction('steer', prompt, options)) {
     replaceAttachments([]);

@@ -206,6 +206,10 @@ describe('public conversation leaf components', () => {
     expect(wrapper.get('[aria-label="Steer queued prompt now"] svg').attributes('class')).toContain('tabler-icon-steering-wheel');
     await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
     expect(wrapper.emitted('steer')).toStrictEqual([['queue-1']]);
+    await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
+    expect(wrapper.emitted('edit')).toStrictEqual([['queue-1']]);
+    await wrapper.setProps({ editDisabled: true });
+    expect(wrapper.get('[aria-label="Edit queued prompt"]').attributes('disabled')).toBeDefined();
   });
 
   it('mounts turn diff independently', () => {

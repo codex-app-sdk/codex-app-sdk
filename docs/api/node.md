@@ -273,7 +273,8 @@ unsubscribes the ephemeral thread.
 - `editMessage(index, content)`
 - `retryMessage(index)`
 - `forkMessage(index)` — forks the active conversation at a message and selects the new conversation.
-- queued-prompt actions
+- queued-prompt actions: `deleteQueuedPrompt(id)`,
+  `updateQueuedPrompt(id, prompt)`, and `steerQueuedPrompt(id, prompt?)`
 - approval and app-server client-request responses
 - `setGoal(objective, tokenBudget?)` / `clearGoal()`
 

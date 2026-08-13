@@ -188,8 +188,10 @@ describe('ported id8 chat components', () => {
 
     expect(wrapper.text()).toContain('Run the tests after this turn');
     await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
+    await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
     await wrapper.get('[aria-label="Delete queued prompt"]').trigger('click');
     expect(wrapper.emitted('steer')).toStrictEqual([['prompt-1']]);
+    expect(wrapper.emitted('edit')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('delete')).toStrictEqual([['prompt-1']]);
   });
 
@@ -217,10 +219,12 @@ describe('ported id8 chat components', () => {
     expect(wrapper.text()).toContain('Ship the goal surface');
 
     await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
+    await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
     await wrapper.get('[aria-label="Clear goal"]').trigger('click');
     await wrapper.get('[aria-label="Edit goal"]').trigger('click');
 
     expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['prompt-1']]);
+    expect(wrapper.emitted('editQueuedPrompt')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('clearGoal')).toStrictEqual([[]]);
     expect(wrapper.emitted('editGoal')).toStrictEqual([[]]);
   });

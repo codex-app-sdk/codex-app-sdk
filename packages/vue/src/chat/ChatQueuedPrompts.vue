@@ -3,8 +3,10 @@
     <ChatQueuedPrompt
       v-for="prompt in prompts"
       :key="prompt.id"
+      :edit-disabled="editDisabled"
       :prompt="prompt"
       @delete="$emit('delete', $event)"
+      @edit="$emit('edit', $event)"
       @steer="$emit('steer', $event)"
     />
   </div>
@@ -16,10 +18,12 @@ import type { QueuedChatPrompt } from './queued-prompts';
 
 defineProps<{
   prompts: readonly QueuedChatPrompt[];
+  editDisabled?: boolean;
 }>();
 
 defineEmits<{
   delete: [id: string];
+  edit: [id: string];
   steer: [id: string];
 }>();
 </script>

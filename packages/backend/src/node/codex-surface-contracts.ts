@@ -161,7 +161,8 @@ export type CodexConversation = {
   retryMessage(index: number): Promise<CodexConversationSnapshot>;
   rollbackToTurn(turnId: string): Promise<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Promise<CodexConversationSnapshot>;
-  steerQueuedPrompt(promptId: string): Promise<CodexConversationSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexConversationSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexConversationSnapshot>;
   respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<CodexConversationSnapshot>;
   resolveApproval(
     approvalId: string,

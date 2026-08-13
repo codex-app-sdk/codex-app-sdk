@@ -6,8 +6,10 @@
     />
     <ChatQueuedPrompts
       v-if="showQueuedPrompts"
+      :edit-disabled="queuedPromptEditDisabled"
       :prompts="queuedPrompts"
       @delete="$emit('deleteQueuedPrompt', $event)"
+      @edit="$emit('editQueuedPrompt', $event)"
       @steer="$emit('steerQueuedPrompt', $event)"
     />
     <ChatGoal
@@ -31,12 +33,14 @@ const props = defineProps<{
   goal: ThreadGoal | null;
   presentation?: CodexComposerShelfPresentation;
   queuedPrompts: readonly QueuedChatPrompt[];
+  queuedPromptEditDisabled?: boolean;
   turnGitDiff?: TurnGitDiff | null;
 }>();
 
 defineEmits<{
   clearGoal: [];
   deleteQueuedPrompt: [promptId: string];
+  editQueuedPrompt: [promptId: string];
   editGoal: [];
   steerQueuedPrompt: [promptId: string];
 }>();

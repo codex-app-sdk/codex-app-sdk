@@ -119,6 +119,7 @@ describe('Codex surface Electron bridge', () => {
       steerQueuedPrompt: vi.fn(async () => snapshot),
       unarchiveConversation: vi.fn(async () => snapshot),
       updateConversationSettings: vi.fn(async () => snapshot),
+      updateQueuedPrompt: vi.fn(async () => snapshot),
       onStateChange: vi.fn((listener: (value: CodexSurfaceSnapshot) => void) => {
         stateListener = listener;
         return unsubscribeState;
@@ -165,6 +166,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:steer-queued-prompt',
       'codex-surface:unarchive-conversation',
       'codex-surface:update-conversation-settings',
+      'codex-surface:update-queued-prompt',
     ]);
     await expect(main.call('codex-surface:archive-conversation', 'thread-archive')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:cancel-login', 'login-1')).resolves.toBe(snapshot);
@@ -439,7 +441,7 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:steer-message', 'More detail', {
       attachments: [{ type: 'file', reference: 'attachment:notes' }],
     })).resolves.toBe(snapshot);
-    await expect(main.call('codex-surface:steer-queued-prompt', 'queued-2')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:steer-queued-prompt', 'queued-2', 'Edited steer')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:unarchive-conversation', 'thread-unarchive')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:unarchive-conversation', '   ')).rejects.toThrow(
       'Conversation id must be a non-empty string',
@@ -457,6 +459,7 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:update-conversation-settings', { planMode: 'yes' })).rejects.toThrow(
       'Conversation plan mode must be a boolean',
     );
+    await expect(main.call('codex-surface:update-queued-prompt', 'queued-1', 'Edited queue')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:connect', 'unexpected')).rejects.toThrow(
       'codex-surface:connect received an invalid number of arguments',
     );
@@ -536,11 +539,12 @@ describe('Codex surface Electron bridge', () => {
         type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown',
       }],
     });
-    expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2');
+    expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited steer');
     expect(surface.unarchiveConversation).toHaveBeenCalledWith('thread-unarchive');
     expect(surface.updateConversationSettings).toHaveBeenCalledWith({
       modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
     });
+    expect(surface.updateQueuedPrompt).toHaveBeenCalledWith('queued-1', 'Edited queue');
     stateListener?.(snapshot);
     eventListener?.(surfaceEvent);
     expect(sender.send).toHaveBeenCalledWith('codex-surface:state-changed', snapshot);
@@ -589,9 +593,10 @@ describe('Codex surface Electron bridge', () => {
     await api.steerMessage('Keep going', {
       attachments: [{ type: 'file', reference: 'attachment:notes' }],
     });
-    await api.steerQueuedPrompt('queued-2');
+    await api.steerQueuedPrompt('queued-2', 'Edited steer');
     await api.unarchiveConversation('thread-unarchive');
     await api.updateConversationSettings({ modelId: 'gpt-5', approvalPreset: 'ask-for-approval' });
+    await api.updateQueuedPrompt('queued-1', 'Edited queue');
     await api.interrupt();
     await api.getSnapshot();
     renderer.emit('codex-surface:state-changed', snapshot);
@@ -631,9 +636,10 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:steer-message', 'Keep going', {
         attachments: [{ type: 'file', reference: 'attachment:notes' }],
       }],
-      ['codex-surface:steer-queued-prompt', 'queued-2'],
+      ['codex-surface:steer-queued-prompt', 'queued-2', 'Edited steer'],
       ['codex-surface:unarchive-conversation', 'thread-unarchive'],
       ['codex-surface:update-conversation-settings', { modelId: 'gpt-5', approvalPreset: 'ask-for-approval' }],
+      ['codex-surface:update-queued-prompt', 'queued-1', 'Edited queue'],
       ['codex-surface:interrupt'],
       ['codex-surface:get-snapshot'],
     ]);

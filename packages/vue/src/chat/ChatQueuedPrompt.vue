@@ -16,6 +16,16 @@
       <button
         class="chat-queued-prompt__action"
         type="button"
+        aria-label="Edit queued prompt"
+        title="Edit"
+        :disabled="editDisabled"
+        @click="emit('edit', prompt.id)"
+      >
+        <PencilIcon aria-hidden="true" />
+      </button>
+      <button
+        class="chat-queued-prompt__action"
+        type="button"
         aria-label="Delete queued prompt"
         title="Delete"
         @click="emit('delete', prompt.id)"
@@ -27,15 +37,17 @@
 </template>
 
 <script setup lang="ts">
-import { SteeringWheelIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
+import { PencilIcon, SteeringWheelIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
 import type { QueuedChatPrompt } from './queued-prompts';
 
 defineProps<{
   prompt: QueuedChatPrompt;
+  editDisabled?: boolean;
 }>();
 
 const emit = defineEmits<{
   delete: [id: string];
+  edit: [id: string];
   steer: [id: string];
 }>();
 </script>
@@ -92,9 +104,14 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.chat-queued-prompt__action:hover {
+.chat-queued-prompt__action:hover:not(:disabled) {
   background: var(--color-surface-low);
   color: var(--color-text);
+}
+
+.chat-queued-prompt__action:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .chat-queued-prompt__action svg {

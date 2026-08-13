@@ -129,6 +129,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   onMessageCopied?: PaneAction<[index: number]>;
   deleteMessage?: PaneAction<[index: number]>;
   deleteQueuedPrompt?: PaneAction<[promptId: string]>;
+  updateQueuedPrompt?: PaneAction<[promptId: string, prompt: string]>;
   editGoal?: PaneAction;
   editMessage?: PaneAction<[payload: { content: string; index: number }]>;
   forkMessage?: PaneAction<[index: number]>;
@@ -150,7 +151,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   selectApprovalPreset?: PaneAction<[preset: ApprovalPreset]>;
   sendFollowUp?: PaneAction<[prompt: string]>;
   steer?: PaneAction<[prompt: string, options?: CodexRendererSendMessageOptions]>;
-  steerQueuedPrompt?: PaneAction<[promptId: string]>;
+  steerQueuedPrompt?: PaneAction<[promptId: string, prompt?: string]>;
   submit?: PaneAction<[prompt: string, options?: CodexRendererSendMessageOptions]>;
   updateAttachments?: PaneAction<[attachments: readonly CodexHostAttachment[]]>;
   updateComposerState?: PaneAction<[state: CodexComposerState]>;

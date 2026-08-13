@@ -429,11 +429,18 @@ describe('CodexSurface', () => {
     const deleteId = firstQueue.queuedPrompts[0]!.id;
     await queued.surface.deleteQueuedPrompt(deleteId);
     await expect(queued.surface.deleteQueuedPrompt(deleteId)).rejects.toThrow('Unknown queued prompt');
-    const secondQueue = await queued.surface.sendMessage('Steer now');
-    const steerId = secondQueue.queuedPrompts[0]!.id;
-    await queued.surface.steerQueuedPrompt(steerId);
+    await queued.surface.sendMessage('Keep my position');
+    const secondQueue = await queued.surface.sendMessage('Edit me');
+    const editId = secondQueue.queuedPrompts[1]!.id;
+    await expect(queued.surface.updateQueuedPrompt(editId, '   ')).rejects.toThrow('empty content');
+    const updatedQueue = await queued.surface.updateQueuedPrompt(editId, 'Edited in place');
+    expect(updatedQueue.queuedPrompts.map(({ id, text }) => ({ id, text }))).toStrictEqual([
+      { id: secondQueue.queuedPrompts[0]!.id, text: 'Keep my position' },
+      { id: editId, text: 'Edited in place' },
+    ]);
+    await queued.surface.steerQueuedPrompt(editId, 'Edited and steered');
     expect(lastRequest(queued.transport, 'turn/steer')).toMatchObject({
-      params: { input: [{ type: 'text', text: 'Steer now' }] },
+      params: { input: [{ type: 'text', text: 'Edited and steered' }] },
     });
     await expect(queued.surface.steerQueuedPrompt('missing')).rejects.toThrow('Unknown queued prompt');
   });

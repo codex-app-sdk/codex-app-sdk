@@ -30,7 +30,8 @@ describe('createCodexConversationHandle', () => {
     await expect(conversation.retryMessage(3)).resolves.toBe(snapshot);
     await expect(conversation.rollbackToTurn('turn-1')).resolves.toBe(snapshot);
     await expect(conversation.deleteQueuedPrompt('prompt-1')).resolves.toBe(snapshot);
-    await expect(conversation.steerQueuedPrompt('prompt-2')).resolves.toBe(snapshot);
+    await expect(conversation.updateQueuedPrompt('prompt-2', 'Edited queue')).resolves.toBe(snapshot);
+    await expect(conversation.steerQueuedPrompt('prompt-2', 'Edited steer')).resolves.toBe(snapshot);
     const response = { requestId: 'request-1', response: { answers: {} } } as never;
     await expect(conversation.respondToClientRequest(response)).resolves.toBe(snapshot);
     await expect(conversation.resolveApproval('approval-1', 'approve', 'session')).resolves.toBe(snapshot);
@@ -44,7 +45,9 @@ describe('createCodexConversationHandle', () => {
     });
     expect(operations.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     expect(operations.setGoal).toHaveBeenCalledWith('Ship it', 500);
-    expect(operations.getSnapshot).toHaveBeenCalledTimes(19);
+    expect(operations.updateQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited queue');
+    expect(operations.steerQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited steer');
+    expect(operations.getSnapshot).toHaveBeenCalledTimes(20);
   });
 
   it('passes through history, realtime, snapshots, and subscriptions', async () => {
@@ -79,6 +82,6 @@ function operationSpies(snapshot: CodexConversationSnapshot): CodexConversationH
     resolveApproval: operation(), respondToClientRequest: operation(), retryMessage: operation(),
     rollbackToTurn: operation(), select: operation(), sendMessage: operation(), setGoal: operation(),
     startRealtime: vi.fn(async () => 'session' as never), startReview: operation(), steerMessage: operation(),
-    steerQueuedPrompt: operation(), updateSettings: operation(),
+    steerQueuedPrompt: operation(), updateQueuedPrompt: operation(), updateSettings: operation(),
   };
 }

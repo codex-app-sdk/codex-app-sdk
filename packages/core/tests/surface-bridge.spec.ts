@@ -120,12 +120,13 @@ describe('Codex surface bridge', () => {
       { operation: 'startChatGptLogin', args: [] },
       { operation: 'startReview', args: [{ target: { type: 'custom', instructions: 'Focus on errors' } }] },
       { operation: 'steerMessage', args: ['Use the other approach'], expected: ['Use the other approach', undefined] },
-      { operation: 'steerQueuedPrompt', args: ['queued-1'] },
+      { operation: 'steerQueuedPrompt', args: ['queued-1', 'Edited steer'] },
       { operation: 'unarchiveConversation', args: ['conversation-1'] },
       {
         operation: 'updateConversationSettings',
         args: [{ modelId: 'gpt-5', reasoningEffort: 'high', serviceTier: null, approvalPreset: 'approve-for-me', planMode: false }],
       },
+      { operation: 'updateQueuedPrompt', args: ['queued-1', 'Edited queue item'] },
     ];
 
     expect(cases.map(({ operation }) => operation)).toStrictEqual([...codexSurfaceBridgeOperations]);
