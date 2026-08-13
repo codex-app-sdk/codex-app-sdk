@@ -61,14 +61,26 @@ Root shortcuts consistently use `verb:target`. The other sample applications
 keep the same convention:
 
 ```bash
-npm run test:spark
-npm run typecheck:spark
-npm run build:spark
+npm run dev:lab
+npm run dev:spark
+npm run dev:relay
 
-npm run test:relay
-npm run typecheck:relay
+npm run build:lab
+npm run build:spark
 npm run build:relay
+
+npm run test:lab
+npm run test:spark
+npm run test:relay
+
+npm run typecheck:lab
+npm run typecheck:spark
+npm run typecheck:relay
 ```
+
+For a single compile-only sweep across all five samples, run
+`npm run build:workspaces`. `npm run check:workspaces` also verifies the
+scaffolder and executes each sample's owned lint, test, and build gate.
 
 ## Documentation
 

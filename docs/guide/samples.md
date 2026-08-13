@@ -13,6 +13,22 @@ All sample `dev` commands consume SDK source directly. A prior SDK build is not
 required; Vue SDK changes hot-reload in the browser or Electron renderer, and
 the Basic Web server restarts for backend or transport changes.
 
+Run every command below from the repository root. The development shortcuts
+follow `verb:target` consistently:
+
+| Sample | Development | Production build |
+| --- | --- | --- |
+| Basic Electron | `npm run dev:electron` | `npm run build:electron` |
+| Spark | `npm run dev:spark` | `npm run build:spark` |
+| Relay | `npm run dev:relay` | `npm run build:relay` |
+| Basic web | `npm run dev:web` | `npm run build:web` |
+| Component lab | `npm run dev:lab` | `npm run build:lab` |
+
+`npm run check:workspaces` builds the SDK once, then runs the owned lint, test,
+and build gates for the scaffolder and every sample. Use
+`npm run build:workspaces` for a compile-only pass across the five checked-in
+samples.
+
 ## Basic: multi-thread client
 
 **Shape:** shared `CodexConversationSidebar` + stock `CodexConversationPane`.
@@ -29,8 +45,7 @@ It demonstrates:
 - a trusted main-process `CodexAppBackend` that owns the shared surface.
 
 ```bash
-cd samples/electron/basic
-npm run dev
+npm run dev:electron
 ```
 
 Production-style build/start:
@@ -102,8 +117,11 @@ It demonstrates:
   reconnect implementation.
 
 ```bash
-npm run start:web
+npm run dev:web
 ```
+
+For a production-style build followed by the Node server, use
+`npm run start:web`.
 
 The fixed demo user is not production authentication. Replace the two named
 host seams with the website's session lookup and per-user backend/process pool.

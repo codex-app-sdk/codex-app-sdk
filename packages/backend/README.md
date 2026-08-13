@@ -20,6 +20,12 @@ await backend.surface.connect();
 // Grant backend.surface to one trusted Electron or web adapter.
 ```
 
+The trusted surface also exposes state-neutral helpers for app-owned workflows:
+`generateText()` runs an ephemeral read-only turn, while
+`readConversationSummary()` and `readConversationPromptHistory()` retrieve
+bounded metadata or user-only prompt history without hydrating a full thread
+into renderer state.
+
 Use `@codex-app-sdk/backend/protocol` only for low-level app-server methods not
 yet projected by `CodexSurface`. Renderer code must use
 `@codex-app-sdk/core` plus a host adapter instead of importing this package.

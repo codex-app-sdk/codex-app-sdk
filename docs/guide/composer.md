@@ -34,7 +34,7 @@ file catalog, normally backed by a conversation with a working directory.
 | --- | --- |
 | `Enter` | Submit the current prompt |
 | `Shift+Enter` | Insert a newline at the current selection |
-| `Cmd+Enter` | Steer the active turn |
+| `Cmd/Ctrl+Enter` | Steer the active turn |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |
 | `Up` / `Down` in an empty composer | Navigate backward / forward through submitted prompts |
 | `Escape`, then `Escape` again within two seconds | Interrupt the active turn |

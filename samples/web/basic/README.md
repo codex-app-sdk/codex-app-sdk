@@ -6,11 +6,15 @@ Express owns the HTTP server and site-authentication seam; `ws` owns the
 upgrade; the SDK owns the Codex WebSocket protocol and Vue surface integration.
 
 ```bash
-npm run start:web
+npm run dev:web
 ```
 
 Open `http://127.0.0.1:3000`. The sample uses the default Codex home, so it
 reuses the authentication from a normal local Codex installation.
+
+The dev command consumes SDK source directly, hot-reloads Vue changes, and
+restarts the sample server when backend or web-transport sources change. Use
+`npm run start:web` for a production-style build followed by server startup.
 
 `authenticateSiteRequest()` is intentionally a fixed local demo user. In a
 multi-user host, replace it with the website's session authentication and make

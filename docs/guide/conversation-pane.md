@@ -81,7 +81,10 @@ const actions: CodexConversationPaneActions = {
   loadOlderHistory: () => backend.loadOlderHistory(),
   resolveApproval: (id, decision, scope) => backend.resolveApproval(id, decision, scope),
   forkMessage: (index) => backend.forkMessage(index),
+  updateQueuedPrompt: (id, prompt) => backend.updateQueuedPrompt(id, prompt),
+  steerQueuedPrompt: (id, prompt) => backend.steerQueuedPrompt(id, prompt),
   openImage: (image, context) => imageTabs.open(image, context),
+  openVisualization: (visualization) => artifactTabs.open(visualization),
 };
 
 export const paneController = createCodexConversationPaneController({
@@ -137,6 +140,13 @@ Controller actions cover:
 - approvals and app-server client responses;
 - goals, follow-ups, and queued-prompt deletion;
 - conversation-link navigation.
+
+Queue editing is host-routed in controlled mode. The pane keeps the edit state
+and composer interaction, while `updateQueuedPrompt(id, prompt)` must replace
+the existing record without changing its position. The
+`steerQueuedPrompt(id, prompt?)` action sends the queued item immediately; when
+edited text is supplied, the host must steer that text and remove the selected
+queue record atomically.
 
 Mutation actions return `void | Promise<void>`; `readPromptHistory` returns
 prompt strings synchronously or asynchronously. The pane can preserve pending/error UI

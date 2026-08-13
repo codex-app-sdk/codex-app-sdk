@@ -35,12 +35,15 @@ authentication, tenancy, policy, business data, and integrations.
   WebSocket implementation dependency.
 - Native attachments, image paste/drop, clipboard actions, and macOS speech
   transcription.
-- `CodexConversationPane` with composer, messages, tools, generated media,
-  thinking, queues, context usage, and customization hooks.
+- `CodexConversationPane` with prompt recall, editable queues, double-Escape
+  interruption, tools, generated media, code copying, context usage, and
+  customization hooks.
+- Renderer-safe restored images with a stock fullscreen viewer and download,
+  plus host-owned image and visualization actions.
 - A grouped controlled-pane adapter for hosts that own conversation state
   outside the SDK surface.
-- Host extensions, dynamic tools, and trusted per-surface or per-conversation
-  MCP servers.
+- Host extensions, dynamic tools, trusted per-surface or per-conversation MCP
+  servers, headless sub-agent events, and ephemeral backend text generation.
 
 ## A deliberately small renderer
 
@@ -121,11 +124,14 @@ boundaries each one demonstrates.
 
 ```bash
 npm install
-npm test
-npm run typecheck
-npm run build
+npm run check
+npm run build:all
 npm run dev:docs
 ```
+
+`npm run check` covers the five SDK packages, compatibility facade,
+scaffolder, all five samples, and the documentation build. Use the narrower
+`test:*`, `typecheck:*`, `build:*`, and `dev:*` commands while iterating.
 
 Build the documentation exactly as GitHub Pages does:
 

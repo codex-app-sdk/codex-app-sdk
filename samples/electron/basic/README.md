@@ -7,7 +7,8 @@ This runnable Electron + Vue sample demonstrates the intended SDK boundary:
 - the right pane uses and customizes the SDK's `CodexConversationPane`;
 - the SDK transport, state, and eventing handle history, streaming, models,
   reasoning, permissions, goals, skills, plan mode, approvals, app-server user
-  input, message rollback actions, queued prompts, steering, interruption, and sending;
+  input, message rollback actions, prompt recall, editable queued prompts,
+  steering, interruption, and sending;
 - the SDK-native Electron bridge supplies file picking and ingestion, attachment
   previews, image paste/drop, copy, audio capture, and Apple voice transcription;
 - multiple conversations remain live concurrently and the custom sidebar can
@@ -39,15 +40,17 @@ From the SDK repository root:
 
 ```bash
 npm install
-npm run start:electron
+npm run dev:electron
 ```
 
-For renderer HMR, preload reloads, and automatic Electron restarts when sample
-or SDK main-process sources change:
+This enables renderer HMR, preload reloads, and automatic Electron restarts
+when sample or SDK main-process sources change. A prior SDK build is not
+required.
+
+For a production-style build followed by Electron startup:
 
 ```bash
-cd samples/electron/basic
-npm run dev
+npm run start:electron
 ```
 
 The sample does not send a cwd override. App-server owns the session working

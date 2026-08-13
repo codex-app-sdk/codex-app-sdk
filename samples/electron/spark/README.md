@@ -27,11 +27,12 @@ The sample demonstrates:
 From the repository root:
 
 ```bash
-npm run start:spark
+npm run dev:spark
 ```
 
-For renderer HMR and automatic Electron restarts:
+This enables renderer HMR and automatic Electron restarts. For a
+production-style build followed by Electron startup:
 
 ```bash
-npm run dev:spark
+npm run start:spark
 ```

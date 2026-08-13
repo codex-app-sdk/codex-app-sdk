@@ -12,12 +12,15 @@ The SDK packages the generic work once:
   persisted conversations;
 - keeping multiple conversations alive and independently streaming;
 - projecting history and live events into one serializable message model;
-- handling approvals, app-server questions, goals, plans, reviews, queues,
-  context usage, and rate limits;
+- handling prompt recall, editable queues, approvals, app-server questions,
+  goals, plans, reviews, context usage, and rate limits;
 - projecting one renderer-safe surface through Electron IPC or an authorized
   WebSocket;
-- rendering a complete Vue conversation pane with native attachments and
-  transcription.
+- rendering a complete Vue conversation pane with native attachments,
+  transcription, restored-image previews, code copying, and host-owned
+  visualization actions;
+- exposing trusted ephemeral text generation and headless sub-agent events for
+  application-owned workflows and UI.
 
 ## Default workflow
 

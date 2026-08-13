@@ -21,6 +21,10 @@ npm install @codex-app-sdk/core
 Renderer attachments contain opaque `reference` values, never filesystem
 paths. Host adapters resolve those references at a trusted boundary.
 
+Semantic surface events include provider-neutral `subagent.*` activity for
+hosts that want to build their own agent tree or activity pane. Core defines
+the renderer-safe contract; it deliberately does not prescribe sub-agent UI.
+
 Most applications consume these contracts indirectly through
 `@codex-app-sdk/electron`, `@codex-app-sdk/web`, or
 `@codex-app-sdk/vue`. See the [architecture

@@ -28,13 +28,13 @@ features:
     details: Keep several conversations loaded and streaming independently without coupling them to the selected UI thread.
   - icon: 💬
     title: Full conversation UI
-    details: Composer, messages, thinking, tools, approvals, goals, queues, generated media, Markdown, LaTeX, Mermaid, and native attachments.
+    details: Prompt recall, editable queues, double-Escape interruption, tools, approvals, goals, generated media, code copying, Markdown, LaTeX, Mermaid, and native attachments.
   - icon: 🧱
     title: Two narrow host adapters
     details: Electron IPC and framework-neutral WebSockets carry the same renderer-safe snapshots, events, and validated actions.
   - icon: 🧰
     title: Built to extend
-    details: Add host instructions, opaque context, dynamic tools, and app-owned MCP servers without leaking raw protocol into the renderer.
+    details: Add host instructions, opaque context, dynamic tools, app-owned MCP servers, visualization actions, and sub-agent UI without leaking raw protocol into the renderer.
   - icon: 🎨
     title: Product-ready customization
     details: Capabilities, presentation controls, slots, reusable leaf components, scoped styles, semantic tokens, and light/dark themes.

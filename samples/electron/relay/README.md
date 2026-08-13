@@ -50,13 +50,14 @@ from other samples.
 From the repository root:
 
 ```bash
-npm run start:relay
+npm run dev:relay
 ```
 
-For renderer HMR and automatic Electron restarts:
+This enables renderer HMR and automatic Electron restarts. For a
+production-style build followed by Electron startup:
 
 ```bash
-npm run dev:relay
+npm run start:relay
 ```
 
 Focused gates:
