@@ -149,6 +149,20 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('draft');
   });
 
+  it('recalls from controlled caret state when the DOM selection is unavailable', async () => {
+    const wrapper = mountComposer({ promptHistory: ['First prompt', 'Second prompt'] });
+    vi.spyOn(richEditorVm(wrapper), 'getSelectionRange').mockReturnValue({
+      end: 0,
+      start: 0,
+      valid: false,
+    });
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('Second prompt');
+  });
+
   it('leaves arrow navigation to the editor when the caret is not at the prompt end', async () => {
     const wrapper = mountComposer({ promptHistory: ['First prompt', 'Second prompt'] });
 

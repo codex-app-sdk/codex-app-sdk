@@ -531,11 +531,10 @@ function handleEditorKeydown(event: KeyboardEvent): void {
 
 function caretIsAtPromptEnd(): boolean {
   const selection = editorEl.value?.getSelectionRange();
-  return Boolean(
-    selection?.valid
-    && selection.start === selection.end
-    && selection.end === prompt.value.length,
-  );
+  if (selection?.valid) {
+    return selection.start === selection.end && selection.end === prompt.value.length;
+  }
+  return selectionStart.value === selectionEnd.value && selectionEnd.value === prompt.value.length;
 }
 
 function handleEditorInput(): void {
