@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
-import { nextTick } from 'vue';
+import { h, nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import ChatMentionChip from '../../src/chat/ChatMentionChip.vue';
 import ChatComposerAtMentionMenu from '../../src/chat/ChatComposerAtMentionMenu.vue';
@@ -29,6 +29,25 @@ describe('ChatRichTextEditor', () => {
     expect(wrapper.find('[data-file-mention="README.md"]').text()).toContain('README.md');
     expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText())
       .toBe('@gmail $cp /cp @README.md');
+  });
+
+  it('renders host mentions with a custom composer chip while preserving stable text', () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      props: {
+        mentionGroups: [{
+          id: 'threads',
+          label: 'Threads',
+          items: [{ id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' }],
+        }],
+        modelValue: 'Ask @thread:019abc',
+      },
+      slots: {
+        mention: ({ item }: { item: { label: string } }) => h('span', { class: 'host-thread-chip' }, `🤖 ${item.label}`),
+      },
+    });
+
+    expect(wrapper.get('[data-mention-value="thread:019abc"]').text()).toBe('🤖 codex-claw');
+    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('Ask @thread:019abc');
   });
 
   it('mounts the exported mention chip', () => {

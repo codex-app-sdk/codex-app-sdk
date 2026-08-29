@@ -116,7 +116,7 @@ The adapter is intentionally a controlled-view boundary. It does not create a
 | `history` | Initial loading, older-page availability, and older-page loading |
 | `thread` | Approvals, answered requests, goal, queued prompts, git diff, and context usage |
 | `composer` | Text/selection state, attachments, placeholder, menus, model/reasoning/tier, approval preset, and plan mode |
-| `catalogs` | Files, models, commands, skills, plugins, and catalog status |
+| `catalogs` | Files, models, commands, skills, plugins, host mention groups, and catalog status |
 | `capabilities` | Which standard conversation behaviors the host exposes |
 | `policy` | Message-action, attachment, follow-up, and disabled policies |
 
@@ -127,6 +127,10 @@ Use `composer.leadingMenuItems` for host actions that belong beside the built-in
 Codex controls. They render after Approval and before Plan mode. Existing
 `composer.menuItems` remain after Plan mode; both collections use
 `CodexComposerMenuItem` and dispatch through `actions.menuSelect`.
+Host-defined `catalogs.mentionGroups` render grouped `@` results before or
+after Plugins and Files and dispatch through `actions.mentionSelect`. Keep Vue
+rendering in the pane's `suggestion-item` and `mention` slots rather than in
+controller state.
 
 ## Action groups
 

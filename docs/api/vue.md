@@ -38,7 +38,7 @@ const paneState = computed(() => ({
     history: { hasOlder, loading, loadingOlder },
     thread: { approvals, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
     composer: { state, attachments, placeholder, leadingMenuItems, menuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
-    catalogs: { files, models, commands, skills, plugins, modelCatalogStatus, skillCatalogStatus },
+    catalogs: { files, models, commands, skills, plugins, mentionGroups, modelCatalogStatus, skillCatalogStatus },
     capabilities,
     policy: { actionsDisabled, attachEnabled, canDeleteMessage, canEditMessage, canForkMessage, canRetryMessage, followUpsDisabled },
 }));
@@ -81,6 +81,12 @@ promises are surfaced through the pane error UI.
 item and before Plan mode. `composer.menuItems` remains the trailing extension
 point after Plan mode. The equivalent granular pane prop is
 `leading-menu-items`.
+
+`catalogs.mentionGroups` adds app-owned grouped `@` suggestions alongside the
+built-in plugin and file results. `actions.mentionSelect(item, group)` observes
+selection. The `suggestion-item` and `mention` slots customize host result rows
+and chips; `mention` is shared by composer and message rendering and identifies
+the active surface in its slot props.
 
 `onMessageCopied(index)` is a post-action notification: the SDK always performs
 the clipboard write and copied-state feedback first. Omitting this hook does not
@@ -391,6 +397,11 @@ rendering recognized names as compact mention chips.
 
 `CodexComposer` uses the same catalog-backed chip renderer while editing. It
 keeps `$skill`, `@plugin`, and `@path` as the canonical submitted prompt text. Slash-prefixed text remains reserved for commands. Plugin and file results share the `@` suggestion menu; files appear only when the host supplies a thread/CWD-backed file catalog.
+Host-defined `CodexComposerMentionGroup` entries share that menu. Their stable
+`item.value` remains in canonical text while `item.label` is used for default
+display. `CodexComposerMentionItem`, `CodexComposerVisibleMentionGroup`,
+`filterComposerMentionGroups`, and `findComposerMention` are exported for
+custom composer implementations.
 When the composer is empty, Up recalls submitted prompts from newest to oldest
 and Down moves forward, returning to an empty prompt after the newest entry.
 Recalled prompts keep the caret at the end, and editing one exits history

@@ -60,6 +60,7 @@
                 :answered-client-request-ids="answeredClientRequestIds"
                 :block="block"
                 :follow-ups-disabled="followUpsDisabled"
+                :mention-groups="mentionGroups"
                 :plugins="plugins"
                 :open-image="openImage"
                 :show-tool-details="showToolDetails"
@@ -75,6 +76,9 @@
                 </template>
                 <template v-if="$slots.text" #text="scope">
                   <slot name="text" v-bind="scope" :index="index" :message="chatMessage" />
+                </template>
+                <template v-if="$slots.mention" #mention="scope">
+                  <slot name="mention" v-bind="scope" :index="index" :message="chatMessage" />
                 </template>
                 <template v-if="$slots.tool" #tool="scope">
                   <slot name="tool" v-bind="scope" :index="index" :message="chatMessage" />
@@ -154,6 +158,7 @@ import { computeMessageBlocks, stripMessageContext } from '../chat/message-block
 import { copyMessageToClipboard } from '../chat/message-actions'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import { useCodexHostCapabilities } from '../native-capabilities'
+import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom'
 
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
@@ -166,6 +171,7 @@ const props = withDefaults(defineProps<{
   followUpsDisabled?: boolean
   index?: number
   message: Message | SurfaceMessage
+  mentionGroups?: readonly CodexComposerMentionGroup[]
   openImage?: CodexMessageImageOpenHandler
   plugins?: readonly CodexSurfacePlugin[]
   presentation?: CodexConversationPresentation
@@ -184,6 +190,7 @@ const props = withDefaults(defineProps<{
 defineSlots<{
   actions(props: { disabled: boolean; index: number; message: Message }): unknown
   header(props: { index: number; message: Message }): unknown
+  mention(props: { group: CodexComposerMentionGroup; index: number; item: CodexComposerMentionItem; message: Message; surface: 'message' }): unknown
   attachment(props: {
     attachment: Extract<MessageBlock, { type: 'attachment' }>['attachment']
     block: Extract<MessageBlock, { type: 'attachment' }>

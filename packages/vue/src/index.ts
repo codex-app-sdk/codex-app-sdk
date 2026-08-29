@@ -97,6 +97,13 @@ export {
 export { createQueuedChatPrompt } from './chat/queued-prompts';
 export { commandDescription, filterComposerCommands } from './chat/composer-commands';
 export {
+  filterComposerMentionGroups,
+  findComposerMention,
+  type CodexComposerMentionGroup,
+  type CodexComposerMentionItem,
+  type CodexComposerVisibleMentionGroup,
+} from './chat/composer-mentions-custom';
+export {
   filterComposerSkills,
   promptSkillInputsFromText,
   skillDescription,

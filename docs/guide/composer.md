@@ -12,7 +12,7 @@ The editor renders rich chips while preserving plain Codex prompt text:
 | --- | --- | --- |
 | `/` | Commands and slash-invoked skills | `commands`, `skills` |
 | `$` | Codex skill mention | `skills` |
-| `@` | Plugin or file mention | `plugins`, `files` |
+| `@` | Plugin, file, or host-defined mention | `plugins`, `files`, `mentionGroups` |
 
 `$skill`, `@plugin`, and `@path` remain in the submitted text. The SDK does not
 replace them with private editor markup. File suggestions require a host-supplied
@@ -27,6 +27,53 @@ file catalog, normally backed by a conversation with a working directory.
   @send="send"
 />
 ```
+
+## Host-defined mentions
+
+Apps can add grouped `@` results without disguising them as plugins or files.
+Each item separates the friendly label from the stable token stored in the
+prompt:
+
+```ts
+const mentionGroups = [{
+  id: 'threads',
+  label: 'Threads',
+  placement: 'before',
+  items: threads.map((thread) => ({
+    id: thread.id,
+    value: `thread:${thread.id}`,
+    label: thread.title,
+    payload: { threadId: thread.id },
+  })),
+}];
+```
+
+```vue
+<CodexConversationPane
+  :mention-groups="mentionGroups"
+  @mention-select="handleMentionSelected"
+>
+  <template #suggestion-item="{ item }">
+    <BotIcon /> {{ item.label }}
+  </template>
+  <template #mention="{ item, surface }">
+    <ThreadMention :thread="item.payload" :surface="surface" />
+  </template>
+</CodexConversationPane>
+```
+
+Selection inserts canonical text such as `@thread:019abc`; the composer and
+subsequently rendered user message display `item.label`. `value` must be a
+single token composed of letters, digits, `_`, `.`, `:`, or `-`. Keep the
+group catalog available while rendering history so the SDK can recognize the
+stable token after reload. `placement` defaults to `before`, placing app groups
+above Plugins and Files; use `after` for trailing groups.
+
+The `suggestion-item` slot owns custom suggestion-row rendering. The shared
+`mention` slot owns custom chips and receives `surface: 'composer' | 'message'`.
+Controller-based panes supply the catalog through
+`state.catalogs.mentionGroups` and receive selection through
+`actions.mentionSelect`.
 
 ## Keyboard behavior
 

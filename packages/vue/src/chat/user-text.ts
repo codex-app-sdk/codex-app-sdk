@@ -1,11 +1,23 @@
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 import { skillDisplayName, skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';
+import {
+  findComposerMention,
+  type CodexComposerMentionGroup,
+  type CodexComposerMentionItem,
+} from './composer-mentions-custom';
 
 export type CodexUserTextToken =
   | { type: 'text'; text: string }
   | { type: 'code'; text: string }
   | { type: 'line-break' }
+  | {
+    type: 'custom-mention';
+    displayName: string;
+    group: CodexComposerMentionGroup;
+    item: CodexComposerMentionItem;
+    label: string;
+  }
   | {
     type: 'plugin-mention';
     displayName: string;
@@ -21,13 +33,14 @@ export type CodexUserTextToken =
     skill?: CodexSurfaceSkill;
   };
 
-const userTextTokenRegex = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\n]+)\)|(?<![\w.%+-])([$@/])([A-Za-z0-9_.-]+(?:[ \t]+\([A-Za-z0-9_.-]+\))?)|(\n)/g;
+const userTextTokenRegex = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\n]+)\)|(?<![\w.%+-])([$@/])([A-Za-z0-9_.:-]+(?:[ \t]+\([A-Za-z0-9_.-]+\))?)|(\n)/g;
 const opaqueAppNameRegex = /^app[-_]?[a-f\d]{16,}$/i;
 
 export function parseCodexUserText(
   content: string,
   plugins: readonly CodexSurfacePlugin[] = [],
   skills: readonly CodexSurfaceSkill[] = [],
+  mentionGroups: readonly CodexComposerMentionGroup[] = [],
 ): CodexUserTextToken[] {
   const tokens: CodexUserTextToken[] = [];
   let lastIndex = 0;
@@ -47,7 +60,7 @@ export function parseCodexUserText(
     } else if (label !== undefined && href !== undefined) {
       tokens.push(mentionToken(label, href, plugins, skills) ?? { type: 'text', text: raw });
     } else if (bareTrigger !== undefined && bareName !== undefined) {
-      tokens.push(bareMentionToken(bareTrigger, bareName, plugins, skills) ?? { type: 'text', text: raw });
+      tokens.push(bareMentionToken(bareTrigger, bareName, plugins, skills, mentionGroups) ?? { type: 'text', text: raw });
     } else {
       tokens.push({ type: 'line-break' });
     }
@@ -63,7 +76,8 @@ function bareMentionToken(
   name: string,
   plugins: readonly CodexSurfacePlugin[],
   skills: readonly CodexSurfaceSkill[],
-): Extract<CodexUserTextToken, { type: 'plugin-mention' | 'skill-mention' }> | null {
+  mentionGroups: readonly CodexComposerMentionGroup[],
+): Extract<CodexUserTextToken, { type: 'custom-mention' | 'plugin-mention' | 'skill-mention' }> | null {
   if (trigger === '$') {
     const skill = skills.find((candidate) => skillMatchesMention(candidate, name));
     if (skill) {
@@ -78,15 +92,38 @@ function bareMentionToken(
   }
 
   if (trigger !== '@') return null;
+  const leadingMention = findComposerMention(
+    mentionGroups.filter((group) => group.placement !== 'after'),
+    name,
+  );
+  if (leadingMention) {
+    return {
+      type: 'custom-mention',
+      displayName: leadingMention.item.label,
+      label: `${trigger}${name}`,
+      ...leadingMention,
+    };
+  }
   const plugin = plugins.find((candidate) => pluginMatchesMention(candidate, name));
-  if (!plugin) return null;
-  return {
-    type: 'plugin-mention',
-    displayName: plugin.displayName || plugin.name,
-    href: `plugin://${plugin.id}`,
+  if (plugin) {
+    return {
+      type: 'plugin-mention',
+      displayName: plugin.displayName || plugin.name,
+      href: `plugin://${plugin.id}`,
+      label: `${trigger}${name}`,
+      plugin,
+    };
+  }
+  const trailingMention = findComposerMention(
+    mentionGroups.filter((group) => group.placement === 'after'),
+    name,
+  );
+  return trailingMention ? {
+    type: 'custom-mention',
+    displayName: trailingMention.item.label,
     label: `${trigger}${name}`,
-    plugin,
-  };
+    ...trailingMention,
+  } : null;
 }
 
 function mentionToken(

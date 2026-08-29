@@ -18,6 +18,7 @@ import type { CodexMessageImageOpenHandler } from './chat/message-image';
 import type { CodexConversationVisualization } from './chat/visualization';
 import type { CodexComposerState } from './composer-state';
 import type { QueuedChatPrompt } from './chat/queued-prompts';
+import type { CodexComposerMentionGroup, CodexComposerMentionItem } from './chat/composer-mentions-custom';
 import type { CodexHostAttachment } from '@codex-app-sdk/core/native';
 import type {
   CodexSurfaceApproval,
@@ -74,6 +75,7 @@ export type CodexConversationPaneCatalogState = {
   commands?: readonly CodexCommandSummary[];
   skills?: readonly CodexSkillSummary[];
   plugins?: readonly CodexSurfacePlugin[];
+  mentionGroups?: readonly CodexComposerMentionGroup[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
 };
@@ -136,6 +138,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   interrupt?: PaneAction;
   loadOlderHistory?: PaneAction;
   menuSelect?: PaneAction<[item: CodexComposerMenuSelectableItem<Payload>]>;
+  mentionSelect?: PaneAction<[item: CodexComposerMentionItem<Payload>, group: CodexComposerMentionGroup<Payload>]>;
   openImage?: CodexMessageImageOpenHandler;
   openLink?: PaneAction<[link: CodexConversationLink]>;
   openVisualization?: PaneAction<[visualization: CodexConversationVisualization]>;

@@ -3,9 +3,12 @@
     <ChatUserText
       class="chat-message-block chat-message-block--text"
       :content="block.content"
+      :mention-groups="mentionGroups"
       :plugins="plugins"
       :skills="skills"
-    />
+    >
+      <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
+    </ChatUserText>
   </slot>
   <slot v-else-if="block.type === 'text'" name="text" :block="block" :content="block.content" :user="false">
     <div
@@ -81,6 +84,7 @@ import type { ClientRequestResponse, CodexConversationLink } from './contracts'
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface'
 import type { CodexMessageImageOpenHandler } from './message-image'
 import type { CodexConversationVisualization } from './visualization'
+import type { CodexComposerMentionGroup, CodexComposerMentionItem } from './composer-mentions-custom'
 import { useCodexHostCapabilities } from '../native-capabilities'
 
 defineSlots<{
@@ -90,6 +94,7 @@ defineSlots<{
   }): unknown
   media(props: { block: Extract<MessageBlock, { type: 'media' }>; media: Extract<MessageBlock, { type: 'media' }>['media'] }): unknown
   mermaid(props: { block: Extract<MessageBlock, { type: 'mermaid' }>; code: string }): unknown
+  mention(props: { group: CodexComposerMentionGroup; item: CodexComposerMentionItem; surface: 'message' }): unknown
   visualization(props: { block: Extract<MessageBlock, { type: 'visualization' }> }): unknown
   text(props: { block: Extract<MessageBlock, { type: 'text' | 'user-text' }>; content: string; user: boolean }): unknown
   tool(props: {
@@ -103,6 +108,7 @@ withDefaults(defineProps<{
   block: MessageBlock
   answeredClientRequestIds?: ReadonlySet<string>
   followUpsDisabled?: boolean
+  mentionGroups?: readonly CodexComposerMentionGroup[]
   openImage?: CodexMessageImageOpenHandler
   plugins?: readonly CodexSurfacePlugin[]
   showToolDetails?: boolean

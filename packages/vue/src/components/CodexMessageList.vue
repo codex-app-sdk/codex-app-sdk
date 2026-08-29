@@ -26,6 +26,7 @@
             :follow-ups-disabled="followUpsDisabled"
             :index="entry.index"
             :message="entry.message"
+            :mention-groups="mentionGroups"
             :open-image="openImage"
             :plugins="plugins"
             :presentation="presentation"
@@ -48,6 +49,7 @@
             <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
             <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
             <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
+            <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
             <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
             <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
             <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
@@ -81,6 +83,7 @@ import type { CodexConversationVisualization } from '../chat/visualization'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
 import CodexScrollToBottom from './CodexScrollToBottom.vue'
+import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom'
 
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
@@ -102,6 +105,7 @@ const props = withDefaults(defineProps<{
   loadingOlderMessages?: boolean
   messageBatchSize?: number
   messages: readonly (Message | SurfaceMessage)[]
+  mentionGroups?: readonly CodexComposerMentionGroup[]
   openImage?: CodexMessageImageOpenHandler
   transformMessage?: (message: Message | SurfaceMessage, index: number) => Message | SurfaceMessage
   plugins?: readonly CodexSurfacePlugin[]
@@ -138,6 +142,7 @@ defineSlots<{
   empty(): unknown
   header(props: { index: number; message: Message }): unknown
   message(props: { index: number; message: Message }): unknown
+  mention(props: { group: CodexComposerMentionGroup; index: number; item: CodexComposerMentionItem; message: Message; surface: 'message' }): unknown
   status(props: { index: number; message: Message; status: 'streaming' }): unknown
   text(props: { block: Extract<MessageBlock, { type: 'text' | 'user-text' }>; content: string; index: number; message: Message; user: boolean }): unknown
   thinking(props: { index: number; message: Message }): unknown

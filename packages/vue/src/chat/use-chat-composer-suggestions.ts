@@ -10,14 +10,24 @@ import { filterFileSearchItems } from './file-search'
 import { filterComposerCommands, findActiveCommandSlash } from './composer-commands'
 import { filterComposerSkills, findActiveSkillTrigger, skillInsertText } from './composer-skills'
 import { filterComposerPlugins } from './composer-plugins'
+import {
+  filterComposerMentionGroups,
+  type CodexComposerMentionGroup,
+  type CodexComposerMentionItem,
+} from './composer-mentions-custom'
 
-type ChatComposerSuggestionOptions = {
+type ChatComposerSuggestionOptions<Payload = unknown> = {
   caretPosition: Ref<number>
   commands: () => readonly CodexCommandSummary[]
   disabled: () => boolean
   files: () => readonly CodexFileSearchItem[]
   plugins?: () => readonly CodexSurfacePlugin[]
   pluginsEnabled?: () => boolean
+  mentionGroups?: () => readonly CodexComposerMentionGroup<Payload>[]
+  onMentionSelected?: (
+    item: CodexComposerMentionItem<Payload>,
+    group: CodexComposerMentionGroup<Payload>,
+  ) => void
   isSending: () => boolean
   onCommandSubmitted: (prompt: string) => void
   onTextInserted: (caretPosition: number) => void
@@ -29,7 +39,7 @@ type ChatComposerSuggestionOptions = {
   } | null>
 }
 
-export function useChatComposerSuggestions(options: ChatComposerSuggestionOptions) {
+export function useChatComposerSuggestions<Payload = unknown>(options: ChatComposerSuggestionOptions<Payload>) {
   const fileMenuOpen = ref(false)
   const activeFileIndex = ref(0)
   const skillMenuOpen = ref(false)
@@ -77,6 +87,16 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     !inputDisabled()
   ))
   const visiblePlugins = computed(() => filterComposerPlugins([...(options.plugins?.() ?? [])], activePluginMention.value?.query ?? ''))
+  const visibleMentionGroups = computed(() => filterComposerMentionGroups(
+    options.mentionGroups?.() ?? [],
+    activeFileMention.value?.query ?? '',
+  ))
+  const visibleLeadingMentionItems = computed(() => visibleMentionGroups.value
+    .filter((group) => group.placement !== 'after')
+    .flatMap((group) => group.items.map((item) => ({ group, item }))))
+  const visibleTrailingMentionItems = computed(() => visibleMentionGroups.value
+    .filter((group) => group.placement === 'after')
+    .flatMap((group) => group.items.map((item) => ({ group, item }))))
   const pluginMenuVisible = computed(() => (
     pluginMenuOpen.value &&
     (options.pluginsEnabled?.() ?? false) &&
@@ -84,7 +104,12 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     visiblePlugins.value.length > 0 &&
     !inputDisabled()
   ))
-  const atItemCount = computed(() => visiblePlugins.value.length + visibleFiles.value.length)
+  const atItemCount = computed(() => (
+    visibleLeadingMentionItems.value.length
+    + visiblePlugins.value.length
+    + visibleFiles.value.length
+    + visibleTrailingMentionItems.value.length
+  ))
   const atMenuVisible = computed(() => (
     (pluginMenuOpen.value || fileMenuOpen.value) &&
     activeFileMention.value !== null &&
@@ -111,6 +136,9 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     activePluginIndex.value = 0
     activeAtIndex.value = 0
   })
+  watch(visibleMentionGroups, () => {
+    activeAtIndex.value = 0
+  })
   watch([visibleSlashCommands, visibleSlashSkills, activeCommandSlash], () => {
     activeSlashIndex.value = 0
   })
@@ -120,11 +148,24 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
 
   function handleKeydown(event: KeyboardEvent): boolean {
     if (handleMenuKeydown(event, atMenuVisible.value, atItemCount.value, activeAtIndex, () => {
-      const plugin = visiblePlugins.value[activeAtIndex.value]
+      const leading = visibleLeadingMentionItems.value[activeAtIndex.value]
+      if (leading) {
+        selectMention(leading.item, leading.group)
+        return
+      }
+      const builtInIndex = activeAtIndex.value - visibleLeadingMentionItems.value.length
+      const plugin = visiblePlugins.value[builtInIndex]
       if (plugin) selectPlugin(plugin)
       else {
-        const file = visibleFiles.value[activeAtIndex.value - visiblePlugins.value.length]
-        if (file) selectFile(file)
+        const file = visibleFiles.value[builtInIndex - visiblePlugins.value.length]
+        if (file) {
+          selectFile(file)
+          return
+        }
+        const trailing = visibleTrailingMentionItems.value[
+          builtInIndex - visiblePlugins.value.length - visibleFiles.value.length
+        ]
+        if (trailing) selectMention(trailing.item, trailing.group)
       }
     })) {
       return true
@@ -195,6 +236,17 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     if (mention) {
       insert(`@${plugin.name || plugin.id} `, mention.start, mention.end)
     }
+  }
+
+  function selectMention(
+    item: CodexComposerMentionItem<Payload>,
+    group: CodexComposerMentionGroup<Payload>,
+  ): void {
+    const mention = activeFileMention.value
+    if (!mention) return
+    insert(`@${item.value} `, mention.start, mention.end)
+    const catalogGroup = options.mentionGroups?.().find((candidate) => candidate.id === group.id) ?? group
+    options.onMentionSelected?.(item, catalogGroup)
   }
 
   function selectSlashSkill(skill: CodexSkillSummary): void {
@@ -335,6 +387,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     selectFile,
     selectSkill,
     selectPlugin,
+    selectMention,
     selectSlashSkill,
     skillMenuVisible,
     pluginMenuVisible,
@@ -345,6 +398,7 @@ export function useChatComposerSuggestions(options: ChatComposerSuggestionOption
     visibleFiles,
     visibleSkills,
     visiblePlugins,
+    visibleMentionGroups,
     visibleSlashCommands,
     visibleSlashSkills,
   }

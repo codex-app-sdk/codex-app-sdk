@@ -39,6 +39,7 @@
         :initial-message-batch-size="initialMessageBatchSize"
         :message-batch-size="messageBatchSize"
         :messages="effectiveMessages"
+        :mention-groups="effectiveMentionGroups"
         :open-image="openImage"
         :plugins="effectivePlugins"
         :presentation="effectivePresentation"
@@ -65,6 +66,7 @@
         <template v-if="$slots['message-attachment']" #attachment="scope"><slot name="message-attachment" v-bind="scope" /></template>
         <template v-if="$slots['message-block']" #block="scope"><slot name="message-block" v-bind="scope" /></template>
         <template v-if="$slots['message-header']" #header="scope"><slot name="message-header" v-bind="scope" /></template>
+        <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
         <template v-if="$slots['message-status']" #status="scope"><slot name="message-status" v-bind="scope" /></template>
         <template v-if="$slots['message-text']" #text="scope"><slot name="message-text" v-bind="scope" /></template>
         <template v-if="$slots['message-thinking']" #thinking="scope"><slot name="message-thinking" v-bind="scope" /></template>
@@ -131,6 +133,7 @@
             :is-sending="effectiveBusy"
             :leading-menu-items="effectiveLeadingMenuItems"
             :menu-items="effectiveMenuItems"
+            :mention-groups="effectiveMentionGroups"
             :model-catalog-status="effectiveModelCatalogStatus"
             :models="effectiveModels"
             :placeholder="effectivePlaceholder"
@@ -147,6 +150,7 @@
             @attach="selectAttachments"
             @interrupt="interrupt"
             @menu-select="menuSelect"
+            @mention-select="mentionSelect"
             @select-approval-preset="selectApprovalPreset"
             @send="submit"
             @steer="steer"
@@ -200,6 +204,8 @@
             </template>
             <template v-if="$slots['menu-icon']" #menu-icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
             <template v-if="$slots['menu-item']" #menu-item="scope"><slot name="menu-item" v-bind="scope" /></template>
+            <template v-if="$slots['suggestion-item']" #suggestion-item="scope"><slot name="suggestion-item" v-bind="scope" /></template>
+            <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
             <template v-if="$slots['composer-after-input']" #after-input><slot name="composer-after-input" /></template>
             <template v-if="$slots['composer-after']" #after><slot name="composer-after" /></template>
           </CodexComposer>
@@ -273,6 +279,7 @@ import {
 } from '../native-capabilities';
 import type { CodexSurfaceController } from '../use-codex-surface';
 import type { CodexComposerState } from '../composer-state';
+import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom';
 import { normalizeCodexComposerState } from '../composer-state';
 import { useConversationEscapeInterrupt } from '../chat/use-conversation-escape-interrupt';
 import { X as XIcon } from '../icons/app-icons';
@@ -322,6 +329,7 @@ const props = withDefaults(defineProps<{
   messageBatchSize?: number;
   leadingMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
+  mentionGroups?: readonly CodexComposerMentionGroup<Payload>[];
   messages?: readonly (Message | SurfaceMessage)[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
@@ -390,6 +398,17 @@ defineSlots<{
   empty(props: { description: string; title: string }): unknown;
   'menu-icon'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
   'menu-item'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
+  mention(props: {
+    group: CodexComposerMentionGroup;
+    item: CodexComposerMentionItem;
+    surface: 'composer' | 'message';
+  }): unknown;
+  'suggestion-item'(props: {
+    active: boolean;
+    group: CodexComposerMentionGroup;
+    item: CodexComposerMentionItem;
+    surface: string;
+  }): unknown;
   message(props: { index: number; message: Message }): unknown;
   'message-actions'(props: { disabled: boolean; index: number; message: Message }): unknown;
   'message-attachment'(props: {
@@ -429,6 +448,7 @@ const emit = defineEmits<{
   error: [message: string | null];
   interrupt: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
+  mentionSelect: [item: CodexComposerMentionItem<Payload>, group: CodexComposerMentionGroup<Payload>];
   openLink: [link: CodexConversationLink];
   openVisualization: [visualization: CodexConversationVisualization];
   resolveApproval: [
@@ -595,6 +615,10 @@ const effectivePlugins = computed(() => controlledValue(
   (state) => state.catalogs?.plugins,
   () => props.plugins ?? surfaceState.value?.plugins,
 ));
+const effectiveMentionGroups = computed(() => controlledValue(
+  (state) => state.catalogs?.mentionGroups,
+  () => props.mentionGroups,
+) as readonly CodexComposerMentionGroup<Payload>[] | undefined);
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
 const effectiveQueuedPrompts = computed(() => controlledValue(
   (state) => state.thread?.queuedPrompts ?? [],
@@ -1209,6 +1233,19 @@ function menuSelect(item: CodexComposerMenuSelectableItem<unknown>): void {
   if (dispatchControllerAction('menuSelect', item)) return;
   if (effectiveController.value) return;
   emit('menuSelect', item as CodexComposerMenuSelectableItem<Payload>);
+}
+
+function mentionSelect(
+  item: CodexComposerMentionItem,
+  group: CodexComposerMentionGroup,
+): void {
+  if (dispatchControllerAction('mentionSelect', item, group)) return;
+  if (effectiveController.value) return;
+  emit(
+    'mentionSelect',
+    item as CodexComposerMentionItem<Payload>,
+    group as CodexComposerMentionGroup<Payload>,
+  );
 }
 
 function dispatchControllerAction(

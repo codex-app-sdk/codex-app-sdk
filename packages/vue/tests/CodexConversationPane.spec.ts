@@ -751,6 +751,65 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('menuSelect')?.[0]).toStrictEqual([menuItems[0]]);
   });
 
+  it('routes host mention groups and rendering through the stock pane', async () => {
+    const group = {
+      id: 'threads',
+      label: 'Threads',
+      items: [{ id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' }],
+    };
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        mentionGroups: [group],
+        messages: [{
+          id: 'user-thread',
+          role: 'user',
+          status: 'complete',
+          parts: [{ type: 'text', text: 'Ask @thread:019abc' }],
+        } satisfies SurfaceMessage],
+      },
+      slots: {
+        mention: ({ item, surface }: { item: { label: string }; surface: string }) => (
+          h('span', { class: `host-mention host-mention--${surface}` }, `🤖 ${item.label}`)
+        ),
+        'suggestion-item': ({ item }: { item: { label: string } }) => (
+          h('span', { class: 'host-suggestion' }, `Thread: ${item.label}`)
+        ),
+      },
+    });
+
+    expect(wrapper.get('.host-mention--message').text()).toBe('🤖 codex-claw');
+    await setComposerText(wrapper, '@codex');
+    expect(wrapper.get('.host-suggestion').text()).toBe('Thread: codex-claw');
+    await wrapper.get('.chat-composer-at-menu__item').trigger('mousedown');
+    expect(composerValue(wrapper)).toBe('@thread:019abc ');
+    expect(wrapper.get('.host-mention--composer').text()).toBe('🤖 codex-claw');
+    expect(wrapper.emitted('mentionSelect')).toStrictEqual([[group.items[0], group]]);
+  });
+
+  it('routes host mention selection exclusively through controller actions in controller mode', async () => {
+    const group = {
+      id: 'threads',
+      label: 'Threads',
+      items: [{ id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' }],
+    };
+    const mentionSelect = vi.fn();
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: { conversationKey: 'controller-thread', messages: [] },
+        catalogs: { mentionGroups: [group] },
+      },
+      actions: { mentionSelect },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await setComposerText(wrapper, '@codex');
+    await wrapper.get('.chat-composer-at-menu__item').trigger('mousedown');
+    await flushPromises();
+
+    expect(mentionSelect).toHaveBeenCalledWith(group.items[0], group);
+    expect(wrapper.emitted('mentionSelect')).toBeUndefined();
+  });
+
   it('composes approvals and forwards decisions without exposing protocol types', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: {

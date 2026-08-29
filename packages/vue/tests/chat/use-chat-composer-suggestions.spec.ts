@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CodexFileSearchItem, CodexCommandSummary, CodexSkillSummary } from '../../src/chat/contracts';
 import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { useChatComposerSuggestions } from '../../src/chat/use-chat-composer-suggestions';
+import type { CodexComposerMentionGroup } from '../../src/chat/composer-mentions-custom';
 
 const files: CodexFileSearchItem[] = [
   { name: 'alpha.ts', path: 'src/alpha.ts' },
@@ -21,7 +22,11 @@ const plugins: CodexSurfacePlugin[] = [
   { id: 'ts@remote', name: 'ts', displayName: 'TypeScript', enabled: true },
 ];
 
-function setup(initialPrompt: string, configuredPlugins: CodexSurfacePlugin[] = []) {
+function setup(
+  initialPrompt: string,
+  configuredPlugins: CodexSurfacePlugin[] = [],
+  mentionGroups: readonly CodexComposerMentionGroup[] = [],
+) {
   const prompt = ref(initialPrompt);
   const caretPosition = ref(initialPrompt.length);
   const editor = ref({
@@ -33,6 +38,7 @@ function setup(initialPrompt: string, configuredPlugins: CodexSurfacePlugin[] = 
   });
   const onCommandSubmitted = vi.fn();
   const onTextInserted = vi.fn();
+  const onMentionSelected = vi.fn();
   const suggestions = useChatComposerSuggestions({
     caretPosition,
     commands: () => commands,
@@ -40,16 +46,18 @@ function setup(initialPrompt: string, configuredPlugins: CodexSurfacePlugin[] = 
     files: () => files,
     plugins: () => configuredPlugins,
     pluginsEnabled: () => true,
+    mentionGroups: () => mentionGroups,
     isSending: () => false,
     onCommandSubmitted,
     onTextInserted,
+    onMentionSelected,
     prompt,
     skills: () => skills,
     skillsEnabled: () => true,
     editor,
   });
   suggestions.sync();
-  return { caretPosition, editor, onCommandSubmitted, onTextInserted, prompt, suggestions };
+  return { caretPosition, editor, onCommandSubmitted, onMentionSelected, onTextInserted, prompt, suggestions };
 }
 
 function key(key: string): KeyboardEvent {
@@ -81,6 +89,35 @@ describe('useChatComposerSuggestions', () => {
     expect(state.suggestions.handleKeydown(key('ArrowDown'))).toBe(true);
     expect(state.suggestions.handleKeydown(key('Enter'))).toBe(true);
     expect(state.prompt.value).toBe('inspect @src/alpha.ts ');
+  });
+
+  it('places host mention groups around built-ins and inserts their stable value', async () => {
+    const leading = {
+      id: 'threads',
+      label: 'Threads',
+      items: [
+        { id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' },
+        { id: 'thread-2', value: 'thread:019def', label: 'sdk-planning' },
+      ],
+    } satisfies CodexComposerMentionGroup;
+    const trailing = {
+      id: 'people',
+      label: 'People',
+      placement: 'after',
+      items: [{ id: 'person-1', value: 'person:nico', label: 'Nicolas' }],
+    } satisfies CodexComposerMentionGroup;
+    const state = setup('@codex', plugins, [leading, trailing]);
+    await nextTick();
+
+    expect(state.suggestions.atMenuVisible.value).toBe(true);
+    expect(state.suggestions.handleKeydown(key('Enter'))).toBe(true);
+    expect(state.prompt.value).toBe('@thread:019abc ');
+    expect(state.onMentionSelected).toHaveBeenCalledWith(leading.items[0], leading);
+
+    const trailingState = setup('@person', plugins, [leading, trailing]);
+    await nextTick();
+    expect(trailingState.suggestions.handleKeydown(key('Enter'))).toBe(true);
+    expect(trailingState.prompt.value).toBe('@person:nico ');
   });
 
   it('inserts skills and submits immediate slash commands', async () => {

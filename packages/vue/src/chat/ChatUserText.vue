@@ -5,6 +5,19 @@
         <span v-if="token.type === 'text'">{{ token.text }}</span>
         <code v-else-if="token.type === 'code'">{{ token.text }}</code>
         <br v-else-if="token.type === 'line-break'">
+        <slot
+          v-else-if="token.type === 'custom-mention'"
+          name="mention"
+          :group="token.group"
+          :item="token.item"
+          :token="token"
+          surface="message"
+        >
+          <span class="chat-user-text__mention chat-user-text__mention--custom" :title="token.item.description || token.displayName">
+            <SparklesIcon class="chat-user-text__mention-icon" aria-hidden="true" />
+            <span class="chat-user-text__mention-label">{{ token.displayName }}</span>
+          </span>
+        </slot>
         <span
           v-else
           class="chat-user-text__mention"
@@ -72,18 +85,30 @@ import { computed, reactive } from 'vue';
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 import { SparklesIcon } from '../icons/app-icons';
 import { parseCodexUserText, type CodexUserTextToken } from './user-text';
+import type { CodexComposerMentionGroup } from './composer-mentions-custom';
 
 const props = withDefaults(defineProps<{
   content: string;
+  mentionGroups?: readonly CodexComposerMentionGroup[];
   plugins?: readonly CodexSurfacePlugin[];
   skills?: readonly CodexSurfaceSkill[];
 }>(), {
   plugins: () => [],
+  mentionGroups: () => [],
   skills: () => [],
 });
 
 const failedIconUrls = reactive(new Set<string>());
-const tokens = computed(() => parseCodexUserText(props.content, props.plugins, props.skills));
+const tokens = computed(() => parseCodexUserText(props.content, props.plugins, props.skills, props.mentionGroups));
+
+defineSlots<{
+  mention(props: {
+    group: Extract<CodexUserTextToken, { type: 'custom-mention' }>['group'];
+    item: Extract<CodexUserTextToken, { type: 'custom-mention' }>['item'];
+    surface: 'message';
+    token: Extract<CodexUserTextToken, { type: 'custom-mention' }>;
+  }): unknown;
+}>();
 
 function mentionIcon(
   token: Extract<CodexUserTextToken, { type: 'plugin-mention' | 'skill-mention' }>,

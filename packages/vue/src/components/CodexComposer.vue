@@ -10,11 +10,17 @@
       v-if="atMenuVisible"
       :active-index="activeAtIndex"
       :show-file-hint="fileMenuShowsHint"
+      :mention-groups="visibleMentionGroups"
       :visible-files="visibleFiles"
       :visible-plugins="visiblePlugins"
       @select-file="selectFile"
       @select-plugin="selectPlugin"
-    />
+      @select-mention="selectMention"
+    >
+      <template v-if="$slots['suggestion-item']" #mention="scope">
+        <slot name="suggestion-item" v-bind="scope" surface="menu" />
+      </template>
+    </ChatComposerAtMentionMenu>
 
     <ChatComposerSkillMenu
       v-if="skillMenuVisible"
@@ -47,6 +53,7 @@
         :placeholder="placeholder"
         :disabled="disabled && !isSending"
         :files="files"
+        :mention-groups="mentionGroups"
         :plugins="plugins"
         :skills="skills"
         @blur="closeComposerMenusSoon"
@@ -56,7 +63,11 @@
         @keydown="handleEditorKeydown"
         @keyup="updateCaretPosition"
         @paste="handleEditorPaste"
-      />
+      >
+        <template v-if="$slots.mention" #mention="scope">
+          <slot name="mention" v-bind="scope" surface="composer" />
+        </template>
+      </ChatRichTextEditor>
       <slot name="after-input" />
     </div>
 
@@ -154,6 +165,7 @@ import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../
 import { useCodexHostCapabilities } from '../native-capabilities';
 import type { CodexComposerState } from '../composer-state';
 import { normalizeCodexComposerState } from '../composer-state';
+import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom';
 
 const props = defineProps<{
   autofocus?: boolean;
@@ -174,6 +186,7 @@ const props = defineProps<{
   interruptArmed?: boolean;
   leadingMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
+  mentionGroups?: readonly CodexComposerMentionGroup<Payload>[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
   placeholder: string;
@@ -196,6 +209,7 @@ const emit = defineEmits<{
   steerQueuedPrompt: [promptId: string];
   attach: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
+  mentionSelect: [item: CodexComposerMentionItem<Payload>, group: CodexComposerMentionGroup<Payload>];
   interrupt: [];
   'update:modelId': [modelId: string];
   'update:composerState': [state: CodexComposerState];
@@ -290,6 +304,7 @@ const {
   selectCommand,
   selectFile,
   selectPlugin,
+  selectMention,
   selectSkill,
   selectSlashSkill,
   skillMenuVisible,
@@ -299,6 +314,7 @@ const {
   updateCaretPosition,
   visibleFiles,
   visiblePlugins,
+  visibleMentionGroups,
   visibleSkills,
   visibleSlashCommands,
   visibleSlashSkills,
@@ -308,6 +324,7 @@ const {
   disabled: () => props.disabled,
   files: () => props.files ?? [],
   plugins: () => props.plugins ?? [],
+  mentionGroups: () => props.mentionGroups ?? [],
   pluginsEnabled: () => true,
   isSending: () => props.isSending,
   onCommandSubmitted: (command) => {
@@ -316,6 +333,7 @@ const {
     void nextTick(resizeEditor);
   },
   onTextInserted: focusAt,
+  onMentionSelected: (item, group) => emit('mentionSelect', item, group),
   prompt,
   skills: () => props.skills ?? [],
   skillsEnabled: () => effectiveCodexCapabilities.value.skills,

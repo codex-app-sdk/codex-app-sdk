@@ -12,12 +12,17 @@
 </template>
 
 <script setup lang="ts">
-import { h, nextTick, onBeforeUnmount, onMounted, ref, render, watch } from 'vue';
+import { Fragment, h, nextTick, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 import type { CodexFileSearchItem, CodexSkillSummary } from './contracts';
 import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import ChatMentionChip from './ChatMentionChip.vue';
 import { skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';
+import {
+  findComposerMention,
+  type CodexComposerMentionGroup,
+  type CodexComposerMentionItem,
+} from './composer-mentions-custom';
 
 export type CodexRichTextEditorExpose = {
   autoResize: () => void;
@@ -35,6 +40,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean;
   files?: readonly CodexFileSearchItem[];
   maxHeight?: number;
+  mentionGroups?: readonly CodexComposerMentionGroup[];
   modelValue: string;
   placeholder?: string;
   plugins?: readonly CodexSurfacePlugin[];
@@ -44,10 +50,13 @@ const props = withDefaults(defineProps<{
   disabled: false,
   files: () => [],
   maxHeight: 304,
+  mentionGroups: () => [],
   placeholder: '',
   plugins: () => [],
   skills: () => [],
 });
+
+const slots = useSlots();
 
 const emit = defineEmits<{
   input: [];
@@ -64,7 +73,7 @@ watch(() => props.modelValue, (value) => {
   renderText(value, Math.min(caretPosition.value, value.length));
 });
 
-watch(() => [props.files, props.plugins, props.skills], () => {
+watch(() => [props.files, props.mentionGroups, props.plugins, props.skills], () => {
   renderText(props.modelValue, Math.min(caretPosition.value, props.modelValue.length));
 }, { deep: true });
 
@@ -155,6 +164,7 @@ function canonicalNodeText(node: Node): string {
   if (node.tagName === 'CODE') return `\`${node.textContent ?? ''}\``;
   if (node.dataset.pluginName) return `@${node.dataset.pluginName}`;
   if (node.dataset.fileMention) return `@${node.dataset.fileMention}`;
+  if (node.dataset.mentionValue) return `@${node.dataset.mentionValue}`;
   if (node.dataset.skillName) return `${node.dataset.skillTrigger || '$'}${node.dataset.skillName}`;
   if (node.tagName === 'BR') return node.dataset.trailingLineBreak === undefined ? '\n' : '';
   return Array.from(node.childNodes).map(canonicalNodeText).join('');
@@ -250,7 +260,7 @@ function domPositionForCanonicalOffset(root: HTMLElement, position: number): { n
 
 function isChipHost(node: Node): node is HTMLElement {
   return node instanceof HTMLElement && Boolean(
-    node.dataset.pluginName || node.dataset.fileMention || node.dataset.skillName,
+    node.dataset.pluginName || node.dataset.fileMention || node.dataset.mentionValue || node.dataset.skillName,
   );
 }
 
@@ -323,7 +333,9 @@ function renderText(value: string, caret = caretPosition.value, options: { focus
       const atMention = mention as Exclude<ReturnType<typeof findAtMention>, undefined>;
       fragment.append(atMention.kind === 'plugin'
         ? createPluginChip(tokenText, atMention.value)
-        : createFileChip(tokenText, atMention.value));
+        : atMention.kind === 'file'
+          ? createFileChip(tokenText, atMention.value)
+          : createCustomMentionChip(tokenText, atMention.group, atMention.item));
     }
     lastIndex = tokenEnd;
   }
@@ -355,11 +367,22 @@ function findPlugin(name: string): CodexSurfacePlugin | undefined {
 function findAtMention(name: string):
   | { kind: 'plugin'; value: CodexSurfacePlugin }
   | { kind: 'file'; value: CodexFileSearchItem }
+  | { kind: 'custom'; group: CodexComposerMentionGroup; item: CodexComposerMentionItem }
   | undefined {
+  const leadingMention = findComposerMention(
+    props.mentionGroups.filter((group) => group.placement !== 'after'),
+    name,
+  );
+  if (leadingMention) return { kind: 'custom', ...leadingMention };
   const plugin = findPlugin(name);
   if (plugin) return { kind: 'plugin', value: plugin };
   const file = findFile(name);
-  return file ? { kind: 'file', value: file } : undefined;
+  if (file) return { kind: 'file', value: file };
+  const trailingMention = findComposerMention(
+    props.mentionGroups.filter((group) => group.placement === 'after'),
+    name,
+  );
+  return trailingMention ? { kind: 'custom', ...trailingMention } : undefined;
 }
 
 function findFile(path: string): CodexFileSearchItem | undefined {
@@ -402,6 +425,23 @@ function createSkillChip(name: string, skill: CodexSkillSummary): HTMLElement {
     kind: 'skill',
     name: skill.displayName || skill.name,
   });
+}
+
+function createCustomMentionChip(
+  value: string,
+  group: CodexComposerMentionGroup,
+  item: CodexComposerMentionItem,
+): HTMLElement {
+  const host = document.createElement('span');
+  host.className = 'chat-rich-text-editor__chip-token-host';
+  host.contentEditable = 'false';
+  host.dataset.mentionGroup = group.id;
+  host.dataset.mentionValue = value;
+  host.setAttribute('aria-label', item.label);
+  render(slots.mention
+    ? h(Fragment, null, slots.mention({ group, item, surface: 'composer' }))
+    : h(ChatMentionChip, { kind: 'plugin', name: item.label }), host);
+  return host;
 }
 
 function unmountChipHosts(): void {

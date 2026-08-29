@@ -1,12 +1,29 @@
 <template>
-  <div class="codex-chat-theme chat-composer-at-menu" role="listbox" aria-label="Plugins and files">
+  <div class="codex-chat-theme chat-composer-at-menu" role="listbox" aria-label="Mentions">
+    <template v-for="group in leadingMentionGroups" :key="`custom:${group.id}`">
+      <div class="chat-composer-at-menu__section">{{ group.label }}</div>
+      <button
+        v-for="item in group.items"
+        :key="`custom:${group.id}:${item.id}`"
+        class="chat-composer-at-menu__item"
+        :class="{ 'chat-composer-at-menu__item--active': mentionIndex(group.id, item.id) === activeIndex }"
+        role="option"
+        type="button"
+        @mousedown.prevent="$emit('select-mention', item, group)"
+      >
+        <slot name="mention" :group="group" :item="item" :active="mentionIndex(group.id, item.id) === activeIndex">
+          <SparklesIcon class="chat-composer-at-menu__icon" aria-hidden="true" />
+          <span><strong>{{ item.label }}</strong><small v-if="item.description">{{ item.description }}</small></span>
+        </slot>
+      </button>
+    </template>
     <template v-if="visiblePlugins.length">
       <div class="chat-composer-at-menu__section">Plugins</div>
       <button
         v-for="(plugin, index) in visiblePlugins"
         :key="`plugin:${plugin.id}`"
         class="chat-composer-at-menu__item"
-        :class="{ 'chat-composer-at-menu__item--active': index === activeIndex }"
+        :class="{ 'chat-composer-at-menu__item--active': leadingMentionCount + index === activeIndex }"
         role="option"
         type="button"
         @mousedown.prevent="$emit('select-plugin', plugin)"
@@ -21,7 +38,7 @@
         v-for="(file, index) in visibleFiles"
         :key="`file:${file.path}`"
         class="chat-composer-at-menu__item"
-        :class="{ 'chat-composer-at-menu__item--active': visiblePlugins.length + index === activeIndex }"
+        :class="{ 'chat-composer-at-menu__item--active': leadingMentionCount + visiblePlugins.length + index === activeIndex }"
         role="option"
         type="button"
         @mousedown.prevent="$emit('select-file', file)"
@@ -30,18 +47,42 @@
         <span><strong>{{ file.name }}</strong><small>{{ file.path }}</small></span>
       </button>
     </template>
+    <template v-for="group in trailingMentionGroups" :key="`custom:${group.id}`">
+      <div class="chat-composer-at-menu__section">{{ group.label }}</div>
+      <button
+        v-for="item in group.items"
+        :key="`custom:${group.id}:${item.id}`"
+        class="chat-composer-at-menu__item"
+        :class="{ 'chat-composer-at-menu__item--active': mentionIndex(group.id, item.id) === activeIndex }"
+        role="option"
+        type="button"
+        @mousedown.prevent="$emit('select-mention', item, group)"
+      >
+        <slot name="mention" :group="group" :item="item" :active="mentionIndex(group.id, item.id) === activeIndex">
+          <SparklesIcon class="chat-composer-at-menu__icon" aria-hidden="true" />
+          <span><strong>{{ item.label }}</strong><small v-if="item.description">{{ item.description }}</small></span>
+        </slot>
+      </button>
+    </template>
     <div v-if="showFileHint && !visibleFiles.length" class="chat-composer-at-menu__hint">Type to search files</div>
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="Payload = unknown">
+import { computed } from 'vue';
 import type { CodexFileSearchItem } from './contracts';
 import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
-import { FileTextIcon, PlugIcon } from '../icons/app-icons';
+import { FileTextIcon, PlugIcon, SparklesIcon } from '../icons/app-icons';
 import { pluginDescription, pluginDisplayName } from './composer-plugins';
+import type {
+  CodexComposerMentionGroup,
+  CodexComposerMentionItem,
+  CodexComposerVisibleMentionGroup,
+} from './composer-mentions-custom';
 
-defineProps<{
+const props = defineProps<{
   activeIndex: number;
+  mentionGroups?: readonly CodexComposerVisibleMentionGroup<Payload>[];
   showFileHint: boolean;
   visibleFiles: CodexFileSearchItem[];
   visiblePlugins: CodexSurfacePlugin[];
@@ -50,7 +91,38 @@ defineProps<{
 defineEmits<{
   'select-file': [file: CodexFileSearchItem];
   'select-plugin': [plugin: CodexSurfacePlugin];
+  'select-mention': [item: CodexComposerMentionItem<Payload>, group: CodexComposerMentionGroup<Payload>];
 }>();
+
+defineSlots<{
+  mention(props: {
+    active: boolean;
+    group: CodexComposerVisibleMentionGroup<Payload>;
+    item: CodexComposerMentionItem<Payload>;
+  }): unknown;
+}>();
+
+const leadingMentionGroups = computed(() => props.mentionGroups?.filter((group) => group.placement !== 'after') ?? []);
+const trailingMentionGroups = computed(() => props.mentionGroups?.filter((group) => group.placement === 'after') ?? []);
+const leadingMentionCount = computed(() => leadingMentionGroups.value.reduce((total, group) => total + group.items.length, 0));
+
+function mentionIndex(groupId: string, itemId: string): number {
+  let index = 0;
+  for (const group of leadingMentionGroups.value) {
+    for (const item of group.items) {
+      if (group.id === groupId && item.id === itemId) return index;
+      index += 1;
+    }
+  }
+  index += props.visiblePlugins.length + props.visibleFiles.length;
+  for (const group of trailingMentionGroups.value) {
+    for (const item of group.items) {
+      if (group.id === groupId && item.id === itemId) return index;
+      index += 1;
+    }
+  }
+  return -1;
+}
 </script>
 
 <style scoped>

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
-import { nextTick } from 'vue';
+import { h, nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import type { CodexFileSearchItem, CodexSkillSummary } from '../../src/chat/contracts';
@@ -54,6 +54,34 @@ describe('composer suggestion menus', () => {
     await wrapper.findAll('button')[1]!.trigger('mousedown');
     expect(wrapper.emitted('select-plugin')).toStrictEqual([[plugin]]);
     expect(wrapper.emitted('select-file')).toStrictEqual([[file]]);
+  });
+
+  it('renders host mention groups before built-ins with an app-owned row slot', async () => {
+    const group = {
+      id: 'threads',
+      label: 'Threads',
+      items: [{ id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' }],
+    };
+    const wrapper = mount(ChatComposerAtMentionMenu, {
+      props: {
+        activeIndex: 0,
+        mentionGroups: [group],
+        showFileHint: false,
+        visiblePlugins: [plugin],
+        visibleFiles: [file],
+      },
+      slots: {
+        mention: ({ item }: { item: { label: string } }) => h('span', { class: 'host-thread' }, `🤖 ${item.label}`),
+      },
+    });
+
+    expect(wrapper.findAll('.chat-composer-at-menu__section').map((section) => section.text()))
+      .toStrictEqual(['Threads', 'Plugins', 'Files']);
+    expect(wrapper.get('.host-thread').text()).toBe('🤖 codex-claw');
+    expect(wrapper.findAll('.chat-composer-at-menu__item')[0]?.classes())
+      .toContain('chat-composer-at-menu__item--active');
+    await wrapper.findAll('button')[0]!.trigger('mousedown');
+    expect(wrapper.emitted('select-mention')).toStrictEqual([[group.items[0], group]]);
   });
 
   it('shows the file-search hint only when requested and files are absent', async () => {

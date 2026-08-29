@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
+import { h } from 'vue';
 import { describe, expect, it } from 'vitest';
 import ChatUserText from '../../src/chat/ChatUserText.vue';
 import { parseCodexUserText } from '../../src/chat/user-text';
@@ -68,6 +69,25 @@ describe('ChatUserText', () => {
     expect(mentions[1]?.text()).toBe('Gmail');
     expect(wrapper.text()).not.toContain('$update-bank-balance-sheet');
     expect(wrapper.text()).not.toContain('@gmail');
+  });
+
+  it('renders host mentions with app-owned message content', () => {
+    const wrapper = mount(ChatUserText, {
+      props: {
+        content: 'Ask @thread:019abc',
+        mentionGroups: [{
+          id: 'threads',
+          label: 'Threads',
+          items: [{ id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' }],
+        }],
+      },
+      slots: {
+        mention: ({ item }: { item: { label: string } }) => h('span', { class: 'host-thread-message' }, `🤖 ${item.label}`),
+      },
+    });
+
+    expect(wrapper.get('.host-thread-message').text()).toBe('🤖 codex-claw');
+    expect(wrapper.text()).not.toContain('@thread:019abc');
   });
 
   it('uses a plugin namespace instead of an opaque app id for contributed skills', () => {
