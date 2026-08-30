@@ -11,6 +11,13 @@
 
 The checked-in app-server bindings currently target `codex-cli 0.146.0`.
 
+During connection, `CodexSurface` negotiates image-aware compaction with the
+running app-server. When `compaction_image_budget` is advertised but disabled,
+the SDK enables it for that app-server process before loading conversations.
+Older app-server releases that do not expose feature discovery remain usable,
+but cannot receive this compatibility improvement; hosts should ship a current
+stable Codex executable for reliable compaction of image-heavy threads.
+
 For a new application, the fastest path is the [project
 scaffolder](/guide/scaffolding): Electron is the default and `--target web`
 creates a runnable Express + `ws` baseline. Continue below when integrating the

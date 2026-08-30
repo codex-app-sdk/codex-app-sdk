@@ -1,4 +1,6 @@
+import { RpcRemoteError } from '../codex/index';
 import type { CodexAppServerClient, v2 } from '../codex/index';
+import type { ExperimentalFeatureListResponse } from '../codex/generated/v2/ExperimentalFeatureListResponse';
 import type {
   CodexSurfaceAuthentication,
   CodexSurfaceChatGptLogin,
@@ -84,6 +86,7 @@ export class CodexSurfaceConnectionController {
           },
           capabilities: { experimentalApi: true, requestAttestation: false },
         });
+        await this.enableCompactionImageBudget();
         const authenticationChanged = await this.authentication.load('lifecycle');
         if (authenticationChanged || this.authentication.blocksBootstrap()) {
           await this.clearAuthenticatedSurfaceData();
@@ -102,6 +105,34 @@ export class CodexSurfaceConnectionController {
       }
     })();
     return this.connectPromise;
+  }
+
+  private async enableCompactionImageBudget(): Promise<void> {
+    try {
+      let cursor: string | null = null;
+      do {
+        const response: ExperimentalFeatureListResponse = await this.client.request('experimentalFeature/list', {
+          cursor,
+          limit: 100,
+          threadId: null,
+        });
+        const feature = response.data.find(({ name }) => name === 'compaction_image_budget');
+        if (feature) {
+          if (!feature.enabled) {
+            await this.client.request('experimentalFeature/enablement/set', {
+              enablement: { compaction_image_budget: true },
+            });
+          }
+          return;
+        }
+        cursor = response.nextCursor;
+      } while (cursor);
+    } catch (error) {
+      // Older app-server releases do not expose feature discovery. They remain
+      // usable, but cannot opt into image-aware compaction.
+      if (error instanceof RpcRemoteError && error.code === -32601) return;
+      throw error;
+    }
   }
 
   async ensureConnected(): Promise<void> {

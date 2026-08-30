@@ -24,13 +24,13 @@ export class FakeTransport implements RpcTransport {
         (result) => this.emit({ id: message.id, result }),
         (error: unknown) => this.emit({
           id: message.id,
-          error: { code: -1, message: error instanceof Error ? error.message : String(error) },
+          error: rpcTestError(error),
         }),
       );
     } catch (error) {
       queueMicrotask(() => this.emit({
         id: message.id,
-        error: { code: -1, message: error instanceof Error ? error.message : String(error) },
+        error: rpcTestError(error),
       }));
     }
   }
@@ -52,6 +52,15 @@ export class FakeTransport implements RpcTransport {
   fail(error: Error): void {
     for (const listener of this.errorListeners) listener(error);
   }
+}
+
+function rpcTestError(error: unknown): { code: number; message: string } {
+  return {
+    code: typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'number'
+      ? error.code
+      : -1,
+    message: error instanceof Error ? error.message : String(error),
+  };
 }
 
 export function createSurface(): { surface: CodexSurface; transport: FakeTransport } {
@@ -102,6 +111,18 @@ export function responseFor(method: string, params: unknown): unknown {
         { id: ':workspace', description: null, allowed: true },
         { id: ':danger-full-access', description: null, allowed: true },
       ],
+      nextCursor: null,
+    };
+    case 'experimentalFeature/list': return {
+      data: [{
+        name: 'compaction_image_budget',
+        stage: 'stable',
+        displayName: null,
+        description: null,
+        announcement: null,
+        enabled: true,
+        defaultEnabled: true,
+      }],
       nextCursor: null,
     };
     case 'configRequirements/read': return { requirements: null };

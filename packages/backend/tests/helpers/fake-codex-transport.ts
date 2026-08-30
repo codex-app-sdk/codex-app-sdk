@@ -72,6 +72,7 @@ function basicSurfaceResponse(method: string): unknown {
     case 'skills/list': return { data: [{ cwd: '/tmp/project', skills: [], errors: [] }] };
     case 'plugin/installed': return { marketplaces: [], marketplaceLoadErrors: [] };
     case 'permissionProfile/list': return { data: [], nextCursor: null };
+    case 'experimentalFeature/list': return { data: [], nextCursor: null };
     case 'configRequirements/read': return { requirements: null };
     case 'thread/list': return { data: [], nextCursor: null };
     default: return {};

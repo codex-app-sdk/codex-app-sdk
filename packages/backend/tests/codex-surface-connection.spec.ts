@@ -100,7 +100,8 @@ describe('CodexSurface', () => {
       approvalPreset: 'ask-for-approval',
     });
     expect(transport.sent.map((message) => 'method' in message ? message.method : null)).toStrictEqual([
-      'initialize', 'initialized', 'account/read', 'model/list', 'skills/list', 'permissionProfile/list',
+      'initialize', 'initialized', 'experimentalFeature/list', 'account/read', 'model/list', 'skills/list',
+      'permissionProfile/list',
       'account/rateLimits/read', 'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get',
       'plugin/installed',
     ]);
@@ -115,6 +116,46 @@ describe('CodexSurface', () => {
     expect(listener).toHaveBeenCalled();
     await expect(surface.connect()).resolves.toMatchObject({ status: 'ready' });
     expect(transport.start).toHaveBeenCalledOnce();
+  });
+
+  it('enables image-aware compaction when the app-server advertises it as disabled', async () => {
+    const transport = new FakeTransport({
+      'experimentalFeature/list': () => ({
+        data: [{
+          name: 'compaction_image_budget',
+          stage: 'underDevelopment',
+          displayName: null,
+          description: null,
+          announcement: null,
+          enabled: false,
+          defaultEnabled: false,
+        }],
+        nextCursor: null,
+      }),
+      'experimentalFeature/enablement/set': () => ({
+        enablement: { compaction_image_budget: true },
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await surface.connect();
+
+    expect(lastRequest(transport, 'experimentalFeature/enablement/set')).toMatchObject({
+      params: { enablement: { compaction_image_budget: true } },
+    });
+  });
+
+  it('keeps older app-server releases usable when feature discovery is unavailable', async () => {
+    const transport = new FakeTransport({
+      'experimentalFeature/list': () => Promise.reject(Object.assign(
+        new Error('Method not found'),
+        { code: -32601 },
+      )),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await expect(surface.connect()).resolves.toMatchObject({ status: 'ready' });
+    expect(requestsFor(transport, 'experimentalFeature/enablement/set')).toHaveLength(0);
   });
 
   it('exposes the installed plugin catalog with canonical ids and renderer-safe presentation metadata', async () => {
