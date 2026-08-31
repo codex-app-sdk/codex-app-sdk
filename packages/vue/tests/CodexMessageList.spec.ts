@@ -233,6 +233,32 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it('retains the genuine conversation tail while repeatedly revealing older messages', async () => {
+    const allMessages = makeMessages(120);
+    const wrapper = mount(CodexMessageList, {
+      props: { messages: allMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+
+    for (let page = 0; page < 4; page += 1) {
+      expect(wrapper.findAllComponents(CodexMessage).at(-1)?.props('message').id).toBe('message-119');
+      scrollEl.scrollTop = 0;
+      await wrapper.get('.message-list').trigger('scroll');
+      await flushPromises();
+    }
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toEqual(
+      allMessages.map((message) => message.id),
+    );
+    wrapper.unmount();
+  });
+
   it('requests older server history one viewport before reaching the top', async () => {
     const wrapper = mount(CodexMessageList, {
       props: { hasOlderMessages: true, messages: makeMessages(10) },
