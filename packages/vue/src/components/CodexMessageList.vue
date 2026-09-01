@@ -194,6 +194,7 @@ let observedMessagesLength = props.messages.length
 let observedFirstMessage = messageIdentityAt(props.messages, 0)
 let observedLastMessage = messageIdentityAt(props.messages, props.messages.length - 1)
 const loadingOlderMessages = ref(false)
+let olderMessagesRequestPending = false
 const hasStreamingAssistant = computed(() => props.messages.some((message) => (
   message.role === 'assistant' && (
     'content' in message
@@ -258,14 +259,19 @@ onMounted(async () => {
 
 watch(() => props.messages.length, async (nextLength) => {
   const previousLength = observedMessagesLength
+  const target = scrollElement.value
+  const previousHeight = target?.scrollHeight ?? 0
+  const previousTop = target?.scrollTop ?? 0
   observedMessagesLength = nextLength
-  if (effectiveRenderStrategy.value === 'lazy') {
-    reconcileMessageWindow(nextLength, previousLength)
-  }
+  const revealedPrependedMessages = effectiveRenderStrategy.value === 'lazy'
+    ? reconcileMessageWindow(nextLength, previousLength)
+    : false
   observeMessageBounds()
-  const shouldScroll = isAtBottom()
+  const shouldScroll = !revealedPrependedMessages && isAtBottom()
   await nextTick()
-  if (shouldScroll) {
+  if (revealedPrependedMessages && target) {
+    target.scrollTop = previousTop + target.scrollHeight - previousHeight
+  } else if (shouldScroll) {
     scrollToBottom()
   }
 }, { flush: 'sync' })
@@ -275,10 +281,15 @@ watch(() => props.resetKey, async () => {
     setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value, true))
     loadingOlderMessages.value = false
   }
+  olderMessagesRequestPending = false
   observeMessageBounds()
   stickToBottom.value = true
   await nextTick()
   scrollToBottom()
+})
+
+watch(() => [props.loadingOlderMessages, props.hasOlderMessages] as const, ([loading, hasOlder], [wasLoading]) => {
+  if (!hasOlder || (wasLoading && !loading)) olderMessagesRequestPending = false
 })
 
 watch(() => [effectiveRenderStrategy.value, effectiveInitialMessageBatchSize.value, effectiveMessageBatchSize.value] as const, async () => {
@@ -298,10 +309,16 @@ watch(() => [effectiveRenderStrategy.value, effectiveInitialMessageBatchSize.val
 function handleScroll(): void {
   updateStickiness()
   if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange() && renderStartIndex.value <= 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
-    emit('load-older-messages')
+    requestOlderMessages()
   } else if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange()) {
     void loadOlderMessages()
   }
+}
+
+function requestOlderMessages(): void {
+  if (!props.hasOlderMessages || props.loadingOlderMessages || olderMessagesRequestPending) return
+  olderMessagesRequestPending = true
+  emit('load-older-messages')
 }
 
 function isWithinTopPrefetchRange(): boolean {
@@ -315,6 +332,7 @@ async function loadOlderMessages(): Promise<void> {
   const target = scrollElement.value
   const previousHeight = target?.scrollHeight ?? 0
   const previousTop = target?.scrollTop ?? 0
+  const previousRenderStart = renderStartIndex.value
   loadingOlderMessages.value = true
   setRenderStartIndex(Math.max(0, renderStartIndex.value - normalizedBatchSize(effectiveMessageBatchSize.value)))
   await nextTick()
@@ -322,20 +340,21 @@ async function loadOlderMessages(): Promise<void> {
     target.scrollTop = previousTop + target.scrollHeight - previousHeight
   }
   loadingOlderMessages.value = false
+  if (previousRenderStart > 0 && renderStartIndex.value <= 0) requestOlderMessages()
 }
 
-function reconcileMessageWindow(nextLength: number, previousLength: number): void {
+function reconcileMessageWindow(nextLength: number, previousLength: number): boolean {
   const batchSize = normalizedBatchSize(effectiveInitialMessageBatchSize.value)
   const previousTailStart = Math.max(0, previousLength - batchSize)
   const wasTailWindow = renderStartIndex.value === previousTailStart
   if (nextLength < previousLength) {
     setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value, true))
-    return
+    return false
   }
-  if (nextLength <= previousLength) return
+  if (nextLength <= previousLength) return false
   if (nextLength <= batchSize) {
     setRenderStartIndex(0)
-    return
+    return false
   }
 
   const anchorIndex = findMessageIndex(props.messages, renderedAnchor)
@@ -344,8 +363,15 @@ function reconcileMessageWindow(nextLength: number, previousLength: number): voi
     observedFirstMessage,
   );
   if (hasPrependedMessages) {
-    setRenderStartIndex(isAtBottom() ? Math.max(0, nextLength - batchSize) : anchorIndex)
-    return
+    // Once the viewport is pinned at the rendered top, another upward gesture
+    // cannot fire a scroll event. Reveal the first server-prepended batch now.
+    const revealOlderBatch = renderStartIndex.value <= 0 && isWithinTopPrefetchRange()
+    setRenderStartIndex(revealOlderBatch
+      ? Math.max(0, anchorIndex - normalizedBatchSize(effectiveMessageBatchSize.value))
+      : isAtBottom()
+        ? Math.max(0, nextLength - batchSize)
+        : anchorIndex)
+    return revealOlderBatch
   }
 
   const hasAppendedMessages = sameMessageIdentity(
@@ -358,6 +384,7 @@ function reconcileMessageWindow(nextLength: number, previousLength: number): voi
   if (hasAppendedMessages && isAtBottom() && wasTailWindow) {
     setRenderStartIndex(Math.max(0, nextLength - batchSize))
   }
+  return false
 }
 
 function setRenderStartIndex(nextIndex: number): void {

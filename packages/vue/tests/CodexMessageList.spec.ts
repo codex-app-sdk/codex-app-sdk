@@ -278,6 +278,44 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it('prefetches one server page when revealing the final in-memory batch', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        hasOlderMessages: true,
+        lazyMessages: true,
+        messageBatchSize: 5,
+        messages: makeMessages(10),
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAll('.chat-message')).toHaveLength(10);
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ loadingOlderMessages: true });
+    await wrapper.setProps({ loadingOlderMessages: false });
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[], []]);
+    wrapper.unmount();
+  });
+
   it('transforms only the mounted lazy batch and preserves absolute indexes', () => {
     const allMessages = makeMessages(75);
     const transformMessage = vi.fn((message: Message | SurfaceMessage, index: number) => ({
@@ -383,6 +421,45 @@ describe('CodexMessageList', () => {
 
     expect(wrapper.findAllComponents(CodexMessage)[0]?.props('message').id).toBe(secondOlderMessages[0]!.id);
     expect(transformMessage.mock.calls.some(([message]) => secondOlderMessages.some((older) => older.id === message.id))).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('reveals server-prepended history when the rendered window is already at the top', async () => {
+    const currentMessages = makeMessages(5);
+    const olderMessages = makeMessages(10, -10);
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        hasOlderMessages: true,
+        lazyMessages: true,
+        messageBatchSize: 5,
+        messages: currentMessages,
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+
+    await wrapper.setProps({
+      loadingOlderMessages: true,
+      messages: [...olderMessages, ...currentMessages],
+    });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toEqual([
+      ...olderMessages.slice(-5).map((message) => message.id),
+      ...currentMessages.map((message) => message.id),
+    ]);
+    expect(scrollEl.scrollTop).toBe(500);
     wrapper.unmount();
   });
 
