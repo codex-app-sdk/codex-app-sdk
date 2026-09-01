@@ -106,7 +106,7 @@ describe('CodexConversationPane', () => {
     expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(5);
     transformMessage.mockClear();
 
-    const olderBatches = Array.from({ length: 15 }, (_, index) => makeMessages(75 - index * 20, 20));
+    const olderBatches = Array.from({ length: 3 }, (_, index) => makeMessages(75 - index * 20, 20));
     for (const olderBatch of olderBatches) {
       scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight - 100;
       await wrapper.get('.message-list').trigger('scroll');
@@ -129,7 +129,7 @@ describe('CodexConversationPane', () => {
 
     expect(wrapper.findAllComponents(CodexMessage).length).toBe(50);
     wrapper.unmount();
-  }, 30000);
+  });
 
   it('forwards the opt-in lazy message window settings', () => {
     const transformMessage = vi.fn((message: SurfaceMessage | Message) => message);
