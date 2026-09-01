@@ -105,6 +105,7 @@
     "start:spark": "npm run start -w @codex-app-sdk/spark-sample",
     "start:web": "npm run start -w @codex-app-sdk/basic-web-sample",
     "test": "npm run test:sdk && npm run test:workspaces",
+    "test:ai": "node scripts/run-ai-tests.mjs",
     "test:compat": "vitest run",
     "test:coverage": "npm run test:coverage:sdk",
     "test:coverage:packages": "npm run test:coverage -w @codex-app-sdk/core && npm run test:coverage -w @codex-app-sdk/backend && npm run test:coverage -w @codex-app-sdk/vue && npm run test:coverage -w @codex-app-sdk/electron && npm run test:coverage -w @codex-app-sdk/web",
