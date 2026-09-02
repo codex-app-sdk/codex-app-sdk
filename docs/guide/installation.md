@@ -110,10 +110,14 @@ intentionally absent from the renderer creation API.
 git clone git@github.com:nbonamy/codex-app-sdk.git
 cd codex-app-sdk
 npm install
-npm test
-npm run typecheck
-npm run build
+npm run check
+npm run dev:docs
 ```
+
+`npm run check` covers the SDK packages, compatibility facade, scaffolder,
+samples, generated JSON-RPC inventory, and VitePress build. Use
+`npm run test:ai` for a compact test-only pass while iterating. Sample `dev:*`
+commands resolve SDK source directly and do not require a prior package build.
 
 Continue with the [tour of the generated targets](/guide/quick-start) for
 the recommended ownership boundaries, then use the advanced guides as a

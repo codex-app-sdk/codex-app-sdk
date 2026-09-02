@@ -16,7 +16,7 @@ narrowest entry point that owns the capability you need.
 | `@codex-app-sdk/electron/preload` | Electron preload | `exposeCodexElectronPreload` and preload-safe types |
 | `@codex-app-sdk/web/client` | Browser | WebSocket-backed `CodexSurfaceRendererApi` and reconnect policy |
 | `@codex-app-sdk/web/server` | Node or compatible server runtime | Established-socket binding, authorization callback, and surface lease |
-| `@codex-app-sdk/vue` | Vue renderer | Controller, pane, composer, messages, tools, media, theme, utilities |
+| `@codex-app-sdk/vue` | Vue renderer | Controller, pane, composer, host-defined mentions, messages, tools, media, theme, utilities |
 | `@codex-app-sdk/vue/styles.css` | Renderer CSS | Complete scoped component theme |
 | `codex-app-sdk/*` | Compatibility | Previous aggregate entry points retained during migration |
 

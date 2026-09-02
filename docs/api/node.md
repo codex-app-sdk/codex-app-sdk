@@ -183,6 +183,12 @@ schedulers are unref'd when supported and are always cleared during close.
 - `onEvent(listener)`
 - `close()`
 
+During `connect()`, the surface discovers app-server experimental features and
+enables `compaction_image_budget` when the running version advertises it as
+disabled. App-server versions without feature discovery remain supported. This
+keeps manual and automatic compaction image-aware without requiring host
+configuration.
+
 ### Authentication
 
 - `refreshAccount()`

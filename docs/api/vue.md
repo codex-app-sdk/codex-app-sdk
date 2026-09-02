@@ -193,12 +193,18 @@ Cmd/Ctrl+Enter dispatches `steerQueuedPrompt(promptId, prompt)`.
 
 `CodexComposerMenu`, `CodexComposerMenuList`, `CodexComposerSendButton`,
 `CodexComposerActionMenu`, `CodexComposerActiveModes`,
+`CodexComposerAtMentionMenu`,
 `CodexComposerFileMentionMenu`, `CodexComposerPluginMenu`,
 `CodexComposerSkillMenu`,
 `CodexComposerSlashMenu`, `CodexComposerVoiceButton`, `CodexComposerVoiceField`,
 `CodexComposerWaveform`, `CodexMentionChip`, `CodexRichTextEditor`,
 `CodexContextUsageIndicator`, and
 `CodexModelReasoningSelector`.
+
+`CodexRichTextEditor` exposes `CodexRichTextEditorExpose` for custom composer
+layouts that need its focus and selection controls. `CodexComposerAtMentionMenu`
+renders the combined plugin, file, and host-defined mention groups used by the
+stock composer.
 
 `useCodexComposerVoice(options)` exposes the same recording and transcription
 controller used by `CodexComposer` for custom layouts. Options are
@@ -364,6 +370,8 @@ An explicit component prop takes precedence over the provided value.
 
 - `CodexCapabilities`
 - `CodexConversationPresentation` and its composer/message/shelf subtypes
+- `CodexComposerMentionGroup`, `CodexComposerMentionItem`, and
+  `CodexComposerVisibleMentionGroup`
 - `CodexComposerMenuItem` discriminated union
 - model, reasoning, service-tier/Fast mode, skill, plugin, command, context-usage, goal, diff, and
   client-request view types

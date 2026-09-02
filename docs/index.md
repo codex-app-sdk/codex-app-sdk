@@ -34,7 +34,7 @@ features:
     details: Electron IPC and framework-neutral WebSockets carry the same renderer-safe snapshots, events, and validated actions.
   - icon: 🧰
     title: Built to extend
-    details: Add host instructions, opaque context, dynamic tools, app-owned MCP servers, visualization actions, and sub-agent UI without leaking raw protocol into the renderer.
+    details: Add grouped @ mentions, custom mention rendering, host instructions, opaque context, dynamic tools, app-owned MCP servers, visualization actions, and sub-agent UI without leaking raw protocol into the renderer.
   - icon: 🎨
     title: Product-ready customization
     details: Capabilities, presentation controls, slots, reusable leaf components, scoped styles, semantic tokens, and light/dark themes.

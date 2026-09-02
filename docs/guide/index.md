@@ -17,8 +17,8 @@ The SDK packages the generic work once:
 - projecting one renderer-safe surface through Electron IPC or an authorized
   WebSocket;
 - rendering a complete Vue conversation pane with native attachments,
-  transcription, restored-image previews, code copying, and host-owned
-  visualization actions;
+  transcription, restored-image previews, code copying, host-defined mentions,
+  and host-owned visualization actions;
 - exposing trusted ephemeral text generation and headless sub-agent events for
   application-owned workflows and UI.
 
