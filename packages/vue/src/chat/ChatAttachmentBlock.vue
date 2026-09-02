@@ -8,8 +8,8 @@
     <button
       class="chat-attachment-block__preview-button"
       type="button"
-      :aria-label="`Open ${attachment.name} fullscreen`"
-      @click="openFullscreen"
+      :aria-label="`Open ${attachment.name}`"
+      @click="handleImageOpen"
     >
       <img
         class="chat-attachment-block__preview"
@@ -97,7 +97,7 @@ onBeforeUnmount(() => {
   previewRequest += 1
 })
 
-async function openFullscreen() {
+async function handleImageOpen() {
   const src = previewSource.value
   if (!src) return
   const image = {
@@ -109,7 +109,7 @@ async function openFullscreen() {
     src,
     title: props.attachment.name,
   } as const
-  if (await props.openImage?.(image) === true) return
+  if (await props.openImage?.(image, { intent: 'open' }) === true) return
   fullscreenOpen.value = true
 }
 

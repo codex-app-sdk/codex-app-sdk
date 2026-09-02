@@ -226,7 +226,8 @@ message image clicks with either `CodexConversationPane`'s `openImage` prop or
 the controlled pane's `actions.openImage(image, context)`. The handler owns the
 click when it returns `void` or `true`; return `false` to use the stock lightbox.
 The exported renderer-safe types are `CodexMessageImage`,
-`CodexMessageImageContext`, and `CodexMessageImageOpenHandler`.
+`CodexMessageImageContext`, `CodexMessageImageOpenIntent`, and
+`CodexMessageImageOpenHandler`.
 
 Visualization annotations use a separate host contract because their
 task-owned HTML paths are not conversation files. Controlled panes receive
@@ -238,6 +239,13 @@ and it never degrades visualization clicks to `openLink`.
 `CodexMediaBlock` owns its generated-image footer actions: fullscreen delegates
 to the same overridable image-opening contract, while download uses browser
 download behavior without entering the conversation-link routing path.
+
+`CodexMessageImageContext.intent` distinguishes the semantic action:
+`open` comes from clicking the inline image, while `fullscreen` comes from the
+explicit maximize control. Pane handlers also receive the absolute message
+`index` and adapted `message`; direct leaf-component handlers receive the
+intent without message metadata. The stock SDK lightbox remains the fallback
+for either intent.
 
 Assistant Markdown rendered by `CodexMessageBlock` adds a copy control to each
 fenced code block and shows a check confirmation for two seconds after copying.

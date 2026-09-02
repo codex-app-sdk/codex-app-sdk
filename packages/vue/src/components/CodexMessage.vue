@@ -148,7 +148,11 @@ import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '@codex-app-sdk/core/surface'
 import type { MessageBlock } from '../chat/message-blocks'
-import type { CodexMessageImage, CodexMessageImageOpenHandler } from '../chat/message-image'
+import type {
+  CodexMessageImage,
+  CodexMessageImageContext,
+  CodexMessageImageOpenHandler,
+} from '../chat/message-image'
 import type { CodexConversationVisualization } from '../chat/visualization'
 import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
@@ -316,8 +320,12 @@ function retryMessage() {
   emit('retry-message', props.index)
 }
 
-function openImage(image: CodexMessageImage) {
-  return props.openImage?.(image, { index: props.index, message: chatMessage.value })
+function openImage(image: CodexMessageImage, context?: CodexMessageImageContext) {
+  return props.openImage?.(image, {
+    index: props.index,
+    intent: context?.intent ?? 'open',
+    message: chatMessage.value,
+  })
 }
 
 async function copyMessage() {

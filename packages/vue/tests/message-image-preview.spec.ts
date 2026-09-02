@@ -45,7 +45,7 @@ describe('conversation message image previews', () => {
   it('opens user attachments and assistant media in the SDK lightbox by default', async () => {
     const wrapper = mount(CodexConversationPane, { props: { messages } })
 
-    await wrapper.get('[aria-label="Open screenshot.png fullscreen"]').trigger('click')
+    await wrapper.get('[aria-label="Open screenshot.png"]').trigger('click')
     await flushPromises()
     expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('src')).toBe(imageUrl)
 
@@ -78,7 +78,7 @@ describe('conversation message image previews', () => {
   it('keeps the SDK lightbox active when CodexMessage is mounted without an image handler', async () => {
     const wrapper = mount(CodexMessage, { props: { message: messages[0]! } })
 
-    await wrapper.get('[aria-label="Open screenshot.png fullscreen"]').trigger('click')
+    await wrapper.get('[aria-label="Open screenshot.png"]').trigger('click')
     await flushPromises()
 
     expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('src')).toBe(imageUrl)
@@ -92,7 +92,7 @@ describe('conversation message image previews', () => {
     })
     const wrapper = mount(CodexConversationPane, { props: { controller } })
 
-    await wrapper.get('[aria-label="Open screenshot.png fullscreen"]').trigger('click')
+    await wrapper.get('[aria-label="Open screenshot.png"]').trigger('click')
     await flushPromises()
 
     expect(openImage).toHaveBeenCalledWith(
@@ -102,14 +102,33 @@ describe('conversation message image previews', () => {
         path: '/tmp/screenshot.png',
         src: imageUrl,
       }),
-      expect.objectContaining({ index: 0, message: expect.objectContaining({ id: 'user-image' }) }),
+      expect.objectContaining({
+        index: 0,
+        intent: 'open',
+        message: expect.objectContaining({ id: 'user-image' }),
+      }),
+    )
+
+    await wrapper.get('.chat-media-block__image-button').trigger('click')
+    await flushPromises()
+    expect(openImage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'media', src: imageUrl, title: 'Result' }),
+      expect.objectContaining({
+        index: 1,
+        intent: 'open',
+        message: expect.objectContaining({ id: 'assistant-image' }),
+      }),
     )
 
     await wrapper.get('.chat-media-block__actions [aria-label="Open fullscreen"]').trigger('click')
     await flushPromises()
     expect(openImage).toHaveBeenLastCalledWith(
       expect.objectContaining({ kind: 'media', src: imageUrl, title: 'Result' }),
-      expect.objectContaining({ index: 1, message: expect.objectContaining({ id: 'assistant-image' }) }),
+      expect.objectContaining({
+        index: 1,
+        intent: 'fullscreen',
+        message: expect.objectContaining({ id: 'assistant-image' }),
+      }),
     )
     expect(document.body.querySelector('.chat-image-lightbox')).toBeNull()
   })
@@ -135,7 +154,7 @@ describe('conversation message image previews', () => {
       props: { controller, openImage: legacyOpenImage },
     })
 
-    await wrapper.get('[aria-label="Open screenshot.png fullscreen"]').trigger('click')
+    await wrapper.get('[aria-label="Open screenshot.png"]').trigger('click')
     await flushPromises()
 
     expect(legacyOpenImage).not.toHaveBeenCalled()

@@ -125,6 +125,7 @@ export type {
   CodexMessageImage,
   CodexMessageImageContext,
   CodexMessageImageOpenHandler,
+  CodexMessageImageOpenIntent,
 } from './chat/message-image';
 export type {
   CodexConversationVisualization,

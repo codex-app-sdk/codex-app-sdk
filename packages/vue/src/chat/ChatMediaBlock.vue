@@ -3,8 +3,8 @@
     <button
       class="chat-media-block__image-button"
       type="button"
-      :aria-label="fullscreenLabel"
-      @click="openFullscreen"
+      :aria-label="openLabel"
+      @click="handleImageAction('open')"
     >
       <img
         class="chat-media-block__image"
@@ -15,7 +15,7 @@
     <figcaption class="chat-media-block__footer">
       <span class="chat-media-block__title">{{ media.title || generatedLabel }}</span>
       <span class="chat-media-block__actions">
-        <ChatIconButton :label="fullscreenLabel" @click="openFullscreen">
+        <ChatIconButton :label="fullscreenLabel" @click="handleImageAction('fullscreen')">
           <Maximize2 />
         </ChatIconButton>
         <ChatIconButton
@@ -54,7 +54,7 @@ import { Download, Info, Maximize2 } from '../icons/app-icons'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatImageLightbox from './ChatImageLightbox.vue'
 import ChatIconButton from './ChatIconButton.vue'
-import type { CodexMessageImageOpenHandler } from './message-image'
+import type { CodexMessageImageOpenHandler, CodexMessageImageOpenIntent } from './message-image'
 import type { MessageMedia } from './types'
 
 const props = defineProps<{
@@ -67,12 +67,13 @@ const fullscreenLabel = 'Open fullscreen'
 const generatedAltLabel = 'Generated media'
 const generatedLabel = 'Generated media'
 const promptLabel = 'Prompt'
+const openLabel = computed(() => `Open ${props.media.title || props.media.alt || generatedLabel}`)
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
 const rootElement = ref<HTMLElement | null>(null)
 const downloadName = computed(() => mediaDownloadName(props.media))
 
-async function openFullscreen() {
+async function handleImageAction(intent: CodexMessageImageOpenIntent) {
   const image = {
     alt: props.media.alt || generatedAltLabel,
     kind: 'media',
@@ -81,7 +82,7 @@ async function openFullscreen() {
     src: props.media.url,
     title: props.media.title || generatedLabel,
   } as const
-  if (await props.openImage?.(image) === true) return
+  if (await props.openImage?.(image, { intent }) === true) return
   fullscreenOpen.value = true
 }
 

@@ -36,8 +36,11 @@ Controlled applications can replace that behavior with `actions.openImage`:
 ```ts
 const actions: CodexConversationPaneActions = {
   async openImage(image, context) {
+    if (context?.intent === 'fullscreen') {
+      return false; // Keep the SDK fullscreen lightbox.
+    }
     await imageTabs.open({
-      id: `${context?.message.id ?? context?.index}-${image.name ?? image.title}`,
+      id: `${context?.message?.id ?? context?.index}-${image.name ?? image.title}`,
       image,
     });
   },
@@ -45,8 +48,11 @@ const actions: CodexConversationPaneActions = {
 ```
 
 The image value contains `kind`, `src`, `alt`, and optional `name`, `title`,
-`path`, and `mimeType`. Context contains the absolute message `index` and the
-adapted `message`. When the action is omitted, the SDK lightbox remains active.
+`path`, and `mimeType`. Context uses semantic `intent: 'open' | 'fullscreen'`:
+clicking the inline image emits `open`, while the explicit maximize control
+emits `fullscreen`. Pane handlers also receive the absolute message `index` and
+the adapted `message`. Direct leaf-component handlers receive the intent
+without message metadata. When the action is omitted, the SDK lightbox remains active.
 A configured action owns the click when it returns `void` or `true`; return
 `false` to deliberately fall back to the SDK lightbox. Non-controller hosts can
 pass the same callback through the `openImage` pane prop.

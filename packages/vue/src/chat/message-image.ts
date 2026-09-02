@@ -15,7 +15,10 @@ export type CodexMessageImageOpenHandler = (
   context?: CodexMessageImageContext,
 ) => boolean | void | Promise<boolean | void>
 
+export type CodexMessageImageOpenIntent = 'fullscreen' | 'open'
+
 export type CodexMessageImageContext = {
-  index: number
-  message: Message
+  intent: CodexMessageImageOpenIntent
+  index?: number
+  message?: Message
 }
