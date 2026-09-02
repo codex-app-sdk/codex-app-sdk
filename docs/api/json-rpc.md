@@ -22,7 +22,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Client → app-server requests | 130 | 45 | 0 | 0 | 85 |
+| Client → app-server requests | 130 | 47 | 0 | 0 | 83 |
 | App-server → client notifications | 72 | 39 | 0 | 30 | 3 |
 | App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
@@ -105,9 +105,9 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `review/start` | High-level SDK | `packages/backend/src/node/codex-surface-turn-actions-controller.ts` |
 | `model/list` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
 | `modelProvider/capabilities/read` | Typed client only | — |
-| `experimentalFeature/list` | Typed client only | — |
+| `experimentalFeature/list` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
 | `permissionProfile/list` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
-| `experimentalFeature/enablement/set` | Typed client only | — |
+| `experimentalFeature/enablement/set` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
 | `remoteControl/enable` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
 | `remoteControl/disable` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |
 | `remoteControl/status/read` | High-level SDK | `packages/backend/src/node/codex-surface-connection-controller.ts` |

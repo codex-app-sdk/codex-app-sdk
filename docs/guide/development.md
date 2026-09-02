@@ -18,6 +18,11 @@ npm run typecheck
 npm run build:all
 ```
 
+For a concise repository-wide test run intended for agent workflows, use
+`npm run test:ai`. It covers the same test workspaces with compact output and
+stops on the first failing suite. It does not replace the lint, build, or
+documentation gates in `npm run check`.
+
 Each SDK workspace owns its source, tests, Vitest configuration, typecheck,
 lint, coverage thresholds, and build commands. Run the complete gate for one
 package with:
