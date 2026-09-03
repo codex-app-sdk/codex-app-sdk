@@ -11,13 +11,9 @@ const mocks = vi.hoisted(() => {
       return [...windows];
     }
 
-    readonly navigationHandlers = new Map<string, (event: { preventDefault(): void }, url: string) => void>();
     windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | undefined;
     readonly webContents = {
       send: vi.fn(),
-      on: vi.fn((event: string, listener: (event: { preventDefault(): void }, url: string) => void) => {
-        this.navigationHandlers.set(event, listener);
-      }),
       setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => { action: 'deny' }) => {
         this.windowOpenHandler = handler;
       }),

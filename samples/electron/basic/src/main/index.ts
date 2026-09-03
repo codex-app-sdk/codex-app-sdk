@@ -23,7 +23,7 @@ async function createWindow(): Promise<void> {
       preload: path.join(bundleDirectory, 'preload.cjs'),
     },
   });
-  installNavigationPolicy(mainWindow.webContents);
+  installWindowOpenPolicy(mainWindow.webContents);
   const rendererUrl = process.env.VITE_DEV_SERVER_URL?.trim();
   if (rendererUrl) {
     await mainWindow.loadURL(rendererUrl);
@@ -34,7 +34,9 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  const sdkBackend = createCodexAppBackend();
+  const sdkBackend = createCodexAppBackend({
+    surfaceOptions: { autoSelectFirstConversation: false },
+  });
   backend = sdkBackend;
   unregisterSdk = registerCodexElectronMain({
     clipboard,
@@ -50,14 +52,10 @@ app.whenReady().then(async () => {
   });
 });
 
-function installNavigationPolicy(webContents: Pick<WebContents, 'on' | 'setWindowOpenHandler'>): void {
+function installWindowOpenPolicy(webContents: Pick<WebContents, 'setWindowOpenHandler'>): void {
   webContents.setWindowOpenHandler(({ url }) => {
     openExternalUrl(url);
     return { action: 'deny' };
-  });
-  webContents.on('will-navigate', (event, url) => {
-    event.preventDefault();
-    openExternalUrl(url);
   });
 }
 

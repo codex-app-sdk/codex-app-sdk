@@ -23,7 +23,9 @@ const webSocketServer = new WebSocketServer({ noServer: true });
 
 // The default backend uses the already-authenticated default Codex home.
 // A production host would acquire a stable, isolated backend for siteUser.id here.
-const backend = createCodexAppBackend();
+const backend = createCodexAppBackend({
+  surfaceOptions: { autoSelectFirstConversation: false },
+});
 
 app.use(express.static(clientDirectory));
 app.get('/', (_request, response) => response.sendFile(path.join(clientDirectory, 'index.html')));

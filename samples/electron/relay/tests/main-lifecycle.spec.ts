@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => {
     windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | undefined;
     readonly webContents = {
       send: vi.fn(),
-      on: vi.fn(),
       setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => { action: 'deny' }) => {
         this.windowOpenHandler = handler;
       }),

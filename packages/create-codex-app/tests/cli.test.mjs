@@ -63,6 +63,9 @@ test('creates a complete app without retaining template tokens', async (t) => {
   assert.match(styles, /html\[data-platform='macos'\] \.sidebar__header[\s\S]*padding-left: 88px/);
   assert.equal(app.includes('{{displayName}}'), false);
   assert.match(main, /createCodexAppBackend/);
+  assert.match(main, /autoSelectFirstConversation: false/);
+  assert.match(main, /setWindowOpenHandler/);
+  assert.doesNotMatch(main, /will-navigate/);
   assert.match(main, /from '@codex-app-sdk\/backend'/);
   assert.match(main, /from '@codex-app-sdk\/electron'/);
   assert.match(viteEnvironment, /from '@codex-app-sdk\/electron'/);
@@ -105,6 +108,7 @@ test('creates a thin Express web target against the modular packages', async (t)
   assert.match(server, /bindCodexWebSocket/);
   assert.match(server, /authenticateSiteRequest/);
   assert.match(server, /acquireCodexSession/);
+  assert.match(server, /autoSelectFirstConversation: false/);
   assert.doesNotMatch(server, /codexWebSocketProtocolVersion|CodexWebSocketRequest|requestId/);
   assert.match(readme, /Team Codex/);
   assert.equal(readme.includes('{{'), false);

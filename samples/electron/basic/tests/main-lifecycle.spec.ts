@@ -11,13 +11,9 @@ const electron = vi.hoisted(() => {
       return [...windows];
     }
 
-    readonly navigationHandlers = new Map<string, (event: { preventDefault(): void }, url: string) => void>();
     windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | undefined;
     readonly webContents = {
       send: vi.fn(),
-      on: vi.fn((event: string, listener: (event: { preventDefault(): void }, url: string) => void) => {
-        this.navigationHandlers.set(event, listener);
-      }),
       setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => { action: 'deny' }) => {
         this.windowOpenHandler = handler;
       }),
@@ -104,7 +100,9 @@ describe('basic sample main lifecycle', () => {
     await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
 
     expect(sdk.createCodexAppBackend).toHaveBeenCalledOnce();
-    expect(sdk.createCodexAppBackend).toHaveBeenCalledWith();
+    expect(sdk.createCodexAppBackend).toHaveBeenCalledWith({
+      surfaceOptions: { autoSelectFirstConversation: false },
+    });
     expect(sdk.registerCodexElectronMain).toHaveBeenCalledOnce();
     expect(sdk.registerCodexElectronMain).toHaveBeenCalledWith(expect.objectContaining({
       clipboard: electron.clipboard,
@@ -143,19 +141,5 @@ describe('basic sample main lifecycle', () => {
     expect(electron.shell.openExternal).toHaveBeenCalledTimes(2);
     expect(electron.shell.openExternal).toHaveBeenNthCalledWith(1, 'https://example.com/docs');
     expect(electron.shell.openExternal).toHaveBeenNthCalledWith(2, 'mailto:team@example.com');
-  });
-
-  it('blocks in-renderer navigation and routes safe external destinations to the OS', async () => {
-    await import('../src/main/index');
-    await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
-    const preventDefault = vi.fn();
-    const handler = electron.windows[0]!.navigationHandlers.get('will-navigate')!;
-
-    handler({ preventDefault }, 'tel:+15551234567');
-    handler({ preventDefault }, 'data:text/html,<script>alert(1)</script>');
-
-    expect(preventDefault).toHaveBeenCalledTimes(2);
-    expect(electron.shell.openExternal).toHaveBeenCalledOnce();
-    expect(electron.shell.openExternal).toHaveBeenCalledWith('tel:+15551234567');
   });
 });

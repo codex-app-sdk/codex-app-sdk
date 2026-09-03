@@ -17,7 +17,9 @@ const clientDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)
 const app = express();
 const httpServer = createServer(app);
 const webSocketServer = new WebSocketServer({ noServer: true });
-const backend = createCodexAppBackend();
+const backend = createCodexAppBackend({
+  surfaceOptions: { autoSelectFirstConversation: false },
+});
 
 app.use(express.static(clientDirectory));
 app.get('/', (_request, response) => response.sendFile(path.join(clientDirectory, 'index.html')));

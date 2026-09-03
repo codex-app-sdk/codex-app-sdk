@@ -101,6 +101,7 @@ export function fakeSurfaceApi(snapshot = surfaceSnapshot()) {
     steerQueuedPrompt: vi.fn(async () => snapshot),
     unarchiveConversation: vi.fn(async () => snapshot),
     updateConversationSettings: vi.fn(async () => snapshot),
+    updateQueuedPrompt: vi.fn(async () => snapshot),
   } satisfies CodexSurfaceRendererApi;
   return Object.assign(api, {
     pushSnapshot(nextSnapshot: CodexSurfaceSnapshot) {

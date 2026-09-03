@@ -298,6 +298,7 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
     steerMessage: vi.fn(async () => snapshot),
     steerQueuedPrompt: vi.fn(async () => snapshot),
     updateConversationSettings: vi.fn(async () => snapshot),
+    updateQueuedPrompt: vi.fn(async () => snapshot),
     unarchiveConversation: vi.fn(async () => snapshot),
   };
 }

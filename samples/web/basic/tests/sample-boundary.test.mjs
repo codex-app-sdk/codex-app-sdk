@@ -29,6 +29,7 @@ test('uses the public web transport without reimplementing its protocol', async 
   assert.doesNotMatch(renderer, /addEventListener/);
   assert.match(server, /from '@codex-app-sdk\/web\/server'/);
   assert.match(server, /bindCodexWebSocket/);
+  assert.match(server, /autoSelectFirstConversation:\s*false/);
   assert.match(server, /authenticateSiteRequest/);
   assert.match(server, /acquireCodexSession/);
   assert.match(viteConfig, /['"]\/codex['"]/);
