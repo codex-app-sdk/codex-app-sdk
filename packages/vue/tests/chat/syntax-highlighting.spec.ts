@@ -46,8 +46,12 @@ describe('syntax highlighting', () => {
   });
 
   it('renders escaped plain code with normalized language names', () => {
-    expect(renderCodeBlock('<tag>\nnext', ' Unknown-Lang extra ')).toBe(
-      '<pre><code class="language-unknown-lang"><span class="line">&lt;tag&gt;</span><span class="line">next</span></code></pre>',
+    expect(renderCodeBlock('<tag>\n\n  next', ' Unknown-Lang extra ')).toBe(
+      [
+        '<pre><code class="language-unknown-lang"><span class="line">&lt;tag&gt;</span>',
+        '<span class="line"></span>',
+        '<span class="line">  next</span></code></pre>',
+      ].join('\n'),
     );
     expect(renderCodeBlock('&', undefined)).toBe('<pre><code><span class="line">&amp;</span></code></pre>');
   });

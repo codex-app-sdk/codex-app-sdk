@@ -147,5 +147,5 @@ function renderPlainCodeBlock(code: string, language: string | undefined) {
 }
 
 function renderPlainCodeLines(code: string) {
-  return code.split('\n').map((line) => `<span class="line">${escapeHtml(line)}</span>`).join('')
+  return code.split('\n').map((line) => `<span class="line">${escapeHtml(line)}</span>`).join('\n')
 }
