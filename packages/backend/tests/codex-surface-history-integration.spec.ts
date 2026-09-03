@@ -285,6 +285,28 @@ describe('CodexSurface', () => {
     ]));
   });
 
+  it('keeps an active resumed thread busy when its initial history page has no running turn', async () => {
+    const transport = new FakeTransport({
+      'thread/resume': () => {
+        const running = thread('thread-existing', false);
+        running.status = { type: 'active', activeFlags: [] };
+        return {
+          ...resumeResponse(running),
+          initialTurnsPage: { data: [], nextCursor: null, backwardsCursor: null },
+        };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    const snapshot = await surface.connect();
+
+    expect(snapshot).toMatchObject({
+      busy: true,
+      threadStatus: { type: 'active', activeFlags: [] },
+    });
+    expect(surface.conversation('thread-existing').getSnapshot().activeTurnId).toBeNull();
+  });
+
   it('emits ordered semantic events after matching state mutations for conversation handles', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();

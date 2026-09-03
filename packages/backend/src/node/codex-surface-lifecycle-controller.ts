@@ -347,6 +347,7 @@ export class CodexSurfaceLifecycleController {
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
       const catalogs = await this.catalog.loadConversationCatalogs(cwd);
       const runningTurnId = activeTurnId(turns);
+      const threadStatus = surfaceThreadStatus(response.thread.status);
       const historyMessages = preserveHistoricalAttachmentPreviews(
         loadingRuntime.messages,
         codexThreadToSurfaceMessages({ ...response.thread, turns }),
@@ -366,9 +367,9 @@ export class CodexSurfaceLifecycleController {
         activeTurnId: runningTurnId,
         turnIds: turns.map((turn) => turn.id),
         messages,
-        busy: Boolean(runningTurnId),
+        busy: Boolean(runningTurnId) || threadStatus.type === 'active',
         goal: goal ? { ...goal } : null,
-        threadStatus: surfaceThreadStatus(response.thread.status),
+        threadStatus,
         ...catalogs,
         ...sessionSelection(response, this.host.getState().models, this.host.snapshotForRuntime(loadingRuntime)),
       });
