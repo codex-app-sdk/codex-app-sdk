@@ -162,7 +162,7 @@ function isSafeBrandColor(value: string | undefined): value is string {
   color: color-mix(in srgb, var(--codex-mention-color) 42%, var(--color-on-primary-container));
   font-weight: var(--font-weight-medium);
   line-height: 1;
-  vertical-align: -0.12em;
+  vertical-align: -0.18em;
 }
 
 .chat-user-text__mention-icon-frame,
