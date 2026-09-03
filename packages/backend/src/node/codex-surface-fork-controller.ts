@@ -157,6 +157,7 @@ export class CodexSurfaceForkController {
     const effectiveLoadingStrategy = hostOptions.loadingStrategy ?? this.loadingStrategy ?? 'lazy';
     const runtime = this.host.createRuntime(response.thread.id, {
       hydrated: true,
+      historyMode: response.thread.historyMode ?? 'legacy',
       loadingStrategy: effectiveLoadingStrategy,
       historyCursor: initialPage.nextCursor,
       historyHasOlder: initialPage.nextCursor !== null,

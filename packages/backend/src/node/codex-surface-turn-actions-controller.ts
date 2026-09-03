@@ -213,6 +213,10 @@ export class CodexSurfaceTurnActionsController {
       targetIndex = runtime.turnIds.indexOf(turnId);
     }
     if (targetIndex < 0) throw new Error(`Cannot roll back to unknown Codex turn '${turnId}'`);
+    if (runtime.historyMode === 'paginated') {
+      await this.revertPaginatedThread(threadId, turnId, targetIndex, runtime);
+      return;
+    }
     const response = await this.client.request('thread/rollback', {
       threadId, numTurns: runtime.turnIds.length - targetIndex,
     });
@@ -229,6 +233,48 @@ export class CodexSurfaceTurnActionsController {
       messages: codexThreadToSurfaceMessages(response.thread),
       answeredClientRequestIds: [], busy: false, turnStartPending: false, error: null,
       contextUsage: null, turnGitDiff: null,
+    });
+    this.host.emitSummaryUpserted(summary, 'updated', 'action');
+    this.host.emitHistoryReplaced(threadId, 'rollback', 'action');
+    this.host.emitConversationActivity(threadId, 'action');
+  }
+
+  private async revertPaginatedThread(
+    threadId: string,
+    turnId: string,
+    targetIndex: number,
+    runtime: ThreadRuntimeState,
+  ): Promise<void> {
+    const response = await this.client.request('thread/revert', {
+      threadId,
+      beforeTurnId: turnId,
+    });
+    if (response.thread.id !== threadId) {
+      throw new Error(`Codex thread/revert returned '${response.thread.id}' for requested thread '${threadId}'`);
+    }
+    const retainedTurnIds = runtime.turnIds.slice(0, targetIndex);
+    const retainedTurnIdSet = new Set(retainedTurnIds);
+    const messages = runtime.messages.filter((message) => {
+      const messageTurnId = messageTurnIdOrNull(message);
+      return messageTurnId === null || retainedTurnIdSet.has(messageTurnId);
+    });
+    runtime.turnIds = retainedTurnIds;
+    runtime.activeTurnId = null;
+    const summary = { ...threadToSummary(response.thread), turnCount: retainedTurnIds.length };
+    this.host.patch({
+      conversations: upsertConversation(this.host.getState().conversations, summary),
+    });
+    this.host.patchRuntime(threadId, {
+      messages,
+      answeredClientRequestIds: [],
+      busy: false,
+      turnStartPending: false,
+      error: null,
+      contextUsage: null,
+      turnGitDiff: null,
+      historyCursor: response.turnsBackwardsCursor,
+      historyHasOlder: response.turnsBackwardsCursor !== null,
+      fullHistoryHydrated: response.turnsBackwardsCursor === null,
     });
     this.host.emitSummaryUpserted(summary, 'updated', 'action');
     this.host.emitHistoryReplaced(threadId, 'rollback', 'action');

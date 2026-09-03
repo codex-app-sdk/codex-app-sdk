@@ -184,6 +184,11 @@ await build.compact();
 await build.rollbackToTurn(turnId);
 ```
 
+`rollbackToTurn`, message deletion, editing, and retrying use one stable SDK
+contract. The SDK selects app-server's paginated `thread/revert` operation or
+the legacy `thread/rollback` operation internally and reconciles the retained
+history page and cursor for the host.
+
 Handles also expose edit, retry, delete-message, steering, reviews, goals,
 queued-prompt actions, approval resolution, and app-server question responses.
 

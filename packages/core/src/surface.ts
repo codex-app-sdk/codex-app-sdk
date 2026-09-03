@@ -474,8 +474,17 @@ export type CodexSurfacePlanStep = {
   status: CodexSurfacePlanStepStatus;
 };
 export type CodexSurfaceSubagentItemLifecycle = 'started' | 'completed';
-export type CodexSurfaceSubagentTool = 'spawnAgent' | 'sendInput' | 'resumeAgent' | 'wait' | 'closeAgent';
-export type CodexSurfaceSubagentToolCallStatus = 'inProgress' | 'completed' | 'failed';
+export type CodexSurfaceSubagentTool =
+  | 'spawnAgent'
+  | 'sendInput'
+  | 'resumeAgent'
+  | 'wait'
+  | 'closeAgent'
+  | 'sendMessage'
+  | 'followupTask'
+  | 'interruptAgent'
+  | 'listAgents';
+export type CodexSurfaceSubagentToolCallStatus = 'inProgress' | 'completed' | 'failed' | 'interrupted';
 export type CodexSurfaceSubagentStatus =
   | 'pendingInit'
   | 'running'
@@ -501,7 +510,7 @@ export type CodexSurfaceSubagentToolCall = {
 };
 export type CodexSurfaceSubagentActivity = {
   id: string;
-  kind: 'started' | 'interacted' | 'interrupted';
+  kind: 'started' | 'interacted' | 'interrupted' | 'completed';
   agentConversationId: string;
   agentPath: string;
 };

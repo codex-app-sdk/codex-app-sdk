@@ -209,6 +209,7 @@ function skill(overrides: Partial<v2.SkillMetadata> = {}): v2.SkillMetadata {
     path: '/skills/cp/SKILL.md',
     scope: 'user',
     enabled: true,
+    pluginId: null,
     ...overrides,
   };
 }

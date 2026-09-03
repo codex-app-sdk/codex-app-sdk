@@ -141,7 +141,7 @@ npm run preview:docs
 ```
 
 The checked-in generated protocol bindings currently target
-`codex-cli 0.146.0`. See the
+`codex-cli 0.151.0`. See the
 [development guide](https://nbonamy.github.io/codex-app-sdk/guide/development)
 before updating them.
 

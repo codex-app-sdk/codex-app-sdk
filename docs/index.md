@@ -107,7 +107,7 @@ protocol types.
 
 ## Publication status
 
-The SDK is currently `0.1.x` and generated against `codex-cli 0.146.0`. Package
+The SDK is currently `0.1.x` and generated against `codex-cli 0.151.0`. Package
 publication is pending, but the documentation uses the intended npm package
 names and scaffold-first workflow throughout. The high-level API is deliberately
 smaller and more stable than app-server.

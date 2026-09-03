@@ -67,7 +67,7 @@ describe('codexThreadToSurfaceMessages', () => {
   it('maps individual history items and all turn statuses', () => {
     const baseTurn = { id: 'turn', startedAt: Number.NaN } as Pick<v2.Turn, 'id' | 'status' | 'startedAt'>;
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'inProgress' }, {
-      type: 'agentMessage', id: 'agent', text: 'Streaming', phase: 'commentary', memoryCitation: null,
+      type: 'agentMessage', id: 'agent', text: 'Streaming', phase: 'commentary', memoryCitation: null, delivery: null,
     })).toMatchObject({
       status: 'streaming',
       createdAt: '1970-01-01T00:00:00.000Z',
@@ -77,7 +77,7 @@ describe('codexThreadToSurfaceMessages', () => {
       type: 'exitedReviewMode', id: 'review', review: 'Failed review',
     })).toMatchObject({ status: 'error', parts: [{ text: 'Failed review' }] });
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'interrupted' }, {
-      type: 'agentMessage', id: 'interrupted', text: 'Partial response', phase: null, memoryCitation: null,
+      type: 'agentMessage', id: 'interrupted', text: 'Partial response', phase: null, memoryCitation: null, delivery: null,
     })).toMatchObject({ status: 'complete', parts: [{ text: 'Partial response' }] });
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'userMessage', id: 'user', clientId: null, content: [],

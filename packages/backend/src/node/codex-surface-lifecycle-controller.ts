@@ -185,6 +185,7 @@ export class CodexSurfaceLifecycleController {
     if (inheritedApprovalPreset) selection.approvalPreset = inheritedApprovalPreset;
     const runtime = this.host.createRuntime(response.thread.id, {
       hydrated: true,
+      historyMode: response.thread.historyMode ?? 'legacy',
       cwd: response.cwd ?? response.thread.cwd,
       activeTurnId: null,
       turnIds: [],
@@ -262,6 +263,7 @@ export class CodexSurfaceLifecycleController {
       const hydratedRuntime = this.host.requireRuntime(conversationId);
       const runtime = this.host.createRuntime(conversationId, {
         hydrated: true,
+        historyMode: response.thread.historyMode ?? 'legacy',
         historyLoading: false,
         activeTurnId: hydratedRuntime.activeTurnId,
         turnIds: hydratedRuntime.turnIds,
@@ -357,6 +359,7 @@ export class CodexSurfaceLifecycleController {
         : historyMessages;
       const runtime = this.host.createRuntime(response.thread.id, {
         hydrated: true,
+        historyMode: response.thread.historyMode ?? 'legacy',
         loadingStrategy: hostOptions.loadingStrategy ?? this.options.loadingStrategy ?? 'lazy',
         historyCursor: initialPage.nextCursor,
         historyHasOlder: initialPage.nextCursor !== null,

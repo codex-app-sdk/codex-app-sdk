@@ -104,7 +104,7 @@ Do not commit `.vitepress/cache` or `.vitepress/dist`.
 
 ## Generated app-server schema
 
-Checked-in generated bindings currently target `codex-cli 0.146.0`.
+Checked-in generated bindings currently target `codex-cli 0.151.0`.
 
 ```bash
 npm run generate:schema

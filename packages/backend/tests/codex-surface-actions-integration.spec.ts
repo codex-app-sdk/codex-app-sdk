@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
-import { FakeTransport, createSurface, lastRequest, lastResponse, thread, turn } from './helpers/codex-surface-fixture';
+import {
+  FakeTransport,
+  createSurface,
+  lastRequest,
+  lastResponse,
+  resumeResponse,
+  thread,
+  turn,
+} from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
   it('renders app-server plans and raw response tools instead of dropping them', async () => {
@@ -207,6 +215,45 @@ describe('CodexSurface', () => {
       params: { threadId: 'thread-existing', numTurns: 1 },
     });
     expect(surface.getSnapshot().messages).toStrictEqual([]);
+  });
+
+  it('uses thread/revert to delete from paginated history without hydrating the full thread', async () => {
+    const firstTurn = turn('turn-first', 'completed', [
+      { type: 'userMessage', id: 'user-first', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
+      { type: 'agentMessage', id: 'agent-first', text: 'First answer', phase: null, memoryCitation: null },
+    ]);
+    const secondTurn = turn('turn-second', 'completed', [
+      { type: 'userMessage', id: 'user-second', clientId: null, content: [{ type: 'text', text: 'Second', text_elements: [] }] },
+      { type: 'agentMessage', id: 'agent-second', text: 'Second answer', phase: null, memoryCitation: null },
+    ]);
+    const paginatedThread = {
+      ...thread('thread-existing', false),
+      historyMode: 'paginated',
+      turns: [firstTurn, secondTurn],
+    };
+    const transport = new FakeTransport({
+      'thread/resume': () => resumeResponse(paginatedThread),
+      'thread/revert': () => ({
+        thread: { ...paginatedThread, turns: [] },
+        turnsBackwardsCursor: 'retained-tail',
+        itemsBackwardsCursor: 'retained-item-tail',
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    await surface.connect();
+
+    await surface.deleteMessage(2);
+
+    expect(lastRequest(transport, 'thread/revert')).toMatchObject({
+      params: { threadId: 'thread-existing', beforeTurnId: 'turn-second' },
+    });
+    expect(lastRequest(transport, 'thread/rollback')).toBeUndefined();
+    expect(lastRequest(transport, 'thread/turns/list')).toBeUndefined();
+    expect(surface.conversation('thread-existing').getSnapshot()).toMatchObject({
+      turnIds: ['turn-first'],
+      historyState: { hasOlder: true, fullyLoaded: false },
+    });
+    expect(surface.getSnapshot().messages.every((message) => message.turnId === 'turn-first')).toBe(true);
   });
 
   it('uses app-server cwd defaults and reports unavailable conversation operations precisely', async () => {

@@ -132,13 +132,17 @@ describe('CodexSurfaceAuthenticationController', () => {
     failed.state.authentication.login = {
       status: 'pending', loginId: 'login-current', authUrl: 'https://example.test/login', error: null,
     };
-    failed.controller.handleLoginCompleted({ loginId: null, success: false, error: null });
+    failed.controller.handleLoginCompleted({
+      loginId: null, success: false, error: null, onboardingEntrypoint: null,
+    });
     expect(failed.state.authentication.login).toMatchObject({
       status: 'error', loginId: 'login-current', error: 'Codex sign-in failed',
     });
 
     const successful = setupController(vi.fn(async () => { throw new Error('refresh failed'); }));
-    successful.controller.handleLoginCompleted({ loginId: 'login-2', success: true, error: null });
+    successful.controller.handleLoginCompleted({
+      loginId: 'login-2', success: true, error: null, onboardingEntrypoint: null,
+    });
     expect(successful.state.authentication.login.status).toBe('completed');
     await vi.waitFor(() => expect(successful.host.reportError).toHaveBeenCalledWith(expect.objectContaining({
       message: 'refresh failed',

@@ -223,6 +223,9 @@ describe('Codex surface settings policy', () => {
 
 function requirements(overrides: Partial<v2.ConfigRequirements>): v2.ConfigRequirements {
   return {
+    cliAuthCredentialsStore: null,
+    chatgptBaseUrl: null,
+    additionalDeveloperInstructions: null,
     allowedApprovalPolicies: null,
     allowedApprovalsReviewers: null,
     allowedSandboxModes: null,
@@ -231,14 +234,17 @@ function requirements(overrides: Partial<v2.ConfigRequirements>): v2.ConfigRequi
     defaultPermissions: null,
     allowedWebSearchModes: null,
     allowManagedHooksOnly: null,
+    allowBrowserAndComputerUse: null,
     allowAppshots: null,
     allowRemoteControl: null,
     computerUse: null,
     browserUse: null,
+    inAppBrowser: null,
     featureRequirements: null,
     hooks: null,
     enforceResidency: null,
     network: null,
+    autoReview: null,
     models: null,
     sqliteHome: null,
     logDir: null,

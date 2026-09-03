@@ -89,6 +89,7 @@ export class CodexSurfaceNotificationsController {
     switch (notification.method) {
       case 'thread/started': {
         this.host.createRuntime(notification.params.thread.id, {
+          historyMode: notification.params.thread.historyMode ?? 'legacy',
           threadStatus: surfaceThreadStatus(notification.params.thread.status),
         });
         const summary = threadToSummary(notification.params.thread);

@@ -8,6 +8,7 @@ import type {
   CodexSurfaceThreadStatus,
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface';
+import type { ThreadHistoryMode } from '../codex/generated/v2/ThreadHistoryMode';
 
 export type ThreadRuntimeState = {
   threadId: string;
@@ -34,6 +35,7 @@ export type ThreadRuntimeState = {
   busy: boolean;
   turnStartPending: boolean;
   historyLoading: boolean;
+  historyMode: ThreadHistoryMode;
   loadingStrategy: CodexConversationLoadingStrategy;
   historyCursor: string | null;
   historyHasOlder: boolean;
@@ -121,6 +123,7 @@ export function createThreadRuntime(
     busy: false,
     turnStartPending: false,
     historyLoading: false,
+    historyMode: 'legacy',
     loadingStrategy: state.historyState?.loadingStrategy ?? 'lazy',
     historyCursor: null,
     historyHasOlder: false,
