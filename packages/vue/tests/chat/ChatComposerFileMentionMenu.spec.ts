@@ -26,8 +26,12 @@ describe('ChatComposerFileMentionMenu', () => {
 
   it('scrolls the active file into view when navigating by keyboard', async () => {
     const scrollIntoView = vi.fn();
-    const original = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const original = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+      writable: true,
+    });
 
     try {
       const wrapper = mountMenu({ activeIndex: 0 });
@@ -36,7 +40,11 @@ describe('ChatComposerFileMentionMenu', () => {
 
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
     } finally {
-      HTMLElement.prototype.scrollIntoView = original;
+      if (original) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', original);
+      } else {
+        Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      }
     }
   });
 

@@ -25,16 +25,23 @@ const skill: CodexSkillSummary = {
 
 describe('composer suggestion menus', () => {
   const scrollIntoView = vi.fn();
+  const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
 
   beforeEach(() => {
     Object.defineProperty(Element.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,
+      writable: true,
     });
   });
 
   afterEach(() => {
     scrollIntoView.mockReset();
+    if (originalScrollIntoView) {
+      Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoView);
+    } else {
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+    }
   });
 
   it('renders combined plugin and file results with correct active indexing', async () => {

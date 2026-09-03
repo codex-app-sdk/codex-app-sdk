@@ -84,10 +84,11 @@ describe('public conversation leaf components', () => {
 
   it('renders and selects both command and skill slash results', async () => {
     const scrollIntoView = vi.fn();
-    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
     Object.defineProperty(Element.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,
+      writable: true,
     });
     try {
       const command = { id: 'review', name: 'review', description: 'Review changes' };
@@ -118,10 +119,11 @@ describe('public conversation leaf components', () => {
       await nextTick();
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
     } finally {
-      Object.defineProperty(Element.prototype, 'scrollIntoView', {
-        configurable: true,
-        value: originalScrollIntoView,
-      });
+      if (originalScrollIntoView) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoView);
+      } else {
+        Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      }
     }
   });
 

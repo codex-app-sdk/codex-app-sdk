@@ -6,21 +6,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatComposerSkillMenu from '../../src/chat/ChatComposerSkillMenu.vue';
 import type { CodexSkillSummary } from '../../src/chat/contracts';
 
-const originalScrollIntoView = Element.prototype.scrollIntoView;
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
 
 describe('ChatComposerSkillMenu', () => {
   beforeEach(() => {
     Object.defineProperty(Element.prototype, 'scrollIntoView', {
       configurable: true,
       value: vi.fn(),
+      writable: true,
     });
   });
 
   afterEach(() => {
-    Object.defineProperty(Element.prototype, 'scrollIntoView', {
-      configurable: true,
-      value: originalScrollIntoView,
-    });
+    if (originalScrollIntoView) {
+      Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoView);
+    } else {
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+    }
     vi.restoreAllMocks();
   });
 
@@ -31,6 +33,7 @@ describe('ChatComposerSkillMenu', () => {
       value: vi.fn(function scrollIntoView(this: Element) {
         scrolledElements.push(this);
       }),
+      writable: true,
     });
     const wrapper = mount(ChatComposerSkillMenu, {
       props: {

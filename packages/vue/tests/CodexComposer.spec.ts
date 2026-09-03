@@ -11,10 +11,6 @@ import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, Codex
 import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import type { CodexComposerState } from '../src/composer-state';
 
-vi.mock('fix-webm-duration', () => ({
-  default: vi.fn(async (blob: Blob) => blob),
-}));
-
 type ChatComposerProps = {
   composerState?: CodexComposerState;
   disabled: boolean;
@@ -81,6 +77,7 @@ const plugins: CodexSurfacePlugin[] = [{
 describe('ChatComposer', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('emits a trimmed prompt and clears the editor', async () => {
@@ -998,7 +995,7 @@ function installAudioRecordingMocks(): void {
   class FakeMediaRecorder {
     static isTypeSupported = vi.fn(() => true);
 
-    mimeType = 'audio/webm;codecs=opus';
+    mimeType = 'audio/wav';
     ondataavailable: ((event: BlobEvent) => void) | null = null;
     onerror: (() => void) | null = null;
     onstop: (() => void) | null = null;

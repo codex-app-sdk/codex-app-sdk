@@ -6,6 +6,8 @@ export type AppleSpeechTranscriptionApi = {
   transcribeAppleSpeech(audioData: ArrayBuffer, options?: { locale?: string }): Promise<CodexSpeechTranscriptionResult>;
 };
 
+type WebmDurationFixer = (blob: Blob, durationMs: number) => Promise<Blob>;
+
 export async function transcribeRecordedAudio(
   recording: RecordedAudio,
   api: AppleSpeechTranscriptionApi | undefined,
@@ -20,8 +22,11 @@ export async function transcribeRecordedAudio(
   });
 }
 
-export async function prepareAppleSpeechAudio(recording: RecordedAudio): Promise<ArrayBuffer> {
-  const source = await normalizeWebmDuration(recording);
+export async function prepareAppleSpeechAudio(
+  recording: RecordedAudio,
+  fixDuration: WebmDurationFixer = fixWebmDuration,
+): Promise<ArrayBuffer> {
+  const source = await normalizeWebmDuration(recording, fixDuration);
   const wavBlob = source.type.includes('webm')
     ? await convertWebmToWav(source)
     : source;
@@ -93,12 +98,12 @@ function resolveAudioContextConstructor(): typeof AudioContext | undefined {
   return (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 }
 
-async function normalizeWebmDuration(recording: RecordedAudio): Promise<Blob> {
+async function normalizeWebmDuration(recording: RecordedAudio, fixDuration: WebmDurationFixer): Promise<Blob> {
   if (!recording.blob.type.includes('webm')) {
     return recording.blob;
   }
 
-  const fixedBlob = await fixWebmDuration(recording.blob, recording.durationMs);
+  const fixedBlob = await fixDuration(recording.blob, recording.durationMs);
   if (fixedBlob.type === recording.blob.type) {
     return fixedBlob;
   }

@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixWebmDuration from 'fix-webm-duration';
 import { prepareAppleSpeechAudio, transcribeRecordedAudio } from '../../src/audio/apple-speech-transcription';
-
-vi.mock('fix-webm-duration', () => ({
-  default: vi.fn(async (blob: Blob) => blob),
-}));
 
 describe('apple speech transcription', () => {
   afterEach(() => {
@@ -40,7 +35,6 @@ describe('apple speech transcription', () => {
     const result = await transcribeRecordedAudio(recording, api);
 
     expect(result).toStrictEqual({ text: 'hello' });
-    expect(fixWebmDuration).toHaveBeenCalledWith(recording.blob, 1200);
     expect(decodeAudioData).toHaveBeenCalledWith(expect.any(ArrayBuffer));
     expect(close).toHaveBeenCalledOnce();
     expect(fetch).not.toHaveBeenCalled();
@@ -69,18 +63,20 @@ describe('apple speech transcription', () => {
 
   it('preserves the original WebM mime type when duration fixing changes it', async () => {
     const decodeAudioData = vi.fn(async () => fakeAudioBuffer());
+    const fixDuration = vi.fn(async () => new Blob(['fixed'], { type: 'video/mp4' }));
     class FakeAudioContext {
       decodeAudioData = decodeAudioData;
       close = vi.fn(async () => undefined);
     }
     vi.stubGlobal('AudioContext', FakeAudioContext);
-    vi.mocked(fixWebmDuration).mockResolvedValueOnce(new Blob(['fixed'], { type: 'video/webm' }));
 
-    await prepareAppleSpeechAudio({
+    const recording = {
       blob: new Blob(['webm'], { type: 'audio/webm' }),
       durationMs: 800,
-    });
+    };
+    await prepareAppleSpeechAudio(recording, fixDuration);
 
+    expect(fixDuration).toHaveBeenCalledWith(recording.blob, 800);
     expect(decodeAudioData).toHaveBeenCalledWith(expect.any(ArrayBuffer));
   });
 
