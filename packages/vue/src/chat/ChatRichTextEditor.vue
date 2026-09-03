@@ -501,6 +501,6 @@ defineExpose<CodexRichTextEditorExpose>({
   display: inline-block;
   max-width: 220px;
   margin: 0 var(--space-1);
-  vertical-align: baseline;
+  vertical-align: -2px;
 }
 </style>
