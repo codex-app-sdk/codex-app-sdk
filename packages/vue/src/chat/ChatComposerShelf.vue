@@ -45,7 +45,11 @@ defineEmits<{
   steerQueuedPrompt: [promptId: string];
 }>();
 
-const showGoal = computed(() => props.presentation?.goal !== false && Boolean(props.goal));
+const showGoal = computed(() => (
+  props.presentation?.goal !== false
+  && Boolean(props.goal)
+  && props.goal?.status !== 'complete'
+));
 const showQueuedPrompts = computed(() => (
   props.presentation?.queuedPrompts !== false && props.queuedPrompts.length > 0
 ));

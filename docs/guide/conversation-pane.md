@@ -122,6 +122,9 @@ The adapter is intentionally a controlled-view boundary. It does not create a
 
 Only `identity.messages` is required beyond the `identity` object itself. Omit
 an optional group or leaf when that capability is not present.
+The default composer shelf presents active, paused, and limited goals, but
+hides a goal once its status is `complete`; the terminal goal remains available
+to controller state and event consumers.
 
 Use `composer.leadingMenuItems` for host actions that belong beside the built-in
 Codex controls. They render after Approval and before Plan mode. Existing

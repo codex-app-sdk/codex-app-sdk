@@ -229,6 +229,27 @@ describe('ported id8 chat components', () => {
     expect(wrapper.emitted('editGoal')).toStrictEqual([[]]);
   });
 
+  it('hides a completed goal from the composer shelf', () => {
+    const wrapper = mount(ChatComposerShelf, {
+      props: {
+        queuedPrompts: [],
+        goal: {
+          threadId: 'thread-1',
+          objective: 'Ship the goal surface',
+          status: 'complete',
+          tokenBudget: null,
+          tokensUsed: 100,
+          timeUsedSeconds: 60,
+          createdAt: 0,
+          updatedAt: 1,
+        },
+      },
+    });
+
+    expect(wrapper.find('.chat-goal').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+  });
+
   it('renders current turn diff in the composer shelf', () => {
     const wrapper = mount(ChatComposerShelf, {
       props: {
