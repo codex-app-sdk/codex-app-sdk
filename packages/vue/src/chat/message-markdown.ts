@@ -61,7 +61,7 @@ markdown.use({
         return {
           type: 'codexBlockKatex',
           raw: match[0],
-          text: (match[1] ?? match[2] ?? '').trim(),
+          text: (match[1] ?? match[2])!.trim(),
         }
       },
       renderer(token) {
@@ -71,10 +71,6 @@ markdown.use({
     {
       name: 'codexInlineKatex',
       level: 'inline',
-      start(src) {
-        const index = src.indexOf('\\(')
-        return index === -1 ? undefined : index
-      },
       tokenizer(src) {
         const match = /^\\\((.+?)\\\)/.exec(src)
         if (!match) return undefined
@@ -87,20 +83,6 @@ markdown.use({
       renderer(token) {
         return renderLatex((token as unknown as { text: string }).text, false)
       },
-    },
-    {
-      name: 'taskList',
-      renderer(token) {
-        const taskList = token as unknown as { items?: unknown }
-        const items: unknown[] = Array.isArray(taskList.items)
-          ? taskList.items
-          : []
-        return `<ul>${items.map((item) => renderTaskItem(item)).join('')}</ul>`
-      },
-    },
-    {
-      name: 'taskItem',
-      renderer: renderTaskItem,
     },
   ],
 })
@@ -173,10 +155,6 @@ export function safeMarkdownHref(value: string): string | null {
     return null
   }
 
-  if (href.startsWith('#') || href.startsWith('?')) {
-    return href
-  }
-
   if (/^[a-z]:[\\/]/i.test(href)) {
     return href
   }
@@ -202,8 +180,8 @@ export function safeMarkdownHref(value: string): string | null {
   }
 
   try {
-    const url = new URL(href)
-    return url.protocol.toLowerCase() === protocol ? href : null
+    new URL(href)
+    return href
   } catch {
     return null
   }
@@ -272,20 +250,4 @@ export function renderInlineToken(token: unknown): string {
   }
 
   return ''
-}
-
-export function renderTaskItem(token: unknown) {
-  const task = token && typeof token === 'object' ? token as Record<string, unknown> : {}
-  const checked = task.checked === true
-  const tokens: Array<{ raw?: string; text?: string }> = Array.isArray(task.tokens)
-    ? task.tokens as Array<{ raw?: string; text?: string }>
-    : []
-  const text = tokens.length > 0
-    ? markdown.parseInline(tokens.map((item) => item.raw ?? item.text ?? '').join('')) as string
-    : escapeHtml(String(task.mainContent ?? task.text ?? ''))
-  const nested = Array.isArray(task.nestedTokens) && task.nestedTokens.length > 0
-    ? (markdown.parser as unknown as (tokens: unknown[]) => string)(task.nestedTokens)
-    : ''
-
-  return `<li><input${checked ? ' checked=""' : ''} disabled="" type="checkbox"> ${text}${nested}</li>`
 }

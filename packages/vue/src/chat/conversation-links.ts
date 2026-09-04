@@ -9,9 +9,9 @@ export type CodexEditorFileReference = {
 export function parseCodexEditorFileReference(value: string): CodexEditorFileReference | null {
   const match = /^(.*\.[^./\\:\s]+):(\d+)(?::(\d+))?$/.exec(value.trim());
   if (!match) return null;
-  const filePath = match[1]?.trim() ?? '';
-  if (!filePath || filePath.includes(':')) return null;
-  const line = Number(match[2]);
+  const filePath = match[1]!;
+  if (filePath.includes(':')) return null;
+  const line = Number(match[2]!);
   const column = match[3] === undefined ? undefined : Number(match[3]);
   if (!Number.isSafeInteger(line) || line <= 0) return null;
   if (column !== undefined && (!Number.isSafeInteger(column) || column <= 0)) return null;
@@ -63,7 +63,7 @@ function fileReferenceLink(
 }
 
 function stripLinkDecoration(href: string): string {
-  return href.split('#', 1)[0]?.split('?', 1)[0]?.trim() ?? '';
+  return href.split('#', 1)[0]!.split('?', 1)[0]!.trim();
 }
 
 function safelyDecodePath(path: string): string {

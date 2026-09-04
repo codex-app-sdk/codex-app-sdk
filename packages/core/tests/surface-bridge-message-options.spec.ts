@@ -36,6 +36,21 @@ describe('Codex surface bridge message options', () => {
     expect(sendMessage).toHaveBeenCalledTimes(5);
   });
 
+  it('accepts repeated references and null-prototype objects in JSON schemas', async () => {
+    const { sendMessage, target } = targetWithSend();
+    const shared = { type: 'string' };
+    const nullPrototype = Object.assign(Object.create(null) as Record<string, unknown>, { type: 'number' });
+
+    await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', [
+      'prompt',
+      { outputSchema: { alternatives: [shared, shared], nullPrototype } },
+    ]);
+
+    expect(sendMessage).toHaveBeenCalledWith('prompt', {
+      outputSchema: { alternatives: [shared, shared], nullPrototype },
+    });
+  });
+
   it.each([
     [null, 'Message options must be an object'],
     [{ extra: true }, 'Message options contains unsupported property "extra"'],
@@ -75,8 +90,25 @@ describe('Codex surface bridge message options', () => {
     symbolObject[Symbol('secret')] = true;
     const accessor = {} as Record<string, unknown>;
     Object.defineProperty(accessor, 'hidden', { get: () => true });
+    const disguisedArrays = ['x0', '1x'].map((invalidKey) => {
+      const array = [true, 'discarded'] as unknown[] & Record<string, unknown>;
+      delete array[1];
+      array[invalidKey] = true;
+      return array;
+    });
+    const mixedArray = [true, Number.NaN];
+    const mixedObject = { valid: true, invalid: Number.NaN };
+    const outOfRangeArrayKey = new Proxy([true, true], {
+      ownKeys: () => ['0', '2', 'length'],
+      getOwnPropertyDescriptor: (target, property) => property === '2'
+        ? { configurable: true, enumerable: true, value: true, writable: true }
+        : Reflect.getOwnPropertyDescriptor(target, property),
+    });
 
-    for (const outputSchema of [cyclic, sparse, decorated, symbolObject, accessor]) {
+    for (const outputSchema of [
+      cyclic, sparse, decorated, symbolObject, accessor, ...disguisedArrays, mixedArray, mixedObject,
+      outOfRangeArrayKey,
+    ]) {
       await expectMessageRejected({ outputSchema }, 'Message output schema must be JSON-serializable');
     }
   });
@@ -87,6 +119,7 @@ describe('Codex surface bridge message options', () => {
     [{ type: 'file', reference: 'ref', detail: 'high' }, 'Message attachment contains unsupported property "detail"'],
     [{ type: 'image', reference: 'ref', detail: 'maximum' }, 'Message image detail is invalid'],
     [{ type: 'file', reference: '' }, 'Message attachment reference must be a non-empty string'],
+    [{ type: 'image', reference: '' }, 'Message attachment reference must be a non-empty string'],
   ] as const)('rejects malformed attachment references', async (attachment, message) => {
     await expectMessageRejected(
       { attachments: [attachment] },
@@ -115,15 +148,16 @@ describe('Codex surface bridge message options', () => {
 
   it('preserves safe host-resolved image previews', async () => {
     const { sendMessage, target } = targetWithSend();
+    const resolveAttachment = vi.fn(async (_attachment: Parameters<CodexSurfaceBridgeAttachmentResolver>[0]) => ({
+      type: 'image' as const,
+      path: '/resolved.png',
+      previewUrl: 'data:image/png;base64,cG5n',
+    }));
     await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', [
       'prompt',
       { attachments: [{ type: 'image', reference: 'image:pasted' }] },
     ], {
-      resolveAttachment: async () => ({
-        type: 'image',
-        path: '/resolved.png',
-        previewUrl: 'data:image/png;base64,cG5n',
-      }),
+      resolveAttachment,
     });
 
     expect(sendMessage).toHaveBeenCalledWith('prompt', {
@@ -131,6 +165,33 @@ describe('Codex surface bridge message options', () => {
         type: 'image',
         path: '/resolved.png',
         previewUrl: 'data:image/png;base64,cG5n',
+      }],
+    });
+    expect(Object.hasOwn(resolveAttachment.mock.calls[0]![0], 'detail')).toBe(false);
+    expect(Object.hasOwn(sendMessage.mock.calls[0]![1].attachments[0], 'detail')).toBe(false);
+  });
+
+  it('accepts JPG previews and attachment display strings at their limits', async () => {
+    const { sendMessage, target } = targetWithSend();
+    const boundedName = 'n'.repeat(1_024);
+    await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', [
+      'prompt',
+      { attachments: [{ type: 'image', reference: 'image:jpg' }] },
+    ], {
+      resolveAttachment: async () => ({
+        type: 'image',
+        path: '/resolved.jpg',
+        name: boundedName,
+        previewUrl: 'data:image/jpg;base64,anBn',
+      }),
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith('prompt', {
+      attachments: [{
+        type: 'image',
+        path: '/resolved.jpg',
+        name: boundedName,
+        previewUrl: 'data:image/jpg;base64,anBn',
       }],
     });
   });
@@ -151,14 +212,37 @@ describe('Codex surface bridge message options', () => {
   });
 
   it('rejects unsafe host-resolved image previews', async () => {
+    for (const previewUrl of [
+      123,
+      { toString: () => 'data:image/png;base64,cG5n' },
+      'https://example.com/image.png',
+      'prefix:data:image/png;base64,cG5n',
+      'data:image/png;base64,cG5n:suffix',
+    ]) {
+      await expectMessageRejected(
+        { attachments: [{ type: 'image', reference: 'image:1' }] },
+        'Resolved message attachment preview must be a bounded image data URL',
+        (async () => ({ type: 'image', path: '/image.png', previewUrl })) as CodexSurfaceBridgeAttachmentResolver,
+      );
+    }
+  });
+
+  it('enforces the resolved image preview byte boundary', async () => {
+    const prefix = 'data:image/png;base64,';
+    const maximum = `${prefix}${'a'.repeat(16 * 1024 * 1024 - prefix.length)}`;
+    const { sendMessage, target } = targetWithSend();
+    await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', [
+      'prompt',
+      { attachments: [{ type: 'image', reference: 'image:max' }] },
+    ], {
+      resolveAttachment: async () => ({ type: 'image', path: '/image.png', previewUrl: maximum }),
+    });
+    expect(sendMessage).toHaveBeenCalledOnce();
+
     await expectMessageRejected(
-      { attachments: [{ type: 'image', reference: 'image:1' }] },
+      { attachments: [{ type: 'image', reference: 'image:over' }] },
       'Resolved message attachment preview must be a bounded image data URL',
-      async () => ({
-        type: 'image',
-        path: '/image.png',
-        previewUrl: 'https://example.com/image.png',
-      }),
+      async () => ({ type: 'image', path: '/image.png', previewUrl: `${maximum}a` }),
     );
   });
 });

@@ -95,4 +95,28 @@ describe('CodexWorkbenchLayout', () => {
     wrapper.unmount();
     expect(disconnect).toHaveBeenCalledTimes(2);
   });
+
+  it('measures chrome immediately and unmounts without ResizeObserver support', async () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function height(this: HTMLElement) {
+      if (this.classList.contains('codex-workbench-layout__header')) return 18;
+      if (this.classList.contains('codex-workbench-layout__footer')) return 36;
+      return 0;
+    });
+    const errors: unknown[] = [];
+    const wrapper = mount(CodexWorkbenchLayout, {
+      global: { config: { errorHandler: (error) => errors.push(error) } },
+      slots: {
+        default: '<main>Transcript</main>',
+        footer: '<footer>Composer</footer>',
+        header: '<header>Context</header>',
+      },
+    });
+
+    await nextTick();
+    expect(wrapper.attributes('style')).toContain('--workbench-layout-header-offset: 18px');
+    expect(wrapper.attributes('style')).toContain('--workbench-layout-footer-offset: 36px');
+    wrapper.unmount();
+    expect(errors).toStrictEqual([]);
+  });
 });

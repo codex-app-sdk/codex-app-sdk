@@ -136,7 +136,7 @@ export class CodexSurfaceConnectionController {
   }
 
   async ensureConnected(): Promise<void> {
-    if (this.host.getState().status !== 'ready') await this.connect();
+    await this.connect();
     while (true) {
       const pending = this.authentication.pendingRefresh() ?? this.surfaceBootstrapPromise;
       if (!pending) return;
@@ -149,10 +149,7 @@ export class CodexSurfaceConnectionController {
     if (!force && this.bootstrappedAuthenticationKey === authenticationKey) return Promise.resolve();
     if (this.surfaceBootstrapPromise) {
       const pending = this.surfaceBootstrapPromise;
-      return pending.then(() => {
-        if (this.surfaceBootstrapPromise === pending) this.surfaceBootstrapPromise = null;
-        return this.bootstrapSurfaceData(force);
-      });
+      return pending.then(() => this.bootstrapSurfaceData(force));
     }
     const bootstrap = (async () => {
       await Promise.all([
@@ -176,7 +173,7 @@ export class CodexSurfaceConnectionController {
     })();
     this.surfaceBootstrapPromise = bootstrap;
     void bootstrap.finally(() => {
-      if (this.surfaceBootstrapPromise === bootstrap) this.surfaceBootstrapPromise = null;
+      this.surfaceBootstrapPromise = null;
     }).catch(() => undefined);
     return bootstrap;
   }

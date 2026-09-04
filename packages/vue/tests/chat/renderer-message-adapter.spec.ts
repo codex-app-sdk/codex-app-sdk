@@ -1,10 +1,34 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { chatMessageFromInput, surfaceMessageToChatMessage } from '../../src/chat/renderer-message-adapter';
+import type { Message, MessageToolCall } from '../../src/chat/types';
+import {
+  chatMessageFromInput,
+  chatMessagesFromInputs,
+  surfaceMessageToChatMessage,
+} from '../../src/chat/renderer-message-adapter';
 import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
 
 describe('renderer message adapter', () => {
+  it('adapts mixed input collections while preserving unchanged compatibility messages', () => {
+    const compatibilityMessage: Message = {
+      role: 'user',
+      content: 'legacy input',
+    };
+    const surfaceMessage: SurfaceMessage = {
+      id: 'surface-input',
+      parts: [{ type: 'text', text: 'surface input' }],
+      role: 'assistant',
+      status: 'complete',
+    };
+
+    const messages = chatMessagesFromInputs([compatibilityMessage, surfaceMessage]);
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toBe(compatibilityMessage);
+    expect(messages[1]).toMatchObject({ content: 'surface input', id: 'surface-input' });
+  });
+
   it('preserves assistant phases and safe reasoning summaries as structured parts', () => {
     const message = surfaceMessageToChatMessage({
       id: 'assistant-phased',
@@ -180,6 +204,22 @@ describe('renderer message adapter', () => {
     });
   });
 
+  it('marks a completed compaction with its terminal timeline status', () => {
+    const message = surfaceMessageToChatMessage({
+      id: 'compaction-complete',
+      kind: 'compaction',
+      parts: [],
+      role: 'assistant',
+      status: 'complete',
+    });
+
+    expect(message).toMatchObject({
+      compactionStatus: 'completed',
+      streaming: false,
+      type: 'compaction',
+    });
+  });
+
 
   it('maps failed and bodyless tools into displayable tool calls', () => {
     const rendererMessage: SurfaceMessage = {
@@ -252,6 +292,99 @@ describe('renderer message adapter', () => {
     });
   });
 
+  it('settles every terminal tool-state combination without cloning completed work', () => {
+    const settled: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'settled',
+      id: 'settled',
+      result: 'done',
+      state: 'completed',
+      status: 'completed',
+    };
+    const incomplete: MessageToolCall = {
+      args: undefined,
+      function: 'incomplete',
+      id: 'incomplete',
+      result: 'done',
+      state: 'completed',
+      status: 'completed',
+    };
+    const staleRunning: MessageToolCall = {
+      args: undefined,
+      done: true,
+      function: 'stale-running',
+      id: 'stale-running',
+      result: undefined,
+      state: 'running',
+      status: 'Still running',
+    };
+    const message: Message = {
+      role: 'assistant',
+      content: 'terminal',
+      parts: [
+        { type: 'tool', toolCall: settled },
+        { type: 'tool', toolCall: incomplete },
+        { type: 'text', content: 'between tools' },
+        { type: 'tool', toolCall: staleRunning },
+      ],
+      streaming: false,
+      toolCalls: [settled, incomplete, staleRunning],
+    };
+
+    const adapted = chatMessageFromInput(message);
+
+    expect(adapted).not.toBe(message);
+    expect(adapted.toolCalls?.[0]).toBe(settled);
+    expect(adapted.toolCalls?.[1]).toMatchObject({ done: true, state: 'completed', status: 'completed' });
+    expect(adapted.toolCalls?.[2]).toMatchObject({ done: true, state: 'error', status: 'failed' });
+    expect(adapted.parts?.[0]).toStrictEqual({ type: 'tool', toolCall: settled });
+    expect(adapted.parts?.[1]).toStrictEqual({ type: 'tool', toolCall: adapted.toolCalls?.[1] });
+    expect(adapted.parts?.[2]).toStrictEqual({ type: 'text', content: 'between tools' });
+    expect(adapted.parts?.[3]).toStrictEqual({ type: 'tool', toolCall: adapted.toolCalls?.[2] });
+    expect((adapted.parts?.[1] as { toolCall: MessageToolCall }).toolCall).toBe(adapted.toolCalls?.[1]);
+    expect((adapted.parts?.[3] as { toolCall: MessageToolCall }).toolCall).toBe(adapted.toolCalls?.[2]);
+  });
+
+  it('returns an already settled terminal compatibility message by identity', () => {
+    const message: Message = {
+      role: 'assistant',
+      content: 'done',
+      streaming: false,
+      toolCalls: [{
+        args: undefined,
+        done: true,
+        function: 'read',
+        id: 'read',
+        result: 'done',
+        state: 'completed',
+      }],
+    };
+
+    expect(chatMessageFromInput(message)).toBe(message);
+  });
+
+  it.each([undefined, '', 'plain running label', '[]', 'null']) (
+    'normalizes a stale terminal status of %j to the failed fallback',
+    (status) => {
+      const message = chatMessageFromInput({
+        role: 'assistant',
+        content: '',
+        streaming: false,
+        toolCalls: [{
+          args: undefined,
+          function: 'read',
+          id: 'read',
+          result: undefined,
+          state: 'running',
+          status,
+        }],
+      });
+
+      expect(message.toolCalls?.[0]?.status).toBe('failed');
+    },
+  );
+
   it('prefers structuredContent over the MCP model-facing placeholder result', () => {
     const rendererMessage: SurfaceMessage = {
       createdAt: '2026-06-05T00:00:00.000Z',
@@ -302,6 +435,64 @@ describe('renderer message adapter', () => {
         status: 'completed',
       },
     ]);
+  });
+
+  it('keeps a null tool output as the exact result', () => {
+    const message = surfaceMessageToChatMessage({
+      id: 'assistant-null-output',
+      parts: [{
+        type: 'tool',
+        id: 'null-output',
+        title: 'read',
+        status: 'completed',
+        output: null as never,
+      }],
+      role: 'assistant',
+      status: 'complete',
+    });
+
+    expect(message.toolCalls?.[0]?.result).toBeNull();
+  });
+
+  it('derives body arguments, fallback item identity, and turn context from metadata', () => {
+    const message = surfaceMessageToChatMessage({
+      id: 'assistant-fallback-tool',
+      metadata: { turnId: 'turn-from-metadata' },
+      parts: [{
+        type: 'tool',
+        id: '',
+        title: 'shell',
+        status: 'running',
+        body: 'command output',
+      }],
+      role: 'assistant',
+      status: 'streaming',
+    });
+
+    expect(message.toolCalls).toStrictEqual([{
+      args: { output: 'command output' },
+      done: false,
+      function: 'shell',
+      id: 'assistant-fallback-tool-tool-0',
+      itemId: 'assistant-fallback-tool-tool-0',
+      messageId: 'assistant-fallback-tool',
+      result: 'command output',
+      state: 'running',
+      status: 'running',
+      turnId: 'turn-from-metadata',
+    }]);
+  });
+
+  it.each([undefined, '', false, 42])('rejects non-usable metadata turn ids: %j', (turnId) => {
+    const toolCall = surfaceMessageToChatMessage({
+      id: 'assistant-invalid-turn',
+      metadata: turnId === undefined ? undefined : { turnId },
+      parts: [{ type: 'tool', id: 'read', title: 'read', status: 'completed' }],
+      role: 'assistant',
+      status: 'complete',
+    }).toolCalls?.[0];
+
+    expect(toolCall).not.toHaveProperty('turnId');
   });
 
   it('preserves ordered renderer parts so tools can render between text chunks', () => {

@@ -54,6 +54,7 @@ type SelectorCommand = {
   value: string;
 };
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   disabled?: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -79,6 +80,7 @@ const emit = defineEmits<{
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
   'update:serviceTier': [serviceTier: string | null];
 }>();
+// Stryker restore all
 
 const selectedModel = computed(() => (
   props.models.find((model) => model.id === props.modelId) ??

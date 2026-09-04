@@ -19,10 +19,12 @@
 import { DashboardIcon, ExternalLinkIcon } from '../icons/app-icons'
 import type { CodexConversationVisualization } from './visualization'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{ path?: string; title: string }>()
 const emit = defineEmits<{
   'open-visualization': [visualization: CodexConversationVisualization]
 }>()
+// Stryker restore all
 
 function open() {
   if (!props.path) return

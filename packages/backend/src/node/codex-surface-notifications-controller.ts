@@ -330,15 +330,13 @@ export class CodexSurfaceNotificationsController {
         });
         const message = this.host.requireRuntime(notification.params.threadId).messages.find((candidate) => (
           candidate.kind === 'compaction' && candidate.metadata?.turnId === notification.params.turnId
-        ));
-        if (message) {
-          this.host.emitEvent('notification', {
-            type: 'context.compactionCompleted',
-            conversationId: notification.params.threadId,
-            turnId: notification.params.turnId,
-            payload: { itemId: null, message: structuredClone(message) },
-          });
-        }
+        ))!;
+        this.host.emitEvent('notification', {
+          type: 'context.compactionCompleted',
+          conversationId: notification.params.threadId,
+          turnId: notification.params.turnId,
+          payload: { itemId: null, message: structuredClone(message) },
+        });
         return;
       }
       case 'turn/completed':

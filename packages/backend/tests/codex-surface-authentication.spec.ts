@@ -17,6 +17,7 @@ import {
   type CodexSurfaceAuthenticationHost,
 } from '../src/node/codex-surface-authentication-controller';
 import { initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
+import { deferred } from './helpers/codex-surface-fixture';
 
 describe('Codex surface authentication values', () => {
   it('normalizes each supported account type and identity', () => {
@@ -49,7 +50,10 @@ describe('Codex surface authentication values', () => {
       account: value.account,
       requiresOpenaiAuth: false,
     }));
-    expect(initialAuthentication().login.status).toBe('idle');
+    expect(initialAuthentication()).toStrictEqual({
+      status: 'notLoaded', account: null, requiresOpenaiAuth: null, error: null,
+      login: { status: 'idle', loginId: null, authUrl: null, error: null },
+    });
   });
 
   it('validates login ids and browser-safe authentication URLs', () => {
@@ -63,6 +67,61 @@ describe('Codex surface authentication values', () => {
 });
 
 describe('CodexSurfaceAuthenticationController', () => {
+  it.each([
+    [{ status: 'pending', loginId: null, authUrl: 'https://old.test' }, 'missing id'],
+    [{ status: 'pending', loginId: 'old', authUrl: null }, 'missing URL'],
+    [{ status: 'idle', loginId: 'old', authUrl: 'https://old.test' }, 'non-pending status'],
+  ] as const)('starts a new login instead of reusing an incomplete current login: %s', async (login, _reason) => {
+    const request = vi.fn(async () => ({
+      type: 'chatgpt', loginId: 'new', authUrl: 'https://new.test/login',
+    }));
+    const setup = setupController(request);
+    setup.state.authentication.login = { ...login, error: null };
+
+    await expect(setup.controller.startChatGptLogin()).resolves.toStrictEqual({
+      loginId: 'new', authUrl: 'https://new.test/login',
+    });
+
+    expect(request).toHaveBeenCalledExactlyOnceWith('account/login/start', { type: 'chatgpt' });
+  });
+
+  it('shares an in-flight login and clears it before a later independent attempt', async () => {
+    const first = deferred<{ type: 'chatgpt'; loginId: string; authUrl: string }>();
+    const request = vi.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValueOnce({ type: 'chatgpt', loginId: 'second', authUrl: 'https://second.test' });
+    const setup = setupController(request);
+
+    const one = setup.controller.startChatGptLogin();
+    const two = setup.controller.startChatGptLogin();
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    expect(setup.host.patchAuthentication).toHaveBeenCalledWith({
+      login: { status: 'starting', loginId: null, authUrl: null, error: null },
+    }, 'action');
+    first.resolve({ type: 'chatgpt', loginId: 'first', authUrl: 'https://first.test' });
+    await expect(Promise.all([one, two])).resolves.toStrictEqual([
+      { loginId: 'first', authUrl: 'https://first.test/' },
+      { loginId: 'first', authUrl: 'https://first.test/' },
+    ]);
+    expect(setup.state.authentication.login).toStrictEqual({
+      status: 'pending', loginId: 'first', authUrl: 'https://first.test/', error: null,
+    });
+    expect(setup.host.patchAuthentication).toHaveBeenLastCalledWith({
+      login: {
+        status: 'pending', loginId: 'first', authUrl: 'https://first.test/', error: null,
+      },
+    }, 'action');
+    expect(request).toHaveBeenCalledOnce();
+
+    setup.state.authentication.login = {
+      status: 'idle', loginId: null, authUrl: null, error: null,
+    };
+    await expect(setup.controller.startChatGptLogin()).resolves.toStrictEqual({
+      loginId: 'second', authUrl: 'https://second.test/',
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it('starts, reuses, and cancels a ChatGPT login', async () => {
     const request = vi.fn(async (method: string) => method === 'account/login/start'
       ? { type: 'chatgpt', loginId: ' login-1 ', authUrl: 'https://example.test/login' }
@@ -86,14 +145,101 @@ describe('CodexSurfaceAuthenticationController', () => {
     }), 'action');
   });
 
+  it('normalizes every cancel result and rejects an empty id before the RPC', async () => {
+    const setup = setupController(vi.fn(async () => ({ status: 'notFound' })));
+    setup.state.authentication.login = {
+      status: 'pending', loginId: 'login', authUrl: 'https://login.test', error: 'old',
+    };
+
+    await expect(setup.controller.cancelLogin('login')).resolves.toBe(setup.state);
+    expect(setup.state.authentication.login).toStrictEqual({
+      status: 'idle', loginId: null, authUrl: null, error: null,
+    });
+    expect(setup.host.patchAuthentication).toHaveBeenLastCalledWith({
+      login: { status: 'idle', loginId: null, authUrl: null, error: null },
+    }, 'action');
+
+    setup.host.patchAuthentication.mockClear();
+    await expect(setup.controller.cancelLogin('   ')).rejects.toThrow('cannot be empty');
+    expect(setup.host.patchAuthentication).not.toHaveBeenCalled();
+  });
+
   it('surfaces invalid and rejected login attempts', async () => {
     const wrongType = setupController(vi.fn(async () => ({ type: 'apiKey' })));
     await expect(wrongType.controller.startChatGptLogin()).rejects.toThrow("unexpected login type 'apiKey'");
-    expect(wrongType.state.authentication.login.status).toBe('error');
+    expect(wrongType.state.authentication.login).toStrictEqual({
+      status: 'error', loginId: null, authUrl: null,
+      error: "Codex account/login/start returned unexpected login type 'apiKey'",
+    });
+    expect(wrongType.host.patchAuthentication).toHaveBeenLastCalledWith({
+      login: {
+        status: 'error', loginId: null, authUrl: null,
+        error: "Codex account/login/start returned unexpected login type 'apiKey'",
+      },
+    }, 'action');
 
     const rejected = setupController(vi.fn(async () => { throw new Error('offline'); }));
     await expect(rejected.controller.startChatGptLogin()).rejects.toThrow('offline');
     expect(rejected.state.authentication.login).toMatchObject({ status: 'error', error: 'offline' });
+
+    rejected.state.authentication.login = {
+      status: 'idle', loginId: null, authUrl: null, error: null,
+    };
+    await expect(rejected.controller.startChatGptLogin()).rejects.toThrow('offline');
+    expect(rejected.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('logs out with exact protocol and bootstraps an allowed account', async () => {
+    const request = vi.fn(async (method: string) => method === 'account/logout'
+      ? {}
+      : { account: { type: 'apiKey' }, requiresOpenaiAuth: false });
+    const setup = setupController(request);
+    setup.state.authentication.login = {
+      status: 'completed', loginId: 'login', authUrl: 'https://login.test', error: 'old',
+    };
+
+    await expect(setup.controller.logout()).resolves.toBe(setup.state);
+
+    expect(request).toHaveBeenNthCalledWith(1, 'account/logout', undefined);
+    expect(request).toHaveBeenNthCalledWith(2, 'account/read', { refreshToken: false });
+    expect(setup.host.patchAuthentication).toHaveBeenCalledWith({
+      login: { status: 'idle', loginId: null, authUrl: null, error: null },
+    }, 'action');
+    expect(setup.host.patchAuthentication.mock.calls.slice(1)).toStrictEqual([
+      [{ status: 'loading', error: null }, 'action'],
+      [{
+        status: 'loaded', account: { type: 'apiKey' }, requiresOpenaiAuth: false, error: null,
+      }, 'action'],
+    ]);
+    expect(setup.host.clearAuthenticatedSurfaceData).not.toHaveBeenCalled();
+    expect(setup.host.bootstrapSurfaceData).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it('clears data and skips bootstrap when logout leaves authentication blocked', async () => {
+    const setup = setupController(vi.fn(async (method: string) => method === 'account/logout'
+      ? {}
+      : { account: null, requiresOpenaiAuth: true }));
+
+    await setup.controller.logout();
+
+    expect(setup.host.clearAuthenticatedSurfaceData).toHaveBeenCalledOnce();
+    expect(setup.host.bootstrapSurfaceData).not.toHaveBeenCalled();
+  });
+
+  it('clears data and reboots when logout changes account identity', async () => {
+    let email = 'first@example.test';
+    const request = vi.fn(async (method: string) => method === 'account/logout'
+      ? {}
+      : { account: { type: 'chatgpt', email, planType: 'pro' }, requiresOpenaiAuth: false });
+    const setup = setupController(request);
+    await setup.controller.load('lifecycle');
+    email = 'second@example.test';
+    setup.host.patchAuthentication.mockClear();
+
+    await setup.controller.logout();
+
+    expect(setup.host.clearAuthenticatedSurfaceData).toHaveBeenCalledOnce();
+    expect(setup.host.bootstrapSurfaceData).toHaveBeenCalledExactlyOnceWith(true);
   });
 
   it('loads authentication, detects identity changes, and records read failures', async () => {
@@ -113,6 +259,18 @@ describe('CodexSurfaceAuthenticationController', () => {
     expect(setup.state.authentication).toMatchObject({ status: 'error', error: 'read failed' });
   });
 
+  it('loads an absent account with exact transitions, request, and origin', async () => {
+    const setup = setupController(vi.fn(async () => ({ account: null, requiresOpenaiAuth: true })));
+
+    await expect(setup.controller.load('notification')).resolves.toBe(false);
+
+    expect(setup.request).toHaveBeenCalledExactlyOnceWith('account/read', { refreshToken: false });
+    expect(setup.host.patchAuthentication.mock.calls).toStrictEqual([
+      [{ status: 'loading', error: null }, 'notification'],
+      [{ status: 'loaded', account: null, requiresOpenaiAuth: true, error: null }, 'notification'],
+    ]);
+  });
+
   it('refreshes bootstrap state and honors the blocked-authentication boundary', async () => {
     const allowed = setupController(vi.fn(async () => ({ account: { type: 'apiKey' }, requiresOpenaiAuth: true })));
     await allowed.controller.refresh('action', true);
@@ -125,6 +283,89 @@ describe('CodexSurfaceAuthenticationController', () => {
     expect(blocked.controller.blocksBootstrap()).toBe(true);
     expect(blocked.host.clearAuthenticatedSurfaceData).toHaveBeenCalledOnce();
     expect(blocked.host.bootstrapSurfaceData).not.toHaveBeenCalled();
+  });
+
+  it('coalesces refreshes while preserving the latest origin and force request', async () => {
+    const first = deferred<{ account: { type: 'apiKey' }; requiresOpenaiAuth: boolean }>();
+    const request = vi.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValueOnce({ account: { type: 'apiKey' }, requiresOpenaiAuth: false });
+    const setup = setupController(request);
+
+    const action = setup.controller.refresh('action');
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    expect(setup.controller.pendingRefresh()).toBe(action);
+    const notification = setup.controller.refresh('notification', true);
+    expect(notification).toBe(action);
+    first.resolve({ account: { type: 'apiKey' }, requiresOpenaiAuth: false });
+    await action;
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(setup.host.bootstrapSurfaceData.mock.calls).toStrictEqual([[false], [true]]);
+    expect(setup.host.patchAuthentication.mock.calls).toStrictEqual([
+      [{ status: 'loading', error: null }, 'action'],
+      [{ status: 'loaded', account: { type: 'apiKey' }, requiresOpenaiAuth: false, error: null }, 'action'],
+      [{ status: 'loading', error: null }, 'notification'],
+      [{ status: 'loaded', account: { type: 'apiKey' }, requiresOpenaiAuth: false, error: null }, 'notification'],
+    ]);
+    expect(setup.controller.pendingRefresh()).toBeNull();
+  });
+
+  it('retries a failed refresh when another refresh is queued and preserves force', async () => {
+    const first = deferred<never>();
+    const request = vi.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValueOnce({ account: { type: 'apiKey' }, requiresOpenaiAuth: false });
+    const setup = setupController(request);
+
+    const refresh = setup.controller.refresh('action', true);
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    expect(setup.controller.refresh('notification')).toBe(refresh);
+    first.reject(new Error('superseded failure'));
+
+    await expect(refresh).resolves.toBe(setup.state);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(setup.host.bootstrapSurfaceData).toHaveBeenCalledExactlyOnceWith(true);
+    expect(setup.state.authentication).toMatchObject({ status: 'loaded', account: { type: 'apiKey' } });
+  });
+
+  it('resets force-bootstrap between successful queued refreshes', async () => {
+    const first = deferred<{ account: { type: 'apiKey' }; requiresOpenaiAuth: boolean }>();
+    const request = vi.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValueOnce({ account: { type: 'apiKey' }, requiresOpenaiAuth: false });
+    const setup = setupController(request);
+
+    const refresh = setup.controller.refresh('action', true);
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    setup.controller.refresh('notification', false);
+    first.resolve({ account: { type: 'apiKey' }, requiresOpenaiAuth: false });
+    await refresh;
+
+    expect(setup.host.bootstrapSurfaceData.mock.calls).toStrictEqual([[true], [false]]);
+  });
+
+  it('rejects an unqueued refresh failure and clears pending state', async () => {
+    const setup = setupController(vi.fn(async () => { throw new Error('read failed'); }));
+    await expect(setup.controller.refresh('action', true)).rejects.toThrow('read failed');
+    expect(setup.host.bootstrapSurfaceData).not.toHaveBeenCalled();
+    expect(setup.controller.pendingRefresh()).toBeNull();
+  });
+
+  it('blocks bootstrap only for the exact loaded, absent, required-auth state', () => {
+    const setup = setupController(vi.fn());
+    const cases = [
+      { status: 'notLoaded', account: null, requiresOpenaiAuth: true, expected: false },
+      { status: 'loaded', account: { type: 'apiKey' }, requiresOpenaiAuth: true, expected: false },
+      { status: 'loaded', account: null, requiresOpenaiAuth: false, expected: false },
+      { status: 'loaded', account: null, requiresOpenaiAuth: true, expected: true },
+    ] as const;
+    for (const entry of cases) {
+      setup.state.authentication = authentication({
+        status: entry.status, account: entry.account, requiresOpenaiAuth: entry.requiresOpenaiAuth,
+      });
+      expect(setup.controller.blocksBootstrap()).toBe(entry.expected);
+    }
   });
 
   it('handles login completion notifications and refresh errors', async () => {
@@ -148,6 +389,48 @@ describe('CodexSurfaceAuthenticationController', () => {
       message: 'refresh failed',
     })));
   });
+
+  it('preserves explicit failure details and current URL in a login notification', () => {
+    const setup = setupController(vi.fn());
+    setup.state.authentication.login = {
+      status: 'pending', loginId: 'current', authUrl: 'https://login.test', error: null,
+    };
+
+    setup.controller.handleLoginCompleted({
+      loginId: 'reported', success: false, error: 'Denied', onboardingEntrypoint: null,
+    });
+
+    expect(setup.host.patchAuthentication).toHaveBeenCalledExactlyOnceWith({
+      login: {
+        status: 'error', loginId: 'reported', authUrl: 'https://login.test', error: 'Denied',
+      },
+    }, 'notification');
+    expect(setup.request).not.toHaveBeenCalled();
+  });
+
+  it('projects successful login completion and refreshes with notification origin', async () => {
+    const setup = setupController(vi.fn(async () => ({
+      account: { type: 'apiKey' }, requiresOpenaiAuth: false,
+    })));
+    setup.state.authentication.login = {
+      status: 'pending', loginId: 'current', authUrl: 'https://login.test', error: 'old',
+    };
+
+    setup.controller.handleLoginCompleted({
+      loginId: null, success: true, error: null, onboardingEntrypoint: null,
+    });
+
+    expect(setup.host.patchAuthentication).toHaveBeenNthCalledWith(1, {
+      login: { status: 'completed', loginId: 'current', authUrl: 'https://login.test', error: null },
+    }, 'notification');
+    await vi.waitFor(() => expect(setup.host.bootstrapSurfaceData).toHaveBeenCalledWith(false));
+    expect(setup.host.patchAuthentication.mock.calls.slice(1)).toStrictEqual([
+      [{ status: 'loading', error: null }, 'notification'],
+      [{
+        status: 'loaded', account: { type: 'apiKey' }, requiresOpenaiAuth: false, error: null,
+      }, 'notification'],
+    ]);
+  });
 });
 
 function authentication(overrides: Partial<CodexSurfaceAuthentication> = {}): CodexSurfaceAuthentication {
@@ -156,7 +439,7 @@ function authentication(overrides: Partial<CodexSurfaceAuthentication> = {}): Co
 
 function setupController(request: ReturnType<typeof vi.fn>) {
   const state = initialSurfaceSnapshot(initialAuthentication());
-  const host: CodexSurfaceAuthenticationHost = {
+  const host = {
     bootstrapSurfaceData: vi.fn(async () => undefined),
     clearAuthenticatedSurfaceData: vi.fn(async () => undefined),
     getSnapshot: () => state,
@@ -164,7 +447,7 @@ function setupController(request: ReturnType<typeof vi.fn>) {
       state.authentication = { ...state.authentication, ...patch };
     }),
     reportError: vi.fn(),
-  };
+  } satisfies CodexSurfaceAuthenticationHost;
   const client = { request } as unknown as CodexAppServerClient;
-  return { controller: new CodexSurfaceAuthenticationController(client, host), host, state };
+  return { controller: new CodexSurfaceAuthenticationController(client, host), host, request, state };
 }

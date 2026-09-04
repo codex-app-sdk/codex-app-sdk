@@ -15,6 +15,7 @@
 <script setup lang="ts">
 import ChatComposerWaveform from './ChatComposerWaveform.vue'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   recorder: {
     getAnalyser(): AnalyserNode | null
@@ -22,6 +23,7 @@ defineProps<{
   } | null
   recording: boolean
 }>()
+// Stryker restore all
 </script>
 
 <style scoped>

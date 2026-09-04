@@ -27,11 +27,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   kind: 'added' | 'deleted'
   label: string
   value: number
 }>()
+// Stryker restore all
 
 const sign = computed(() => (props.kind === 'added' ? '+' : '-'))
 

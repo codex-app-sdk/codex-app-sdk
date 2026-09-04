@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
-import { toRaw } from 'vue';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { defineComponent, h, ref, toRaw } from 'vue';
 import CodexMessageList from '../src/components/CodexMessageList.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
 import type { Message } from '../src/chat/types';
@@ -44,6 +44,11 @@ function makeMessages(count: number, offset = 0): Message[] {
   }));
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
 describe('CodexMessageList', () => {
   it('keeps the thinking shimmer visible while a busy turn has no assistant row yet', async () => {
     const wrapper = mount(CodexMessageList, {
@@ -77,6 +82,36 @@ describe('CodexMessageList', () => {
     expect(wrapper.get('.chat-message--compaction-running')).toBeTruthy();
     expect(wrapper.text()).toContain('Compacting context');
     expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+  });
+
+  it.each([
+    ['a streaming flag on a user row', [{ id: 'user-streaming', role: 'user', content: '', streaming: true }]],
+    ['a completed legacy assistant row', [{ id: 'assistant-complete', role: 'assistant', content: 'Done', streaming: false }]],
+    ['a completed compaction row', [{
+      id: 'compaction-complete', role: 'assistant', content: '', type: 'compaction', compactionStatus: 'completed',
+    }]],
+    ['a completed surface assistant row', [{
+      id: 'surface-complete', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Done' }],
+    }]],
+  ])('adds a thinking placeholder while busy with %s', (_label, busyMessages) => {
+    const wrapper = mount(CodexMessageList, { props: { busy: true, messages: busyMessages } as never });
+
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+  });
+
+  it.each([
+    ['a legacy streaming assistant among user rows', [
+      { id: 'user-before-stream', role: 'user', content: 'Question' },
+      { id: 'assistant-streaming', role: 'assistant', content: 'Working', streaming: true },
+    ]],
+    ['a streaming surface assistant', [{
+      id: 'surface-streaming', role: 'assistant', status: 'streaming', parts: [{ type: 'text', text: 'Working' }],
+    }]],
+  ])('does not add a duplicate thinking placeholder for %s', (_label, busyMessages) => {
+    const wrapper = mount(CodexMessageList, { props: { busy: true, messages: busyMessages } as never });
+
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+    expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
   });
 
   it('renders user text, markdown, streaming assistant state, follow-ups, and tool groups', () => {
@@ -158,6 +193,45 @@ describe('CodexMessageList', () => {
     expect(rows[2]?.classes()).toContain('chat-message--actions-visible');
   });
 
+  it('keeps the latest completed assistant actions visible when a user follows it', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages: [
+          { role: 'assistant', content: 'Answer' },
+          { role: 'user', content: 'Follow up' },
+        ],
+      },
+    });
+
+    const rows = wrapper.findAll('.chat-message');
+    expect(rows[0]?.classes()).toContain('chat-message--actions-visible');
+    expect(rows[1]?.classes()).not.toContain('chat-message--actions-visible');
+  });
+
+  it('does not mark any user action row as persistently visible without an assistant response', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { messages: makeMessages(2) },
+    });
+
+    expect(wrapper.findAll('.chat-message')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message--actions-visible')).toHaveLength(0);
+  });
+
+  it.each([
+    ['a completed legacy response', { role: 'assistant', content: 'Done', streaming: false }, true],
+    ['a streaming legacy response', { role: 'assistant', content: 'Working', streaming: true }, false],
+    ['a completed surface response', {
+      id: 'surface-complete-actions', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Done' }],
+    }, true],
+    ['a streaming surface response', {
+      id: 'surface-streaming-actions', role: 'assistant', status: 'streaming', parts: [{ type: 'text', text: 'Working' }],
+    }, false],
+  ])('marks actions as persistently visible for %s only after completion', (_label, message, expected) => {
+    const wrapper = mount(CodexMessageList, { props: { messages: [message] } as never });
+
+    expect(wrapper.get('.chat-message').classes().includes('chat-message--actions-visible')).toBe(expected);
+  });
+
   it('forwards provider capability flags to message actions', () => {
     const wrapper = mount(CodexMessageList, {
       props: {
@@ -233,6 +307,34 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it('normalizes zero and fractional lazy batch sizes before rendering and paging', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        initialMessageBatchSize: 0,
+        lazyMessages: true,
+        messageBatchSize: 1.9,
+        messages: makeMessages(3),
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual(['message-2']);
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-1',
+      'message-2',
+    ]);
+    wrapper.unmount();
+  });
+
   it('retains the genuine conversation tail while repeatedly revealing older messages', async () => {
     const allMessages = makeMessages(120);
     const wrapper = mount(CodexMessageList, {
@@ -278,6 +380,149 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it.each([5, 10])('never pages or requests server history while eager rendering is active with %i messages', async (messageCount) => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        hasOlderMessages: true,
+        messageBatchSize: 5,
+        messages: makeMessages(messageCount),
+        renderStrategy: 'eager',
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_000 });
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(messageCount);
+    expect(wrapper.emitted('load-older-messages')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('requests server history only after the final in-memory batch is revealed', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        hasOlderMessages: true,
+        initialMessageBatchSize: 5,
+        messageBatchSize: 5,
+        messages: makeMessages(20),
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+
+    for (const expectedCount of [10, 15]) {
+      scrollEl.scrollTop = 0;
+      await wrapper.get('.message-list').trigger('scroll');
+      await flushPromises();
+      expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(expectedCount);
+      expect(wrapper.emitted('load-older-messages')).toBeUndefined();
+    }
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(20);
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+    wrapper.unmount();
+  });
+
+  it('does not request another server page while the current page is loading', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        hasOlderMessages: true,
+        initialMessageBatchSize: 5,
+        loadingOlderMessages: true,
+        messageBatchSize: 5,
+        messages: makeMessages(10),
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(10);
+    expect(wrapper.emitted('load-older-messages')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('coalesces synchronous upward scroll events into one in-memory page', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messageBatchSize: 5, messages: makeMessages(20) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    scrollEl.scrollTop = 0;
+
+    scrollEl.dispatchEvent(new Event('scroll'));
+    scrollEl.dispatchEvent(new Event('scroll'));
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(10);
+    wrapper.unmount();
+  });
+
+  it('does not rewrite scroll position when no earlier in-memory messages exist', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: { lazyMessages: true, messages: makeMessages(51) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let scrollTop = 0;
+    const writeScrollTop = vi.fn((value: number) => { scrollTop = value; });
+    Object.defineProperty(scrollEl, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: writeScrollTop,
+    });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_000 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(50);
+    scrollEl.scrollTop = 0;
+    writeScrollTop.mockClear();
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(51);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 0;
+    writeScrollTop.mockClear();
+
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(writeScrollTop).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it('prefetches one server page when revealing the final in-memory batch', async () => {
     const wrapper = mount(CodexMessageList, {
       props: {
@@ -313,6 +558,236 @@ describe('CodexMessageList', () => {
     scrollEl.scrollTop = 0;
     await wrapper.get('.message-list').trigger('scroll');
     expect(wrapper.emitted('load-older-messages')).toStrictEqual([[], []]);
+    wrapper.unmount();
+  });
+
+  it('releases the server-history request lock when loading completes or older history disappears', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: { hasOlderMessages: true, lazyMessages: true, messageBatchSize: 5, messages: makeMessages(5) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_000 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ loadingOlderMessages: true });
+    await wrapper.setProps({ loadingOlderMessages: false });
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[], []]);
+
+    await wrapper.setProps({ hasOlderMessages: false });
+    await wrapper.setProps({ hasOlderMessages: true });
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[], [], []]);
+    wrapper.unmount();
+  });
+
+  it('recomputes the visible window when render strategy and batch size change', async () => {
+    const allMessages = makeMessages(8);
+    const wrapper = mount(CodexMessageList, {
+      props: { messageBatchSize: 3, messages: allMessages, renderStrategy: 'lazy' },
+    });
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-5',
+      'message-6',
+      'message-7',
+    ]);
+
+    await wrapper.setProps({ renderStrategy: 'eager' });
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(8);
+    expect(wrapper.findAllComponents(CodexMessage)[0]!.props('message').id).toBe('message-0');
+
+    await wrapper.setProps({ renderStrategy: 'lazy' });
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage)[0]!.props('message').id).toBe('message-5');
+
+    await wrapper.setProps({ messageBatchSize: 4 });
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-4',
+      'message-5',
+      'message-6',
+      'message-7',
+    ]);
+  });
+
+  it('preserves public slot identity and absolute indexes when switching from lazy to eager', async () => {
+    const transformedIndexes: number[] = [];
+    const createdFor: string[] = [];
+    const StatefulMessage = defineComponent({
+      props: { content: { required: true, type: String } },
+      setup(props) {
+        const mountedFor = props.content;
+        createdFor.push(mountedFor);
+        return () => h('p', { class: 'stateful-message' }, `${mountedFor} -> ${props.content}`);
+      },
+    });
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        initialMessageBatchSize: 2,
+        messages: makeMessages(4).map(({ id: _id, ...message }) => message),
+        renderStrategy: 'lazy',
+        transformMessage(message, index) {
+          transformedIndexes.push(index);
+          return message;
+        },
+      },
+      slots: {
+        message: ({ index, message }: { index: number; message: Message }) => h('section', {
+          'class': 'slotted-message',
+          'data-index': index,
+        }, [h(StatefulMessage, { content: message.content })]),
+      },
+    });
+
+    expect(wrapper.findAll('.slotted-message').map((row) => row.attributes('data-index'))).toStrictEqual(['2', '3']);
+    expect(transformedIndexes).toStrictEqual([2, 3]);
+    transformedIndexes.length = 0;
+
+    await wrapper.setProps({ renderStrategy: 'eager' });
+
+    expect(wrapper.findAll('.slotted-message').map((row) => row.attributes('data-index'))).toStrictEqual([
+      '0', '1', '2', '3',
+    ]);
+    expect(transformedIndexes).toStrictEqual([0, 1, 2, 3]);
+    expect(wrapper.findAll('.stateful-message').map((row) => row.text())).toStrictEqual([
+      'Message 0 -> Message 0',
+      'Message 1 -> Message 1',
+      'Message 2 -> Message 2',
+      'Message 3 -> Message 3',
+    ]);
+    expect(createdFor).toStrictEqual(['Message 2', 'Message 3', 'Message 0', 'Message 1']);
+  });
+
+  it('preserves an eager transcript position when older messages are prepended', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const currentMessages = makeMessages(60);
+    const olderMessages = makeMessages(10, -10);
+    const wrapper = mount(CodexMessageList, {
+      props: { messages: currentMessages, renderStrategy: 'eager' },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 100;
+    await wrapper.get('.message-list').trigger('scroll');
+
+    await wrapper.setProps({ messages: [...olderMessages, ...currentMessages] });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(70);
+    expect(wrapper.findAllComponents(CodexMessage)[0]!.props('message').id).toBe('message--10');
+    expect(scrollEl.scrollTop).toBe(100);
+    wrapper.unmount();
+  });
+
+  it('does not scroll an eager transcript when its unused batch size changes', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: { messageBatchSize: 5, messages: makeMessages(10), renderStrategy: 'eager' },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_000 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 100;
+
+    await wrapper.setProps({ messageBatchSize: 6 });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(10);
+    expect(scrollEl.scrollTop).toBe(100);
+    wrapper.unmount();
+  });
+
+  it('keeps lazy batch reconfiguration at the bottom without dragging an unstuck transcript', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: { messageBatchSize: 5, messages: makeMessages(10) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let scrollTop = 0;
+    const writeScrollTop = vi.fn((value: number) => { scrollTop = value; });
+    Object.defineProperty(scrollEl, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: writeScrollTop,
+    });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await wrapper.setProps({ messageBatchSize: 6 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(6);
+    expect(scrollEl.scrollTop).toBe(600);
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('stickiness-change')).toContainEqual([false]);
+    writeScrollTop.mockClear();
+    await wrapper.setProps({ messageBatchSize: 4 });
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(4);
+    expect(writeScrollTop).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('refreshes message boundaries when lazy batch configuration replaces a conversation', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const replacement = makeMessages(5, 100);
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messageBatchSize: 4, messages: makeMessages(5) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await wrapper.setProps({ initialMessageBatchSize: 6, messages: replacement });
+    await flushPromises();
+    scrollEl.scrollTop = 0;
+    await wrapper.setProps({ messages: [...replacement, ...makeMessages(2, 105)] });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(7);
+    expect(scrollEl.scrollTop).toBe(0);
     wrapper.unmount();
   });
 
@@ -424,6 +899,35 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it('keeps an early server prepend outside the window while local history remains', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const currentMessages = makeMessages(20);
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messageBatchSize: 5, messages: currentMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 0;
+
+    await wrapper.setProps({ messages: [...makeMessages(5, -5), ...currentMessages] });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-15', 'message-16', 'message-17', 'message-18', 'message-19',
+    ]);
+    expect(scrollEl.scrollTop).toBe(0);
+    wrapper.unmount();
+  });
+
   it('reveals server-prepended history when the rendered window is already at the top', async () => {
     const currentMessages = makeMessages(5);
     const olderMessages = makeMessages(10, -10);
@@ -445,7 +949,7 @@ describe('CodexMessageList', () => {
     await flushPromises();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    scrollEl.scrollTop = 0;
+    scrollEl.scrollTop = 100;
     await wrapper.get('.message-list').trigger('scroll');
     expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
 
@@ -459,7 +963,170 @@ describe('CodexMessageList', () => {
       ...olderMessages.slice(-5).map((message) => message.id),
       ...currentMessages.map((message) => message.id),
     ]);
-    expect(scrollEl.scrollTop).toBe(500);
+    expect(scrollEl.scrollTop).toBe(600);
+    wrapper.unmount();
+  });
+
+  it('does not mistake an append for another prepend after history reconciliation', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const currentMessages = makeMessages(10);
+    const olderMessages = makeMessages(10, -10);
+    const wrapper = mount(CodexMessageList, {
+      props: { messageBatchSize: 10, messages: currentMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await wrapper.setProps({ messages: [...olderMessages, ...currentMessages] });
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual(
+      currentMessages.map((message) => message.id),
+    );
+
+    scrollEl.scrollTop = 0;
+    await wrapper.setProps({ messages: [...olderMessages, ...currentMessages, makeMessages(1, 10)[0]!] });
+
+    expect(wrapper.findAllComponents(CodexMessage)[0]!.props('message').id).toBe(currentMessages[0]!.id);
+    expect(wrapper.text()).not.toContain('Message -10');
+    wrapper.unmount();
+  });
+
+  it('preserves the visible anchor when a hidden head is trimmed and the tail grows', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const allMessages = makeMessages(10);
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messages: allMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 0;
+
+    await wrapper.setProps({
+      messages: [...allMessages.slice(5), ...makeMessages(6, 10)],
+    });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)[0]?.props('message').id).toBe('message-5');
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(11);
+    expect(scrollEl.scrollTop).toBe(0);
+    wrapper.unmount();
+  });
+
+  it('preserves expanded context when a message is inserted away from either edge', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const allMessages = makeMessages(10);
+    const inserted: Message = { id: 'message-middle', role: 'user', content: 'Inserted middle message' };
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messages: allMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 200;
+
+    await wrapper.setProps({
+      messages: [...allMessages.slice(0, 8), inserted, ...allMessages.slice(8)],
+    });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-5', 'message-6', 'message-7', 'message-middle', 'message-8', 'message-9',
+    ]);
+    wrapper.unmount();
+  });
+
+  it('retains the latest observed tail identity across consecutive growth updates', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const initialMessages = makeMessages(10);
+    const appendedMessages = [...initialMessages, makeMessages(1, 10)[0]!];
+    const inserted: Message = { id: 'message-middle-after-append', role: 'user', content: 'Inserted later' };
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messages: initialMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 200;
+
+    await wrapper.setProps({ messages: appendedMessages });
+    await flushPromises();
+    scrollEl.scrollTop = 200;
+    await wrapper.setProps({
+      messages: [...appendedMessages.slice(0, 8), inserted, ...appendedMessages.slice(8)],
+    });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-6',
+      'message-7',
+      'message-middle-after-append',
+      'message-8',
+      'message-9',
+      'message-10',
+    ]);
+    wrapper.unmount();
+  });
+
+  it('refreshes message boundaries after replacing a transcript with a shorter one', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const replacement = makeMessages(5, 100);
+    const wrapper = mount(CodexMessageList, {
+      props: { messageBatchSize: 5, messages: makeMessages(10) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await wrapper.setProps({ messages: replacement });
+    await flushPromises();
+    scrollEl.scrollTop = 0;
+    await wrapper.setProps({ messages: [...replacement, makeMessages(1, 105)[0]!] });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(6);
+    expect(scrollEl.scrollTop).toBe(0);
     wrapper.unmount();
   });
 
@@ -531,6 +1198,77 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
+  it('keeps a fully revealed local window intact when a new tail message arrives', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const allMessages = makeMessages(10);
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messageBatchSize: 5, messages: allMessages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(10);
+
+    scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight;
+    await wrapper.get('.message-list').trigger('scroll');
+    await wrapper.setProps({ messages: [...allMessages, makeMessages(1, 10)[0]!] });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual(
+      makeMessages(11).map((message) => message.id),
+    );
+    wrapper.unmount();
+  });
+
+  it('does not apply prepend anchoring when a transcript shrinks away from the bottom', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: { initialMessageBatchSize: 5, messages: makeMessages(10) },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let scrollTop = 0;
+    const writeScrollTop = vi.fn((value: number) => { scrollTop = value; });
+    Object.defineProperty(scrollEl, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: writeScrollTop,
+    });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 0;
+    writeScrollTop.mockClear();
+
+    await wrapper.setProps({ messages: makeMessages(4, 100) });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-100', 'message-101', 'message-102', 'message-103',
+    ]);
+    expect(scrollEl.scrollTop).toBe(0);
+    expect(writeScrollTop).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it('uses viewport geometry when stickiness is stale during a prepend', async () => {
     const currentMessages = makeMessages(50);
     const wrapper = mount(CodexMessageList, {
@@ -594,6 +1332,84 @@ describe('CodexMessageList', () => {
     expect(wrapper.text()).not.toContain('Message 100');
   });
 
+  it('restores the lazy tail and server-history eligibility when the conversation resets', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        hasOlderMessages: true,
+        messageBatchSize: 5,
+        messages: makeMessages(15),
+        resetKey: 'thread-a',
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    for (let page = 0; page < 2; page += 1) {
+      scrollEl.scrollTop = 0;
+      await wrapper.get('.message-list').trigger('scroll');
+      await flushPromises();
+    }
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(15);
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ resetKey: 'thread-b' });
+    await flushPromises();
+    expect(wrapper.findAllComponents(CodexMessage).map((row) => row.props('message').id)).toStrictEqual([
+      'message-10',
+      'message-11',
+      'message-12',
+      'message-13',
+      'message-14',
+    ]);
+
+    for (let page = 0; page < 2; page += 1) {
+      scrollEl.scrollTop = 0;
+      await wrapper.get('.message-list').trigger('scroll');
+      await flushPromises();
+    }
+    expect(wrapper.emitted('load-older-messages')).toStrictEqual([[], []]);
+    wrapper.unmount();
+  });
+
+  it('refreshes message boundaries when resetting to a same-length conversation', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const replacement = makeMessages(5, 100);
+    const wrapper = mount(CodexMessageList, {
+      props: { messageBatchSize: 5, messages: makeMessages(5), resetKey: 'thread-a' },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await wrapper.setProps({ messages: replacement, resetKey: 'thread-b' });
+    await flushPromises();
+    scrollEl.scrollTop = 0;
+    await wrapper.setProps({ messages: [...replacement, makeMessages(1, 105)[0]!] });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(6);
+    expect(scrollEl.scrollTop).toBe(0);
+    wrapper.unmount();
+  });
+
   it('forwards message action events from chat messages', async () => {
     const wrapper = mount(CodexMessageList, {
       props: {
@@ -625,6 +1441,9 @@ describe('CodexMessageList', () => {
   });
 
   it('keeps the transcript stuck to the bottom when messages are appended', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
     const wrapper = mount(CodexMessageList, {
       props: {
         messages: messages.slice(0, 1),
@@ -634,12 +1453,203 @@ describe('CodexMessageList', () => {
     const scrollEl = wrapper.get('.message-list').element as HTMLElement;
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 600;
 
     await (wrapper as unknown as { setProps: (props: { messages: Message[] }) => Promise<void> }).setProps({ messages });
     await flushPromises();
 
     expect(scrollEl.scrollTop).toBe(900);
     wrapper.unmount();
+  });
+
+  it('defers a second initial scroll until post-mount layout is available', async () => {
+    let frame: FrameRequestCallback = () => undefined;
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frame = callback;
+      return 17;
+    });
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
+    const wrapper = mount(CodexMessageList, {
+      props: { messages: [] },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let layoutReady = false;
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => layoutReady ? 900 : 0,
+    });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+    expect(scrollEl.scrollTop).toBe(0);
+    layoutReady = true;
+    frame(0);
+    expect(scrollEl.scrollTop).toBe(900);
+    wrapper.unmount();
+  });
+
+  it('does not cancel completed scroll work during unmount', async () => {
+    let frame: FrameRequestCallback = () => undefined;
+    const cancelAnimationFrame = vi.fn();
+    const clearTimeout = vi.fn();
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      frame = callback;
+      return 29;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame);
+    vi.stubGlobal('clearTimeout', clearTimeout);
+    const wrapper = mount(CodexMessageList, { props: { messages: [] } });
+    await flushPromises();
+
+    frame(0);
+    wrapper.unmount();
+
+    expect(cancelAnimationFrame).not.toHaveBeenCalled();
+    expect(clearTimeout).not.toHaveBeenCalled();
+  });
+
+  it('cancels a queued animation-frame scroll when unmounted', async () => {
+    const cancelAnimationFrame = vi.fn();
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 71));
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame);
+    const wrapper = mount(CodexMessageList, { props: { messages: [] } });
+    await flushPromises();
+
+    wrapper.unmount();
+
+    expect(cancelAnimationFrame).toHaveBeenCalledOnce();
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(71);
+  });
+
+  it('clears a queued timeout when animation frames are unavailable', async () => {
+    const clearTimeout = vi.fn();
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    vi.stubGlobal('cancelAnimationFrame', undefined);
+    vi.stubGlobal('setTimeout', vi.fn(() => 73));
+    vi.stubGlobal('clearTimeout', clearTimeout);
+    const wrapper = mount(CodexMessageList, { props: { messages: [] } });
+    await flushPromises();
+
+    wrapper.unmount();
+
+    expect(clearTimeout).toHaveBeenCalledOnce();
+    expect(clearTimeout).toHaveBeenCalledWith(73);
+  });
+
+  it('coalesces repeated transcript observations into one queued scroll', async () => {
+    let mutationCallback: MutationCallback = () => undefined;
+    let frame: FrameRequestCallback = () => undefined;
+    vi.stubGlobal('MutationObserver', class MockMutationObserver {
+      disconnect(): void {}
+      observe(): void {}
+      takeRecords = (): MutationRecord[] => [];
+
+      constructor(callback: MutationCallback) {
+        mutationCallback = callback;
+      }
+    });
+    vi.stubGlobal('ResizeObserver', undefined);
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frame = callback;
+      return requestAnimationFrame.mock.calls.length;
+    });
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
+    const wrapper = mount(CodexMessageList, { props: { messages } });
+    await flushPromises();
+
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+    mutationCallback([], {} as MutationObserver);
+    mutationCallback([], {} as MutationObserver);
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+
+    frame(0);
+    mutationCallback([], {} as MutationObserver);
+    mutationCallback([], {} as MutationObserver);
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it('exposes scroll-to-bottom only through a real parent component ref', async () => {
+    const list = ref<{ scrollToBottom: () => void } | null>(null);
+    const Parent = defineComponent({
+      setup: () => () => h(CodexMessageList, { messages: [], ref: list }),
+    });
+    const wrapper = mount(Parent);
+    await flushPromises();
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 640 });
+
+    expect(Object.keys(list.value ?? {})).toStrictEqual(['scrollToBottom']);
+    list.value!.scrollToBottom();
+    expect(scrollEl.scrollTop).toBe(640);
+  });
+
+  it('observes transcript mutations only while stuck to the bottom and disconnects on unmount', async () => {
+    const observers: Array<{
+      callback: MutationCallback;
+      disconnect: ReturnType<typeof vi.fn>;
+      observe: ReturnType<typeof vi.fn>;
+      takeRecords: () => MutationRecord[];
+    }> = [];
+    vi.stubGlobal('MutationObserver', class MockMutationObserver {
+      callback: MutationCallback;
+      disconnect = vi.fn();
+      observe = vi.fn();
+      takeRecords = (): MutationRecord[] => [];
+
+      constructor(callback: MutationCallback) {
+        this.callback = callback;
+        observers.push(this);
+      }
+    });
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: { messages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let scrollHeight = 300;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const content = wrapper.get('.codex-message-list__content').element;
+    const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === content));
+    expect(observer).toBeDefined();
+    expect(observer!.observe).toHaveBeenCalledWith(content, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+
+    scrollHeight = 900;
+    observer!.callback([], observer as unknown as MutationObserver);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(scrollEl.scrollTop).toBe(900);
+
+    scrollEl.scrollTop = 100;
+    await wrapper.get('.message-list').trigger('scroll');
+    scrollHeight = 1_200;
+    observer!.callback([], observer as unknown as MutationObserver);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(scrollEl.scrollTop).toBe(100);
+
+    wrapper.unmount();
+    expect(observer!.disconnect).toHaveBeenCalledOnce();
   });
 
   it('keeps the transcript stuck to the bottom when a streaming row changes', async () => {
@@ -663,16 +1673,23 @@ describe('CodexMessageList', () => {
   });
 
   it('follows late transcript layout growth after the initial history render', async () => {
-    let notifyResize: () => void = () => undefined;
-    const disconnect = vi.fn();
-    vi.stubGlobal('ResizeObserver', class {
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const observers: Array<{
+      callback: ResizeObserverCallback;
+      disconnect: ReturnType<typeof vi.fn>;
+      observe: ReturnType<typeof vi.fn>;
+    }> = [];
+    vi.stubGlobal('ResizeObserver', class MockResizeObserver {
+      callback: ResizeObserverCallback;
+      disconnect = vi.fn();
+      observe = vi.fn();
+
       constructor(callback: ResizeObserverCallback) {
-        notifyResize = () => callback([], this as unknown as ResizeObserver);
+        this.callback = callback;
+        observers.push(this);
       }
 
-      observe(): void {}
       unobserve(): void {}
-      disconnect(): void { disconnect(); }
     });
     const wrapper = mount(CodexMessageList, {
       props: { messages },
@@ -683,14 +1700,28 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const content = wrapper.get('.codex-message-list__content').element;
+    const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === content));
+    expect(observer).toBeDefined();
+    expect(observer!.observe).toHaveBeenCalledWith(content);
 
     scrollHeight = 1_200;
-    notifyResize();
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    observer!.callback([], observer as unknown as ResizeObserver);
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(scrollEl.scrollTop).toBe(1_200);
+
+    scrollEl.scrollTop = 100;
+    await wrapper.get('.message-list').trigger('scroll');
+    scrollHeight = 1_500;
+    observer!.callback([], observer as unknown as ResizeObserver);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(scrollEl.scrollTop).toBe(100);
+
     wrapper.unmount();
-    expect(disconnect).toHaveBeenCalledOnce();
+    expect(observer!.disconnect).toHaveBeenCalledOnce();
     vi.unstubAllGlobals();
   });
 
@@ -711,6 +1742,56 @@ describe('CodexMessageList', () => {
     await wrapper.get('.message-list').trigger('scroll');
 
     expect(scrollEl.scrollTop).toBe(100);
+    wrapper.unmount();
+  });
+
+  it('emits each exact stickiness transition once and never emits the settled state', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, { props: { messages }, attachTo: document.body });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 600;
+
+    await wrapper.get('.message-list').trigger('scroll');
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('stickiness-change')).toBeUndefined();
+
+    scrollEl.scrollTop = 100;
+    await wrapper.get('.message-list').trigger('scroll');
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('stickiness-change')).toStrictEqual([[false]]);
+
+    await wrapper.get('.codex-message-list__scroll-to-bottom').trigger('click');
+    expect(wrapper.emitted('stickiness-change')).toStrictEqual([[false], [true]]);
+    wrapper.unmount();
+  });
+
+  it('treats the exact bottom threshold as stuck and one pixel beyond it as unstuck', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: { bottomThreshold: 24, messages },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    scrollEl.scrollTop = 576;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.find('.codex-message-list__scroll-to-bottom').exists()).toBe(false);
+
+    scrollEl.scrollTop = 575;
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.find('.codex-message-list__scroll-to-bottom').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -737,6 +1818,7 @@ describe('CodexMessageList', () => {
   });
 
   it('resets scroll position when the conversation key changes', async () => {
+    vi.stubGlobal('requestAnimationFrame', undefined);
     const wrapper = mount(CodexMessageList, {
       props: { messages, resetKey: 'thread-a' },
       attachTo: document.body,
@@ -744,6 +1826,8 @@ describe('CodexMessageList', () => {
     const scrollEl = wrapper.get('.message-list').element as HTMLElement;
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     scrollEl.scrollTop = 100;
     await wrapper.get('.message-list').trigger('scroll');
 

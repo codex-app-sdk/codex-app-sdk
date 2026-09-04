@@ -7,9 +7,11 @@
 </template>
 
 <script setup lang="ts">
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   open: boolean
 }>()
+// Stryker restore all
 </script>
 
 <style scoped>

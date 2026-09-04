@@ -30,7 +30,6 @@ export type CodexSurfaceTurnActionsHost = {
   emitEvent(origin: 'action', input: SurfaceEventInput): void;
   emitHistoryReplaced(threadId: string, reason: 'rollback', origin: 'action'): void;
   emitSummaryUpserted(summary: CodexConversationSummary, reason: 'updated', origin: 'action'): void;
-  ensureConnected(): Promise<void>;
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
   getSnapshot(): CodexSurfaceSnapshot;
   getState(): CodexSurfaceSnapshot;
@@ -68,7 +67,6 @@ export class CodexSurfaceTurnActionsController {
   }
 
   async startReview(options: StartCodexReviewOptions = {}): Promise<CodexSurfaceSnapshot> {
-    await this.host.ensureConnected();
     if (!this.host.getState().activeConversationId) await this.host.createConversation();
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation');
@@ -197,9 +195,10 @@ export class CodexSurfaceTurnActionsController {
     const prompt = [...runtime.messages.slice(0, index + 1)].reverse().find((candidate) => (
       candidate.role === 'user' && messageTurnIdOrNull(candidate) === turnId
     ));
-    const text = prompt ? surfaceMessageText(prompt) : '';
+    if (!prompt) throw new Error('Could not find the user prompt for this turn');
+    const text = surfaceMessageText(prompt);
     if (!text) throw new Error('Could not find the user prompt for this turn');
-    const attachments = prompt ? surfaceMessageAttachments(prompt) : [];
+    const attachments = surfaceMessageAttachments(prompt);
     await this.rollbackToTurn(threadId, turnId);
     await this.host.sendMessageToThread(threadId, text, attachments.length > 0 ? { attachments } : {});
   }
@@ -293,7 +292,6 @@ function insertTurnMessages(
   turnId: string,
   incoming: readonly SurfaceMessage[],
 ): SurfaceMessage[] {
-  if (incoming.length === 0) return [...current];
   const firstTurnMessageIndex = current.findIndex((message) => message.turnId === turnId);
   if (firstTurnMessageIndex < 0) return [...current, ...incoming];
   return [

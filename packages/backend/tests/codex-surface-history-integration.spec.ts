@@ -331,6 +331,20 @@ describe('CodexSurface', () => {
     const conversation = surface.conversation('thread-existing');
     const unsubscribeConversation = conversation.onEvent((event) => handleEvents.push(event));
 
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-other', turn: turn('turn-other', 'inProgress', []) },
+    });
+    expect(handleEvents).toStrictEqual([]);
+
+    await conversation.updateSettings({ planMode: true });
+    expect(handleEvents).toContainEqual(expect.objectContaining({
+      type: 'conversation.settingsChanged',
+      conversationId: 'thread-existing',
+      origin: 'action',
+      payload: expect.objectContaining({ planMode: true }),
+    }));
+
     await conversation.sendMessage('Inspect these', {
       attachments: [
         {
@@ -399,9 +413,14 @@ describe('CodexSurface', () => {
       },
     });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'approval.requested')).toBe(true));
-    await conversation.resolveApproval('approval-event', 'approve', 'once');
+    await conversation.resolveApproval('approval-event', 'approve');
     transport.emit({ method: 'skills/changed', params: {} });
     await vi.waitFor(() => expect(handleEvents.some((event) => event.type === 'conversation.skillsChanged')).toBe(true));
+    expect(handleEvents).toContainEqual(expect.objectContaining({
+      type: 'conversation.permissionsChanged',
+      conversationId: 'thread-existing',
+      origin: 'notification',
+    }));
 
     const appended = events.find((event) => (
       event.type === 'message.appended' && event.origin === 'action'
@@ -435,6 +454,10 @@ describe('CodexSurface', () => {
       expect.objectContaining({ type: 'tool.updated', payload: expect.objectContaining({ update: expect.objectContaining({ bodyAppend: 'halfway' }) }) }),
       expect.objectContaining({ type: 'clientRequest.resolved', payload: expect.objectContaining({ reason: 'host' }) }),
       expect.objectContaining({ type: 'approval.resolved', payload: expect.objectContaining({ decision: 'approve' }) }),
+      expect.objectContaining({
+        type: 'conversation.activityChanged',
+        conversationId: 'thread-existing',
+      }),
     ]));
     expect(events.map((event) => event.seq)).toStrictEqual(
       [...events.map((event) => event.seq)].sort((left, right) => left - right),

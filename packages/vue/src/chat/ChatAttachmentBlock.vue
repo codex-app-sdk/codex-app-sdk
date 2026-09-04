@@ -48,10 +48,12 @@ import ChatImageLightbox from './ChatImageLightbox.vue'
 import type { CodexMessageImageOpenHandler } from './message-image'
 import type { MessageAttachment } from './types'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   attachment: MessageAttachment
   openImage?: CodexMessageImageOpenHandler
 }>()
+// Stryker restore all
 
 const hostCapabilities = useCodexHostCapabilities()
 

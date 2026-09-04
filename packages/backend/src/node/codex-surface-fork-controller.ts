@@ -44,9 +44,8 @@ export type CodexSurfaceForkHost = {
   emitConversationSkills(threadId: string): void;
   emitHistoryReplaced(threadId: string): void;
   emitSummaryUpserted(summary: CodexConversationSummary): void;
-  ensureConnected(): Promise<void>;
   getState(): CodexSurfaceSnapshot;
-  hydrateCompleteHistory(threadId: string, cursor: string): Promise<void>;
+  hydrateCompleteHistory(threadId: string): Promise<void>;
   patch(patch: Partial<CodexSurfaceSnapshot>): void;
   rememberHostOptions(threadId: string, options: CodexConversationLoadOptions): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
@@ -74,7 +73,6 @@ export class CodexSurfaceForkController {
     hostOptions: CodexConversationLoadOptions = {},
     boundary: CodexForkBoundary = {},
   ): Promise<string> {
-    await this.host.ensureConnected();
     const sourceRuntime = this.host.requireRuntime(sourceThreadId);
     if (
       (sourceRuntime.busy || sourceRuntime.activeTurnId)
@@ -194,7 +192,7 @@ export class CodexSurfaceForkController {
     this.host.emitConversationSkills(response.thread.id);
     this.host.emitConversationPermissions(response.thread.id);
     if (effectiveLoadingStrategy === 'eager' && initialPage.nextCursor !== null) {
-      void this.host.hydrateCompleteHistory(response.thread.id, initialPage.nextCursor).catch(() => undefined);
+      void this.host.hydrateCompleteHistory(response.thread.id).catch(() => undefined);
     }
     return response.thread.id;
   }
@@ -222,7 +220,7 @@ export class CodexSurfaceForkController {
       ? { lastTurnId: messageTurnId(previousAssistant) }
       : { beforeTurnId: currentTurnId };
     const attachments = surfaceMessageAttachments(message);
-    const prompt = surfaceMessageText(message).trim()
+    const prompt = surfaceMessageText(message)
       || (attachments.length > 0 ? '(no user instructions)' : '');
     if (!prompt) throw new Error('Cannot fork an empty user message');
     const conversationId = await this.fork(sourceThreadId, options, hostOptions, boundary);

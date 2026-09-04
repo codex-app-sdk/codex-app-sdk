@@ -37,6 +37,7 @@
 <script setup lang="ts">
 import { PlayerPlayFilledIcon } from '../icons/app-icons';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 withDefaults(defineProps<{
   busy?: boolean;
   disabled?: boolean;
@@ -56,6 +57,7 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   click: [];
 }>();
+// Stryker restore all
 </script>
 
 <style scoped>

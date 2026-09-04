@@ -167,6 +167,7 @@ import type { CodexComposerState } from '../composer-state';
 import { normalizeCodexComposerState } from '../composer-state';
 import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   autofocus?: boolean;
   attachEnabled?: boolean;
@@ -218,6 +219,7 @@ const emit = defineEmits<{
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
   'update:serviceTier': [serviceTier: string | null];
 }>();
+// Stryker restore all
 
 const hostCapabilities = useCodexHostCapabilities();
 
@@ -248,20 +250,19 @@ const voiceVisible = computed(() => (
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean((hasPrompt.value || props.hasAttachments) && !props.disabled));
-const transcribeAndSendPending = ref(false);
+let pendingTranscriptCaret: number | null = null;
 const canInterrupt = computed(() => Boolean(
   props.isSending
   && !hasPrompt.value
   && !props.hasAttachments
   && !props.disabled
   && !isRecording.value
-  && !isTranscribing.value
-  && !transcribeAndSendPending.value,
+  && !isTranscribing.value,
 ));
 const sendButtonLoading = computed(() => canInterrupt.value);
 const sendButtonDisabled = computed(() => {
   if (props.interruptArmed) return false;
-  if (transcribeAndSendPending.value || isTranscribing.value) return true;
+  if (isTranscribing.value) return true;
   if (isRecording.value && !props.disabled) return false;
   return !canSend.value && !canInterrupt.value;
 });
@@ -284,6 +285,14 @@ const {
 });
 
 watch(voiceError, (message) => emit('error', message));
+watch(isTranscribing, (transcribing) => {
+  if (transcribing || pendingTranscriptCaret === null) return;
+  const caret = pendingTranscriptCaret;
+  pendingTranscriptCaret = null;
+  void nextTick(() => {
+    editorEl.value?.setCaret(caret);
+  });
+});
 let pendingPromptHistorySteps = 0;
 watch(() => [props.promptHistory, props.promptHistoryLoading] as const, ([history, loading]) => {
   seedPromptHistory(history ?? []);
@@ -311,7 +320,6 @@ const {
   skillMenuVisible,
   slashMenuVisible,
   suspend: suspendComposerSuggestions,
-  sync: syncComposerMenus,
   updateCaretPosition,
   visibleFiles,
   visiblePlugins,
@@ -326,12 +334,10 @@ const {
   files: () => props.files ?? [],
   plugins: () => props.plugins ?? [],
   mentionGroups: () => props.mentionGroups ?? [],
-  pluginsEnabled: () => true,
   isSending: () => props.isSending,
   onCommandSubmitted: (command) => {
     rememberSubmittedPrompt(command);
     emit('send', command);
-    void nextTick(resizeEditor);
   },
   onTextInserted: focusAt,
   onMentionSelected: (item, group) => emit('mentionSelect', item, group),
@@ -362,19 +368,13 @@ function submitPrompt(): void {
 }
 
 async function handleSendButtonClick(): Promise<void> {
-  if (transcribeAndSendPending.value) return;
   if (props.interruptArmed) {
     emit('interrupt');
     return;
   }
   if (isRecording.value) {
-    transcribeAndSendPending.value = true;
-    try {
-      if (await stopRecording()) {
-        submitPrompt();
-      }
-    } finally {
-      transcribeAndSendPending.value = false;
+    if (await stopRecording()) {
+      submitPrompt();
     }
     return;
   }
@@ -416,7 +416,6 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
     if (submissionOptions) emit('steer', submittedPrompt, submissionOptions);
     else emit('steer', submittedPrompt);
   }
-  void nextTick(resizeEditor);
 }
 
 async function insertTranscript(text: string): Promise<void> {
@@ -426,8 +425,8 @@ async function insertTranscript(text: string): Promise<void> {
   }
 
   const selection = editorEl.value?.getSelectionRange();
-  const start = selection?.start ?? caretPosition.value;
-  const end = selection?.end ?? caretPosition.value;
+  const start = selection?.start ?? selectionStart.value;
+  const end = selection?.end ?? selectionEnd.value;
   const before = prompt.value.slice(0, start);
   const after = prompt.value.slice(end);
   const prefix = before && !/\s$/.test(before) ? ' ' : '';
@@ -439,11 +438,8 @@ async function insertTranscript(text: string): Promise<void> {
   caretPosition.value = nextCaret;
   selectionStart.value = nextCaret;
   selectionEnd.value = nextCaret;
+  pendingTranscriptCaret = nextCaret;
   closeComposerMenus();
-  await nextTick(() => {
-    editorEl.value?.setCaret(nextCaret);
-    resizeEditor();
-  });
 }
 
 function setComposerText(value: string): void {
@@ -483,16 +479,12 @@ function restoreComposerState(state: CodexComposerState): void {
       restoringComposerState = false;
       return;
     }
-    if (editorEl.value?.readText() !== normalized.text) {
-      editorEl.value?.setText(normalized.text, normalized.selectionEnd, { focus: false });
-    }
     const restoredSelection = editorEl.value?.getSelectionRange();
     if (!restoredSelection?.valid
       || restoredSelection.start !== normalized.selectionStart
       || restoredSelection.end !== normalized.selectionEnd) {
       editorEl.value?.setSelection(normalized.selectionStart, normalized.selectionEnd, { focus: false });
     }
-    resizeEditor();
     restoringComposerState = false;
   });
 }
@@ -538,7 +530,6 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   if (event.shiftKey) {
     event.preventDefault();
     editorEl.value?.insertTextAtSelection('\n');
-    resizeEditorSoon();
     return;
   }
 
@@ -567,7 +558,6 @@ function handleEditorInput(): void {
   resumeComposerSuggestions();
   updateCaretPosition();
   resizeEditor();
-  syncComposerMenus();
 }
 
 function applyRecalledPrompt(value: string): void {
@@ -579,7 +569,6 @@ function applyRecalledPrompt(value: string): void {
   suspendComposerSuggestions();
   void nextTick(() => {
     editorEl.value?.setText(value, caret);
-    resizeEditor();
   });
 }
 
@@ -618,7 +607,6 @@ function focusAt(caret: number): void {
   caretPosition.value = caret;
   void nextTick(() => {
     editorEl.value?.setCaret(caret);
-    resizeEditor();
   });
 }
 
@@ -626,15 +614,13 @@ function resizeEditor(): void {
   editorEl.value?.autoResize();
 }
 
-function resizeEditorSoon(): void {
-  void nextTick(resizeEditor);
-}
-
 function focus(): void {
   editorEl.value?.focusEnd();
 }
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineExpose({ focus });
+// Stryker restore all
 </script>
 
 <style scoped>

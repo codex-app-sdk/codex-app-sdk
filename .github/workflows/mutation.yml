@@ -1,0 +1,54 @@
+name: Mutation testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: SDK package campaign to run
+        required: true
+        default: core
+        type: choice
+        options:
+          - core
+          - web
+          - electron
+          - backend
+          - vue
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}-${{ inputs.package }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    name: ${{ inputs.package }} mutation campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run mutation campaign
+        run: npm run mutation:${{ inputs.package }}
+
+      - name: Upload mutation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-${{ inputs.package }}
+          path: reports/mutation/
+          if-no-files-found: warn
+          retention-days: 14

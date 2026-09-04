@@ -19,7 +19,6 @@ type PendingGeneration = {
   readonly resolve: (result: CodexGeneratedText) => void;
   readonly reject: (error: Error) => void;
   readonly texts: string[];
-  settled: boolean;
   turnId: string | null;
 };
 
@@ -91,18 +90,18 @@ export class CodexSurfaceTextGenerationController {
       ephemeral: true,
       ...(model ? { model } : {}),
       permissions: ':read-only',
-      ...(serviceTier === undefined ? {} : { serviceTier }),
+      serviceTier,
       serviceName: 'codex_app_sdk',
       threadSource: 'sdk_ephemeral_generation',
     });
     const threadId = started.thread.id;
     if (!started.thread.ephemeral) {
-      await this.client.request('thread/delete', { threadId }).catch(() => undefined);
+      await ignoreFailure(() => this.client.request('thread/delete', { threadId }));
       throw new Error('Codex app-server did not create an ephemeral generation thread');
     }
     this.hiddenThreadIds.add(threadId);
     if (options.signal?.aborted) {
-      await this.client.request('thread/unsubscribe', { threadId }).catch(() => undefined);
+      await ignoreFailure(() => this.client.request('thread/unsubscribe', { threadId }));
       this.hiddenThreadIds.delete(threadId);
       throw abortedError();
     }
@@ -110,14 +109,13 @@ export class CodexSurfaceTextGenerationController {
     this.pendingByThread.set(threadId, pending);
     let turnId: string | null = null;
     let completed = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
     const abort = () => pending.reject(abortedError());
-    options.signal?.addEventListener('abort', abort, { once: true });
+    options.signal?.addEventListener('abort', abort);
+    const timeout = setTimeout(() => {
+      pending.reject(new Error('Codex ephemeral generation timed out'));
+    }, options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS);
 
     try {
-      timeout = setTimeout(() => {
-        pending.reject(new Error('Codex ephemeral generation timed out'));
-      }, options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS);
       const turnResponse = await this.client.request('turn/start', {
         threadId,
         input: [{ type: 'text', text, text_elements: [] }],
@@ -125,27 +123,28 @@ export class CodexSurfaceTextGenerationController {
         permissions: ':read-only',
         ...(model ? { model } : {}),
         ...(reasoningEffort ? { effort: reasoningEffort as v2.TurnStartParams['effort'] } : {}),
-        ...(serviceTier === undefined ? {} : { serviceTier }),
+        serviceTier,
         ...(options.outputSchema === undefined
           ? {}
           : { outputSchema: options.outputSchema as v2.TurnStartParams['outputSchema'] }),
       });
       turnId = turnResponse.turn.id;
       pending.turnId = turnId;
-      if (turnResponse.turn.status !== 'inProgress') {
-        completeFromTurn(pending, turnResponse.turn);
-      }
+      completeFromTurn(pending, turnResponse.turn);
       const result = await pending.promise;
       completed = true;
       return result;
     } finally {
-      if (timeout) clearTimeout(timeout);
+      clearTimeout(timeout);
       options.signal?.removeEventListener('abort', abort);
       this.pendingByThread.delete(threadId);
       if (!completed && turnId) {
-        await this.client.request('turn/interrupt', { threadId, turnId }).catch(() => undefined);
+        const interruptedTurnId = turnId;
+        await ignoreFailure(() => this.client.request('turn/interrupt', {
+          threadId, turnId: interruptedTurnId,
+        }));
       }
-      await this.client.request('thread/unsubscribe', { threadId }).catch(() => undefined);
+      await ignoreFailure(() => this.client.request('thread/unsubscribe', { threadId }));
       this.hiddenThreadIds.delete(threadId);
     }
   }
@@ -178,6 +177,14 @@ export class CodexSurfaceTextGenerationController {
   }
 }
 
+async function ignoreFailure(operation: () => Promise<unknown>): Promise<void> {
+  try {
+    await operation();
+  } catch {
+    // Best-effort cleanup must not replace the generation result or its original failure.
+  }
+}
+
 function createPendingGeneration(): PendingGeneration {
   let resolvePromise!: (result: CodexGeneratedText) => void;
   let rejectPromise!: (error: Error) => void;
@@ -187,17 +194,12 @@ function createPendingGeneration(): PendingGeneration {
       rejectPromise = reject;
     }),
     resolve: (result) => {
-      if (pending.settled) return;
-      pending.settled = true;
       resolvePromise(result);
     },
     reject: (error) => {
-      if (pending.settled) return;
-      pending.settled = true;
       rejectPromise(error);
     },
     texts: [],
-    settled: false,
     turnId: null,
   };
   // The turn/start RPC may still be in flight when an abort, disconnect, or

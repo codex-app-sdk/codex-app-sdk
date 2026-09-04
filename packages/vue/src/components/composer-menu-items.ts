@@ -23,9 +23,7 @@ const CodexComposerMenuItems = defineComponent({
   setup(props, { emit, slots }) {
     const openSubmenus = reactive(new Set<string>());
     const select = (item: CodexComposerMenuSelectableItem<unknown>): void => {
-      if (!item.disabled) {
-        emit('select', item);
-      }
+      emit('select', item);
     };
 
     return (): VNode => renderMenu(props.items, props.ariaLabel, slots, select, openSubmenus);
@@ -38,7 +36,7 @@ function renderMenu(
   slots: Slots,
   select: (item: CodexComposerMenuSelectableItem<unknown>) => void,
   openSubmenus: Set<string>,
-  className = 'codex-chat-theme codex-composer-menu-list',
+  className: string | Array<string | null> = 'codex-chat-theme codex-composer-menu-list',
 ): VNode {
   const firstFocusableId = items.find((item) => item.type !== 'separator'
     && item.type !== 'heading'
@@ -98,8 +96,6 @@ function renderItem(
       },
       onFocusout: (event: FocusEvent) => {
         const container = event.currentTarget as HTMLElement;
-        const nextFocus = event.relatedTarget;
-        if (nextFocus instanceof Node && container.contains(nextFocus)) return;
         window.setTimeout(() => {
           if (!container.contains(document.activeElement)) openSubmenus.delete(item.id);
         }, 0);
@@ -140,9 +136,9 @@ function renderItem(
             'codex-composer-menu-list codex-composer-menu-list__submenu-list',
             item.submenuAlignment === 'bottom'
               ? 'codex-composer-menu-list__submenu-list--bottom-aligned'
-              : '',
-            item.submenuWidth === 'wide' ? 'codex-composer-menu-list__submenu-list--wide' : '',
-          ].filter(Boolean).join(' '),
+              : null,
+            item.submenuWidth === 'wide' ? 'codex-composer-menu-list__submenu-list--wide' : null,
+          ],
         )
         : null,
     ]);

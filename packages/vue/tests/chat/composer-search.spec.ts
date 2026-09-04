@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { CodexCommandSummary, CodexSkillSummary } from '../../src/chat/contracts';
+import { filterComposerSearchItems } from '../../src/chat/composer-search';
 import {
   commandDescription,
   commandDisplayName,
@@ -18,6 +19,104 @@ import {
 } from '../../src/chat/composer-skills';
 
 describe('composer search ranking', () => {
+  it('ranks field priority before match quality, then score and original order', () => {
+    const items = [
+      { id: 'secondary-exact', primary: 'unrelated', secondary: 'alpha' },
+      { id: 'primary-contains', primary: 'xxalphaxx', secondary: '' },
+      { id: 'primary-start', primary: 'alpha suffix', secondary: '' },
+      { id: 'primary-exact-first', primary: 'alpha', secondary: '' },
+      { id: 'primary-exact-second', primary: 'ALPHA', secondary: '' },
+    ];
+
+    expect(filterComposerSearchItems(items, 'alpha', [
+      { values: (item) => [item.primary] },
+      { values: (item) => [item.secondary] },
+    ]).map((item) => item.id)).toStrictEqual([
+      'primary-exact-first',
+      'primary-exact-second',
+      'primary-start',
+      'primary-contains',
+      'secondary-exact',
+    ]);
+  });
+
+  it('uses the best value inside a field while retaining the earliest matching field', () => {
+    const items = [
+      { id: 'dual', primary: ['xxalphaxx'], secondary: ['alpha'] },
+      { id: 'best-value', primary: ['xxalphaxx', 'alpha'], secondary: [] },
+      { id: 'primary-start', primary: ['alpha suffix'], secondary: [] },
+    ];
+
+    expect(filterComposerSearchItems(items, 'alpha', [
+      { values: (item) => item.primary },
+      { values: (item) => item.secondary },
+    ]).map((item) => item.id)).toStrictEqual(['best-value', 'primary-start', 'dual']);
+  });
+
+  it('does not let a stronger later-field match replace an earlier-field match', () => {
+    const items = [
+      { id: 'later-only', primary: '', secondary: 'alpha' },
+      { id: 'dual', primary: 'xxalphaxx', secondary: 'alpha' },
+    ];
+
+    expect(filterComposerSearchItems(items, 'alpha', [
+      { values: (item) => [item.primary] },
+      { values: (item) => [item.secondary] },
+    ]).map((item) => item.id)).toStrictEqual(['dual', 'later-only']);
+  });
+
+  it('ranks true prefixes above suffixes and earlier contains above later contains', () => {
+    const fields = [{ values: (item: { label: string }) => [item.label] }];
+    const prefixAndSuffix = [
+      { id: 'suffix', label: 'xalpha' },
+      { id: 'prefix', label: 'alphax' },
+    ];
+    const contains = [
+      { id: 'later', label: 'xxalpha' },
+      { id: 'earlier', label: 'xalpha' },
+    ];
+
+    expect(filterComposerSearchItems(prefixAndSuffix, 'alpha', fields).map((item) => item.id))
+      .toStrictEqual(['prefix', 'suffix']);
+    expect(filterComposerSearchItems(contains, 'alpha', fields).map((item) => item.id))
+      .toStrictEqual(['earlier', 'later']);
+  });
+
+  it('normalizes query whitespace and target case without matching empty values', () => {
+    const items = [
+      { id: 'match', values: ['PREFIX Alpha SUFFIX'] },
+      { id: 'empty', values: ['', null, undefined] },
+    ];
+
+    expect(filterComposerSearchItems(items, '  ALPHA  ', [{ values: (item) => item.values }]))
+      .toStrictEqual([items[0]]);
+    expect(filterComposerSearchItems(items, 'stryker', [{ values: (item) => item.values }]))
+      .toStrictEqual([]);
+  });
+
+  it('preserves and limits input order for an empty query', () => {
+    const items = [{ id: 'first' }, { id: 'second' }, { id: 'third' }];
+    const fields = [{ values: (item: { id: string }) => [item.id] }];
+
+    expect(filterComposerSearchItems(items, ' \t ', fields)).toStrictEqual(items);
+    expect(filterComposerSearchItems(items, '', [])).toStrictEqual(items);
+    expect(filterComposerSearchItems(items, '', fields, 2)).toStrictEqual(items.slice(0, 2));
+    expect(filterComposerSearchItems(items, '', fields, 0)).toStrictEqual([]);
+    expect(filterComposerSearchItems(items, '', fields, -2)).toStrictEqual(items);
+  });
+
+  it('drops nonmatches and applies the result limit after ranking', () => {
+    const items = [
+      { id: 'contains-late', label: 'xxalphaxx' },
+      { id: 'missing', label: 'beta' },
+      { id: 'exact', label: 'alpha' },
+      { id: 'starts', label: 'alphabet' },
+    ];
+
+    expect(filterComposerSearchItems(items, 'alpha', [{ values: (item) => [item.label] }], 2))
+      .toStrictEqual([items[2], items[3]]);
+  });
+
   it('ranks skill id matches before name matches and description matches', () => {
     const skills: CodexSkillSummary[] = [
       skill({

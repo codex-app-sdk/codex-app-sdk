@@ -15,7 +15,7 @@ export function formatMessageSentAt(value: string, now = new Date()) {
     return new Intl.DateTimeFormat(undefined, timeOptions).format(sentAt)
   }
 
-  if (sentAt.getTime() <= now.getTime() && now.getTime() - sentAt.getTime() < 7 * dayMs) {
+  if (sentAt.getTime() < now.getTime() && now.getTime() - sentAt.getTime() < 7 * dayMs) {
     return new Intl.DateTimeFormat(undefined, {
       weekday: 'short',
       ...timeOptions,

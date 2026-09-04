@@ -118,6 +118,11 @@ describe('public conversation leaf components', () => {
       await wrapper.setProps({ activeIndex: 0 });
       await nextTick();
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+
+      scrollIntoView.mockReset();
+      await wrapper.setProps({ activeIndex: 99 });
+      await nextTick();
+      expect(scrollIntoView).not.toHaveBeenCalled();
     } finally {
       if (originalScrollIntoView) {
         Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoView);

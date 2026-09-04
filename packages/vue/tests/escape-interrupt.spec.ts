@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils'
+import { defineComponent, h, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CodexConversationPane } from '../src'
+import { useConversationEscapeInterrupt } from '../src/chat/use-conversation-escape-interrupt'
 
 describe('conversation Escape interruption', () => {
   afterEach(() => {
@@ -124,6 +126,133 @@ describe('conversation Escape interruption', () => {
     expect(event.defaultPrevented).toBe(false)
     expect(wrapper.get('.chat-composer__send').classes())
       .not.toContain('codex-composer-send-button--interrupt-armed')
+    wrapper.unmount()
+  })
+
+  it('installs, clears, and removes the shortcut as reactive eligibility changes', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { busy: true, messages: [] },
+    })
+
+    pressEscape()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('.chat-composer__send').classes())
+      .toContain('codex-composer-send-button--interrupt-armed')
+
+    await wrapper.setProps({ busy: false })
+    expect(wrapper.get('.chat-composer__send').classes())
+      .not.toContain('codex-composer-send-button--interrupt-armed')
+    expect(pressEscape().defaultPrevented).toBe(false)
+
+    await wrapper.setProps({ busy: true })
+    expect(pressEscape().defaultPrevented).toBe(true)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('.chat-composer__send').classes())
+      .toContain('codex-composer-send-button--interrupt-armed')
+
+    await wrapper.setProps({ escapeInterrupt: false })
+    expect(wrapper.get('.chat-composer__send').classes())
+      .not.toContain('codex-composer-send-button--interrupt-armed')
+    expect(pressEscape().defaultPrevented).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('ignores non-Escape, repeated, composing, and modified key events', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { busy: true, messages: [] },
+    })
+    const cases: KeyboardEventInit[] = [
+      { key: 'Enter' },
+      { key: 'Escape', repeat: true },
+      { isComposing: true, key: 'Escape' },
+      { altKey: true, key: 'Escape' },
+      { ctrlKey: true, key: 'Escape' },
+      { metaKey: true, key: 'Escape' },
+      { shiftKey: true, key: 'Escape' },
+    ]
+
+    for (const init of cases) {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+      document.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+    }
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('.chat-composer__send').classes())
+      .not.toContain('codex-composer-send-button--interrupt-armed')
+    wrapper.unmount()
+  })
+
+  it('routes an ambiguous Escape only to the pane that owns focus', async () => {
+    const first = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { busy: true, messages: [] },
+    })
+    const second = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { busy: true, messages: [] },
+    })
+
+    ;(second.get('[role="textbox"]').element as HTMLElement).focus()
+    pressEscape()
+    await second.vm.$nextTick()
+
+    expect(first.get('.chat-composer__send').classes())
+      .not.toContain('codex-composer-send-button--interrupt-armed')
+    expect(second.get('.chat-composer__send').classes())
+      .toContain('codex-composer-send-button--interrupt-armed')
+    first.unmount()
+    second.unmount()
+  })
+
+  it('cancels armed timeout and document listener during unmount', () => {
+    vi.useFakeTimers()
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout')
+    const removeEventListener = vi.spyOn(document, 'removeEventListener')
+    const wrapper = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { busy: true, messages: [] },
+    })
+
+    pressEscape()
+    wrapper.unmount()
+
+    expect(clearTimeoutSpy).toHaveBeenCalledOnce()
+    expect(removeEventListener).toHaveBeenCalledWith('keydown', expect.any(Function))
+    clearTimeoutSpy.mockRestore()
+    removeEventListener.mockRestore()
+  })
+
+  it('clears its own public armed state before invoking an interrupt callback', async () => {
+    const onInterrupt = vi.fn()
+    const Harness = defineComponent({
+      setup() {
+        const root = ref<HTMLElement | null>(null)
+        const { armed } = useConversationEscapeInterrupt({
+          root,
+          busy: () => true,
+          enabled: () => true,
+          onInterrupt,
+        })
+        return () => h('div', {
+          ref: root,
+          'data-armed': String(armed.value),
+          'data-codex-generating': 'true',
+        })
+      },
+    })
+    const wrapper = mount(Harness, { attachTo: document.body })
+
+    pressEscape()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.attributes('data-armed')).toBe('true')
+    pressEscape()
+    await wrapper.vm.$nextTick()
+
+    expect(onInterrupt).toHaveBeenCalledOnce()
+    expect(wrapper.attributes('data-armed')).toBe('false')
     wrapper.unmount()
   })
 

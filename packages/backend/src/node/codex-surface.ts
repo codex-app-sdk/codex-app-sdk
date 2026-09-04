@@ -159,7 +159,6 @@ export class CodexSurface {
   private readonly unsubscribeNotification: () => void;
   private readonly unsubscribeToolInputRequests: () => void;
   private readonly unsubscribeMcpElicitationRequests: () => void;
-  private readonly unsubscribeServerRequestPolicies: () => void;
   private eventSequence = 0;
   private readonly pendingMarkdownImageHydrations = new Set<string>();
   private closed = false;
@@ -210,7 +209,6 @@ export class CodexSurface {
       patch: (patch) => this.patch(patch),
       patchConversationStatus: (threadId, status) => this.patchConversationStatus(threadId, status),
       patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
-      requireRuntime: (threadId) => this.requireRuntime(threadId),
     });
     this.clientRequests = new CodexSurfaceClientRequestsController({
       emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
@@ -261,7 +259,6 @@ export class CodexSurface {
       emitEvent: (origin, input) => this.emitEvent(origin, input),
       emitHistoryReplaced: (threadId, reason, origin) => this.emitHistoryReplaced(threadId, reason, origin),
       emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
-      ensureConnected: () => this.ensureConnected(),
       ensureThreadReady: (threadId) => this.ensureThreadReady(threadId),
       getSnapshot: () => this.getSnapshot(),
       getState: () => this.state,
@@ -296,7 +293,6 @@ export class CodexSurface {
     });
     this.catalog = new CodexSurfaceCatalogController(this.client, options.cwd, {
       authenticationBlocksBootstrap: () => this.authentication.blocksBootstrap(),
-      emitConversationPermissions: (threadId, origin) => this.emitConversationPermissions(threadId, origin),
       emitConversationSkills: (threadId, origin) => this.emitConversationSkills(threadId, origin),
       emitEvent: (origin, input) => this.emitEvent(origin, input),
       ensureConnected: () => this.ensureConnected(),
@@ -368,11 +364,8 @@ export class CodexSurface {
         emitConversationSkills: (threadId) => this.emitConversationSkills(threadId, 'action'),
         emitHistoryReplaced: (threadId) => this.emitHistoryReplaced(threadId, 'fork', 'action'),
         emitSummaryUpserted: (summary) => this.emitSummaryUpserted(summary, 'created', 'action'),
-        ensureConnected: () => this.ensureConnected(),
         getState: () => this.state,
-        hydrateCompleteHistory: (threadId, cursor) => (
-          this.conversations.hydrateCompleteHistory(threadId, { cursor })
-        ),
+        hydrateCompleteHistory: (threadId) => this.conversations.hydrateCompleteHistory(threadId),
         patch: (patch) => this.patch(patch),
         rememberHostOptions: (threadId, hostOptions) => (
           this.lifecycle.rememberHostOptions(threadId, hostOptions)
@@ -466,27 +459,18 @@ export class CodexSurface {
       'mcpServer/elicitation/request',
       (request, responder) => this.clientRequests.handleMcpElicitationRequest(request, responder),
     );
-    const policyUnsubscribers = [
-      this.client.onServerRequest('item/tool/call', async (request, responder) => {
-        await this.extensions.handleDynamicToolCall(request, responder);
-        return true;
-      }),
-      this.client.onServerRequest('account/chatgptAuthTokens/refresh', (_request, responder) => {
-        responder.reject({ code: -32601, message: 'ChatGPT token refresh must be provided by the host application' });
-        return true;
-      }),
-      this.client.onServerRequest('attestation/generate', (_request, responder) => {
-        responder.reject({ code: -32601, message: 'Client attestation must be provided by the host application' });
-        return true;
-      }),
-      this.client.onServerRequest('currentTime/read', (_request, responder) => {
-        responder.resolve({ currentTimeAt: Math.floor(Date.now() / 1000) });
-        return true;
-      }),
-    ];
-    this.unsubscribeServerRequestPolicies = () => {
-      for (const unsubscribe of policyUnsubscribers) unsubscribe();
-    };
+    this.client.onServerRequest('item/tool/call', async (request, responder) => {
+      await this.extensions.handleDynamicToolCall(request, responder);
+    });
+    this.client.onServerRequest('account/chatgptAuthTokens/refresh', (_request, responder) => {
+      responder.reject({ code: -32601, message: 'ChatGPT token refresh must be provided by the host application' });
+    });
+    this.client.onServerRequest('attestation/generate', (_request, responder) => {
+      responder.reject({ code: -32601, message: 'Client attestation must be provided by the host application' });
+    });
+    this.client.onServerRequest('currentTime/read', (_request, responder) => {
+      responder.resolve({ currentTimeAt: Math.floor(Date.now() / 1000) });
+    });
   }
 
   connect(): Promise<CodexSurfaceSnapshot> {
@@ -902,7 +886,6 @@ export class CodexSurface {
     this.unsubscribeNotification();
     this.unsubscribeToolInputRequests();
     this.unsubscribeMcpElicitationRequests();
-    this.unsubscribeServerRequestPolicies();
     this.unsubscribeDisconnect();
     this.approvals.close();
     this.clientRequests.clear();
@@ -977,8 +960,9 @@ export class CodexSurface {
           if (!runtime) return;
           const messageIndex = runtime.messages.findIndex((candidate) => candidate.id === message.id);
           const currentMessage = runtime.messages[messageIndex];
-          const currentPart = currentMessage?.parts[partIndex];
-          if (!currentMessage || currentPart?.type !== 'text' || currentPart.text !== part.text) return;
+          if (!currentMessage) return;
+          const currentPart = currentMessage.parts[partIndex];
+          if (currentPart?.type !== 'text' || currentPart.text !== part.text) return;
           const nextParts = [...currentMessage.parts];
           nextParts.splice(partIndex, 1, { ...currentPart, text: hydratedText });
           const hydratedMessage = { ...currentMessage, parts: nextParts };
@@ -990,8 +974,9 @@ export class CodexSurface {
           if (this.closed) return;
           const currentRuntime = this.runtimeState.get(threadId);
           const publishedMessage = currentRuntime?.messages.find((candidate) => candidate.id === message.id);
-          const publishedPart = publishedMessage?.parts[partIndex];
-          if (!publishedMessage || publishedPart?.type !== 'text' || publishedPart.text !== hydratedText) return;
+          if (!publishedMessage) return;
+          const publishedPart = publishedMessage.parts[partIndex];
+          if (publishedPart?.type !== 'text' || publishedPart.text !== hydratedText) return;
           if (publishedMessage.turnId) this.emitEvent('lifecycle', {
             type: 'message.updated',
             conversationId: threadId,
@@ -1057,7 +1042,7 @@ export class CodexSurface {
 
   private notifyConversationListeners(threadId: string): void {
     const listeners = this.conversationListeners.get(threadId);
-    if (!listeners || listeners.size === 0) return;
+    if (!listeners) return;
     const snapshot = this.getConversationSnapshot(threadId);
     for (const listener of listeners) listener(snapshot);
   }
@@ -1096,8 +1081,7 @@ export class CodexSurface {
     reason: 'archived' | 'deleted',
     origin: CodexSurfaceEventOrigin = 'notification',
   ): void {
-    const known = this.state.activeConversationId === threadId
-      || this.state.conversations.some((conversation) => conversation.id === threadId)
+    const known = this.state.conversations.some((conversation) => conversation.id === threadId)
       || this.runtimeState.get(threadId) !== undefined
       || this.approvals.hasForThread(threadId)
       || this.clientRequests.hasForThread(threadId);

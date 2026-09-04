@@ -2,9 +2,101 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
-import { FakeTransport, lastRequest, pluginSummary, resumeResponse, thread } from './helpers/codex-surface-fixture';
+import {
+  FakeTransport,
+  deferred,
+  lastRequest,
+  lastResponse,
+  pluginSummary,
+  resumeResponse,
+  thread,
+} from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('connects before serving an explicit catalog request', async () => {
+    const transport = new FakeTransport();
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await expect(surface.listSkills()).resolves.toStrictEqual([]);
+    await expect(surface.listModels({ includeHidden: true })).resolves.toHaveLength(2);
+
+    expect(transport.start).toHaveBeenCalledOnce();
+    expect(lastRequest(transport, 'initialize')).toBeDefined();
+    expect(lastRequest(transport, 'skills/list')).toBeDefined();
+    expect(lastRequest(transport, 'model/list')).toMatchObject({ params: { includeHidden: true } });
+    await surface.close();
+  });
+
+  it('does not publish a catalog failure when closing with a refresh in flight', async () => {
+    const pluginCatalog = deferred<unknown>();
+    const transport = new FakeTransport({
+      'plugin/installed': () => pluginCatalog.promise,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    expect(surface.getSnapshot().pluginCatalogStatus).toBe('loading');
+    events.length = 0;
+
+    await surface.close();
+
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'catalog.pluginsChanged',
+      payload: expect.objectContaining({ status: 'error' }),
+    }));
+    expect(surface.getSnapshot()).toMatchObject({ status: 'idle', pluginCatalogStatus: 'loading' });
+  });
+
+  it('does not bootstrap plugins while authentication is required', async () => {
+    const transport = new FakeTransport({
+      'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await surface.connect();
+    await surface.refreshConversations();
+    await Promise.resolve();
+
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'plugin/installed'
+    ))).toStrictEqual([]);
+    expect(surface.getSnapshot().pluginCatalogStatus).toBe('notLoaded');
+    await surface.close();
+  });
+
+  it('publishes conversation skill changes from an explicit catalog refresh', async () => {
+    let skillVersion = 0;
+    const transport = new FakeTransport({
+      'skills/list': () => ({
+        data: [{
+          cwd: '/tmp/project', errors: [], skills: [{
+            name: `skill-${skillVersion}`, description: 'Skill', path: `/tmp/skill-${skillVersion}/SKILL.md`,
+            scope: 'repo', enabled: true, interface: null,
+          }],
+        }],
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+    skillVersion = 1;
+
+    await surface.listSkills({ cwd: '/tmp/project', forceReload: true });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.skillsChanged',
+      origin: 'action',
+      conversationId: 'thread-existing',
+      payload: expect.objectContaining({
+        skills: [expect.objectContaining({ name: 'skill-1' })],
+      }),
+    }));
+    await surface.close();
+  });
+
   it('retries a transient plugin catalog failure on an explicit conversation refresh', async () => {
     let attempts = 0;
     const transport = new FakeTransport({
@@ -278,21 +370,51 @@ describe('CodexSurface', () => {
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     const removedEvents: CodexSurfaceEvent[] = [];
+    const selectedEvents: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => {
       if (event.type === 'conversation.summaryRemoved') removedEvents.push(event);
+      if (event.type === 'conversation.selected') selectedEvents.push(event);
     });
     await surface.connect();
+    const handleBeforeArchive = surface.conversation('thread-existing');
+    selectedEvents.length = 0;
+
+    const beforeUnknownRemoval = surface.getSnapshot();
+    transport.emit({ method: 'thread/deleted', params: { threadId: 'thread-unknown' } });
+    expect(surface.getSnapshot()).toStrictEqual(beforeUnknownRemoval);
+    expect(removedEvents).toStrictEqual([]);
 
     await surface.archiveConversation(' thread-existing ');
     expect(lastRequest(transport, 'thread/archive')).toMatchObject({
       params: { threadId: 'thread-existing' },
     });
-    expect(surface.getSnapshot()).toMatchObject({ activeConversationId: null, conversations: [] });
+    expect(surface.getSnapshot()).toMatchObject({
+      activeConversationId: null,
+      conversations: [],
+      messages: [],
+      answeredClientRequestIds: [],
+      approvals: [],
+      clientRequests: [],
+      contextUsage: null,
+      goal: null,
+      turnGitDiff: null,
+      threadStatus: null,
+      queuedPrompts: [],
+      busy: false,
+      historyLoading: false,
+      error: null,
+    });
     expect(removedEvents).toStrictEqual([expect.objectContaining({
       origin: 'action',
       conversationId: 'thread-existing',
       payload: { reason: 'archived' },
     })]);
+    expect(selectedEvents).toStrictEqual([
+      expect.objectContaining({
+        origin: 'action',
+        payload: { conversationId: null },
+      }),
+    ]);
 
     transport.emit({ method: 'thread/archived', params: { threadId: 'thread-existing' } });
     expect(removedEvents).toHaveLength(1);
@@ -304,6 +426,7 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot().conversations).toEqual([
       expect.objectContaining({ id: 'thread-existing' }),
     ]);
+    expect(surface.conversation('thread-existing')).not.toBe(handleBeforeArchive);
 
     await surface.deleteConversation('thread-existing');
     expect(lastRequest(transport, 'thread/delete')).toMatchObject({
@@ -318,10 +441,87 @@ describe('CodexSurface', () => {
         payload: { reason: 'deleted' },
       }),
     ]);
+    expect(selectedEvents).toHaveLength(1);
 
     transport.emit({ method: 'thread/deleted', params: { threadId: 'thread-existing' } });
     expect(removedEvents).toHaveLength(2);
     await expect(surface.deleteConversation('   ')).rejects.toThrow('Conversation id cannot be empty');
+  });
+
+  it('removes a background conversation without disturbing active state and rejects its pending work', async () => {
+    const transport = new FakeTransport({
+      'thread/list': () => ({
+        data: [thread('thread-existing', false), thread('thread-background', false)],
+        nextCursor: null,
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const selectedEvents: CodexSurfaceEvent[] = [];
+    const resolvedEvents: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => {
+      if (event.type === 'conversation.selected') selectedEvents.push(event);
+      if (event.type === 'approval.resolved' || event.type === 'clientRequest.resolved') {
+        resolvedEvents.push(event);
+      }
+    });
+    await surface.connect();
+    await surface.conversation('thread-background').load();
+    selectedEvents.length = 0;
+    transport.emit({
+      id: 'background-approval',
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-background', turnId: 'turn-background', itemId: 'command-background',
+        command: 'npm test', cwd: '/tmp/project', reason: null, environmentId: null,
+        commandActions: [], networkApprovalContext: null, additionalPermissions: null,
+        availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
+      },
+    });
+    transport.emit({
+      id: 'background-input',
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-background', turnId: 'turn-background', itemId: 'input-background',
+        autoResolutionMs: null,
+        questions: [{
+          id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
+          options: null,
+        }],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getConversationSnapshot('thread-background')).toMatchObject({
+      approvals: [{ id: 'background-approval' }],
+      clientRequests: [{ id: 'background-input' }],
+    }));
+
+    await surface.deleteConversation('thread-background');
+
+    expect(lastResponse(transport, 'background-approval')).toMatchObject({
+      result: { decision: 'decline' },
+    });
+    expect(lastResponse(transport, 'background-input')).toMatchObject({
+      error: { message: 'Codex thread is no longer available' },
+    });
+    expect(resolvedEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'approval.resolved',
+        conversationId: 'thread-background',
+        payload: expect.objectContaining({ reason: 'conversation_removed' }),
+      }),
+      expect.objectContaining({
+        type: 'clientRequest.resolved',
+        conversationId: 'thread-background',
+        payload: expect.objectContaining({ reason: 'conversation_removed' }),
+      }),
+    ]));
+    expect(surface.getSnapshot()).toMatchObject({
+      activeConversationId: 'thread-existing',
+      conversations: [expect.objectContaining({ id: 'thread-existing' })],
+      messages: expect.arrayContaining([
+        expect.objectContaining({ id: 'user-thread-existing-turn-history-user-history' }),
+      ]),
+    });
+    expect(selectedEvents).toStrictEqual([]);
   });
 
 });

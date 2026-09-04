@@ -67,7 +67,6 @@ export function skillDisplayName(
   ));
   if (!plugin) return skill.name;
   const namespace = plugin.displayName
-    .trim()
     .toLowerCase()
     .replace(/[^a-z\d]+/g, '-')
     .replace(/^-|-$/g, '') || plugin.name;
@@ -101,8 +100,7 @@ export function promptSkillInputsFromText(text: string, skills: CodexSkillSummar
   const pattern = /(?:^|[^\w.%+-])[$/]([A-Za-z0-9_.-]+)/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
-    const name = match[1];
-    if (name) names.add(name);
+    names.add(match[1]!);
   }
 
   return skills

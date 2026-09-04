@@ -34,6 +34,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposerMenuList from './CodexComposerMenuList.vue';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   ariaLabel?: string;
   buttonLabel?: string;
@@ -53,6 +54,7 @@ const emit = defineEmits<{
   select: [item: CodexComposerMenuSelectableItem<Payload>];
   'update:open': [open: boolean];
 }>();
+// Stryker restore all
 
 const root = ref<HTMLElement | null>(null);
 const triggerElement = ref<HTMLElement | null>(null);
@@ -107,7 +109,9 @@ function selectItem(item: CodexComposerMenuSelectableItem<Payload>): void {
   }
 }
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineExpose({ close, open: () => setOpen(true), toggle });
+// Stryker restore all
 </script>
 
 <style scoped>

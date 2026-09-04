@@ -1,6 +1,7 @@
 import { effectScope, nextTick } from 'vue';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type {
+  CodexSurfaceEvent,
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
   CreateCodexRendererConversationOptions,
@@ -8,6 +9,15 @@ import type {
 import { useCodexSurface } from '../../src';
 
 describe('useCodexSurface', () => {
+  it('starts with the exact idle state without registering disposal outside a scope', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const surface = useCodexSurface(fakeApi(() => vi.fn()));
+
+    expect(surface.state).toEqual(idleSnapshot);
+    expect([...surface.answeredClientRequestIds]).toStrictEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('keeps Vue state synchronized with actions and pushed snapshots', async () => {
     let listener: ((snapshot: CodexSurfaceSnapshot) => void) | undefined;
     const unsubscribe = vi.fn();
@@ -104,6 +114,127 @@ describe('useCodexSurface', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
+  it('fans out events, supports listener removal, and releases every subscription with its scope', () => {
+    let pushEvent: ((event: CodexSurfaceEvent) => void) | undefined;
+    const unsubscribeState = vi.fn();
+    const unsubscribeEvents = vi.fn();
+    const api = fakeApi(
+      () => unsubscribeState,
+      (listener) => {
+        pushEvent = listener;
+        return unsubscribeEvents;
+      },
+    );
+    const scope = effectScope();
+    const surface = scope.run(() => useCodexSurface(api))!;
+    const firstListener = vi.fn();
+    const secondListener = vi.fn();
+    const stopFirst = surface.onEvent(firstListener);
+    surface.onEvent(secondListener);
+    const readyEvent: CodexSurfaceEvent = {
+      seq: 1,
+      occurredAt: '2026-09-04T00:00:00.000Z',
+      origin: 'notification',
+      type: 'surface.statusChanged',
+      payload: { status: 'ready', error: null },
+    };
+
+    pushEvent?.(readyEvent);
+    expect(surface.lastEvent.value).toStrictEqual(readyEvent);
+    expect(firstListener).toHaveBeenCalledExactlyOnceWith(readyEvent);
+    expect(secondListener).toHaveBeenCalledExactlyOnceWith(readyEvent);
+
+    stopFirst();
+    const disconnectedEvent: CodexSurfaceEvent = {
+      seq: 2,
+      occurredAt: '2026-09-04T00:00:01.000Z',
+      origin: 'notification',
+      type: 'surface.statusChanged',
+      payload: { status: 'error', error: 'socket closed' },
+    };
+    pushEvent?.(disconnectedEvent);
+    expect(firstListener).toHaveBeenCalledTimes(1);
+    expect(secondListener).toHaveBeenCalledTimes(2);
+    expect(surface.lastEvent.value).toStrictEqual(disconnectedEvent);
+
+    scope.stop();
+    expect(unsubscribeEvents).toHaveBeenCalledOnce();
+    expect(unsubscribeState).toHaveBeenCalledOnce();
+    pushEvent?.(readyEvent);
+    expect(secondListener).toHaveBeenCalledTimes(2);
+  });
+
+  it('replaces pushed answered-request ids and clears them as soon as reconnect begins', async () => {
+    let pushState: ((snapshot: CodexSurfaceSnapshot) => void) | undefined;
+    let resolveConnect: ((snapshot: CodexSurfaceSnapshot) => void) | undefined;
+    const api = fakeApi((listener) => {
+      pushState = listener;
+      return vi.fn();
+    });
+    vi.mocked(api.connect).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveConnect = resolve;
+    }));
+    const surface = useCodexSurface(api);
+
+    pushState?.({ ...readySnapshot, answeredClientRequestIds: ['old-request'] });
+    pushState?.({ ...readySnapshot, answeredClientRequestIds: ['current-request'] });
+    expect([...surface.answeredClientRequestIds]).toStrictEqual(['current-request']);
+
+    const reconnect = surface.connect();
+    expect([...surface.answeredClientRequestIds]).toStrictEqual([]);
+    resolveConnect?.(readySnapshot);
+    await expect(reconnect).resolves.toBe(readySnapshot);
+  });
+
+  it('forwards goal, catalog, and prompt-history operations with their exact results', async () => {
+    const api = fakeApi(() => vi.fn());
+    const clearSnapshot = { ...readySnapshot, error: 'goal cleared' };
+    const goalSnapshot = { ...readySnapshot, error: 'goal set' };
+    vi.mocked(api.clearGoal).mockResolvedValueOnce(clearSnapshot);
+    vi.mocked(api.setGoal).mockResolvedValueOnce(goalSnapshot);
+    vi.mocked(api.listConversations).mockResolvedValueOnce([]);
+    vi.mocked(api.listModels).mockResolvedValueOnce([]);
+    const surface = useCodexSurface(api);
+
+    await expect(surface.clearGoal()).resolves.toBe(clearSnapshot);
+    expect(surface.state.error).toBe('goal cleared');
+    await expect(surface.setGoal('Harden the SDK', 4_096)).resolves.toBe(goalSnapshot);
+    expect(surface.state.error).toBe('goal set');
+    await expect(surface.listConversations({ archived: true, limit: 7 })).resolves.toStrictEqual([]);
+    await expect(surface.listModels({ includeHidden: true, forceReload: true })).resolves.toStrictEqual([]);
+    await expect(surface.readConversationPromptHistory('thread-prompts')).resolves.toStrictEqual({
+      conversationId: 'thread-prompts',
+      prompts: [],
+    });
+
+    expect(api.clearGoal).toHaveBeenCalledWith();
+    expect(api.setGoal).toHaveBeenCalledWith('Harden the SDK', 4_096);
+    expect(api.listConversations).toHaveBeenCalledWith({ archived: true, limit: 7 });
+    expect(api.listModels).toHaveBeenCalledWith({ includeHidden: true, forceReload: true });
+    expect(api.readConversationPromptHistory).toHaveBeenCalledWith('thread-prompts');
+  });
+
+  it('delegates optional history paging and reports the exact unsupported error', async () => {
+    const api = fakeApi(() => vi.fn());
+    api.loadOlderConversationHistory = vi.fn(async (conversationId = 'thread-1') => ({
+      conversationId,
+      messages: [],
+      hasOlder: false,
+    }));
+    const surface = useCodexSurface(api);
+
+    await expect(surface.loadOlderConversationHistory('thread-page')).resolves.toStrictEqual({
+      conversationId: 'thread-page',
+      messages: [],
+      hasOlder: false,
+    });
+    expect(api.loadOlderConversationHistory).toHaveBeenCalledWith('thread-page');
+
+    const unsupported = useCodexSurface(fakeApi(() => vi.fn()));
+    await expect(unsupported.loadOlderConversationHistory('thread-page'))
+      .rejects.toThrow('Conversation history paging is not available.');
+  });
+
   it('marks client requests before dispatch and clears the local guard on reconnect', async () => {
     const api = fakeApi(() => vi.fn());
     vi.mocked(api.respondToClientRequest).mockRejectedValueOnce(new Error('disconnected'));
@@ -186,8 +317,48 @@ const readySnapshot: CodexSurfaceSnapshot = {
   error: null,
 };
 
+const idleSnapshot: CodexSurfaceSnapshot = {
+  status: 'idle',
+  authentication: {
+    status: 'notLoaded',
+    account: null,
+    requiresOpenaiAuth: null,
+    error: null,
+    login: { status: 'idle', loginId: null, authUrl: null, error: null },
+  },
+  conversations: [],
+  activeConversationId: null,
+  messages: [],
+  clientRequests: [],
+  answeredClientRequestIds: [],
+  approvals: [],
+  models: [],
+  modelCatalogStatus: 'notLoaded',
+  skills: [],
+  skillCatalogStatus: 'notLoaded',
+  plugins: [],
+  pluginCatalogStatus: 'notLoaded',
+  permissionProfiles: [],
+  approvalPresets: [],
+  approvalPreset: null,
+  selectedModelId: null,
+  selectedReasoningEffort: null,
+  selectedServiceTier: null,
+  planMode: false,
+  contextUsage: null,
+  goal: null,
+  turnGitDiff: null,
+  threadStatus: null,
+  rateLimits: null,
+  queuedPrompts: [],
+  busy: false,
+  historyLoading: false,
+  error: null,
+};
+
 function fakeApi(
   subscribe: (listener: (snapshot: CodexSurfaceSnapshot) => void) => () => void,
+  subscribeEvents: (listener: (event: CodexSurfaceEvent) => void) => () => void = () => () => undefined,
 ): CodexSurfaceRendererApi & { [key: string]: ReturnType<typeof vi.fn> | unknown } {
   return {
     archiveConversation: vi.fn(async () => readySnapshot),
@@ -207,7 +378,7 @@ function fakeApi(
     listConversations: vi.fn(async () => []),
     listModels: vi.fn(async () => []),
     logout: vi.fn(async () => readySnapshot),
-    onEvent: vi.fn(() => () => undefined),
+    onEvent: vi.fn(subscribeEvents),
     onStateChange: vi.fn(subscribe),
     readConversationHistory: vi.fn(async (conversationId = 'thread-1') => ({
       conversationId,

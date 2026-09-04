@@ -1,5 +1,5 @@
 import { spawn as nodeSpawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync as nodeExistsSync } from 'node:fs';
 import { promises as nodeFs } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -13,6 +13,15 @@ export type AppleSpeechTranscriptionOptions = {
 export type AppleSpeechTranscriptionResult = {
   text: string;
   error?: string;
+};
+
+export type AppleSpeechAssetDiscoveryDependencies = {
+  cwd?: () => string;
+  env?: NodeJS.ProcessEnv;
+  existsSync?: (filePath: string) => boolean;
+  moduleUrl?: string | null;
+  packageResolve?: ((specifier: string) => string) | null;
+  resourcesPath?: string | null;
 };
 
 type AppleSpeechFs = {
@@ -71,8 +80,11 @@ export async function transcribeWithAppleSpeechAnalyzer(
   }
 }
 
-export function resolveAppleSpeechAnalyzerPath(assetsPath?: string): string {
-  return path.join(assetsPath ?? defaultAssetsPath(), 'apple-speechanalyzer-cli');
+export function resolveAppleSpeechAnalyzerPath(
+  assetsPath?: string,
+  dependencies: AppleSpeechAssetDiscoveryDependencies = {},
+): string {
+  return path.join(assetsPath ?? defaultAssetsPath(dependencies), 'apple-speechanalyzer-cli');
 }
 
 function buildAppleSpeechArgs(
@@ -127,13 +139,17 @@ function runAppleSpeechCli(
   });
 }
 
-function defaultAssetsPath(): string {
-  const configuredAssetsPath = process.env.CODEX_APP_SDK_ASSETS_PATH?.trim();
+function defaultAssetsPath(dependencies: AppleSpeechAssetDiscoveryDependencies): string {
+  const configuredAssetsPath = (dependencies.env ?? process.env).CODEX_APP_SDK_ASSETS_PATH?.trim();
   if (configuredAssetsPath) {
     return configuredAssetsPath;
   }
 
-  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const processResourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const resourcesPath = dependencies.resourcesPath === undefined
+    ? processResourcesPath
+    : dependencies.resourcesPath ?? undefined;
+  const existsSync = dependencies.existsSync ?? nodeExistsSync;
   if (resourcesPath && !resourcesPath.endsWith('.vite/build')) {
     const resourceCandidates = [
       resourcesPath,
@@ -149,7 +165,10 @@ function defaultAssetsPath(): string {
     if (match) return match;
   }
 
-  const packageResolver = typeof import.meta.resolve === 'function' ? import.meta.resolve : undefined;
+  const defaultPackageResolver = import.meta.resolve;
+  const packageResolver = dependencies.packageResolve === undefined
+    ? defaultPackageResolver
+    : dependencies.packageResolve ?? undefined;
   if (packageResolver) {
     try {
       const packageNodeEntry = fileURLToPath(packageResolver('@codex-app-sdk/backend'));
@@ -162,20 +181,26 @@ function defaultAssetsPath(): string {
     }
   }
 
+  const cwd = (dependencies.cwd ?? process.cwd)();
   const cwdCandidates = [
-    path.resolve(process.cwd(), 'node_modules/@codex-app-sdk/backend/assets'),
-    path.resolve(process.cwd(), '../node_modules/@codex-app-sdk/backend/assets'),
-    path.resolve(process.cwd(), 'node_modules/codex-app-sdk/assets'),
-    path.resolve(process.cwd(), '../node_modules/codex-app-sdk/assets'),
-    path.resolve(process.cwd(), '../codex-app-sdk/assets'),
+    path.resolve(cwd, 'node_modules/@codex-app-sdk/backend/assets'),
+    path.resolve(cwd, '../node_modules/@codex-app-sdk/backend/assets'),
+    path.resolve(cwd, 'node_modules/codex-app-sdk/assets'),
+    path.resolve(cwd, '../node_modules/codex-app-sdk/assets'),
+    path.resolve(cwd, '../codex-app-sdk/assets'),
   ];
   const cwdMatch = cwdCandidates.find((candidate) => (
     existsSync(path.join(candidate, 'apple-speechanalyzer-cli'))
   ));
   if (cwdMatch) return cwdMatch;
 
-  const moduleUrl = typeof import.meta.url === 'string' ? import.meta.url : undefined;
-  const moduleDirectory = moduleUrl ? path.dirname(fileURLToPath(moduleUrl)) : process.cwd();
+  const defaultModuleUrl = import.meta.url;
+  const moduleUrl = dependencies.moduleUrl === undefined
+    ? defaultModuleUrl
+    : dependencies.moduleUrl ?? undefined;
+  const moduleDirectory = moduleUrl
+    ? path.dirname(fileURLToPath(moduleUrl))
+    : cwd;
   const moduleCandidates = [
     path.resolve(moduleDirectory, '../assets'),
     path.resolve(moduleDirectory, '../../assets'),

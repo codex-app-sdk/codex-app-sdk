@@ -40,6 +40,7 @@
 import { PencilIcon, SteeringWheelIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
 import type { QueuedChatPrompt } from './queued-prompts';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   prompt: QueuedChatPrompt;
   editDisabled?: boolean;
@@ -50,6 +51,7 @@ const emit = defineEmits<{
   edit: [id: string];
   steer: [id: string];
 }>();
+// Stryker restore all
 </script>
 
 <style scoped>

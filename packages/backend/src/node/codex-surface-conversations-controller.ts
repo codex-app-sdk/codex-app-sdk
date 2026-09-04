@@ -296,7 +296,7 @@ export class CodexSurfaceConversationsController {
       });
       conversations.push(...response.data.map((thread) => this.summaryWithKnownTurnCount(thread)));
       cursor = response.nextCursor;
-    } while (cursor && conversations.length < totalLimit);
+    } while (cursor);
     return conversations;
   }
 

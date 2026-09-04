@@ -29,6 +29,7 @@ import ChatQueuedPrompts from './ChatQueuedPrompts.vue';
 import ChatTurnGitInfo from './ChatTurnGitInfo.vue';
 import type { QueuedChatPrompt } from './queued-prompts';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   goal: ThreadGoal | null;
   presentation?: CodexComposerShelfPresentation;
@@ -44,6 +45,7 @@ defineEmits<{
   editGoal: [];
   steerQueuedPrompt: [promptId: string];
 }>();
+// Stryker restore all
 
 const showGoal = computed(() => (
   props.presentation?.goal !== false

@@ -3,8 +3,10 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ChatMessageBlock from '../../src/chat/ChatMessageBlock.vue';
+import ChatFollowUps from '../../src/chat/ChatFollowUps.vue';
 import ChatToolCall from '../../src/chat/ChatToolCall.vue';
 import ChatToolGroup from '../../src/chat/ChatToolGroup.vue';
+import ChatVisualizationBlock from '../../src/chat/ChatVisualizationBlock.vue';
 import type { MessageBlock } from '../../src/chat/message-blocks';
 
 afterEach(() => {
@@ -75,12 +77,126 @@ describe('ChatMessageBlock', () => {
 
     expect(writeText).toHaveBeenCalledWith('npm test');
     expect(button.attributes('aria-label')).toBe('Code copied');
+    expect(button.attributes('title')).toBe('Code copied');
     expect(button.attributes('data-copied')).toBe('true');
     expect(wrapper.find('.chat-code-block__check-icon').exists()).toBe(true);
 
     vi.advanceTimersByTime(2_000);
     expect(button.attributes('aria-label')).toBe('Copy code');
+    expect(button.attributes('title')).toBe('Copy code');
     expect(button.attributes('data-copied')).toBeUndefined();
+  });
+
+  it('restarts the code-copy confirmation timeout after repeated copies', async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const wrapper = mount(ChatMessageBlock, {
+      props: { block: { type: 'text', content: '```sh\nnpm test\n```' } },
+    });
+    const button = wrapper.get<HTMLButtonElement>('[data-chat-code-copy]');
+
+    await button.trigger('click');
+    await Promise.resolve();
+    vi.advanceTimersByTime(1_500);
+    await button.trigger('click');
+    await Promise.resolve();
+    vi.advanceTimersByTime(500);
+
+    expect(writeText).toHaveBeenCalledTimes(2);
+    expect(button.attributes('data-copied')).toBe('true');
+
+    vi.advanceTimersByTime(1_500);
+    expect(button.attributes('data-copied')).toBeUndefined();
+  });
+
+  it('cancels pending code-copy confirmation work when unmounted', async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn(async () => undefined) },
+    });
+    const wrapper = mount(ChatMessageBlock, {
+      props: { block: { type: 'text', content: '```sh\nnpm test\n```' } },
+    });
+
+    await wrapper.get('[data-chat-code-copy]').trigger('click');
+    await Promise.resolve();
+    expect(vi.getTimerCount()).toBe(1);
+
+    wrapper.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('ignores ordinary message clicks and copy controls whose code is gone', async () => {
+    const onError = vi.fn();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const wrapper = mount(ChatMessageBlock, {
+      global: { config: { errorHandler: onError } },
+      props: { block: { type: 'text', content: 'Intro\n\n```sh\nnpm test\n```' } },
+    });
+
+    await wrapper.get('p').trigger('click');
+    expect(writeText).not.toHaveBeenCalled();
+
+    wrapper.get('pre code').element.remove();
+    await wrapper.get('[data-chat-code-copy]').trigger('click');
+    await Promise.resolve();
+    expect(writeText).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('ignores bubbled clicks whose target is not an element without reporting an application error', async () => {
+    const onError = vi.fn();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const wrapper = mount(ChatMessageBlock, {
+      global: { config: { errorHandler: onError } },
+      props: { block: { type: 'text', content: 'Plain assistant text' } },
+    });
+    const textNode = wrapper.get('p').element.firstChild;
+    expect(textNode).not.toBeNull();
+
+    textNode!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(writeText).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('ignores a copy-like control outside a rendered code block without reporting an application error', async () => {
+    const onError = vi.fn();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const wrapper = mount(ChatMessageBlock, {
+      global: { config: { errorHandler: onError } },
+      props: { block: { type: 'text', content: '```sh\nnpm test\n```' } },
+    });
+    const root = wrapper.get('.chat-message-block--text').element;
+    const button = wrapper.get<HTMLButtonElement>('[data-chat-code-copy]').element;
+    button.remove();
+    root.append(button);
+
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(writeText).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it('emits follow-up prompts from follow-up blocks', async () => {
@@ -215,6 +331,10 @@ describe('ChatMessageBlock', () => {
         decision: 'allow',
       },
     };
+    const link = {
+      href: 'https://example.com/tool-result',
+      kind: 'external' as const,
+    };
     const single = mount(ChatMessageBlock, {
       props: {
         block: { type: 'tool', toolCall: tool },
@@ -223,10 +343,12 @@ describe('ChatMessageBlock', () => {
 
     single.getComponent(ChatToolCall).vm.$emit('cancel');
     single.getComponent(ChatToolCall).vm.$emit('client-response', response);
+    single.getComponent(ChatToolCall).vm.$emit('open-link', link);
     await single.vm.$nextTick();
 
     expect(single.emitted('cancel')).toStrictEqual([[]]);
     expect(single.emitted('client-response')).toStrictEqual([[response]]);
+    expect(single.emitted('open-link')).toStrictEqual([[link]]);
 
     const group = mount(ChatMessageBlock, {
       props: {
@@ -236,10 +358,75 @@ describe('ChatMessageBlock', () => {
 
     group.getComponent(ChatToolGroup).vm.$emit('cancel');
     group.getComponent(ChatToolGroup).vm.$emit('client-response', response);
+    group.getComponent(ChatToolGroup).vm.$emit('open-link', link);
     await group.vm.$nextTick();
 
     expect(group.emitted('cancel')).toStrictEqual([[]]);
     expect(group.emitted('client-response')).toStrictEqual([[response]]);
+    expect(group.emitted('open-link')).toStrictEqual([[link]]);
+  });
+
+  it('forwards actions from tools and artifacts nested inside phased work', async () => {
+    const tool = {
+      args: {},
+      done: false,
+      function: 'ask_user_question',
+      id: 'question-1',
+      result: null,
+      state: 'running' as const,
+    };
+    const wrapper = mount(ChatMessageBlock, {
+      props: {
+        block: {
+          type: 'work-group', active: true, finalStarted: false,
+          blocks: [
+            { type: 'tool', toolCall: tool },
+            { type: 'visualization', path: '/tmp/chart.html', title: 'Chart' },
+            { type: 'follow-ups', prompts: ['Continue'] },
+          ],
+        },
+      },
+    });
+    const response = { id: 'question-1', payload: { answers: { choice: 'yes' } } };
+    const link = { href: 'https://example.com/result', kind: 'external' as const };
+    const visualization = { path: '/tmp/chart.html', title: 'Chart' };
+
+    wrapper.getComponent(ChatToolCall).vm.$emit('cancel');
+    wrapper.getComponent(ChatToolCall).vm.$emit('client-response', response);
+    wrapper.getComponent(ChatToolCall).vm.$emit('open-link', link);
+    wrapper.getComponent(ChatVisualizationBlock).vm.$emit('open-visualization', visualization);
+    wrapper.getComponent(ChatFollowUps).vm.$emit('send-follow-up', 'Continue');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
+    expect(wrapper.emitted('client-response')).toStrictEqual([[response]]);
+    expect(wrapper.emitted('open-link')).toStrictEqual([[link]]);
+    expect(wrapper.emitted('open-visualization')).toStrictEqual([[visualization]]);
+    expect(wrapper.emitted('send-follow-up')).toStrictEqual([['Continue']]);
+  });
+
+  it('applies custom text and tool rendering inside phased work', () => {
+    const tool = {
+      args: {}, done: true, function: 'shell', id: 'shell-1', result: 'done', state: 'completed' as const,
+    };
+    const wrapper = mount(ChatMessageBlock, {
+      props: {
+        block: {
+          type: 'work-group', active: false, finalStarted: true,
+          blocks: [
+            { type: 'text', content: 'Checking the result', phase: 'commentary' },
+            { type: 'tool', toolCall: tool },
+          ],
+        },
+      },
+      slots: {
+        text: ({ content }: { content: string }) => `Custom text: ${content}`,
+        tool: ({ toolCall }: { toolCall?: { id: string } }) => `Custom tool: ${toolCall?.id}`,
+      },
+    });
+
+    expect(wrapper.text()).toContain('Custom text: Checking the result');
+    expect(wrapper.text()).toContain('Custom tool: shell-1');
   });
 
   it('renders mermaid blocks as SVG diagrams and toggles source code', async () => {

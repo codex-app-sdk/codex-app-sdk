@@ -64,6 +64,28 @@ describe('Codex surface settings policy', () => {
     expect(defaultReasoningEffort({ id: 'none', model: 'none', displayName: 'None' })).toBeNull();
   });
 
+  it('treats absent model capabilities as open while rejecting selections without a model', () => {
+    const openModel = { id: 'open', model: 'open', displayName: 'Open' };
+    const emptyModel = {
+      ...openModel,
+      supportedReasoningEfforts: [],
+      serviceTiers: [],
+    };
+
+    expect(defaultReasoningEffort(openModel)).toBeNull();
+    expect(defaultReasoningEffort(emptyModel)).toBeNull();
+    expect(() => validateServiceTier(null, undefined)).not.toThrow();
+    expect(() => validateServiceTier(null, null)).not.toThrow();
+    expect(() => validateServiceTier(openModel, 'custom')).not.toThrow();
+    expect(() => validateServiceTier(emptyModel, 'custom')).not.toThrow();
+    expect(() => validateServiceTier(null, 'priority')).toThrowError(
+      new Error("Cannot select service tier 'priority' without a model"),
+    );
+    expect(() => validateServiceTier(models[0]!, 'unknown')).toThrowError(
+      new Error("Service tier 'unknown' is not available for 'Fast'"),
+    );
+  });
+
   it('derives allowed approval presets from profiles and managed requirements', () => {
     const profiles = [
       { id: ':workspace', description: null, allowed: true },
@@ -85,6 +107,29 @@ describe('Codex surface settings policy', () => {
     }))).toStrictEqual(['full-access']);
     expect(approvalPresetsForProfiles(profiles.map((profile) => ({ ...profile, allowed: false })), null))
       .toStrictEqual([]);
+  });
+
+  it('applies every approval-policy and reviewer requirement independently', () => {
+    const workspace = [{ id: ':workspace', description: null, allowed: true }];
+
+    expect(approvalPresetsForProfiles(workspace, requirements({
+      allowedApprovalPolicies: ['on-request'],
+      allowedApprovalsReviewers: ['auto_review'],
+    }))).toStrictEqual(['approve-for-me']);
+    expect(approvalPresetsForProfiles(workspace, requirements({
+      allowedApprovalPolicies: ['never'],
+      allowedApprovalsReviewers: ['user', 'auto_review'],
+    }))).toStrictEqual([]);
+    expect(approvalPresetsForProfiles(workspace, requirements({
+      allowedApprovalPolicies: ['on-request'],
+      allowedApprovalsReviewers: ['guardian_subagent'],
+    }))).toStrictEqual([]);
+    expect(approvalPresetsForProfiles([
+      { id: ':danger-full-access', description: null, allowed: true },
+    ], requirements({
+      allowedApprovalPolicies: ['never'],
+      allowedApprovalsReviewers: ['auto_review'],
+    }))).toStrictEqual([]);
   });
 
   it('maps approval presets and authoritative settings in both directions', () => {
@@ -109,6 +154,18 @@ describe('Codex surface settings policy', () => {
     expect(approvalPresetFromSettings('on-request', 'user', { type: 'readOnly', networkAccess: false }, null))
       .toBe('ask-for-approval');
     expect(approvalPresetFromSettings('untrusted', 'user', { type: 'readOnly', networkAccess: false }, null)).toBeNull();
+  });
+
+  it('requires both never-approval and unrestricted permissions for full access', () => {
+    const readOnly = { type: 'readOnly', networkAccess: false } as const;
+    const dangerProfile = { id: ':danger-full-access', extends: null };
+
+    expect(approvalPresetFromSettings('never', 'user', readOnly, null)).toBeNull();
+    expect(approvalPresetFromSettings('on-request', 'user', { type: 'dangerFullAccess' }, null))
+      .toBe('ask-for-approval');
+    expect(approvalPresetFromSettings('on-request', 'user', readOnly, dangerProfile))
+      .toBe('ask-for-approval');
+    expect(approvalPresetFromSettings('untrusted', 'auto_review', readOnly, null)).toBeNull();
   });
 
   it('computes local selection changes and rejects incompatible settings', () => {
@@ -144,6 +201,99 @@ describe('Codex surface settings policy', () => {
     expect(() => nextSelection(current, { reasoningEffort: 'high' })).toThrow("not available for 'Fast'");
     expect(nextSelection(snapshot({ models: [], selectedModelId: null }), { planMode: true }))
       .toMatchObject({ selectedModelId: null, planMode: true });
+  });
+
+  it('reconciles reasoning and service tiers when the selected model changes', () => {
+    const priorityDefault: CodexSurfaceModel = {
+      ...models[0]!,
+      id: 'priority-id',
+      model: 'priority-model',
+      defaultServiceTier: 'priority',
+    };
+    const current = snapshot({
+      models: [priorityDefault, models[0]!, models[1]!],
+      selectedModelId: 'priority-id',
+      selectedReasoningEffort: 'low',
+      selectedServiceTier: 'priority',
+    });
+
+    expect(nextSelection(current, { modelId: 'fast-id' })).toMatchObject({
+      selectedModelId: 'fast-id',
+      selectedReasoningEffort: 'low',
+      selectedServiceTier: 'priority',
+    });
+    expect(nextSelection(current, { modelId: 'default-id' })).toMatchObject({
+      selectedModelId: 'default-id',
+      selectedReasoningEffort: 'high',
+      selectedServiceTier: null,
+    });
+    expect(nextSelection(current, { serviceTier: null })).toMatchObject({
+      selectedModelId: 'priority-id',
+      selectedReasoningEffort: 'low',
+      selectedServiceTier: null,
+    });
+    expect(() => nextSelection(current, { serviceTier: 'unknown' })).toThrowError(
+      new Error("Service tier 'unknown' is not available for 'Fast'"),
+    );
+
+    const multiTierModel: CodexSurfaceModel = {
+      ...models[0]!,
+      id: 'multi-id',
+      model: 'multi-model',
+      serviceTiers: [
+        { id: 'priority', name: 'Priority', description: 'Fast mode' },
+        { id: 'flex', name: 'Flex', description: 'Flexible mode' },
+      ],
+    };
+    expect(nextSelection({ ...current, models: [...current.models, multiTierModel] }, { modelId: 'multi-id' })
+      .selectedServiceTier).toBe('priority');
+    expect(nextSelection({ ...current, selectedServiceTier: 'incompatible' }, { modelId: 'fast-id' })
+      .selectedServiceTier).toBeNull();
+  });
+
+  it('preserves open-ended model selections and validates explicit capability choices', () => {
+    const openModel: CodexSurfaceModel = { id: 'open', model: 'open-model', displayName: 'Open' };
+    const current = snapshot({
+      models: [openModel],
+      selectedModelId: 'open',
+      selectedReasoningEffort: 'custom',
+      selectedServiceTier: 'custom-tier',
+    });
+
+    expect(nextSelection(current, {})).toMatchObject({
+      selectedModelId: 'open',
+      selectedReasoningEffort: 'custom',
+      selectedServiceTier: 'custom-tier',
+    });
+    expect(nextSelection(current, { modelId: 'open' })).toMatchObject({
+      selectedModelId: 'open',
+      selectedReasoningEffort: 'custom',
+      selectedServiceTier: null,
+    });
+    expect(nextSelection(current, { modelId: 'open', serviceTier: 'another-tier' }))
+      .toMatchObject({
+        selectedModelId: 'open',
+        selectedReasoningEffort: 'custom',
+        selectedServiceTier: 'another-tier',
+      });
+    expect(nextSelection(current, { reasoningEffort: 'another', serviceTier: 'another-tier' }))
+      .toMatchObject({
+        selectedModelId: 'open',
+        selectedReasoningEffort: 'another',
+        selectedServiceTier: 'another-tier',
+      });
+    expect(() => nextSelection(snapshot({ models: [], selectedModelId: null }), { serviceTier: 'priority' }))
+      .toThrowError(new Error("Cannot select service tier 'priority' without a model"));
+    expect(nextSelection(snapshot({
+      models: [],
+      selectedModelId: null,
+      selectedServiceTier: 'stale-tier',
+    }), {}).selectedServiceTier).toBe('stale-tier');
+    expect(nextSelection(snapshot({
+      models,
+      selectedModelId: 'fast-id',
+      selectedReasoningEffort: null,
+    }), {}).selectedReasoningEffort).toBeNull();
   });
 
   it('projects app-server session and thread settings with safe fallbacks', () => {
@@ -194,6 +344,43 @@ describe('Codex surface settings policy', () => {
     } as v2.ThreadStartResponse, [], current)).toMatchObject({
       approvalPreset: 'ask-for-approval', selectedModelId: 'fast-id', selectedReasoningEffort: null,
     });
+  });
+
+  it('distinguishes omitted session values from explicit null values', () => {
+    const current = snapshot({
+      models,
+      selectedModelId: 'fast-id',
+      selectedReasoningEffort: 'low',
+      selectedServiceTier: 'priority',
+    });
+    const baseResponse = {
+      model: 'fast-model',
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'user',
+      sandbox: { type: 'readOnly' },
+      activePermissionProfile: null,
+      reasoningEffort: 'low',
+    } as v2.ThreadStartResponse;
+
+    expect(sessionSelection(baseResponse, models, current).selectedServiceTier).toBeNull();
+    expect(sessionSelection({ ...baseResponse, serviceTier: null }, models, current).selectedServiceTier)
+      .toBeNull();
+    expect(sessionSelection({ ...baseResponse, serviceTier: 'priority' }, models, current).selectedServiceTier)
+      .toBe('priority');
+
+    const threadWithoutCatalog = threadSettingsSelection({
+      model: 'missing',
+      approvalPolicy: 'untrusted',
+      approvalsReviewer: 'user',
+      sandboxPolicy: { type: 'readOnly' },
+      activePermissionProfile: null,
+      effort: null,
+      collaborationMode: {
+        mode: 'default',
+        settings: { model: 'missing', reasoning_effort: null, developer_instructions: null },
+      },
+    } as v2.ThreadSettings, [], current);
+    expect(threadWithoutCatalog.selectedModelId).toBe('fast-id');
   });
 
   it('builds turn settings only from available or explicit values', () => {

@@ -75,29 +75,19 @@ export function languageForFilePath(filePath: string | undefined): string | unde
   const normalizedPath = (filePath ?? '').trim().toLowerCase();
   const extension = normalizedPath.match(/\.([^.\\/]+)$/)?.[1];
   switch (extension) {
-    case 'css':
-      return 'css';
-    case 'diff':
     case 'patch':
       return 'diff';
     case 'dockerfile':
       return 'docker';
-    case 'go':
-      return 'go';
     case 'htm':
-    case 'html':
       return 'html';
     case 'js':
     case 'mjs':
     case 'cjs':
       return 'javascript';
-    case 'json':
     case 'jsonc':
       return 'json';
-    case 'jsx':
-      return 'jsx';
     case 'md':
-    case 'markdown':
     case 'mdown':
     case 'mkdn':
       return 'markdown';
@@ -105,26 +95,15 @@ export function languageForFilePath(filePath: string | undefined): string | unde
       return 'python';
     case 'rs':
       return 'rust';
-    case 'sh':
     case 'bash':
     case 'zsh':
       return 'sh';
-    case 'sql':
-      return 'sql';
-    case 'toml':
-      return 'toml';
     case 'ts':
     case 'mts':
     case 'cts':
       return 'typescript';
-    case 'tsx':
-      return 'tsx';
-    case 'vue':
-      return 'vue';
-    case 'xml':
     case 'svg':
       return 'xml';
-    case 'yaml':
     case 'yml':
       return 'yaml';
     default:

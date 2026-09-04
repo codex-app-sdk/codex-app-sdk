@@ -57,9 +57,11 @@ import { CodeIcon, EyeIcon, Maximize2, X } from '../icons/app-icons'
 import ChatIconButton from './ChatIconButton.vue'
 import { captureCodexPortalTheme, type CodexPortalTheme } from './portal-theme'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   code: string
 }>()
+// Stryker restore all
 
 const closeFullscreenLabel = 'Close fullscreen'
 const fullscreenLabel = 'Open fullscreen'

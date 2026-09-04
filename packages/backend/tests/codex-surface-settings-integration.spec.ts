@@ -1,9 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
+import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { FakeTransport, createSurface, lastRequest, testModel, thread, threadSettings, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('connects and clears an authoritative goal when called before bootstrap', async () => {
+    const goal = {
+      threadId: 'thread-existing', objective: 'Clear me', status: 'active', tokenBudget: null,
+      tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1,
+    };
+    const transport = new FakeTransport({
+      'thread/goal/get': () => ({ goal }),
+      'thread/goal/clear': () => ({ cleared: true }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await surface.clearGoal();
+
+    expect(lastRequest(transport, 'initialize')).toBeDefined();
+    expect(lastRequest(transport, 'thread/goal/clear')).toMatchObject({
+      params: { threadId: 'thread-existing' },
+    });
+    expect(surface.getSnapshot()).toMatchObject({
+      activeConversationId: 'thread-existing', goal: null,
+    });
+    await surface.close();
+  });
+
   it('creates conversations with app-server-backed permission defaults and interrupts active turns', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -316,6 +340,52 @@ describe('CodexSurface', () => {
       },
     });
     expect(surface.getSnapshot().approvalPreset).toBe('approve-for-me');
+  });
+
+  it('routes authoritative settings notifications to a background conversation', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    const background = surface.conversation('thread-background');
+    await background.load();
+    await background.updateSettings({ approvalPreset: 'full-access' });
+    events.length = 0;
+
+    transport.emit({
+      method: 'thread/settings/updated',
+      params: {
+        threadId: 'thread-background',
+        threadSettings: threadSettings({
+          approvalPolicy: 'untrusted',
+          approvalsReviewer: 'user',
+          sandboxPolicy: { type: 'readOnly', networkAccess: false },
+          activePermissionProfile: null,
+          collaborationMode: { mode: 'plan', settings: null },
+        }),
+      },
+    });
+
+    expect(surface.getSnapshot()).toMatchObject({
+      activeConversationId: 'thread-existing',
+      selectedModelId: 'gpt-5',
+      planMode: false,
+    });
+    expect(surface.getConversationSnapshot('thread-background')).toMatchObject({
+      selectedModelId: 'gpt-5',
+      selectedReasoningEffort: 'medium',
+      approvalPreset: 'full-access',
+      planMode: true,
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.settingsChanged',
+      origin: 'notification',
+      conversationId: 'thread-background',
+      payload: expect.objectContaining({
+        approvalPreset: 'full-access', selectedModelId: 'gpt-5', planMode: true,
+      }),
+    }));
+    await surface.close();
   });
 
   it('honors explicit main-process policy defaults', async () => {

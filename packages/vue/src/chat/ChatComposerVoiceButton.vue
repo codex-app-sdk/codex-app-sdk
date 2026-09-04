@@ -16,6 +16,7 @@
 <script setup lang="ts">
 import { MicrophoneIcon } from '../icons/app-icons'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   disabled: boolean
   label: string
@@ -26,6 +27,7 @@ defineProps<{
 const emit = defineEmits<{
   toggle: []
 }>()
+// Stryker restore all
 </script>
 
 <style scoped>

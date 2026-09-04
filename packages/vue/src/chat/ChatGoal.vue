@@ -33,6 +33,7 @@
 import type { ThreadGoal } from './contracts';
 import { PencilIcon, TargetArrowIcon, Trash2Icon } from '../icons/app-icons';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   goal: ThreadGoal | null;
 }>();
@@ -41,6 +42,7 @@ const emit = defineEmits<{
   clear: [];
   edit: [];
 }>();
+// Stryker restore all
 </script>
 
 <style scoped>

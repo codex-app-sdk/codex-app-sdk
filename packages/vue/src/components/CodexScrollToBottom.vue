@@ -13,6 +13,7 @@
 <script setup lang="ts">
 import { ArrowDownIcon } from '../icons/app-icons';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 withDefaults(defineProps<{
   label?: string;
 }>(), {
@@ -22,6 +23,7 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   click: [];
 }>();
+// Stryker restore all
 </script>
 
 <style scoped>

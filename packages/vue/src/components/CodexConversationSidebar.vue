@@ -56,6 +56,7 @@
 <script setup lang="ts">
 import type { CodexConversationSummary } from '@codex-app-sdk/core/surface';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 withDefaults(defineProps<{
   activeConversationId?: string | null;
   brand?: string;
@@ -74,6 +75,7 @@ const emit = defineEmits<{
   delete: [conversationId: string];
   select: [conversationId: string];
 }>();
+// Stryker restore all
 
 function confirmDelete(conversation: CodexConversationSummary): void {
   const confirmed = window.confirm(

@@ -24,6 +24,7 @@
     "lint": "vue-tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:mutation": "cd ../.. && stryker run packages/vue/stryker.config.mjs",
     "typecheck": "vue-tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

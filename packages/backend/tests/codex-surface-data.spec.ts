@@ -5,13 +5,19 @@ import type {
   CodexSurfaceModel,
   CodexSurfaceRateLimitSnapshot,
   CodexSurfaceSnapshot,
+  SurfaceMessage,
 } from '@codex-app-sdk/core/surface';
 import {
   attachmentInput,
   conversationStatus,
   mergeRateLimitSnapshot,
   mergeSurfaceRateLimits,
+  messageAt,
+  messageTurnId,
+  messageTurnIdOrNull,
   surfaceAttachmentPart,
+  surfaceMessageAttachments,
+  surfaceMessageText,
   surfaceContextUsage,
   surfaceRateLimits,
   surfaceThreadStatus,
@@ -29,6 +35,12 @@ describe('Codex surface data codecs', () => {
       .toMatchObject({ title: 'First line', status: 'error', updatedAt: '2026-01-01T00:00:02.000Z' });
     expect(threadToSummary(thread({ name: ' ', preview: ' ', status: { type: 'idle' } })))
       .toMatchObject({ title: 'Untitled conversation', status: 'idle' });
+    expect(threadToSummary(thread({
+      name: null, preview: 'Title with padding   \nsecond', createdAt: 1, updatedAt: 2, recencyAt: null,
+    }))).toMatchObject({
+      title: 'Title with padding', createdAt: '1970-01-01T00:00:01.000Z',
+      updatedAt: '1970-01-01T00:00:02.000Z',
+    });
   });
 
   it('projects sub-agent thread identity without exposing protocol field names', () => {
@@ -77,6 +89,10 @@ describe('Codex surface data codecs', () => {
     expect(() => validatedSendOptions(state, { model: 'missing' })).toThrow("Unknown model 'missing'");
     expect(() => validatedSendOptions(state, { reasoningEffort: 'high' }))
       .toThrow("Reasoning effort 'high' is not available");
+    expect(() => validatedSendOptions({
+      ...state,
+      models: [{ ...state.models[0]!, serviceTiers: [{ id: 'priority', name: 'Priority', description: '' }] }],
+    }, { serviceTier: 'flex' })).toThrow("Service tier 'flex' is not available");
   });
 
   it('rejects blank and relative attachment paths and preserves blank file names', () => {
@@ -85,6 +101,8 @@ describe('Codex surface data codecs', () => {
       .toThrow("must be absolute: 'relative.png'");
     expect(validateAttachments([{ type: 'file', path: '/tmp/file.txt', name: ' ' }]))
       .toStrictEqual([{ type: 'file', path: '/tmp/file.txt', name: ' ' }]);
+    expect(validateAttachments([{ type: 'image', path: ' /tmp/image.png ', name: ' Image ' }]))
+      .toStrictEqual([{ type: 'image', path: '/tmp/image.png', name: ' Image ' }]);
   });
 
   it('encodes file and image attachments for app-server input', () => {
@@ -118,6 +136,67 @@ describe('Codex surface data codecs', () => {
     } });
     expect(surfaceAttachmentPart({ type: 'image', path: '/tmp/image.png', name: 'Image' }))
       .toMatchObject({ attachment: { kind: 'image', name: 'Image', url: 'file:///tmp/image.png' } });
+  });
+
+  it('selects messages only by valid integer index and reports exact failures', () => {
+    const first = surfaceMessage('first', 'assistant', 'turn-1');
+    const second = surfaceMessage('second', 'user', 'turn-2');
+    expect(messageAt([first, second], 1)).toBe(second);
+    expect(() => messageAt([first], 0.5)).toThrow("Unknown message index '0.5'");
+    expect(() => messageAt([first], 2)).toThrow("Unknown message index '2'");
+  });
+
+  it('resolves turn identity from the direct field, metadata, or a precise absence', () => {
+    const direct = surfaceMessage('direct', 'assistant', 'turn-direct');
+    direct.metadata = { turnId: 'turn-metadata' };
+    expect(messageTurnIdOrNull(direct)).toBe('turn-direct');
+
+    const metadata = { ...surfaceMessage('metadata', 'assistant'), metadata: { turnId: 'turn-metadata' } };
+    expect(messageTurnIdOrNull(metadata)).toBe('turn-metadata');
+    expect(messageTurnId(metadata)).toBe('turn-metadata');
+
+    const absent = surfaceMessage('absent', 'assistant');
+    expect(messageTurnIdOrNull(absent)).toBeNull();
+    expect(messageTurnIdOrNull({ ...absent, metadata: { turnId: 42 } })).toBeNull();
+    expect(() => messageTurnId(absent)).toThrow('This message is not associated with a Codex turn');
+  });
+
+  it('extracts trimmed text while ignoring every non-text message part', () => {
+    const message = surfaceMessage('mixed', 'assistant');
+    message.parts = [
+      { type: 'text', text: '  first ' },
+      { type: 'status', text: 'ignored' },
+      { type: 'text', text: ' second  ' },
+      { type: 'attachment', attachment: { kind: 'file', name: 'file', path: '/file' } },
+    ];
+    expect(surfaceMessageText(message)).toBe('first \n second');
+  });
+
+  it('extracts renderer attachments and drops missing paths and unsafe image previews', () => {
+    const message = surfaceMessage('attachments', 'user');
+    message.parts = [
+      { type: 'text', text: 'prompt' },
+      { type: 'attachment', attachment: { kind: 'file', name: 'missing', path: '' } },
+      { type: 'attachment', attachment: {
+        kind: 'file', name: 'notes', path: '/notes.txt', mimeType: 'text/plain',
+      } },
+      { type: 'attachment', attachment: {
+        kind: 'image', name: 'remote', path: '/remote.png', url: 'https://example.test/image.png',
+      } },
+      { type: 'attachment', attachment: {
+        kind: 'image', name: 'inline', path: '/inline.png',
+        url: 'data:image/png;base64,AQ==', mimeType: 'image/png',
+      } },
+    ];
+
+    expect(surfaceMessageAttachments(message)).toStrictEqual([
+      { type: 'file', path: '/notes.txt', name: 'notes', mimeType: 'text/plain' },
+      { type: 'image', path: '/remote.png', name: 'remote' },
+      {
+        type: 'image', path: '/inline.png', name: 'inline', mimeType: 'image/png',
+        previewUrl: 'data:image/png;base64,AQ==',
+      },
+    ]);
   });
 
   it('maps context usage and clamps percentages', () => {
@@ -159,6 +238,15 @@ describe('Codex surface data codecs', () => {
     expect(surfaceRateLimits({
       rateLimits: rateSnapshot(), rateLimitsByLimitId: null, rateLimitResetCredits: null,
     }).rateLimitResetCredits).toBeNull();
+
+    const individual = { limit: '10', used: '2', remainingPercent: 80, resetsAt: 10 };
+    const mapped = surfaceRateLimits({
+      rateLimits: rateSnapshot({ individualLimit: individual }),
+      rateLimitsByLimitId: null,
+      rateLimitResetCredits: null,
+    });
+    expect(mapped.rateLimits.individualLimit).toStrictEqual(individual);
+    expect(mapped.rateLimits.individualLimit).not.toBe(individual);
   });
 
   it('merges partial rate limit snapshots without erasing known fields', () => {
@@ -210,6 +298,37 @@ describe('Codex surface data codecs', () => {
       individualLimit: { limit: '5', used: '3' },
       planType: 'plus', rateLimitReachedType: 'primary',
     });
+
+    expect(mergeRateLimitSnapshot(current, surfaceRateLimitSnapshotFixture({
+      secondary: { resetsAt: 30 }, credits: { hasCredits: true },
+    }))).toMatchObject({
+      secondary: { usedPercent: 20, resetsAt: 30 },
+      credits: { balance: '1', hasCredits: true },
+    });
+  });
+
+  it('preserves existing rate-limit buckets and keeps a truly empty map null', () => {
+    const other = surfaceRateLimitSnapshotFixture({ limitId: 'other', limitName: 'Other' });
+    const current = {
+      rateLimits: surfaceRateLimitSnapshotFixture({ limitId: 'codex', limitName: 'Codex' }),
+      rateLimitsByLimitId: { other },
+      rateLimitResetCredits: null,
+    };
+    const merged = mergeSurfaceRateLimits(current, rateSnapshot({
+      limitId: 'codex', primary: { usedPercent: 50, windowDurationMins: 60, resetsAt: 10 },
+    }));
+    expect(merged.rateLimitsByLimitId).toStrictEqual({
+      other,
+      codex: expect.objectContaining({ limitId: 'codex', primary: expect.objectContaining({ usedPercent: 50 }) }),
+    });
+    expect(merged.rateLimitsByLimitId).not.toBe(current.rateLimitsByLimitId);
+
+    const empty = {
+      rateLimits: surfaceRateLimitSnapshotFixture(),
+      rateLimitsByLimitId: null,
+      rateLimitResetCredits: null,
+    };
+    expect(mergeSurfaceRateLimits(empty, rateSnapshot()).rateLimitsByLimitId).toBeNull();
   });
 });
 
@@ -259,4 +378,15 @@ function surfaceRateLimitSnapshotFixture(
     credits: null, individualLimit: null, planType: null, rateLimitReachedType: null,
     ...overrides,
   } as CodexSurfaceRateLimitSnapshot;
+}
+
+function surfaceMessage(
+  id: string,
+  role: SurfaceMessage['role'],
+  turnId?: string,
+): SurfaceMessage {
+  return {
+    id, role, status: 'complete', parts: [],
+    ...(turnId ? { turnId } : {}),
+  };
 }

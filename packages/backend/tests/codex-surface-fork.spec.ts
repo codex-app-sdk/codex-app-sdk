@@ -5,6 +5,7 @@ import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import {
   FakeTransport,
   lastRequest,
+  lastResponse,
   requestsFor,
   resumeResponse,
   thread,
@@ -12,20 +13,46 @@ import {
 } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface conversation forks', () => {
+  it.each(['latest', 'message'] as const)(
+    'inherits source host context when forking the %s boundary',
+    async (boundary) => {
+      const configureConversation = vi.fn(async () => ({}));
+      const transport = forkTransport();
+      const surface = new CodexSurface({
+        client: new CodexAppServerClient(transport),
+        extensions: [{ configureConversation }],
+      });
+      await surface.connect();
+      await surface.conversation('thread-existing').load({
+        extensionContext: { source: 'remembered' },
+      });
+      configureConversation.mockClear();
+
+      if (boundary === 'latest') {
+        await surface.forkConversation('thread-existing');
+      } else {
+        await surface.forkConversationAtMessage('thread-existing', 1);
+      }
+
+      expect(configureConversation).toHaveBeenCalledWith(expect.objectContaining({
+        operation: 'start',
+        extensionContext: { source: 'remembered' },
+      }));
+    },
+  );
+
   it('forks the latest completed conversation into an unselected usable handle', async () => {
     const transport = forkTransport();
     const surface = new CodexSurface({
       client: new CodexAppServerClient(transport),
       cwd: '/tmp/project',
     });
-    const historyEvents: CodexSurfaceEvent[] = [];
-    surface.onEvent((event) => {
-      if (event.type === 'conversation.historyReplaced') historyEvents.push(event);
-    });
-    await surface.connect();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
 
     const result = await surface.conversation('thread-existing').fork();
 
+    expect(transport.start).toHaveBeenCalledOnce();
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({
       method: 'thread/fork',
       params: {
@@ -59,12 +86,28 @@ describe('CodexSurface conversation forks', () => {
       activeConversationId: 'thread-existing',
       conversations: expect.arrayContaining([expect.objectContaining({ id: 'thread-forked' })]),
     });
-    expect(historyEvents.at(-1)).toMatchObject({
-      type: 'conversation.historyReplaced',
-      conversationId: 'thread-forked',
-      origin: 'action',
-      payload: { reason: 'fork' },
-    });
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'conversation.summaryUpserted', conversationId: 'thread-forked', origin: 'action',
+        payload: expect.objectContaining({ reason: 'created' }),
+      }),
+      expect.objectContaining({
+        type: 'conversation.historyReplaced', conversationId: 'thread-forked', origin: 'action',
+        payload: expect.objectContaining({ reason: 'fork' }),
+      }),
+      expect.objectContaining({
+        type: 'conversation.activityChanged', conversationId: 'thread-forked', origin: 'action',
+      }),
+      expect.objectContaining({
+        type: 'conversation.settingsChanged', conversationId: 'thread-forked', origin: 'action',
+      }),
+      expect.objectContaining({
+        type: 'conversation.skillsChanged', conversationId: 'thread-forked', origin: 'action',
+      }),
+      expect.objectContaining({
+        type: 'conversation.permissionsChanged', conversationId: 'thread-forked', origin: 'action',
+      }),
+    ]));
 
     await result.conversation.sendMessage('Continue from the fork');
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
@@ -76,6 +119,7 @@ describe('CodexSurface conversation forks', () => {
   });
 
   it('applies trusted fork overrides and host extension context', async () => {
+    const execute = vi.fn(async () => 'done');
     const configureConversation = vi.fn(async () => ({
       config: { extension_flag: true },
       developerInstructions: 'Extension instructions',
@@ -89,7 +133,12 @@ describe('CodexSurface conversation forks', () => {
     const surface = new CodexSurface({
       client: new CodexAppServerClient(transport),
       cwd: '/tmp/project',
-      extensions: [{ configureConversation }],
+      extensions: [{
+        configureConversation,
+        dynamicTools: [{
+          name: 'inspect', description: 'Inspect', inputSchema: { type: 'object' }, execute,
+        }],
+      }],
     });
     await surface.connect();
     configureConversation.mockClear();
@@ -133,6 +182,43 @@ describe('CodexSurface conversation forks', () => {
       selectedReasoningEffort: 'high',
       selectedServiceTier: 'priority',
     });
+    transport.emit({
+      id: 'fork-context', method: 'item/tool/call',
+      params: {
+        threadId: 'thread-forked', turnId: 'turn-forked', callId: 'call-forked',
+        namespace: null, tool: 'inspect', arguments: {},
+      },
+    });
+    await vi.waitFor(() => expect(lastResponse(transport, 'fork-context')).toMatchObject({
+      result: { success: true },
+    }));
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({
+      conversationId: 'thread-forked', extensionContext: { agentId: 'agent-forked' },
+    }));
+  });
+
+  it('eagerly hydrates the remaining history of a fork', async () => {
+    const transport = forkTransport({
+      forkNextCursor: 'fork-older',
+      forkOlderTurns: [turn('turn-forked-older', 'completed', [
+        { type: 'userMessage', id: 'forked-older-user', clientId: null, content: [{ type: 'text', text: 'Older fork prompt', text_elements: [] }] },
+        { type: 'agentMessage', id: 'forked-older-agent', text: 'Older fork reply', phase: null, memoryCitation: null },
+      ])],
+    });
+    const surface = new CodexSurface({
+      client: new CodexAppServerClient(transport), loadingStrategy: 'eager',
+    });
+    await surface.connect();
+
+    const result = await surface.conversation('thread-existing').fork();
+
+    await vi.waitFor(() => expect(result.conversation.getSnapshot().turnIds).toEqual([
+      'turn-forked-older', 'turn-forked-history',
+    ]));
+    expect(requestsFor(transport, 'thread/turns/list')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ params: expect.objectContaining({ threadId: 'thread-forked', cursor: 'fork-older' }) }),
+    ]));
+    await surface.close();
   });
 
   it('refuses to fork a source conversation with an active turn', async () => {
@@ -234,6 +320,8 @@ function forkTransport(overrides: {
   cwd?: string;
   reasoningEffort?: string | null;
   sourceTurns?: unknown[];
+  forkNextCursor?: string | null;
+  forkOlderTurns?: unknown[];
 } = {}): FakeTransport {
   const forkedTurn = turn('turn-forked-history', 'completed', [
     {
@@ -261,13 +349,19 @@ function forkTransport(overrides: {
       reasoningEffort: overrides.reasoningEffort ?? 'medium',
       multiAgentMode: 'explicitRequestOnly',
     }),
-    'thread/turns/list': (params) => ({
-      data: (params as { threadId: string }).threadId === 'thread-forked'
-        ? [forkedTurn]
-        : (overrides.sourceTurns ?? (thread('thread-existing', true).turns as unknown[])),
-      nextCursor: null,
-      backwardsCursor: null,
-    }),
+    'thread/turns/list': (params) => {
+      const { threadId, cursor } = params as { threadId: string; cursor: string | null };
+      if (threadId !== 'thread-forked') {
+        return {
+          data: overrides.sourceTurns ?? (thread('thread-existing', true).turns as unknown[]),
+          nextCursor: null,
+          backwardsCursor: null,
+        };
+      }
+      return cursor === 'fork-older'
+        ? { data: overrides.forkOlderTurns ?? [], nextCursor: null, backwardsCursor: null }
+        : { data: [forkedTurn], nextCursor: overrides.forkNextCursor ?? null, backwardsCursor: null };
+    },
     'thread/resume': (params) => {
       const threadId = (params as { threadId: string }).threadId;
       return threadId === 'thread-forked'

@@ -35,6 +35,7 @@ export type CodexRichTextEditorExpose = {
   setText: (value: string, caret?: number, options?: { focus?: boolean }) => void;
 };
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   ariaLabel?: string;
   disabled?: boolean;
@@ -55,27 +56,31 @@ const props = withDefaults(defineProps<{
   plugins: () => [],
   skills: () => [],
 });
+// Stryker restore all
 
 const slots = useSlots();
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const emit = defineEmits<{
   input: [];
   'caret-change': [range: { end: number; start: number; valid: boolean }];
   'update:modelValue': [value: string];
 }>();
+// Stryker restore all
 
 const editor = ref<HTMLElement | null>(null);
 const caretPosition = ref(0);
+const catalogRevision = ref(0);
 const inlineTokenPattern = /(`[^`]+`)|(^|[^\w.%+-])([@$/])([^\s@$]+)/g;
 
-watch(() => props.modelValue, (value) => {
-  if (!editor.value || readText() === value) return;
+watch(() => [props.files, props.mentionGroups, props.plugins, props.skills], () => {
+  catalogRevision.value += 1;
+}, { deep: true, flush: 'sync' });
+
+watch(() => [props.modelValue, catalogRevision.value] as const, ([value, revision], previous) => {
+  if (!editor.value || (revision === previous[1] && readText() === value)) return;
   renderText(value, Math.min(caretPosition.value, value.length));
 });
-
-watch(() => [props.files, props.mentionGroups, props.plugins, props.skills], () => {
-  renderText(props.modelValue, Math.min(caretPosition.value, props.modelValue.length));
-}, { deep: true });
 
 onMounted(() => {
   renderText(props.modelValue, props.modelValue.length, { focus: false });
@@ -111,7 +116,7 @@ function onInput(): void {
 }
 
 function normalizeTrailingBrowserLineBreak(): void {
-  const lastChild = editor.value?.lastChild;
+  const lastChild = editor.value!.lastChild;
   if (!(lastChild instanceof HTMLBRElement) || lastChild.dataset.trailingLineBreak !== undefined) return;
 
   // Chromium keeps a terminal BR as a visual caret placeholder after native
@@ -127,10 +132,7 @@ function autoResize(): void {
   element.style.height = `${Math.min(element.scrollHeight, props.maxHeight)}px`;
 }
 
-function scrollCaretIntoView(): void {
-  const element = editor.value;
-  if (!element) return;
-
+function scrollCaretIntoView(element: HTMLElement): void {
   // A collapsed range after a trailing BR does not consistently expose a box
   // in Chromium. At the end of the draft, scrolling to the content bottom is
   // both exact and avoids waiting for the next native input event.
@@ -159,9 +161,9 @@ function readText(): string {
 }
 
 function canonicalNodeText(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent!;
   if (!(node instanceof HTMLElement)) return '';
-  if (node.tagName === 'CODE') return `\`${node.textContent ?? ''}\``;
+  if (node.tagName === 'CODE') return `\`${node.textContent!}\``;
   if (node.dataset.pluginName) return `@${node.dataset.pluginName}`;
   if (node.dataset.fileMention) return `@${node.dataset.fileMention}`;
   if (node.dataset.mentionValue) return `@${node.dataset.mentionValue}`;
@@ -212,12 +214,10 @@ function canonicalOffsetForDomPosition(root: HTMLElement, target: Node, offset: 
     }
     for (const child of Array.from(node.childNodes)) {
       walk(child);
-      if (found) return;
     }
   };
   for (const child of Array.from(root.childNodes)) {
     walk(child);
-    if (found) break;
   }
   return position;
 }
@@ -315,9 +315,9 @@ function renderText(value: string, caret = caretPosition.value, options: { focus
   inlineTokenPattern.lastIndex = 0;
   while ((match = inlineTokenPattern.exec(value)) !== null) {
     if (match[1]) continue;
-    const prefix = match[2] ?? '';
+    const prefix = match[2]!;
     const trigger = match[3];
-    const tokenText = match[4] ?? '';
+    const tokenText = match[4]!;
     const tokenStart = match.index + prefix.length;
     const tokenEnd = tokenStart + tokenText.length + 1;
     const mention = trigger === '$'
@@ -349,7 +349,7 @@ function renderText(value: string, caret = caretPosition.value, options: { focus
   element.replaceChildren(fragment);
   setCaret(Math.min(caret, value.length), { focus: shouldFocus });
   autoResize();
-  scrollCaretIntoView();
+  scrollCaretIntoView(element);
 }
 
 function appendTextNode(parent: Node, value: string): void {
@@ -378,8 +378,9 @@ function findAtMention(name: string):
   if (plugin) return { kind: 'plugin', value: plugin };
   const file = findFile(name);
   if (file) return { kind: 'file', value: file };
+  // Non-after groups were already exhausted by the leading lookup above.
   const trailingMention = findComposerMention(
-    props.mentionGroups.filter((group) => group.placement === 'after'),
+    props.mentionGroups,
     name,
   );
   return trailingMention ? { kind: 'custom', ...trailingMention } : undefined;
@@ -445,11 +446,12 @@ function createCustomMentionChip(
 }
 
 function unmountChipHosts(): void {
-  for (const chip of editor.value?.querySelectorAll('.chat-rich-text-editor__chip-token-host') ?? []) {
+  for (const chip of editor.value!.querySelectorAll('.chat-rich-text-editor__chip-token-host')) {
     render(null, chip as HTMLElement);
   }
 }
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineExpose<CodexRichTextEditorExpose>({
   autoResize,
   focusEnd,
@@ -460,6 +462,7 @@ defineExpose<CodexRichTextEditorExpose>({
   setSelection,
   setText,
 });
+// Stryker restore all
 </script>
 
 <style scoped>

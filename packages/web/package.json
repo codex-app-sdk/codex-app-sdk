@@ -32,6 +32,7 @@
     "lint": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:mutation": "cd ../.. && stryker run packages/web/stryker.config.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

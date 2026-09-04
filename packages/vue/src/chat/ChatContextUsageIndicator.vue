@@ -23,9 +23,11 @@ import { computed } from 'vue';
 import { useCodexChatTranslate } from './chat-i18n';
 import type { CodexContextUsage } from './contracts';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   contextUsage?: CodexContextUsage | null;
 }>();
+// Stryker restore all
 const t = useCodexChatTranslate();
 
 const usagePercent = computed(() => {
@@ -38,14 +40,15 @@ const usagePercent = computed(() => {
 });
 
 const usageDetails = computed(() => {
-  const usage = props.contextUsage;
-  if (!usage || usagePercent.value === null || typeof usage.modelContextWindow !== 'number') {
+  const usage = props.contextUsage!;
+  const percent = usagePercent.value!;
+  if (typeof usage.modelContextWindow !== 'number') {
     return null;
   }
 
   const contextTokens = Math.min(Math.max(0, usage.lastTotalTokens), usage.modelContextWindow);
   return {
-    leftPercent: Math.max(0, 100 - usagePercent.value),
+    leftPercent: Math.max(0, 100 - percent),
     usedTokens: compactTokenCount(contextTokens),
     windowTokens: compactTokenCount(usage.modelContextWindow),
   };

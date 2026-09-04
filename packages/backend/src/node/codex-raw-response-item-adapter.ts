@@ -12,10 +12,7 @@ export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseIt
   }
 
   if (item.type === 'local_shell_call') {
-    const toolPart = codexThreadItemToToolPart(localShellCallToCommandExecution(item));
-    if (!toolPart) {
-      return null;
-    }
+    const toolPart = codexThreadItemToToolPart(localShellCallToCommandExecution(item))!;
 
     return {
       type: rawStatusIsCompleted(item.status) ? 'item.completed' : 'item.started',
@@ -24,10 +21,7 @@ export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseIt
   }
 
   if (item.type === 'function_call') {
-    const toolPart = codexThreadItemToToolPart(functionCallToThreadItem(item));
-    if (!toolPart) {
-      return null;
-    }
+    const toolPart = codexThreadItemToToolPart(functionCallToThreadItem(item))!;
 
     return {
       type: 'item.started',
@@ -45,15 +39,12 @@ export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseIt
       id: stringValue(item.call_id) ?? fallbackRawItemId(item),
       namespace: null,
       tool: stringValue(item.name) ?? 'custom_tool',
-      status: item.status ?? 'inProgress',
+      status: item.status,
       arguments: stringValue(item.input) ?? '',
       contentItems: null,
       success: null,
       durationMs: null,
-    });
-    if (!toolPart) {
-      return null;
-    }
+    })!;
 
     return {
       type: 'item.started',
@@ -71,16 +62,13 @@ export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseIt
       id: stringValue(item.call_id) ?? fallbackRawItemId(item),
       namespace: 'codex',
       tool: 'tool_search',
-      status: item.status ?? 'inProgress',
+      status: item.status,
       arguments: item.arguments,
       contentItems: null,
       success: null,
       durationMs: null,
       execution: item.execution,
-    });
-    if (!toolPart) {
-      return null;
-    }
+    })!;
 
     return {
       type: 'item.started',
@@ -101,10 +89,7 @@ export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseIt
       id: fallbackRawItemId(item),
       query: webSearchQuery(item.action),
       action: item.action,
-    });
-    if (!toolPart) {
-      return null;
-    }
+    })!;
 
     return {
       type: 'item.completed',
@@ -125,10 +110,7 @@ export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseIt
       contentItems: null,
       success: item.status === 'completed',
       durationMs: null,
-    });
-    if (!toolPart) {
-      return null;
-    }
+    })!;
 
     return {
       type: 'item.completed',

@@ -66,6 +66,7 @@ import type { CodexToolDisplayTargetPart, ToolLineDiff } from './tool-status'
 import type { CodexToolPresentation } from './tool-presentation'
 import type { MessageToolCall } from './types'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   lineDiff?: ToolLineDiff
   running?: boolean
@@ -82,6 +83,7 @@ defineProps<{
 const emit = defineEmits<{
   'open-link': [link: CodexConversationLink]
 }>()
+// Stryker restore all
 </script>
 
 <style scoped>

@@ -21,7 +21,9 @@ export function applyCodexTheme(
 
   for (const [rawName, value] of Object.entries(options.tokens ?? {})) {
     const name = codexThemeTokenName(rawName);
-    previousTokens.set(name, element.style.getPropertyValue(name));
+    if (!previousTokens.has(name)) {
+      previousTokens.set(name, element.style.getPropertyValue(name));
+    }
     if (value === null || value === undefined || !value.trim()) {
       element.style.removeProperty(name);
     } else {

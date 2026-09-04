@@ -16,7 +16,7 @@ describe('Codex surface MCP configuration', () => {
           type: 'stdio',
           command: ' node ',
           args: [' server.js ', 'server.js'],
-          cwd: '/tmp/project',
+          cwd: ' /tmp/project ',
           env: { TOKEN: 'secret' },
           envVars: ['PATH', 'PATH', '_CUSTOM'],
         },
@@ -47,6 +47,49 @@ describe('Codex surface MCP configuration', () => {
     ]);
     expect(normalizeMcpServers([{ name: 'minimal', transport: { type: 'stdio', command: 'server' } }]))
       .toStrictEqual([{ name: 'minimal', transport: { type: 'stdio', command: 'server' } }]);
+  });
+
+  it('accepts every documented tool approval mode', () => {
+    const definitions = (['auto', 'prompt', 'writes', 'approve'] as const).map((toolApprovalMode) => ({
+      name: toolApprovalMode,
+      transport: { type: 'stdio' as const, command: 'server' },
+      toolApprovalMode,
+    }));
+
+    expect(normalizeMcpServers(definitions).map((definition) => definition.toolApprovalMode))
+      .toStrictEqual(['auto', 'prompt', 'writes', 'approve']);
+  });
+
+  it.each([
+    [
+      [{ name: 'valid', transport: { type: 'stdio', command: 'x' } }, null],
+      'Codex MCP server 2 must be an object',
+    ],
+    [
+      [{ name: 'valid', transport: { type: 'stdio', command: 'x' } }, { name: 'bad name' }],
+      'Codex MCP server 2 name must match ^[A-Za-z0-9][A-Za-z0-9_-]*$',
+    ],
+    [['not-an-object'], 'Codex MCP server 1 must be an object'],
+    [[{ transport: { type: 'stdio', command: 'x' } }],
+      'Codex MCP server 1 name must match ^[A-Za-z0-9][A-Za-z0-9_-]*$'],
+    [[{ name: 'x', transport: 3 }], "Codex MCP server 'x' transport must be an object"],
+    [[{ name: 'x', transport: { type: 'http' } }], "Codex MCP server 'x' URL must be valid"],
+    [[{ name: 'x', transport: { type: 'stdio' } }], "Codex MCP server 'x' command cannot be empty"],
+    [[{ name: 'x', transport: { type: 'stdio', command: 'x', env: 'VALUE' } }],
+      "Codex MCP server 'x' env must be an object"],
+    [[{ name: 'x', transport: { type: 'stdio', command: 'x', env: 3 } }],
+      "Codex MCP server 'x' env must be an object"],
+    [[{ name: 'x', transport: { type: 'stdio', command: 'x', args: [3] } }],
+      "Codex MCP server 'x' argument cannot be empty"],
+    [[{ name: 'x', transport: { type: 'stdio', command: 'x', args: ['   '] } }],
+      "Codex MCP server 'x' argument cannot be empty"],
+    [[{ name: 'x', transport: { type: 'stdio', command: 'x', envVars: [''] } }],
+      "Codex MCP server 'x' environment variable cannot be empty"],
+    [[{ name: 'x', transport: { type: 'stdio', command: 'x' }, toolTimeoutMs: Infinity }],
+      "Codex MCP server 'x' tool timeout must be a positive finite number"],
+  ] as Array<[unknown, string]>)('reports the exact invalid boundary for %#', (definitions, message) => {
+    expect(() => normalizeMcpServers(definitions as readonly CodexMcpServerDefinition[]))
+      .toThrowError(new TypeError(message));
   });
 
   it.each([
@@ -109,6 +152,15 @@ describe('Codex surface MCP configuration', () => {
       'mcp_servers.remote': { url: 'https://example.test/mcp' },
     });
     expect(mcpServerConfig([])).toStrictEqual({});
+  });
+
+  it('omits every absent optional stdio field from app-server config', () => {
+    expect(mcpServerConfig([{
+      name: 'minimal',
+      transport: { type: 'stdio', command: 'server' },
+    }])).toStrictEqual({
+      'mcp_servers.minimal': { command: 'server' },
+    });
   });
 
   it('rejects raw config collisions while allowing unrelated keys', () => {

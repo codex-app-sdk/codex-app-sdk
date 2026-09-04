@@ -63,6 +63,7 @@ import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import { parseToolStatusDescriptor } from './tool-status'
 import { getMessageToolCallArgs, getMessageToolCallName, type MessageToolCall } from './types'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
   toolCall: MessageToolCall
@@ -71,6 +72,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'client-response': [response: { id: string; payload: { decision: ToolConfirmationDecision } }]
 }>()
+// Stryker restore all
 
 const localDecision = ref<ToolConfirmationDecision | null>(null)
 

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  root: import.meta.dirname,
   test: {
     environment: 'node',
     include: ['tests/**/*.spec.ts'],
@@ -14,10 +15,10 @@ export default defineConfig({
         'tests/**',
       ],
       thresholds: {
-        statements: 91,
-        branches: 85,
-        functions: 92,
-        lines: 94,
+        statements: 95,
+        branches: 95,
+        functions: 95,
+        lines: 95,
       },
     },
   },

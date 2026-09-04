@@ -45,6 +45,7 @@ import type { CodexSkillSummary } from './contracts';
 import { skillDescription, skillDisplayName } from './composer-skills';
 import { SparklesIcon } from '../icons/app-icons';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   activeIndex: number;
   plugins?: readonly CodexSurfacePlugin[];
@@ -54,6 +55,7 @@ const props = defineProps<{
 defineEmits<{
   select: [skill: CodexSkillSummary];
 }>();
+// Stryker restore all
 
 const t = useCodexChatTranslate();
 const menuEl = ref<HTMLElement | null>(null);

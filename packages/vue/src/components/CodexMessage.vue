@@ -190,6 +190,7 @@ import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import { useCodexHostCapabilities } from '../native-capabilities'
 import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
   actionsAlwaysVisible?: boolean
@@ -252,6 +253,7 @@ const emit = defineEmits<{
   'retry-message': [index: number]
   'send-follow-up': [prompt: string]
 }>()
+// Stryker restore all
 
 const hostCapabilities = useCodexHostCapabilities()
 
@@ -380,9 +382,11 @@ function isVisibleAssistantBlock(block: RenderedMessageBlock) {
 
   return block.type === 'attachment'
     || block.type === 'media'
+    || block.type === 'mermaid'
     || block.type === 'reasoning'
     || block.type === 'tool'
     || block.type === 'tool-group'
+    || block.type === 'visualization'
     || block.type === 'work-group'
 }
 

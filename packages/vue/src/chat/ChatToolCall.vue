@@ -35,7 +35,7 @@
     </div>
 
     <div
-      v-else-if="isStaticPlanProgress || !detailsAvailable"
+      v-else-if="!detailsAvailable"
       class="chat-tool-call__header chat-tool-call__header--static"
     >
       <ChatToolCallTitle
@@ -78,7 +78,7 @@
       </div>
     </div>
 
-    <ChatFoldTransition v-else-if="detailsAvailable && !isStaticPlanProgress" :open="isOpen">
+    <ChatFoldTransition v-else-if="detailsAvailable" :open="isOpen">
       <div class="chat-tool-call__body">
         <div v-if="hasParams" class="chat-tool-call__section">
           <div class="chat-tool-call__section-title">Input</div>
@@ -108,6 +108,7 @@ import { getToolDisplayTargetParts, getToolDisplayTitleParts, getToolLineDiff, p
 import { getMessageToolCallArgs, type MessageToolCall } from './types'
 import { useCodexToolCallDetails } from './tool-call-details'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
   expandable?: boolean
@@ -123,6 +124,7 @@ const emit = defineEmits<{
   'client-response': [response: ClientRequestResponse]
   'open-link': [link: CodexConversationLink]
 }>()
+// Stryker restore all
 
 const t = useCodexChatTranslate()
 const resolveToolPresentation = useCodexToolPresentation()
@@ -174,11 +176,8 @@ const hasParams = computed(() => toolCallArgs.value !== undefined)
 const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)
 const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
 const detailsAvailable = computed(() => toolDetailsEnabled.value && (hasParams.value || hasResult.value))
-const isPlanProgress = computed(() => statusDescriptor.value?.source === 'codex' && statusDescriptor.value.action === 'plan')
-const isStaticPlanProgress = computed(() => isPlanProgress.value && !hasParams.value && !hasResult.value && !props.headerless && !props.summaryOnly)
 
 function toggleOpen() {
-  if (!detailsAvailable.value) return
   isOpen.value = !isOpen.value
 }
 

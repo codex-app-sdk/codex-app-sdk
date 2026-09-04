@@ -33,6 +33,7 @@ import { X } from '../icons/app-icons'
 import ChatIconButton from './ChatIconButton.vue'
 import { captureCodexPortalTheme, type CodexPortalTheme } from './portal-theme'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   alt: string
   closeLabel?: string
@@ -44,10 +45,13 @@ const props = withDefaults(defineProps<{
   closeLabel: 'Close fullscreen',
   themeSource: null,
 })
+// Stryker restore all
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const emit = defineEmits<{
   close: []
 }>()
+// Stryker restore all
 
 const portalTheme = ref<CodexPortalTheme>({ mode: 'light', style: {} })
 

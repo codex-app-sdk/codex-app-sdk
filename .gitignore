@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+reports/mutation/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 samples/*/dist-main/

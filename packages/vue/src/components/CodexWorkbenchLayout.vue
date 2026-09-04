@@ -31,11 +31,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 withDefaults(defineProps<{
   scrollMode?: 'body' | 'child'
 }>(), {
   scrollMode: 'body',
 })
+// Stryker restore all
 
 const headerEl = ref<HTMLElement | null>(null)
 const footerEl = ref<HTMLElement | null>(null)
@@ -65,18 +67,15 @@ onBeforeUnmount(() => {
 })
 
 function observeChrome() {
-  if (!resizeObserver) {
-    return
-  }
-
-  resizeObserver.disconnect()
+  const observer = resizeObserver!
+  observer.disconnect()
 
   if (headerEl.value) {
-    resizeObserver.observe(headerEl.value)
+    observer.observe(headerEl.value)
   }
 
   if (footerEl.value) {
-    resizeObserver.observe(footerEl.value)
+    observer.observe(footerEl.value)
   }
 }
 

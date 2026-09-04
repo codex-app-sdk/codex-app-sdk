@@ -55,12 +55,76 @@ describe('composer suggestion menus', () => {
     });
     expect(wrapper.text()).toContain('Plugins');
     expect(wrapper.text()).toContain('Files');
+    expect(wrapper.findAll('.chat-composer-at-menu__section').map((section) => section.text()))
+      .toStrictEqual(['Plugins', 'Files']);
     expect(wrapper.findAll('.chat-composer-at-menu__item')[1]?.classes())
       .toContain('chat-composer-at-menu__item--active');
     await wrapper.findAll('button')[0]!.trigger('mousedown');
     await wrapper.findAll('button')[1]!.trigger('mousedown');
     expect(wrapper.emitted('select-plugin')).toStrictEqual([[plugin]]);
     expect(wrapper.emitted('select-file')).toStrictEqual([[file]]);
+  });
+
+  it('indexes every leading host, plugin, file, and trailing host row in rendered order', async () => {
+    const leading = {
+      id: 'threads',
+      label: 'Threads',
+      items: [
+        { id: 'shared-leading', value: 'thread:one', label: 'Thread one' },
+        { id: 'thread-2', value: 'thread:two', label: 'Thread two' },
+      ],
+    };
+    const secondLeading = {
+      id: 'people',
+      label: 'People',
+      placement: 'before' as const,
+      items: [{ id: 'shared-leading', value: 'person:one', label: 'Person one' }],
+    };
+    const trailing = {
+      id: 'agents',
+      label: 'Agents',
+      placement: 'after' as const,
+      items: [
+        { id: 'shared-trailing', value: 'agent:one', label: 'Agent one' },
+        { id: 'agent-2', value: 'agent:two', label: 'Agent two' },
+      ],
+    };
+    const secondTrailing = {
+      id: 'resources',
+      label: 'Resources',
+      placement: 'after' as const,
+      items: [{ id: 'shared-trailing', value: 'resource:one', label: 'Resource one' }],
+    };
+    const wrapper = mount(ChatComposerAtMentionMenu, {
+      props: {
+        activeIndex: 0,
+        mentionGroups: [leading, secondLeading, trailing, secondTrailing],
+        showFileHint: false,
+        visiblePlugins: [plugin],
+        visibleFiles: [file],
+      },
+    });
+    const rows = wrapper.findAll('.chat-composer-at-menu__item');
+
+    expect(wrapper.findAll('.chat-composer-at-menu__section').map((section) => section.text()))
+      .toStrictEqual(['Threads', 'People', 'Plugins', 'Files', 'Agents', 'Resources']);
+    expect(rows.map((row) => row.text())).toStrictEqual([
+      'Thread one',
+      'Thread two',
+      'Person one',
+      'GmailRead and manage mail',
+      'README.mdREADME.md',
+      'Agent one',
+      'Agent two',
+      'Resource one',
+    ]);
+
+    for (let activeIndex = 0; activeIndex < rows.length; activeIndex += 1) {
+      await wrapper.setProps({ activeIndex });
+      expect(wrapper.findAll('.chat-composer-at-menu__item').map((row) => (
+        row.classes().includes('chat-composer-at-menu__item--active')
+      ))).toStrictEqual(rows.map((_, index) => index === activeIndex));
+    }
   });
 
   it('renders host mention groups before built-ins with an app-owned row slot', async () => {

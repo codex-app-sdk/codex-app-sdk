@@ -15,7 +15,10 @@ import {
 } from './codex-surface-data';
 import type { SurfaceEventInput } from './codex-surface-events';
 import { createMessageId, createQueuedPromptId, timestampToIso } from './codex-surface-events';
-import { ensureAssistantTurnMessage } from './codex-surface-message-state';
+import {
+  ensureAssistantTurnMessage,
+  pruneEmptyAssistantPlaceholders,
+} from './codex-surface-message-state';
 import {
   errorMessage,
   mergeSkillInputs,
@@ -88,7 +91,7 @@ export class CodexSurfaceMessagesController {
         await this.host.createConversation();
         return this.host.startReview({ target: reviewCommand });
       }
-      await this.host.createConversation();
+      if (!this.host.getState().activeConversationId) await this.host.createConversation();
     }
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation');
@@ -283,7 +286,10 @@ export class CodexSurfaceMessagesController {
         ? { ...message, turnId: response.turnId, metadata: { ...message.metadata, turnId: response.turnId } }
         : message);
       this.host.patchRuntime(threadId, {
-        messages: ensureAssistantTurnMessage(steeredMessages, threadId, response.turnId),
+        messages: pruneEmptyAssistantPlaceholders(
+          ensureAssistantTurnMessage(steeredMessages, threadId, response.turnId),
+          threadId,
+        ),
       });
       if (!wasKnownTurn) {
         this.host.emitEvent('action', {
@@ -353,8 +359,8 @@ export class CodexSurfaceMessagesController {
   async sendNextQueuedPrompt(threadId: string): Promise<void> {
     const runtime = this.host.requireRuntime(threadId);
     if (runtime.busy || runtime.queuedPrompts.length === 0) return;
-    const [next, ...queuedPrompts] = runtime.queuedPrompts;
-    if (!next) return;
+    const next = runtime.queuedPrompts[0]!;
+    const queuedPrompts = runtime.queuedPrompts.slice(1);
     this.host.patchRuntime(threadId, { queuedPrompts });
     try {
       await this.sendPromptToThread(threadId, next.text, next.options);

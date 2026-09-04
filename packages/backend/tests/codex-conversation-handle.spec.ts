@@ -39,12 +39,25 @@ describe('createCodexConversationHandle', () => {
     await expect(conversation.clearGoal()).resolves.toBe(snapshot);
 
     expect(operations.load).toHaveBeenCalledWith({ cwd: '/workspace' });
+    expect(operations.select).toHaveBeenCalledOnce();
+    expect(operations.rename).toHaveBeenCalledWith('New title');
+    expect(operations.updateSettings).toHaveBeenCalledWith({ planMode: true });
     expect(operations.sendMessage).toHaveBeenCalledWith('Hello', { model: 'model-1' });
+    expect(operations.compact).toHaveBeenCalledOnce();
+    expect(operations.startReview).toHaveBeenCalledWith({ target: { type: 'uncommittedChanges' } });
     expect(operations.steerMessage).toHaveBeenCalledWith('Follow up', {
       attachments: [{ type: 'file', path: '/tmp/notes.md' }],
     });
+    expect(operations.interrupt).toHaveBeenCalledOnce();
+    expect(operations.deleteMessage).toHaveBeenCalledWith(2);
+    expect(operations.editMessage).toHaveBeenCalledWith(1, 'Edited');
+    expect(operations.retryMessage).toHaveBeenCalledWith(3);
+    expect(operations.rollbackToTurn).toHaveBeenCalledWith('turn-1');
+    expect(operations.deleteQueuedPrompt).toHaveBeenCalledWith('prompt-1');
     expect(operations.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
+    expect(operations.respondToClientRequest).toHaveBeenCalledWith(response);
     expect(operations.setGoal).toHaveBeenCalledWith('Ship it', 500);
+    expect(operations.clearGoal).toHaveBeenCalledOnce();
     expect(operations.updateQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited queue');
     expect(operations.steerQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited steer');
     expect(operations.getSnapshot).toHaveBeenCalledTimes(20);
@@ -64,6 +77,27 @@ describe('createCodexConversationHandle', () => {
       conversationId: 'thread-1', prompts: ['Hello'],
     });
     await expect(conversation.startRealtime({ inputAudioFormat: 'pcm16' } as never)).resolves.toBe('session');
+  });
+
+  it('returns exact empty older history when the operation is unavailable and preserves an override', async () => {
+    const snapshot = { activeConversationId: 'thread-1' } as unknown as CodexConversationSnapshot;
+    const fallback = createCodexConversationHandle('thread-1', operationSpies(snapshot));
+
+    await expect(fallback.loadOlderHistory()).resolves.toStrictEqual({
+      conversationId: 'thread-1',
+      messages: [],
+      hasOlder: false,
+    });
+
+    const operations = operationSpies(snapshot);
+    operations.loadOlderHistory = vi.fn(async () => ({
+      conversationId: 'thread-1', messages: [{ id: 'older' }], hasOlder: true,
+    }) as never);
+    const overridden = createCodexConversationHandle('thread-1', operations);
+    await expect(overridden.loadOlderHistory()).resolves.toStrictEqual({
+      conversationId: 'thread-1', messages: [{ id: 'older' }], hasOlder: true,
+    });
+    expect(operations.loadOlderHistory).toHaveBeenCalledOnce();
   });
 });
 

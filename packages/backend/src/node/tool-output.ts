@@ -13,7 +13,7 @@ export function toolOutputText(output: unknown): string | undefined {
   }
 
   if (!isRecord(output)) {
-    return output === undefined ? undefined : JSON.stringify(output);
+    return JSON.stringify(output);
   }
 
   const structuredText = 'structuredContent' in output ? toolOutputText(output.structuredContent) : undefined;

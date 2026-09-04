@@ -25,7 +25,10 @@ describe('CodexSurface', () => {
 
   it('enters an error state after disconnect and reconnects the app-server', async () => {
     const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
     await surface.connect();
+    events.length = 0;
 
     transport.fail(new Error('app-server exited'));
     expect(surface.getSnapshot()).toMatchObject({
@@ -34,6 +37,11 @@ describe('CodexSurface', () => {
       approvals: [],
       error: 'app-server exited',
     });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'surface.statusChanged',
+      origin: 'lifecycle',
+      payload: { status: 'error', error: 'app-server exited' },
+    }));
 
     await expect(surface.connect()).resolves.toMatchObject({ status: 'ready', error: null });
     expect(transport.start).toHaveBeenCalledTimes(2);
@@ -45,6 +53,56 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: expect.objectContaining({ threadId: 'thread-existing' }),
     });
+  });
+
+  it('publishes why pending UI work was resolved when the app-server disconnects', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+
+    transport.emit({
+      id: 'disconnect-approval',
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-disconnect', itemId: 'command-disconnect',
+        command: 'npm test', cwd: '/tmp/project', reason: null, environmentId: null,
+        commandActions: [], networkApprovalContext: null, additionalPermissions: null,
+        availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
+      },
+    });
+    transport.emit({
+      id: 'disconnect-input',
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-disconnect', itemId: 'input-disconnect',
+        autoResolutionMs: null,
+        questions: [{
+          id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
+          options: null,
+        }],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      approvals: [expect.objectContaining({ id: 'disconnect-approval' })],
+      clientRequests: [expect.objectContaining({ id: 'disconnect-input' })],
+    }));
+    events.length = 0;
+
+    transport.fail(new Error('socket lost'));
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'approval.resolved',
+        origin: 'notification',
+        payload: expect.objectContaining({ reason: 'surface_disconnected' }),
+      }),
+      expect.objectContaining({
+        type: 'clientRequest.resolved',
+        origin: 'notification',
+        payload: expect.objectContaining({ reason: 'surface_disconnected' }),
+      }),
+    ]));
   });
 
   it('clears authenticated state when a restarted app-server reports a signed-out account', async () => {

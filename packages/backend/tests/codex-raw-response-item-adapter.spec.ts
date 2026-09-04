@@ -100,4 +100,156 @@ describe('rawResponseItemToEvent', () => {
       payload: { toolPart: { id: 'raw-image_generation_call', status: 'failed' } },
     });
   });
+
+  it.each([
+    ['completed', 'item.completed', 'completed'],
+    ['failed', 'item.completed', 'failed'],
+    ['error', 'item.completed', 'failed'],
+    ['incomplete', 'item.completed', 'failed'],
+    ['in_progress', 'item.started', 'running'],
+  ] as const)('maps exact local-shell status %s', (status, eventType, toolStatus) => {
+    expect(adapt({
+      type: 'local_shell_call', call_id: '', id: 'shell-fallback', status,
+      action: { command: ['printf', 'two words', 0, false], working_directory: '/workspace' },
+    })).toMatchObject({
+      type: eventType,
+      payload: {
+        toolPart: {
+          id: 'shell-fallback',
+          kind: 'command',
+          title: 'printf "two words" 0 false',
+          status: toolStatus,
+          input: {
+            command: 'printf "two words" 0 false',
+            cwd: '/workspace',
+            commandActions: [],
+          },
+          metadata: { source: 'agent', processId: null },
+        },
+      },
+    });
+  });
+
+  it('maps exact local-shell fallbacks when the action is malformed', () => {
+    expect(adapt({ type: 'local_shell_call', action: null })).toMatchObject({
+      type: 'item.started',
+      payload: {
+        toolPart: {
+          id: 'raw-local_shell_call', title: 'local shell', status: 'running',
+          input: { command: 'local shell', cwd: '', commandActions: [] },
+          metadata: { source: 'agent', processId: null },
+        },
+      },
+    });
+  });
+
+  it('maps function-call object arguments, shell cwd precedence, and generic defaults', () => {
+    expect(adapt({
+      type: 'function_call', call_id: null, id: 'ignored-id', name: 'shell_command',
+      arguments: { command: 'pwd', workdir: '/preferred', cwd: '/fallback' },
+    })).toMatchObject({
+      type: 'item.started',
+      payload: {
+        toolPart: {
+          id: 'ignored-id', kind: 'command', title: 'pwd', status: 'running',
+          input: { command: 'pwd', cwd: '/preferred', commandActions: [] },
+          metadata: { source: 'agent', processId: null },
+        },
+      },
+    });
+    expect(adapt({
+      type: 'function_call', call_id: '', name: null, arguments: { value: 1 },
+    })).toMatchObject({
+      type: 'item.started',
+      payload: {
+        toolPart: {
+          id: 'raw-function_call', kind: 'dynamic', title: 'function_call', status: 'running',
+          input: { value: 1 },
+          metadata: { namespace: null, tool: 'function_call', success: null, durationMs: null },
+        },
+      },
+    });
+    expect(adapt({
+      type: 'function_call', call_id: 'cwd-fallback', name: 'shell_command',
+      arguments: { command: null, workdir: '', cwd: '/cwd' },
+    })).toMatchObject({
+      payload: { toolPart: { title: 'shell_command', input: { cwd: '/cwd' } } },
+    });
+    expect(adapt({
+      type: 'function_call', call_id: 'cwd-empty', name: 'shell_command',
+      arguments: { command: 'pwd' },
+    })).toMatchObject({
+      payload: { toolPart: { input: { cwd: '' } } },
+    });
+  });
+
+  it('maps custom and tool-search defaults without losing raw inputs or output titles', () => {
+    expect(adapt({
+      type: 'custom_tool_call', call_id: null, id: 'custom-id', name: null, input: null,
+    })).toMatchObject({
+      type: 'item.started',
+      payload: {
+        toolPart: {
+          id: 'custom-id', title: 'custom_tool', status: 'running', input: '',
+          metadata: { namespace: null, tool: 'custom_tool', success: null, durationMs: null },
+        },
+      },
+    });
+    expect(adapt({
+      type: 'tool_search_call', call_id: null, id: 'search-id', arguments: 42,
+    })).toMatchObject({
+      type: 'item.started',
+      payload: {
+        toolPart: {
+          id: 'search-id', title: 'codex.tool_search', status: 'running', input: 42,
+          metadata: { namespace: 'codex', tool: 'tool_search', success: null, durationMs: null },
+        },
+      },
+    });
+    expect(adapt({
+      type: 'tool_search_call', call_id: 'completed-search', status: 'completed', arguments: {},
+    })).toMatchObject({
+      type: 'item.started',
+      payload: { toolPart: { id: 'completed-search', status: 'completed' } },
+    });
+    expect(adapt({
+      type: 'tool_search_output', call_id: 'search-id', status: 'completed', tools: [],
+    })).toMatchObject({
+      type: 'item.updated',
+      payload: {
+        itemId: 'search-id', title: 'tool_search', status: 'completed', output: [],
+        fallbackToolPart: { id: 'search-id', title: 'tool_search', status: 'completed' },
+      },
+    });
+    expect(adapt({
+      type: 'custom_tool_call_output', call_id: null, name: '', output: 'done',
+    })).toMatchObject({
+      type: 'item.updated',
+      payload: { itemId: 'raw-response-output', title: undefined, status: 'completed', output: 'done' },
+    });
+  });
+
+  it('records image-generation success independently from renderer status', () => {
+    expect(adapt({
+      type: 'image_generation_call', id: '', status: 'completed', revised_prompt: null,
+    })).toMatchObject({
+      type: 'item.completed',
+      payload: {
+        toolPart: {
+          id: 'raw-image_generation_call', status: 'completed', input: { revisedPrompt: null },
+          metadata: { namespace: null, tool: 'image_generation', success: true, durationMs: null },
+        },
+      },
+    });
+    expect(adapt({
+      type: 'image_generation_call', id: 'failed-image', status: 'failed', revised_prompt: 'prompt',
+    })).toMatchObject({
+      payload: {
+        toolPart: {
+          id: 'failed-image', status: 'failed', input: { revisedPrompt: 'prompt' },
+          metadata: { success: false },
+        },
+      },
+    });
+  });
 });

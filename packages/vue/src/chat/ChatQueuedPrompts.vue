@@ -16,6 +16,7 @@
 import ChatQueuedPrompt from './ChatQueuedPrompt.vue';
 import type { QueuedChatPrompt } from './queued-prompts';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   prompts: readonly QueuedChatPrompt[];
   editDisabled?: boolean;
@@ -26,6 +27,7 @@ defineEmits<{
   edit: [id: string];
   steer: [id: string];
 }>();
+// Stryker restore all
 </script>
 
 <style scoped>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
@@ -96,6 +96,8 @@ describe('CodexSurface', () => {
 
   it('tracks names, completed tool items, errors, and lifecycle cleanup', async () => {
     const { surface, transport } = createSurface();
+    const lifecycleEvents: unknown[] = [];
+    surface.onEvent((event) => lifecycleEvents.push(event));
     await surface.connect();
     await surface.selectConversation('thread-existing');
     transport.emit({ method: 'thread/name/updated', params: { threadId: 'thread-existing', threadName: 'Renamed' } });
@@ -127,9 +129,46 @@ describe('CodexSurface', () => {
       id: 'assistant-turn-tool',
       parts: [{ type: 'tool', status: 'failed' }],
     });
+    transport.emit({
+      id: 'close-approval',
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-close', itemId: 'command-close', command: 'npm test',
+        cwd: '/tmp/project', reason: null, environmentId: null, commandActions: [],
+        networkApprovalContext: null, additionalPermissions: null,
+        availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
+      },
+    });
+    transport.emit({
+      id: 'close-input',
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-close', itemId: 'input-close', autoResolutionMs: null,
+        questions: [{
+          id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
+          options: null,
+        }],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      busy: true,
+      approvals: [{ id: 'close-approval' }],
+      clientRequests: [{ id: 'close-input' }],
+    }));
+    expect(surface.getConversationSnapshot('thread-existing').activeTurnId).toBe('turn-close');
     await surface.close();
     await surface.close();
     expect(transport.close).toHaveBeenCalledOnce();
+    expect(surface.getSnapshot()).toMatchObject({
+      status: 'idle', busy: false, approvals: [], clientRequests: [], historyLoading: false,
+    });
+    expect(surface.getConversationSnapshot('thread-existing')).toMatchObject({
+      activeTurnId: null, busy: false, approvals: [], clientRequests: [],
+    });
+    expect(lifecycleEvents).toContainEqual(expect.objectContaining({
+      type: 'surface.statusChanged', origin: 'lifecycle',
+      payload: { status: 'idle', error: 'No network' },
+    }));
     await expect(surface.connect()).rejects.toThrow('Codex surface is closed');
   });
 

@@ -27,16 +27,21 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   cancelLabel: string
   content: string
   inputLabel: string
   saveLabel: string
 }>()
+// Stryker restore all
+
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const emit = defineEmits<{
   cancel: []
   save: [content: string]
 }>()
+// Stryker restore all
 
 const draft = ref(props.content)
 const input = ref<HTMLTextAreaElement | null>(null)
@@ -48,8 +53,9 @@ watch(() => props.content, (content) => {
 
 onMounted(() => {
   focusFrame = requestAnimationFrame(() => {
-    input.value?.focus()
-    input.value?.setSelectionRange(input.value.value.length, input.value.value.length)
+    const element = input.value!
+    element.focus()
+    element.setSelectionRange(element.value.length, element.value.length)
     focusFrame = null
   })
 })

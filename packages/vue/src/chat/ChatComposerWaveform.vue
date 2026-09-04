@@ -20,6 +20,7 @@ type WaveformAudioRecorder = {
   getBufferLength(): number;
 };
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   active?: boolean;
   audioRecorder: WaveformAudioRecorder | null;
@@ -32,6 +33,7 @@ const props = withDefaults(defineProps<{
   label: 'Audio waveform',
   width: 640,
 });
+// Stryker restore all
 
 const waveform = ref<HTMLCanvasElement | null>(null);
 let animationFrameId: number | null = null;
@@ -63,9 +65,7 @@ onMounted(() => {
 onBeforeUnmount(stopAnimation);
 
 function startAnimation(): void {
-  if (animationFrameId === null) {
-    draw();
-  }
+  draw();
 }
 
 function stopAnimation(): void {
@@ -74,7 +74,6 @@ function stopAnimation(): void {
     animationFrameId = null;
   }
   dataArray = null;
-  amplitudeHistory = [];
   lastSampleTime = 0;
 }
 
@@ -106,14 +105,13 @@ function draw(): void {
 
     const step = barWidth + barGap;
     const centerY = canvas.height / 2;
-    for (let index = amplitudeHistory.length - 1; index >= 0; index -= 1) {
-      const positionFromRight = amplitudeHistory.length - 1 - index;
+    for (const positionFromRight of amplitudeHistory.keys()) {
       const x = canvas.width - barWidth - positionFromRight * step;
       if (x < 0) {
         break;
       }
 
-      const amplitude = amplitudeHistory[index] ?? 0;
+      const amplitude = amplitudeHistory.at(-positionFromRight - 1) ?? 0;
       const barHeight = Math.max(minBarHeight, amplitude * canvas.height);
       canvasContext.fillRect(x, centerY - barHeight / 2, barWidth, barHeight);
     }

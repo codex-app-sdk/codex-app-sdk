@@ -1,9 +1,38 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
+import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { FakeTransport, deferred, lastRequest, requestsFor, testModel, thread } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('reports a failed post-login account refresh on the surface', async () => {
+    let accountReadCount = 0;
+    const transport = new FakeTransport({
+      'account/read': () => {
+        accountReadCount += 1;
+        if (accountReadCount === 1) return { account: null, requiresOpenaiAuth: true };
+        throw new Error('post-login account refresh failed');
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    transport.emit({
+      method: 'account/login/completed',
+      params: { loginId: 'login-error', success: true, error: null },
+    });
+
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      error: 'post-login account refresh failed',
+      authentication: {
+        status: 'error',
+        error: 'post-login account refresh failed',
+        login: { status: 'completed', loginId: 'login-error' },
+      },
+    }));
+    await surface.close();
+  });
+
   it('gates immediate post-login sends until auth-dependent catalogs finish loading', async () => {
     let account: Record<string, unknown> | null = null;
     const models = deferred<unknown>();
@@ -59,13 +88,17 @@ describe('CodexSurface', () => {
       }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
     await surface.connect();
+    const accountAHandle = surface.conversation('thread-existing');
     expect(surface.getSnapshot()).toMatchObject({
       activeConversationId: 'thread-existing',
       messages: expect.arrayContaining([expect.objectContaining({ role: 'user' })]),
     });
 
     account = { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' };
+    events.length = 0;
     transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: 'plus' } });
 
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
@@ -77,6 +110,16 @@ describe('CodexSurface', () => {
       messages: [],
     }));
     expect(requestsFor(transport, 'thread/list')).toHaveLength(2);
+    expect(surface.conversation('thread-existing')).not.toBe(accountAHandle);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'authentication.changed',
+      origin: 'notification',
+      payload: {
+        authentication: expect.objectContaining({
+          account: { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' },
+        }),
+      },
+    }));
   });
 
   it('retains account identity across account/read errors so a later account switch still invalidates state', async () => {
@@ -278,6 +321,32 @@ describe('CodexSurface', () => {
       conversations: [],
       models: [],
     });
+  });
+
+  it('cancels the active login by default and rejects cancellation without one', async () => {
+    const transport = new FakeTransport({
+      'account/login/start': () => ({
+        type: 'chatgpt', loginId: 'login-default', authUrl: 'https://example.test/login',
+      }),
+      'account/login/cancel': () => ({ status: 'canceled' }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    await surface.startChatGptLogin();
+    await surface.cancelLogin();
+
+    expect(lastRequest(transport, 'account/login/cancel')).toMatchObject({
+      params: { loginId: 'login-default' },
+    });
+    await surface.close();
+
+    const withoutLogin = new CodexSurface({
+      client: new CodexAppServerClient(new FakeTransport()),
+    });
+    await withoutLogin.connect();
+    await expect(withoutLogin.cancelLogin()).rejects.toThrow('Codex login id cannot be empty');
+    await withoutLogin.close();
   });
 
 });

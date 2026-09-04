@@ -41,6 +41,10 @@ class FakeTransport implements RpcTransport {
   fail(error: Error): void {
     this.errorListener?.(error);
   }
+
+  get subscribed(): boolean {
+    return this.messageListener !== null && this.errorListener !== null;
+  }
 }
 
 describe('CodexAppServerClient', () => {
@@ -102,6 +106,7 @@ describe('CodexAppServerClient', () => {
     const remoteError = await failed.catch((error: unknown) => error);
     expect(remoteError).toBeInstanceOf(RpcRemoteError);
     expect(remoteError).toMatchObject({
+      name: 'RpcRemoteError',
       code: -32602,
       data: { field: 'cwd' },
       message: 'bad params',
@@ -117,6 +122,20 @@ describe('CodexAppServerClient', () => {
       if ('id' in message && 'method' in message) {
         transport.receive({ id: message.id, result: { requirements: null } });
       }
+    });
+
+    await expect(client.request('configRequirements/read')).resolves.toStrictEqual({ requirements: null });
+  });
+
+  it('keeps a synchronous response when the transport throws after delivering it', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    await client.start();
+    vi.spyOn(transport, 'send').mockImplementation((message) => {
+      if ('id' in message && 'method' in message) {
+        transport.receive({ id: message.id, result: { requirements: null } });
+      }
+      throw new Error('late write failure');
     });
 
     await expect(client.request('configRequirements/read')).resolves.toStrictEqual({ requirements: null });
@@ -145,6 +164,7 @@ describe('CodexAppServerClient', () => {
   });
 
   it('reports malformed frames without disconnecting a healthy transport', async () => {
+    vi.useFakeTimers();
     const transport = new FakeTransport();
     const onProtocolError = vi.fn();
     const onDisconnect = vi.fn();
@@ -156,12 +176,15 @@ describe('CodexAppServerClient', () => {
     const unaffected = client.request('configRequirements/read');
     transport.fail(new RpcTransportProtocolError('malformed frame', { requestId: 1 }));
     await expect(affected).rejects.toThrow('malformed frame');
+    expect(vi.getTimerCount()).toBe(1);
     transport.receive({ id: 2, result: { requirements: null } });
     await expect(unaffected).resolves.toStrictEqual({ requirements: null });
+    expect(vi.getTimerCount()).toBe(0);
 
     const uncorrelated = client.request('configRequirements/read');
     transport.fail(new RpcTransportProtocolError('uncorrelated malformed frame'));
     await expect(uncorrelated).rejects.toThrow('uncorrelated malformed frame');
+    expect(vi.getTimerCount()).toBe(0);
     await client.start();
 
     expect(onProtocolError).toHaveBeenCalledTimes(2);
@@ -327,6 +350,226 @@ describe('CodexAppServerClient', () => {
     expect(transport.close).toHaveBeenCalledOnce();
     expect(() => client.request('configRequirements/read')).toThrow('Codex app-server client is not started');
   });
+
+  it('fully detaches after a failed start and after close', async () => {
+    const transport = new FakeTransport();
+    const protocolErrors = vi.fn();
+    transport.start.mockRejectedValueOnce(new Error('spawn failed'));
+    const client = new CodexAppServerClient(transport, { onProtocolError: protocolErrors });
+
+    await expect(client.start()).rejects.toThrow('spawn failed');
+    expect(transport.subscribed).toBe(false);
+    transport.receive('ignored after failure');
+    await client.start();
+    expect(transport.subscribed).toBe(true);
+    await client.close();
+    expect(transport.subscribed).toBe(false);
+    transport.receive('ignored after close');
+
+    expect(protocolErrors).not.toHaveBeenCalled();
+  });
+
+  it('retries initialization after a rejected handshake and notifies only on success', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    await client.start();
+    const params = {
+      clientInfo: { name: 'test', title: 'Test', version: '1' },
+      capabilities: { experimentalApi: true, requestAttestation: false },
+    };
+
+    const failed = client.initialize(params);
+    transport.receive({ id: 1, error: { code: -32000, message: 'not ready' } });
+    await expect(failed).rejects.toThrow('not ready');
+    const retry = client.initialize(params);
+    transport.receive({
+      id: 2,
+      result: { userAgent: 'codex', codexHome: null, platformFamily: 'unix', platformOs: 'linux' },
+    });
+    await expect(retry).resolves.toMatchObject({ platformOs: 'linux' });
+
+    expect(transport.sent).toStrictEqual([
+      { id: 1, method: 'initialize', params },
+      { id: 2, method: 'initialize', params },
+      { method: 'initialized' },
+    ]);
+  });
+
+  it('enforces start state and emits exact request and notification shapes', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    expect(() => client.notify('initialized')).toThrow('Codex app-server client is not started');
+    await client.start();
+
+    const noParams = client.request('configRequirements/read');
+    client.notify('initialized');
+    transport.receive({ id: 1, result: { requirements: null } });
+    await noParams;
+
+    expect(transport.sent).toStrictEqual([
+      { id: 1, method: 'configRequirements/read' },
+      { method: 'initialized' },
+    ]);
+  });
+
+  it('preserves params when sending a parameter-bearing future notification', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    await client.start();
+
+    const notify = client.notify.bind(client) as unknown as (method: string, params: unknown) => void;
+    notify('future/notification', { enabled: false });
+
+    expect(transport.sent).toStrictEqual([
+      { method: 'future/notification', params: { enabled: false } },
+    ]);
+  });
+
+  it('clears request timers when sending throws or a response arrives', async () => {
+    vi.useFakeTimers();
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport, { requestTimeoutMs: 50 });
+    await client.start();
+    vi.spyOn(transport, 'send').mockImplementationOnce(() => { throw new Error('write failed'); });
+
+    await expect(client.request('configRequirements/read')).rejects.toThrow('write failed');
+    expect(vi.getTimerCount()).toBe(0);
+    const successful = client.request('configRequirements/read');
+    expect(vi.getTimerCount()).toBe(1);
+    transport.receive({ id: 2, result: { requirements: null } });
+    await successful;
+    expect(vi.getTimerCount()).toBe(0);
+    transport.receive({ id: 2, result: { requirements: 'late duplicate' } });
+  });
+
+  it('honors disconnect unsubscription and isolates unknown correlated protocol errors', async () => {
+    const transport = new FakeTransport();
+    const disconnected = vi.fn();
+    const client = new CodexAppServerClient(transport);
+    const unsubscribe = client.onDisconnect(disconnected);
+    await client.start();
+    unsubscribe();
+    const pending = client.request('configRequirements/read');
+
+    transport.fail(new RpcTransportProtocolError('unknown response', { requestId: 999 }));
+    transport.receive({ id: 1, result: { requirements: null } });
+    await expect(pending).resolves.toStrictEqual({ requirements: null });
+    transport.fail(new Error('disconnected'));
+
+    expect(disconnected).not.toHaveBeenCalled();
+    expect(transport.subscribed).toBe(false);
+  });
+
+  it('classifies zero and empty-string IDs without confusing responses, requests, or notifications', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    const notifications = vi.fn();
+    const requests = vi.fn((_request, responder) => {
+      responder.resolve({ time: 'now' });
+      return true;
+    });
+    client.onNotification(notifications);
+    client.onServerRequest('currentTime/read', requests);
+    await client.start();
+
+    transport.receive({ id: 0, method: 'currentTime/read' });
+    transport.receive({ id: '', method: 'currentTime/read', params: undefined });
+    transport.receive({ method: 'turn/started', params: { threadId: 't', turn: {} } });
+    await vi.waitFor(() => expect(requests).toHaveBeenCalledTimes(2));
+
+    expect(transport.sent).toContainEqual({ id: 0, result: { time: 'now' } });
+    expect(transport.sent).toContainEqual({ id: '', result: { time: 'now' } });
+    expect(requests.mock.calls[0]?.[0]).not.toHaveProperty('params');
+    expect(requests.mock.calls[1]?.[0]).toHaveProperty('params', undefined);
+    expect(notifications).toHaveBeenCalledOnce();
+  });
+
+  it('routes a method-bearing response as a server request and reports exact malformed messages', async () => {
+    const transport = new FakeTransport();
+    const protocolErrors = vi.fn();
+    const client = new CodexAppServerClient(transport, { onProtocolError: protocolErrors });
+    const handler = vi.fn((_request, responder) => {
+      responder.reject({ code: -32001, message: 'method wins' });
+      return true;
+    });
+    client.onAnyServerRequest(handler);
+    await client.start();
+
+    transport.receive({ id: 7, method: 'future/request', result: 'not a response' });
+    transport.receive(null);
+    transport.receive({ id: true, result: 'invalid' });
+    transport.receive({ id: 8 });
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledOnce());
+
+    expect(transport.sent).toContainEqual({ id: 7, error: { code: -32001, message: 'method wins' } });
+    expect(protocolErrors.mock.calls.map(([error]) => error.message)).toStrictEqual([
+      'Codex app-server sent a non-object message',
+      'Codex app-server sent an invalid RPC message',
+      'Codex app-server sent an invalid RPC message',
+    ]);
+  });
+
+  it('lets a response without an explicit claim stop later server-request handlers', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    const later = vi.fn();
+    client.onAnyServerRequest((_request, responder) => {
+      expect(responder.responded).toBe(false);
+      responder.resolve({ accepted: true });
+      expect(responder.responded).toBe(true);
+    });
+    client.onAnyServerRequest(later);
+    await client.start();
+
+    transport.receive({ id: 'claim', method: 'future/request' });
+    await vi.waitFor(() => expect(transport.sent).toContainEqual({ id: 'claim', result: { accepted: true } }));
+
+    expect(later).not.toHaveBeenCalled();
+  });
+
+  it('allows each responder to send only its first resolution or rejection', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    client.onAnyServerRequest((_request, responder) => {
+      responder.resolve('first');
+      responder.resolve('second');
+      responder.reject('third');
+      return true;
+    });
+    await client.start();
+
+    transport.receive({ id: 'once', method: 'future/request' });
+    await vi.waitFor(() => expect(transport.sent).toHaveLength(1));
+
+    expect(transport.sent).toStrictEqual([{ id: 'once', result: 'first' }]);
+  });
+
+  it('allows each responder to reject only once', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    client.onAnyServerRequest((_request, responder) => {
+      responder.reject('first');
+      responder.reject('second');
+      return true;
+    });
+    await client.start();
+
+    transport.receive({ id: 'reject-once', method: 'future/request' });
+    await vi.waitFor(() => expect(transport.sent).toHaveLength(1));
+
+    expect(transport.sent).toStrictEqual([
+      { id: 'reject-once', error: { code: -32603, message: 'first' } },
+    ]);
+  });
+
+  it('tolerates malformed inbound data when no protocol-error callback is configured', async () => {
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    await client.start();
+
+    expect(() => transport.receive(false)).not.toThrow();
+    expect(() => transport.receive({ nope: true })).not.toThrow();
+  });
 });
 
 describe('RPC wire guards', () => {
@@ -335,7 +578,10 @@ describe('RPC wire guards', () => {
     expect(isRecord([])).toBe(false);
     expect(isRecord(null)).toBe(false);
     expect(isRpcError('bad')).toBe(false);
+    expect(isRpcError(null)).toBe(false);
+    expect(isRpcError(Object.assign([], { code: -1, message: 'array error' }))).toBe(false);
     expect(isRpcError({ code: 'bad', message: 'error' })).toBe(false);
+    expect(isRpcError({ code: -1, message: 42 })).toBe(false);
     expect(isRpcError({ code: -1, message: 'error' })).toBe(true);
   });
 });

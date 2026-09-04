@@ -24,7 +24,6 @@ export type CodexSurfaceApprovalsHost = {
   patch(patch: Partial<CodexSurfaceSnapshot>): void;
   patchConversationStatus(threadId: string, status: 'active'): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
-  requireRuntime(threadId: string): ThreadRuntimeState;
 };
 
 export class CodexSurfaceApprovalsController {

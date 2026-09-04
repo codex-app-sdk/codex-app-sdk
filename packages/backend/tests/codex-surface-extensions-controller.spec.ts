@@ -14,6 +14,10 @@ describe('CodexSurfaceExtensionsController', () => {
     expect(subject.dynamicToolSpecs()).toStrictEqual([{
       type: 'function', name: 'inspect', description: 'Inspect', inputSchema: { type: 'object' }, deferLoading: true,
     }]);
+    expect(controller([]).hasDynamicTools()).toBe(false);
+    expect(controller([tool('plain')]).dynamicToolSpecs()).toStrictEqual([{
+      type: 'function', name: 'plain', description: 'Inspect', inputSchema: { type: 'object' },
+    }]);
   });
 
   it('merges extension and per-conversation instructions in declaration order', async () => {
@@ -36,6 +40,47 @@ describe('CodexSurfaceExtensionsController', () => {
     });
   });
 
+  it('preserves defined extension output across empty and non-configuring extensions', async () => {
+    const subject = new CodexSurfaceExtensionsController([{}, {
+      configureConversation: vi.fn(async () => ({
+        baseInstructions: 'extension base',
+        developerInstructions: ' first ',
+      })),
+    }, {
+      configureConversation: vi.fn(async () => ({})),
+    }, {
+      configureConversation: vi.fn(async () => ({ developerInstructions: '   ' })),
+    }], [{ name: 'local', transport: { type: 'stdio', command: 'server' } }], () => undefined);
+
+    await expect(subject.conversationExtension({ operation: 'start', conversationId: null }, {
+      developerInstructions: '   ',
+    })).resolves.toStrictEqual({
+      baseInstructions: 'extension base',
+      config: { 'mcp_servers.local': { command: 'server' } },
+      developerInstructions: 'first',
+    });
+  });
+
+  it('omits every absent extension field', async () => {
+    const subject = new CodexSurfaceExtensionsController([{
+      configureConversation: vi.fn(async () => ({})),
+    }], [], () => undefined);
+
+    await expect(subject.conversationExtension({ operation: 'resume', conversationId: 'thread-1' }))
+      .resolves.toStrictEqual({});
+  });
+
+  it('rejects extension config that collides with a typed MCP server', async () => {
+    const subject = new CodexSurfaceExtensionsController([{
+      configureConversation: vi.fn(async () => ({
+        config: { 'mcp_servers.local.enabled': true },
+      })),
+    }], [{ name: 'local', transport: { type: 'stdio', command: 'server' } }], () => undefined);
+
+    await expect(subject.conversationExtension({ operation: 'start', conversationId: null }))
+      .rejects.toThrow("Raw config for Codex MCP server 'local' conflicts with its typed definition");
+  });
+
   it('handles unknown, successful, image, and failed dynamic tool calls', async () => {
     const execute = vi.fn()
       .mockResolvedValueOnce('done')
@@ -45,7 +90,10 @@ describe('CodexSurfaceExtensionsController', () => {
     const responder = { resolve: vi.fn(), reject: vi.fn() };
 
     await subject.handleDynamicToolCall(request({ namespace: 'remote' }), responder as never);
-    expect(responder.reject).toHaveBeenLastCalledWith(expect.objectContaining({ code: -32601 }));
+    expect(responder.reject).toHaveBeenLastCalledWith({
+      code: -32601,
+      message: "Dynamic tool namespace 'remote' is not configured",
+    });
     await subject.handleDynamicToolCall(request({ tool: 'missing' }), responder as never);
     expect(responder.reject).toHaveBeenLastCalledWith(expect.objectContaining({ message: expect.stringContaining('Unknown') }));
 
@@ -62,6 +110,31 @@ describe('CodexSurfaceExtensionsController', () => {
     expect(responder.resolve).toHaveBeenLastCalledWith({
       success: false, contentItems: [{ type: 'inputText', text: 'tool failed' }],
     });
+  });
+
+  it('defaults object tool results to success and tolerates absent host options', async () => {
+    const execute = vi.fn(async () => ({
+      content: [{ type: 'text' as const, text: 'done' }],
+    }));
+    const subject = new CodexSurfaceExtensionsController([{
+      dynamicTools: [{ ...tool('inspect'), execute }],
+    }], [], () => undefined);
+    const responder = { resolve: vi.fn(), reject: vi.fn() };
+
+    await subject.handleDynamicToolCall(request(), responder as never);
+
+    expect(execute).toHaveBeenCalledWith({
+      callId: 'call-1',
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      arguments: { value: 1 },
+      extensionContext: undefined,
+    });
+    expect(responder.resolve).toHaveBeenCalledWith({
+      success: true,
+      contentItems: [{ type: 'inputText', text: 'done' }],
+    });
+    expect(responder.reject).not.toHaveBeenCalled();
   });
 });
 

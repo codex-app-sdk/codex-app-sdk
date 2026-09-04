@@ -27,6 +27,15 @@ describe('message actions', () => {
     ].join('\n'))).toBe('Visible');
   });
 
+  it('removes tool markers with repeated protocol whitespace', () => {
+    expect(stripMessageMarkup([
+      'Before',
+      '<tool   id="tool-1"></tool>',
+      '<tool\t\tindex="2"></tool>',
+      'After',
+    ].join('\n'))).toBe('Before\n\n\nAfter');
+  });
+
   it('converts markdown blocks and inline formatting into readable text', () => {
     expect(copyableMessageText([
       '# Heading',
@@ -51,6 +60,71 @@ describe('message actions', () => {
       'const value = 1;',
     ].join('\n'));
     expect(copyableMessageText('')).toBe('');
+  });
+
+  it('preserves multiline code and inline block text when copying markdown', () => {
+    expect(copyableMessageText([
+      '## Heading **detail**',
+      '',
+      '- List *detail*',
+      '',
+      '```txt',
+      'first line   ',
+      'second line',
+      '',
+      '',
+      'last line',
+      '```',
+    ].join('\n'))).toBe([
+      'Heading detail',
+      'List detail',
+      'first line',
+      'second line',
+      '',
+      'last line',
+    ].join('\n'));
+  });
+
+  it('copies inline and displayed math as its original readable expression', () => {
+    expect(copyableMessageText([
+      'Inline \\(x^2\\) done.',
+      '',
+      '\\[',
+      'y + 1',
+      '\\]',
+    ].join('\n'))).toBe('Inline x^2 done.\ny + 1');
+  });
+
+  it('copies table cells and escaped HTML in document order', () => {
+    expect(copyableMessageText([
+      '| Name | Value |',
+      '| --- | --- |',
+      '| alpha | **one** |',
+    ].join('\n'))).toBe('Name\nValue\nalpha\none');
+    expect(copyableMessageText('<custom>literal</custom>')).toBe('<custom>literal</custom>');
+  });
+
+  it('does not add separators for empty rendered code or math blocks', () => {
+    expect(copyableMessageText([
+      'before',
+      '',
+      '```',
+      '```',
+      '',
+      '```txt',
+      '',
+      'inside',
+      '',
+      '```',
+      '',
+      '#',
+      '',
+      '-',
+      '',
+      '\\[   \\]',
+      '',
+      'after',
+    ].join('\n'))).toBe('before\ninside\nafter');
   });
 
   it('returns sanitized rendered HTML', () => {
@@ -98,6 +172,48 @@ describe('message actions', () => {
     const item = write.mock.calls[0]![0][0] as unknown as { values: Record<string, Blob> };
     expect(item.values['text/html']?.type).toBe('text/html');
     expect(item.values['text/plain']?.type).toBe('text/plain');
+    await expect(item.values['text/html']?.text()).resolves.toBe('<p>Hello</p>');
+    await expect(item.values['text/plain']?.text()).resolves.toBe('Hello');
+  });
+
+  it.each([
+    {
+      name: 'ClipboardItem is unavailable',
+      clipboard: { write: vi.fn(async () => undefined) },
+      installClipboardItem: false,
+      content: 'plain text',
+    },
+    {
+      name: 'clipboard.write is unavailable',
+      clipboard: {},
+      installClipboardItem: true,
+      content: 'plain text',
+    },
+    {
+      name: 'the rendered HTML is empty',
+      clipboard: { write: vi.fn(async () => undefined) },
+      installClipboardItem: true,
+      content: '',
+    },
+  ])('uses plain text when $name', async ({ clipboard, installClipboardItem, content }) => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { ...clipboard, writeText },
+    });
+    if (installClipboardItem) {
+      Object.defineProperty(globalThis, 'ClipboardItem', {
+        configurable: true,
+        value: vi.fn(function ClipboardItem() {}),
+      });
+    }
+
+    await copyMessageToClipboard(content);
+
+    expect(writeText).toHaveBeenCalledWith(content);
+    if ('write' in clipboard) {
+      expect(clipboard.write).not.toHaveBeenCalled();
+    }
   });
 
   it('falls back to plain clipboard text without the rich API', async () => {

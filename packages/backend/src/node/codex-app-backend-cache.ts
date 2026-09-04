@@ -128,17 +128,18 @@ export class CodexAppBackendTtlCache<Value> {
     try {
       return await sweep;
     } finally {
-      if (this.activeSweep === sweep) this.activeSweep = null;
+      this.activeSweep = null;
       this.schedule();
     }
   }
 
   async close(): Promise<void> {
-    if (this.closePromise) return this.closePromise;
-    this.closed = true;
-    this.clearTimer();
-    this.closePromise = this.activeSweep?.then(() => undefined) ?? Promise.resolve();
-    return this.closePromise;
+    if (!this.closePromise) {
+      this.closed = true;
+      this.clearTimer();
+      this.closePromise = Promise.resolve(this.activeSweep).then(() => undefined);
+    }
+    await this.closePromise;
   }
 
   private async evictExpired(): Promise<readonly string[]> {
@@ -153,7 +154,7 @@ export class CodexAppBackendTtlCache<Value> {
         now,
         idleForMs,
       };
-      let safeToEvict = false;
+      let safeToEvict: boolean;
       try {
         safeToEvict = await this.options.canEvict(record.value, context);
       } catch (error) {
@@ -195,8 +196,10 @@ export class CodexAppBackendTtlCache<Value> {
     value: Value,
     context: CodexAppBackendTtlCacheEvictionContext,
   ): Promise<void> {
+    const onEvictionError = this.options.onEvictionError;
+    if (!onEvictionError) return;
     try {
-      await this.options.onEvictionError?.(error, value, context);
+      await onEvictionError(error, value, context);
     } catch {
       // Error reporting must not strand the periodic eviction loop.
     }

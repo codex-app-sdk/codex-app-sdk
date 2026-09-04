@@ -44,7 +44,7 @@ export function codexToolPartFileActivities(
     : Array.isArray(input.changes) ? input.changes : [];
   return changes.flatMap((change) => {
     if (!isRecord(change) || typeof change.path !== 'string') return [];
-    const kind = patchChangeKind(change.kind) ?? 'update';
+    const kind = patchChangeKind(change.kind);
     if (kind === 'delete') return [];
     const path = fullFilePath(change.path, cwd ?? undefined);
     return path ? [{ action: kind === 'add' ? 'create' as const : 'edit' as const, path, status }] : [];
@@ -52,7 +52,7 @@ export function codexToolPartFileActivities(
 }
 
 export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartAdapterOptions = {}): RendererToolPart | null {
-  if (!isRecord(item) || typeof item.id !== 'string' || typeof item.type !== 'string') {
+  if (!isRecord(item) || typeof item.id !== 'string') {
     return null;
   }
 
@@ -192,7 +192,7 @@ export function shouldForwardCommandExecutionOutput(item: unknown): boolean {
     return false;
   }
 
-  const command = item.command.trim();
+  const command = item.command;
   return isApplyPatchCommand(command) || isShellRedirectWriteCommand(command) || isTeeWriteCommand(command);
 }
 
@@ -289,9 +289,8 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
   source: 'codex';
 } | undefined {
   const actions = normalizedCommandActions(commandActions);
-  const knownActions = actions.filter((action) => action.type !== 'unknown');
-  const actionTypes = new Set(knownActions.map((action) => action.type));
-  if (knownActions.length === 0) {
+  const actionTypes = new Set(actions.map((action) => action.type));
+  if (actions.length === 0) {
     return {
       action: 'run',
       phase: status,
@@ -301,7 +300,7 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
   }
 
   if (actionTypes.size === 1 && actionTypes.has('read')) {
-    const names = uniqueNonEmpty(knownActions.map((action) => action.name ?? action.path));
+    const names = uniqueNonEmpty(actions.map((action) => action.name ?? action.path));
     return {
       action: 'read',
       phase: status,
@@ -314,7 +313,7 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
   }
 
   if (actionTypes.size === 1 && actionTypes.has('listFiles')) {
-    const targets = uniqueNonEmpty(knownActions.map((action) => action.path ?? action.command));
+    const targets = uniqueNonEmpty(actions.map((action) => action.path ?? action.command));
     return {
       action: 'list',
       phase: status,
@@ -327,7 +326,7 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
   }
 
   if (actionTypes.size === 1 && actionTypes.has('search')) {
-    const searches = knownActions.map((action) => {
+    const searches = actions.map((action) => {
       if (action.query && action.path) {
         return `"${action.query}" in ${action.path}`;
       }
@@ -350,8 +349,8 @@ function commandStatusDescriptor(status: RendererToolPart['status'], commandActi
     action: 'explore',
     phase: status,
     params: {
-      actions: knownActions.map((action) => action.type),
-      target: formatTargetList(uniqueNonEmpty(knownActions.map(commandActionTarget)), command),
+      actions: actions.map((action) => action.type),
+      target: formatTargetList(uniqueNonEmpty(actions.map(commandActionTarget)), command),
     },
     source: 'codex',
   };
@@ -366,7 +365,7 @@ type NormalizedCommandAction = {
   name?: string;
   path?: string;
   query?: string;
-  type: 'listFiles' | 'read' | 'search' | 'unknown';
+  type: 'listFiles' | 'read' | 'search';
 };
 
 function normalizedCommandActions(value: unknown): NormalizedCommandAction[] {
@@ -375,11 +374,11 @@ function normalizedCommandActions(value: unknown): NormalizedCommandAction[] {
   }
 
   return value.flatMap((entry) => {
-    if (!isRecord(entry) || typeof entry.type !== 'string') {
+    if (!isRecord(entry)) {
       return [];
     }
 
-    if (entry.type !== 'read' && entry.type !== 'listFiles' && entry.type !== 'search' && entry.type !== 'unknown') {
+    if (entry.type !== 'read' && entry.type !== 'listFiles' && entry.type !== 'search') {
       return [];
     }
 
@@ -398,11 +397,11 @@ function isApplyPatchCommand(command: string): boolean {
 }
 
 function isShellRedirectWriteCommand(command: string): boolean {
-  return /(?:^|[\s;"'(|&])(?:cat|printf|echo)\b[\s\S]*(?:>|>>)\s*(?:"[^"]+"|'[^']+'|[^\s;&|]+)/u.test(command);
+  return /(?:^|[\s;"'(|&])(?:cat|printf|echo)\b[\s\S]*>>?\s*(?:"[^"]+"|'[^']+'|[^\s;"'&|]+)(?=$|[\s;&|])/u.test(command);
 }
 
 function isTeeWriteCommand(command: string): boolean {
-  return /(?:^|[\s;"'(|&])tee(?:\s+-a)?\s+(?:"[^"]+"|'[^']+'|[^\s;&|]+)/u.test(command);
+  return /(?:^|[\s;"'(|&])tee(?:\s+-a)?\s+(?!-)(?:"[^"]+"|'[^']+'|[^\s;"'&|]+)(?=$|[\s;&|])/u.test(command);
 }
 
 function uniqueNonEmpty(values: Array<string | undefined>): string[] {
@@ -447,7 +446,7 @@ function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes:
     }
 
     const path = typeof change.path === 'string' ? change.path : undefined;
-    const kind = patchChangeKind(change.kind) ?? 'update';
+    const kind = patchChangeKind(change.kind);
     const lineDiff = lineDiffFromFileChange(change);
     return [{
       addedLines: lineDiff.addedLines,
@@ -478,12 +477,12 @@ function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes:
   };
 }
 
-function fileChangeAction(kinds: Array<'add' | 'delete' | 'update'>): 'create' | 'delete' | 'edit' {
-  if (kinds.length > 0 && kinds.every((kind) => kind === 'add')) {
+function fileChangeAction(kinds: Array<'add' | 'delete' | undefined>): 'create' | 'delete' | 'edit' {
+  if (kinds.every((kind) => kind === 'add')) {
     return 'create';
   }
 
-  if (kinds.length > 0 && kinds.every((kind) => kind === 'delete')) {
+  if (kinds.every((kind) => kind === 'delete')) {
     return 'delete';
   }
 
@@ -525,8 +524,8 @@ export function lineDiffFromUnifiedDiff(diff: string | undefined): { addedLines:
   return { addedLines, removedLines };
 }
 
-function patchChangeKind(kind: unknown): 'add' | 'delete' | 'update' | undefined {
-  if (kind === 'add' || kind === 'delete' || kind === 'update') {
+function patchChangeKind(kind: unknown): 'add' | 'delete' | undefined {
+  if (kind === 'add' || kind === 'delete') {
     return kind;
   }
 

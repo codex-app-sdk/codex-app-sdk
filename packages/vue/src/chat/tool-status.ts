@@ -33,9 +33,7 @@ export function registerCodexToolTitlePresenter(presenter: CodexToolTitlePresent
 }
 
 export function parseToolStatusDescriptor(value: unknown): ToolStatusDescriptor | undefined {
-  if (typeof value !== 'string' || !value.trim().startsWith('{')) {
-    return undefined;
-  }
+  if (typeof value !== 'string') return undefined;
 
   try {
     const parsed = JSON.parse(value) as Partial<ToolStatusDescriptor>;
@@ -52,9 +50,7 @@ export function parseToolStatusDescriptor(value: unknown): ToolStatusDescriptor 
       params: parsed.params && typeof parsed.params === 'object' && !Array.isArray(parsed.params) ? parsed.params : undefined,
       source: parsed.source,
     };
-  } catch {
-    return undefined;
-  }
+  } catch {}
 }
 
 export function getToolLineDiff(descriptor: ToolStatusDescriptor | undefined): ToolLineDiff | undefined {
@@ -136,7 +132,7 @@ export function getToolDisplayTargetLink(
 export function getToolDisplayTargetParts(
   toolCall: MessageToolCall,
   descriptor: ToolStatusDescriptor | undefined,
-  target?: string,
+  _target?: string,
 ): CodexToolDisplayTargetPart[] | undefined {
   if (
     !descriptor
@@ -145,20 +141,14 @@ export function getToolDisplayTargetParts(
     return undefined;
   }
 
-  const displayTarget = displayFileTarget(
-    toolCall,
-    descriptor,
-    target?.trim() || commandTarget(descriptor, getMessageToolCallName(toolCall)),
-  );
-  const targetTokens = splitFileTargetDisplay(displayTarget);
+  const targetValues = fileTargetValues(toolCall);
+  const targetTokens = targetValues.slice(0, 3);
   const filePaths = toolFilePaths(toolCall);
   if (!targetTokens.length || !filePaths.length) return undefined;
 
   const action = descriptor.action as CodexConversationFileAction;
   const parts = targetTokens.map((token, index) => {
-    const filePath = filePaths.find((candidate) => (
-      candidate === token || fileName(candidate) === fileName(token)
-    ));
+    const filePath = filePaths.find((candidate) => fileName(candidate) === fileName(token));
     const link = filePath ? codexConversationLinkFromHref(filePath) : undefined;
     return {
       label: token,
@@ -176,7 +166,7 @@ export function getToolDisplayTargetParts(
     } satisfies CodexToolDisplayTargetPart;
   });
 
-  const truncatedCount = fileTargetTruncationCount(displayTarget);
+  const truncatedCount = targetValues.length - targetTokens.length;
   if (truncatedCount > 0) {
     parts.push({ label: `and ${truncatedCount} more`, separator: ' ' });
   }
@@ -226,7 +216,7 @@ function fileTargetValues(toolCall: MessageToolCall): string[] {
     ...(typeof args.path === 'string' ? [args.path] : []),
     ...(typeof args.name === 'string' ? [args.name] : []),
   ];
-  return [...new Set(values.map(fileName).filter(Boolean))];
+  return [...new Set(values.map((value) => fileName(value.trim())).filter(Boolean))];
 }
 
 function rawFileTargetValues(value: unknown): string[] {
@@ -258,17 +248,6 @@ function filePathsFromArray(value: unknown): string[] {
   ));
 }
 
-function splitFileTargetDisplay(target: string): string[] {
-  const withoutTruncation = target.replace(/\s+and\s+\d+\s+more$/u, '').trim();
-  if (!withoutTruncation) return [];
-  return withoutTruncation.split(/,\s*/u).map((value) => fileName(value.trim())).filter(Boolean);
-}
-
-function fileTargetTruncationCount(target: string): number {
-  const match = target.match(/\s+and\s+(\d+)\s+more$/u);
-  return match ? Number(match[1]) : 0;
-}
-
 function absolutePath(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const path = value.trim();
@@ -288,7 +267,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function commandPhase(phase: string) {
-  if (phase === 'completed' || phase === 'failed' || phase === 'running') {
+  if (phase === 'completed' || phase === 'failed') {
     return phase;
   }
 

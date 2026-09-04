@@ -65,4 +65,109 @@ describe('ChatContextUsageIndicator', () => {
 
     expect(wrapper.html()).toBe('<!--v-if-->');
   });
+
+  it.each([
+    undefined,
+    null,
+  ])('stays hidden without context usage: %s', (contextUsage) => {
+    const errors: unknown[] = [];
+    const wrapper = mount(ChatContextUsageIndicator, {
+      global: { config: { errorHandler: (error) => errors.push(error) } },
+      props: { contextUsage },
+    });
+
+    expect(errors).toStrictEqual([]);
+    expect(wrapper.html()).toBe('<!--v-if-->');
+  });
+
+  it('stays hidden without a numeric model context window', () => {
+    const wrapper = mount(ChatContextUsageIndicator, {
+      props: {
+        contextUsage: {
+          totalTokens: 1,
+          inputTokens: 1,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          lastTotalTokens: 1,
+          modelContextWindow: null,
+          usedPercent: 1,
+        },
+      },
+    });
+
+    expect(wrapper.html()).toBe('<!--v-if-->');
+  });
+
+  it('stays hidden when usage percent is absent despite a valid context window', () => {
+    const wrapper = mount(ChatContextUsageIndicator, {
+      props: {
+        contextUsage: {
+          totalTokens: 1,
+          inputTokens: 1,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          lastTotalTokens: 1,
+          modelContextWindow: 1_000,
+          usedPercent: null,
+        },
+      },
+    });
+
+    expect(wrapper.html()).toBe('<!--v-if-->');
+  });
+
+  it.each([
+    [-1, '0% used (100% left)', '0%'],
+    [24.6, '25% used (75% left)', '25%'],
+    [100.6, '100% used (0% left)', '100%'],
+  ])('rounds and clamps usage percent %s', (usedPercent, expectedText, expectedStyle) => {
+    const wrapper = mount(ChatContextUsageIndicator, {
+      props: {
+        contextUsage: {
+          totalTokens: 0,
+          inputTokens: 0,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          lastTotalTokens: 0,
+          modelContextWindow: 2_000_000,
+          usedPercent,
+        },
+      },
+    });
+
+    expect(wrapper.text()).toContain(expectedText);
+    expect(wrapper.attributes('style')).toContain(`--chat-context-usage-percent: ${expectedStyle}`);
+  });
+
+  it.each([
+    [0, '0 / 2m tokens used'],
+    [999, '999 / 2m tokens used'],
+    [1_000, '1k / 2m tokens used'],
+    [1_499, '1k / 2m tokens used'],
+    [1_500, '2k / 2m tokens used'],
+    [999_999, '1000k / 2m tokens used'],
+    [1_000_000, '1m / 2m tokens used'],
+    [1_049_999, '1m / 2m tokens used'],
+    [1_050_000, '1.1m / 2m tokens used'],
+  ])('formats the token-count boundary %s', (lastTotalTokens, expected) => {
+    const wrapper = mount(ChatContextUsageIndicator, {
+      props: {
+        contextUsage: {
+          totalTokens: lastTotalTokens,
+          inputTokens: lastTotalTokens,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          lastTotalTokens,
+          modelContextWindow: 2_000_000,
+          usedPercent: 50,
+        },
+      },
+    });
+
+    expect(wrapper.text()).toContain(expected);
+  });
 });

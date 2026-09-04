@@ -144,6 +144,20 @@ describe('conversation message image previews', () => {
     expect(document.body.querySelector('.chat-image-lightbox')).not.toBeNull()
   })
 
+  it('surfaces image-handler failures without also opening the fallback lightbox', async () => {
+    const openImage = vi.fn(async () => {
+      throw new Error('Image host failed')
+    })
+    const wrapper = mount(CodexConversationPane, { props: { messages, openImage } })
+
+    await wrapper.get('.chat-media-block__image-button').trigger('click')
+    await flushPromises()
+
+    expect(openImage).toHaveBeenCalledOnce()
+    expect(wrapper.get('[role="alert"]').text()).toBe('Image host failed')
+    expect(document.body.querySelector('.chat-image-lightbox')).toBeNull()
+  })
+
   it('does not invoke the compatibility image handler in controller mode', async () => {
     const legacyOpenImage = vi.fn(() => true)
     const controller = createCodexConversationPaneController({

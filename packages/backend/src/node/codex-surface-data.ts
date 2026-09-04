@@ -22,13 +22,14 @@ import {
 
 export function threadToSummary(thread: v2.Thread): CodexConversationSummary {
   const preview = thread.preview.trim();
+  const firstPreviewLine = preview.split('\n')[0]!;
   return {
     id: thread.id,
     ...(thread.sessionId ? { sessionId: thread.sessionId } : {}),
     ...(thread.parentThreadId ? { parentConversationId: thread.parentThreadId } : {}),
     ...(thread.agentNickname ? { agentNickname: thread.agentNickname } : {}),
     ...(thread.agentRole ? { agentRole: thread.agentRole } : {}),
-    title: thread.name?.trim() || preview.split('\n')[0]?.trim() || 'Untitled conversation',
+    title: thread.name?.trim() || firstPreviewLine.trim() || 'Untitled conversation',
     preview,
     cwd: thread.cwd,
     status: thread.status.type === 'active' ? 'active' : thread.status.type === 'systemError' ? 'error' : 'idle',

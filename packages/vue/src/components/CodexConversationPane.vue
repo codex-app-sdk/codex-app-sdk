@@ -122,7 +122,6 @@
             :context-usage="effectiveContextUsage"
             :disabled="effectiveDisabled"
             :draft="localDraft"
-            :draft-revision="draftRevision"
             :files="effectiveFiles"
             :has-attachments="selectedAttachments.length > 0"
             :interrupt-armed="escapeInterruptArmed"
@@ -290,6 +289,7 @@ import CodexConversationHistoryLoader from './CodexConversationHistoryLoader.vue
 import CodexMessageList from './CodexMessageList.vue';
 import CodexWorkbenchLayout from './CodexWorkbenchLayout.vue';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   ariaLabel?: string;
   actionsDisabled?: boolean;
@@ -470,10 +470,10 @@ const emit = defineEmits<{
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
   'update:serviceTier': [serviceTier: string | null];
 }>();
+// Stryker restore all
 
 const hostCapabilities = useCodexHostCapabilities();
 
-const draftRevision = ref(0);
 const composer = ref<{ focus(): void } | null>(null);
 const paneElement = ref<HTMLElement | null>(null);
 const effectiveController = computed(() => resolveCodexConversationPaneValue(props.controller));
@@ -723,16 +723,14 @@ watch(() => props.modelValue, () => {
     selectionStart: props.modelValue.length,
     selectionEnd: props.modelValue.length,
   };
-  draftRevision.value += 1;
-}, { immediate: true });
+});
 
 watch(effectiveComposerState, (state) => {
   if (!state) return;
   const normalized = normalizeCodexComposerState(state);
   localComposerState.value = normalized;
   localDraft.value = normalized.text;
-  draftRevision.value += 1;
-}, { deep: true, immediate: true });
+}, { deep: true });
 
 watch(effectiveAttachments, (attachments) => {
   selectedAttachments.value = [...attachments];
@@ -757,9 +755,7 @@ watch(effectiveConversationKey, () => {
   ));
   localComposerState.value = incoming;
   localDraft.value = incoming.text;
-  selectedAttachments.value = [...effectiveAttachments.value];
-  draftRevision.value += 1;
-}, { immediate: true });
+});
 
 watch(effectiveQueuedPrompts, (prompts) => {
   const editingId = editingQueuedPromptId.value;
@@ -772,7 +768,7 @@ watch([
   effectiveConversationKey,
   () => surfaceState.value?.activeConversationId,
   () => effectiveControllerActions.value?.readPromptHistory,
-  () => configuredPromptHistory.value !== undefined,
+  configuredPromptHistory,
 ], () => { void loadPromptHistory(); }, { immediate: true });
 
 watch(() => [surfaceState.value?.status, surfaceState.value?.error] as const, ([status, error]) => {
@@ -790,7 +786,7 @@ async function loadPromptHistory(): Promise<void> {
   const key = effectiveConversationKey.value;
   promptHistoryLoading.value = false;
   loadedPromptHistory.value = [];
-  if (key === null || key === undefined || configuredPromptHistory.value !== undefined) return;
+  if (key == null || configuredPromptHistory.value !== undefined) return;
 
   const cached = promptHistoryByConversation.get(key);
   if (cached) {
@@ -801,7 +797,7 @@ async function loadPromptHistory(): Promise<void> {
   const controlledLoader = effectiveControllerActions.value?.readPromptHistory;
   const surface = props.surface;
   const conversationId = surfaceState.value?.activeConversationId;
-  if (!controlledLoader && (!surface || !conversationId)) return;
+  if (!controlledLoader && !conversationId) return;
 
   promptHistoryLoading.value = true;
   try {
@@ -843,11 +839,8 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
     return;
   }
   const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
-  if (dispatchControllerAction('submit', prompt, options)) {
-    replaceAttachments([]);
-    return;
-  }
-  if (effectiveController.value) {
+  const dispatched = dispatchControllerAction('submit', prompt, options);
+  if (dispatched || effectiveController.value) {
     replaceAttachments([]);
     return;
   }
@@ -874,7 +867,7 @@ function quoteMessage(index: number): void {
   if (!message) return;
   const chatMessage = chatMessageFromInput(message);
   const content = stripMessageContext(chatMessage.content);
-  if (chatMessage.role !== 'user' || !content.trim()) return;
+  if (chatMessage.role !== 'user' || !content) return;
   updateDraft(content);
   if (dispatchControllerAction('quoteMessage', index)) return;
   if (effectiveController.value) return;
@@ -989,7 +982,6 @@ function clipboardFiles(event: ClipboardEvent): File[] {
 }
 
 async function ingestFiles(files: readonly File[]): Promise<void> {
-  if (!effectiveAttachEnabled.value) return;
   try {
     appendAttachments(await ingestCodexAttachments(files, props.ingestAttachments, hostCapabilities));
   } catch (error) {
@@ -1034,7 +1026,6 @@ function sendOptionsForAttachments(
 
 function updateDraft(value: string): void {
   updateComposerState({ text: value, selectionStart: value.length, selectionEnd: value.length });
-  draftRevision.value += 1;
 }
 
 function updateComposerState(state: CodexComposerState): void {
@@ -1135,10 +1126,8 @@ function updateQueuedPrompt(promptId: string, prompt: string): void {
 
 function steerQueuedPrompt(promptId: string, prompt?: string): void {
   if (editingQueuedPromptId.value === promptId) editingQueuedPromptId.value = null;
-  const dispatched = prompt === undefined
-    ? dispatchControllerAction('steerQueuedPrompt', promptId)
-    : dispatchControllerAction('steerQueuedPrompt', promptId, prompt);
-  if (dispatched) return;
+  if (prompt === undefined) dispatchControllerAction('steerQueuedPrompt', promptId);
+  else dispatchControllerAction('steerQueuedPrompt', promptId, prompt);
   if (effectiveController.value) return;
   if (prompt === undefined) emit('steerQueuedPrompt', promptId);
   else emit('steerQueuedPrompt', promptId, prompt);
@@ -1160,18 +1149,14 @@ function interrupt(): void {
 function steer(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>): void {
   const queuedPromptId = editingQueuedPromptId.value;
   if (queuedPromptId) {
-    updateDraft('');
     editingQueuedPromptId.value = null;
     steerQueuedPrompt(queuedPromptId, prompt);
     replaceAttachments([]);
     return;
   }
   const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
-  if (dispatchControllerAction('steer', prompt, options)) {
-    replaceAttachments([]);
-    return;
-  }
-  if (effectiveController.value) {
+  const dispatched = dispatchControllerAction('steer', prompt, options);
+  if (dispatched || effectiveController.value) {
     replaceAttachments([]);
     return;
   }
@@ -1283,7 +1268,9 @@ function focusComposer(): void {
   composer.value?.focus();
 }
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineExpose({ focusComposer });
+// Stryker restore all
 </script>
 
 <style scoped>

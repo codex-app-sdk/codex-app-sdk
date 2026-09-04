@@ -3,8 +3,9 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CodexConversationSidebar from '../src/components/CodexConversationSidebar.vue';
+import type { CodexConversationSummary } from '@codex-app-sdk/core/surface';
 
-const conversations = [{
+const conversations: CodexConversationSummary[] = [{
   id: 'thread-1', title: 'Build a surface', preview: 'Build a surface', cwd: '/tmp/project', status: 'active' as const,
   turnCount: 2, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
 }, {
@@ -13,7 +14,10 @@ const conversations = [{
 }];
 
 describe('CodexConversationSidebar', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it('renders conversation data and exposes selection and creation interfaces', async () => {
     const wrapper = mount(CodexConversationSidebar, {
@@ -38,6 +42,45 @@ describe('CodexConversationSidebar', () => {
     const items = wrapper.findAll('.codex-conversation-sidebar__select');
     expect(items).toHaveLength(2);
     expect(items.every((item) => item.attributes('disabled') === undefined)).toBe(true);
+  });
+
+  it('renders the default brand and settled empty state', () => {
+    const wrapper = mount(CodexConversationSidebar, { props: { conversations: [] } });
+
+    expect(wrapper.get('.codex-conversation-sidebar__brand').text()).toBe('Codex');
+    expect(wrapper.get('.codex-conversation-sidebar__empty').text()).toBe('No conversations yet');
+    expect(wrapper.find('.codex-conversation-sidebar__list').exists()).toBe(false);
+    expect(wrapper.get('.codex-conversation-sidebar__new').attributes('disabled')).toBeUndefined();
+  });
+
+  it('renders exact relative-time boundaries and clamps future updates to now', () => {
+    const now = new Date('2026-09-04T12:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const elapsedMinutes = [-1, 0, 1, 59, 60, 1_439, 1_440, 2_940];
+    const wrapper = mount(CodexConversationSidebar, {
+      props: {
+        activeConversationId: null,
+        conversations: elapsedMinutes.map((minutes, index) => ({
+          ...conversations[0]!,
+          id: `thread-${index}`,
+          title: `Thread ${index}`,
+          updatedAt: new Date(now.getTime() - minutes * 60_000).toISOString(),
+        })),
+      },
+    });
+
+    expect(wrapper.findAll('.codex-conversation-sidebar__time').map((time) => time.text())).toStrictEqual([
+      'now',
+      'now',
+      '1m',
+      '59m',
+      '1h',
+      '23h',
+      '1d',
+      '2d',
+    ]);
+    expect(wrapper.find('[aria-current]').exists()).toBe(false);
   });
 
   it('confirms permanent deletion without selecting the conversation', async () => {

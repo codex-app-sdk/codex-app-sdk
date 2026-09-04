@@ -77,6 +77,7 @@ import { formatMessageSentAt, fullMessageSentAt } from './message-time'
 import type { CodexMessageActionsPresentation } from './contracts'
 import type { Message } from './types'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   canDelete?: boolean
   canEdit?: boolean
@@ -92,7 +93,9 @@ const props = withDefaults(defineProps<{
   canFork: false,
   canRetry: true,
 })
+// Stryker restore all
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const emit = defineEmits<{
   copy: []
   delete: []
@@ -101,6 +104,7 @@ const emit = defineEmits<{
   quote: []
   retry: []
 }>()
+// Stryker restore all
 const t = useCodexChatTranslate()
 const showCopy = computed(() => props.presentation?.copy !== false)
 const showDelete = computed(() => props.presentation?.delete !== false)

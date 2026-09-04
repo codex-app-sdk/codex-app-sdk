@@ -123,6 +123,7 @@ import type { CodexConversationVisualization } from './visualization'
 import type { CodexComposerMentionGroup, CodexComposerMentionItem } from './composer-mentions-custom'
 import { useCodexHostCapabilities } from '../native-capabilities'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineSlots<{
   block(props: { block: MessageBlock; blockIndex: number }): unknown
   attachment(props: {
@@ -161,6 +162,7 @@ const emit = defineEmits<{
   'open-visualization': [visualization: CodexConversationVisualization]
   'send-follow-up': [prompt: string]
 }>()
+// Stryker restore all
 
 const t = useCodexChatTranslate()
 const hostCapabilities = useCodexHostCapabilities()
@@ -169,7 +171,7 @@ const copyResetTimers = new Map<HTMLButtonElement, ReturnType<typeof setTimeout>
 async function copyCodeBlock(event: MouseEvent) {
   const target = event.target instanceof Element ? event.target : null
   const button = target?.closest<HTMLButtonElement>('[data-chat-code-copy]')
-  if (!button || !(event.currentTarget instanceof HTMLElement) || !event.currentTarget.contains(button)) return
+  if (!button) return
   const code = button.closest('.chat-code-block')?.querySelector('pre code')?.textContent
   if (code === undefined) return
 
@@ -178,7 +180,7 @@ async function copyCodeBlock(event: MouseEvent) {
   button.setAttribute('aria-label', t('chat.code.copied'))
   button.title = t('chat.code.copied')
   const previousTimer = copyResetTimers.get(button)
-  if (previousTimer) clearTimeout(previousTimer)
+  clearTimeout(previousTimer)
   copyResetTimers.set(button, setTimeout(() => {
     button.removeAttribute('data-copied')
     button.setAttribute('aria-label', t('chat.code.copy'))

@@ -25,9 +25,11 @@
 import type { TurnGitDiff } from './contracts';
 import ChatAnimatedDiffStat from './ChatAnimatedDiffStat.vue';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   diff: TurnGitDiff;
 }>();
+// Stryker restore all
 </script>
 
 <style scoped>

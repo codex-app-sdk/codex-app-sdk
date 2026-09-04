@@ -37,7 +37,7 @@ export function fuzzyScore(pattern: string, target: string): number {
     }
 
     score += lastMatch === index - 1 ? 6 : 1;
-    if (index === 0 || '/-_.'.includes(target[index - 1] ?? '')) {
+    if (index === 0 || '/-_.'.includes(target[index - 1]!)) {
       score += 4;
     }
     lastMatch = index;

@@ -87,6 +87,7 @@ import { SparklesIcon } from '../icons/app-icons';
 import { parseCodexUserText, type CodexUserTextToken } from './user-text';
 import type { CodexComposerMentionGroup } from './composer-mentions-custom';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   content: string;
   mentionGroups?: readonly CodexComposerMentionGroup[];
@@ -97,10 +98,12 @@ const props = withDefaults(defineProps<{
   mentionGroups: () => [],
   skills: () => [],
 });
+// Stryker restore all
 
 const failedIconUrls = reactive(new Set<string>());
 const tokens = computed(() => parseCodexUserText(props.content, props.plugins, props.skills, props.mentionGroups));
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineSlots<{
   mention(props: {
     group: Extract<CodexUserTextToken, { type: 'custom-mention' }>['group'];
@@ -109,6 +112,7 @@ defineSlots<{
     token: Extract<CodexUserTextToken, { type: 'custom-mention' }>;
   }): unknown;
 }>();
+// Stryker restore all
 
 function mentionIcon(
   token: Extract<CodexUserTextToken, { type: 'plugin-mention' | 'skill-mention' }>,

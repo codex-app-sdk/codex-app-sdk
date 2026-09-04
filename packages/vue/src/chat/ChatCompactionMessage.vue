@@ -18,11 +18,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   completedTitle: string
   runningTitle: string
   status?: 'completed' | 'running'
 }>()
+// Stryker restore all
 
 const running = computed(() => props.status === 'running')
 const title = computed(() => running.value ? props.runningTitle : props.completedTitle)

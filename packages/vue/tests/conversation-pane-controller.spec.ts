@@ -50,6 +50,15 @@ describe('createCodexConversationPaneController', () => {
     expect(resolveCodexConversationPaneValue(controller.state).identity.messages).toBe(messages);
   });
 
+  it('resolves function sources and preserves nullable direct values', () => {
+    const currentState = state([message('message-function')]);
+    const source = vi.fn(() => currentState);
+
+    expect(resolveCodexConversationPaneValue(source)).toBe(currentState);
+    expect(source).toHaveBeenCalledOnce();
+    expect(resolveCodexConversationPaneValue<null>(null)).toBeNull();
+  });
+
   it('resolves reactive state and actions without cloning message identities', async () => {
     const messages = [message('message-1')];
     const current = shallowRef(state(messages));

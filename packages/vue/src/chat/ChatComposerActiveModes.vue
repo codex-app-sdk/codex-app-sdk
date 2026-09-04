@@ -20,6 +20,7 @@
 <script setup lang="ts">
 import { CircleXIcon, ListDetailsIcon } from '../icons/app-icons'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   planMode: boolean
 }>()
@@ -27,6 +28,7 @@ defineProps<{
 const emit = defineEmits<{
   disablePlanMode: []
 }>()
+// Stryker restore all
 </script>
 
 <style scoped>

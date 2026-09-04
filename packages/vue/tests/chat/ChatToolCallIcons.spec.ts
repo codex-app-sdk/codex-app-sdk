@@ -39,6 +39,103 @@ describe('ChatToolCall action icons', () => {
     expect(wrapper.get('svg').classes()).toContain('tabler-icon-tool');
   });
 
+  it('uses command metadata without relying on command text', () => {
+    const commandKind = mount(ChatToolIcon, {
+      props: {
+        toolCall: {
+          args: undefined,
+          done: true,
+          function: 'opaque-tool',
+          id: 'command-kind-only',
+          kind: 'command',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+    const commandArgument = mount(ChatToolIcon, {
+      props: {
+        toolCall: {
+          args: { command: 'npm test' },
+          done: true,
+          function: 'opaque-tool',
+          id: 'command-argument-only',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+    const nonStringArgument = mount(ChatToolIcon, {
+      props: {
+        toolCall: {
+          args: { command: false },
+          done: true,
+          function: 'opaque-tool',
+          id: 'non-string-command',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(commandKind.get('svg').classes()).toContain('tabler-icon-terminal-2');
+    expect(commandArgument.get('svg').classes()).toContain('tabler-icon-terminal-2');
+    expect(nonStringArgument.get('svg').classes()).toContain('tabler-icon-tool');
+  });
+
+  it.each([
+    ['bash', true],
+    ['/bin/bash -lc npm test', true],
+    ['prefix bash -lc npm test', true],
+    ['Run pwsh', true],
+    ['fish --version', true],
+    ['embash', false],
+    ['bashful', false],
+    ['prefix/bin/bash', false],
+  ])('classifies shell-like function text %s: %s', (value, terminal) => {
+    const wrapper = mount(ChatToolIcon, {
+      props: {
+        toolCall: {
+          args: undefined,
+          done: true,
+          function: value,
+          id: 'shell-text',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(wrapper.get('svg').classes()).toContain(
+      terminal ? 'tabler-icon-terminal-2' : 'tabler-icon-tool',
+    );
+  });
+
+  it('treats null arguments as an ordinary non-command payload', () => {
+    const errors: unknown[] = [];
+    const wrapper = mount(ChatToolIcon, {
+      global: { config: { errorHandler: (error) => errors.push(error) } },
+      props: {
+        toolCall: {
+          args: null,
+          done: true,
+          function: 'opaque-tool',
+          id: 'null-args',
+          result: undefined,
+          state: 'completed',
+          status: 'completed',
+        },
+      },
+    });
+
+    expect(errors).toStrictEqual([]);
+    expect(wrapper.get('svg').classes()).toContain('tabler-icon-tool');
+  });
+
   it('renders a dedicated icon for a web search tool', () => {
     const wrapper = mount(ChatToolIcon, {
       props: {

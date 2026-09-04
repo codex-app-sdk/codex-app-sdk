@@ -13,6 +13,7 @@
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposerMenuItems from './composer-menu-items';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 withDefaults(defineProps<{
   ariaLabel?: string;
   items: readonly CodexComposerMenuItem<Payload>[];
@@ -23,6 +24,7 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   select: [item: CodexComposerMenuSelectableItem<Payload>];
 }>();
+// Stryker restore all
 
 function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void {
   emit('select', item as CodexComposerMenuSelectableItem<Payload>);

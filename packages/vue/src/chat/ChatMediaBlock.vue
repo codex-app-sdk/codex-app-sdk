@@ -57,10 +57,12 @@ import ChatIconButton from './ChatIconButton.vue'
 import type { CodexMessageImageOpenHandler, CodexMessageImageOpenIntent } from './message-image'
 import type { MessageMedia } from './types'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   media: MessageMedia
   openImage?: CodexMessageImageOpenHandler
 }>()
+// Stryker restore all
 
 const downloadLabel = 'Download media'
 const fullscreenLabel = 'Open fullscreen'

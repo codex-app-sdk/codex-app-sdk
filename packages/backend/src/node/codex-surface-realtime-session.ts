@@ -110,12 +110,12 @@ function deferredRealtimeSdp(
   onConversationEvent: StartCodexRealtimeSessionContext['onConversationEvent'],
 ): { promise: Promise<string>; cancel(): void } {
   let unsubscribe: () => void = () => undefined;
-  let timer: NodeJS.Timeout | null = null;
+  let timer: NodeJS.Timeout | undefined;
   let settled = false;
   const cleanup = () => {
     if (settled) return;
     settled = true;
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
     unsubscribe();
   };
   const promise = new Promise<string>((resolve, reject) => {

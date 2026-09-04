@@ -49,6 +49,29 @@ describe('Codex surface catalog codecs', () => {
     });
   });
 
+  it('omits empty model tiers and publishes an explicit default tier', () => {
+    const base = {
+      id: 'model-id', model: 'gpt-model', displayName: 'GPT Model', description: 'Description',
+      hidden: false, supportedReasoningEfforts: [], defaultReasoningEffort: 'medium', isDefault: false,
+      inputModalities: ['text'], supportsPersonality: false, upgrade: null, upgradeInfo: null,
+    };
+    const withoutTiers = codexModelToSurfaceModel({
+      ...base, serviceTiers: [], defaultServiceTier: null,
+    } as unknown as v2.Model);
+    expect(withoutTiers).not.toHaveProperty('serviceTiers');
+    expect(withoutTiers).not.toHaveProperty('defaultServiceTier');
+    expect(withoutTiers.providerMetadata).toMatchObject({ serviceTiers: [] });
+
+    expect(codexModelToSurfaceModel({
+      ...base,
+      serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast' }],
+      defaultServiceTier: 'priority',
+    } as unknown as v2.Model)).toMatchObject({
+      defaultServiceTier: 'priority',
+      serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast' }],
+    });
+  });
+
   it('filters disabled skills and resolves only declared icons', async () => {
     const loadIcon = vi.fn(async (path: string) => `data:${path}`);
     const enabled = skill({
@@ -161,6 +184,19 @@ describe('Codex surface catalog codecs', () => {
       .resolves.toBeUndefined();
   });
 
+  it('uses plugin identity defaults when interface metadata is absent', async () => {
+    const loadIcon = vi.fn(async () => 'unused');
+    await expect(surfacePlugin({
+      id: 'plugin-minimal', name: 'minimal', enabled: false, interface: undefined,
+    } as unknown as v2.PluginSummary, loadIcon)).resolves.toStrictEqual({
+      id: 'plugin-minimal',
+      name: 'minimal',
+      displayName: 'minimal',
+      enabled: false,
+    });
+    expect(loadIcon).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['https://example.com/icon.png', 'https://example.com/icon.png'],
     ['  https://example.com/icon.png  ', 'https://example.com/icon.png'],
@@ -193,11 +229,17 @@ describe('Codex surface catalog codecs', () => {
   it('validates, normalizes, and bounds image base64 data', () => {
     expect(boundedImageDataUrl('image/png', ' AQIDBA== ')).toBe('data:image/png;base64,AQIDBA==');
     expect(boundedImageDataUrl('image/png', 'AQI')).toBe('data:image/png;base64,AQI=');
+    expect(boundedImageDataUrl('image/png', 'AQI=')).toBe('data:image/png;base64,AQI=');
     expect(boundedImageDataUrl('image/png', '')).toBeUndefined();
     expect(boundedImageDataUrl('image/png', '%%%')).toBeUndefined();
+    expect(boundedImageDataUrl('image/png', '!AQI')).toBeUndefined();
+    expect(boundedImageDataUrl('image/png', 'AQI!')).toBeUndefined();
     expect(boundedImageDataUrl('image/png', 'A')).toBeUndefined();
     expect(boundedImageDataUrl('image/png', 'AQI==')).toBeUndefined();
-    expect(boundedImageDataUrl('image/png', 'A'.repeat(349_528))).toBeUndefined();
+    const atLimit = Buffer.alloc(256 * 1024).toString('base64');
+    const overLimit = Buffer.alloc(256 * 1024 + 1).toString('base64');
+    expect(boundedImageDataUrl('image/png', atLimit)).toBe(`data:image/png;base64,${atLimit}`);
+    expect(boundedImageDataUrl('image/png', overLimit)).toBeUndefined();
   });
 });
 

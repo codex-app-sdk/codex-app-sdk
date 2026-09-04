@@ -75,6 +75,7 @@ export {
 export {
   resolveAppleSpeechAnalyzerPath,
   transcribeWithAppleSpeechAnalyzer,
+  type AppleSpeechAssetDiscoveryDependencies,
   type AppleSpeechTranscriptionOptions,
   type AppleSpeechTranscriptionResult,
 } from './apple-speech-transcription';

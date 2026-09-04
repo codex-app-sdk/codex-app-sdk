@@ -97,6 +97,39 @@ describe('typed Electron IPC', () => {
     expect(port.handlers.size).toBe(0);
   });
 
+  it('does not remove individually cleared handlers again during disposal', () => {
+    const port = {
+      handle: vi.fn(),
+      removeHandler: vi.fn(),
+    };
+    const main = new TypedIpcMain<Requests>(port);
+    main.handle('conversation:load', async () => ({ title: 'Conversation' }));
+
+    main.removeHandler('conversation:load');
+    main.dispose();
+    main.dispose();
+
+    expect(port.removeHandler).toHaveBeenCalledOnce();
+    expect(port.removeHandler).toHaveBeenCalledWith('conversation:load');
+  });
+
+  it('disposes a registered handler group idempotently', () => {
+    const port = {
+      handle: vi.fn(),
+      removeHandler: vi.fn(),
+    };
+    const main = new TypedIpcMain<Requests>(port);
+    main.handle('conversation:load', async () => ({ title: 'Conversation' }));
+    main.handle('prompt:send', () => undefined);
+
+    main.dispose();
+    main.dispose();
+
+    expect(port.removeHandler).toHaveBeenCalledTimes(2);
+    expect(port.removeHandler).toHaveBeenNthCalledWith(1, 'conversation:load');
+    expect(port.removeHandler).toHaveBeenNthCalledWith(2, 'prompt:send');
+  });
+
   it('sends typed events and relays renderer events into a bus', () => {
     const sender = { send: vi.fn() };
     sendIpcEvent<Events, 'turn:completed'>(sender, 'turn:completed', { turnId: 'turn-1' });

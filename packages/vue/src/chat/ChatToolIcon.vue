@@ -25,10 +25,12 @@ import type { CodexToolPresentation } from './tool-presentation'
 import { parseToolStatusDescriptor } from './tool-status'
 import { isImageGenerationToolCall, type MessageToolCall } from './types'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   presentation?: CodexToolPresentation
   toolCall: MessageToolCall
 }>()
+// Stryker restore all
 
 const resolvedIcon = computed<Component | undefined>(() => {
   if (props.presentation?.icon === null) return undefined
@@ -43,7 +45,7 @@ const resolvedIcon = computed<Component | undefined>(() => {
       case 'create': return PencilIcon
       case 'delete': return Trash2Icon
       case 'edit': return PencilIcon
-      case 'explore': return FolderIcon
+      case 'explore':
       case 'list': return FolderIcon
       case 'plan': return ListDetailsIcon
       case 'read': return FileTextIcon
@@ -61,7 +63,7 @@ function isCommandLikeToolCall(toolCall: MessageToolCall): boolean {
 
   return [toolCall.function, toolCall.status].some((value) => (
     typeof value === 'string'
-    && /(?:^|\s)(?:\/bin\/)?(?:bash|cmd|fish|powershell|pwsh|sh|zsh)(?:\s|$)/i.test(value.trim())
+    && /(?:^|\s)(?:\/bin\/)?(?:bash|cmd|fish|powershell|pwsh|sh|zsh)(?:\s|$)/i.test(value)
   ))
 }
 

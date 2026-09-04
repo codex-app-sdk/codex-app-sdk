@@ -45,6 +45,7 @@ import { useCodexChatTranslate } from './chat-i18n';
 import type { CodexFileSearchItem } from './contracts';
 import { FileTextIcon } from '../icons/app-icons';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   activeIndex: number;
   showHint?: boolean;
@@ -54,6 +55,7 @@ const props = defineProps<{
 defineEmits<{
   select: [file: CodexFileSearchItem];
 }>();
+// Stryker restore all
 
 const t = useCodexChatTranslate();
 const menuEl = ref<HTMLElement | null>(null);

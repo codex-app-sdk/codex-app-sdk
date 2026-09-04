@@ -5,8 +5,8 @@ import { normalizedConversationId } from './codex-surface-prompts';
 export const CODEX_PROMPT_HISTORY_TURN_LIMIT = 100;
 
 const contextTagRegex = /<context>[\s\S]*?<\/context>\s*/g;
-const inAppBrowserContextTagRegex = /<in-app-browser-context(?:\s+[^>]*)?>[\s\S]*?<\/in-app-browser-context>\s*/g;
-const ambientRequestHeadingRegex = /^[ \t]*## My request for Codex:[ \t]*(?:\r?\n|$)/m;
+const inAppBrowserContextTagRegex = /<in-app-browser-context(?:\s[^>]*)?>[\s\S]*?<\/in-app-browser-context>\s*/g;
+const ambientRequestHeadingRegex = /^[ \t]*## My request for Codex:[ \t]*$/m;
 
 export async function readPromptHistory(
   client: CodexAppServerClient,

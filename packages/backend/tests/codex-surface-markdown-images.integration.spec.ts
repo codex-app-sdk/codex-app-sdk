@@ -3,8 +3,10 @@ import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import {
+  deferred,
   FakeTransport,
   generatedPngBase64,
+  requestsFor,
   resumeResponse,
   thread,
   turn,
@@ -34,6 +36,10 @@ function historicalTurn(id: string, index: number, firstReply: string): Record<s
     },
     { type: 'agentMessage', id: `${id}-agent-3`, text: `Older ${index} last reply`, phase: null, memoryCitation: null },
   ]);
+}
+
+async function flushAsyncCallbacks(): Promise<void> {
+  for (let index = 0; index < 20; index += 1) await Promise.resolve();
 }
 
 describe('CodexSurface local Markdown images', () => {
@@ -82,6 +88,7 @@ describe('CodexSurface local Markdown images', () => {
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'message.updated',
+        origin: 'lifecycle',
         conversationId: 'thread-existing',
         turnId: 'turn-image',
         payload: expect.objectContaining({
@@ -99,8 +106,206 @@ describe('CodexSurface local Markdown images', () => {
         parts: [expect.objectContaining({ type: 'text', text: '![do not resolve](/tmp/user-image.png)' })],
       }),
     ]));
+    expect(requestsFor(transport, 'fs/readFile').map((request) => (
+      'params' in request ? request.params : undefined
+    ))).toStrictEqual([
+      { path: '/tmp/music-album-playbar.png' },
+      { path: '/tmp/music-album-playbar.png' },
+    ]);
 
     await surface.close();
+  });
+
+  it('hydrates every simultaneously discovered assistant image independently', async () => {
+    const transport = new FakeTransport({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: {
+          data: [
+            turn('turn-image-a', 'completed', [
+              { type: 'agentMessage', id: 'agent-a', text: '![a](/tmp/a.png)', phase: null, memoryCitation: null },
+            ]),
+            turn('turn-image-b', 'completed', [
+              { type: 'agentMessage', id: 'agent-b', text: '![b](/tmp/b.png)', phase: null, memoryCitation: null },
+            ]),
+          ],
+          nextCursor: null,
+          backwardsCursor: null,
+        },
+      }),
+      'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    await surface.connect();
+    const dataUrl = `data:image/png;base64,${generatedPngBase64}`;
+    await vi.waitFor(() => expect(surface.getSnapshot().messages.flatMap((message) => message.parts))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'text', text: `![a](${dataUrl})` }),
+        expect.objectContaining({ type: 'text', text: `![b](${dataUrl})` }),
+      ])));
+    expect(requestsFor(transport, 'fs/readFile')
+      .map((request) => ('params' in request ? (request.params as { path: string }).path : undefined))
+      .sort()).toStrictEqual(['/tmp/a.png', '/tmp/b.png']);
+    await surface.close();
+  });
+
+  it('deduplicates pending hydration and does not overwrite a replacement after the conversation is forgotten', async () => {
+    const read = deferred<{ dataBase64: string }>();
+    const transport = new FakeTransport({
+      'fs/readFile': () => read.promise,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-stale-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-stale-image', itemId: 'agent-stale-image',
+        delta: '![stale](/tmp/stale.png)',
+      },
+    });
+    const completed = {
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-stale-image', 'completed', []) },
+    } as const;
+    transport.emit(completed);
+    transport.emit(completed);
+    await vi.waitFor(() => expect(requestsFor(transport, 'fs/readFile')).toHaveLength(1));
+
+    surface.forgetConversation('thread-existing');
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-stale-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-stale-image', itemId: 'agent-stale-image',
+        delta: 'Replacement response',
+      },
+    });
+    expect(surface.getConversationSnapshot('thread-existing').messages).toEqual([
+      expect.objectContaining({
+        id: 'assistant-turn-stale-image',
+        parts: [expect.objectContaining({ type: 'text', text: 'Replacement response' })],
+      }),
+    ]);
+    read.resolve({ dataBase64: generatedPngBase64 });
+    await flushAsyncCallbacks();
+
+    expect(surface.getConversationSnapshot('thread-existing').messages).toEqual([
+      expect.objectContaining({
+        id: 'assistant-turn-stale-image',
+        parts: [expect.objectContaining({ type: 'text', text: 'Replacement response' })],
+      }),
+    ]);
+    await surface.close();
+  });
+
+  it('settles a pending hydration safely when its conversation remains forgotten', async () => {
+    const read = deferred<{ dataBase64: string }>();
+    const transport = new FakeTransport({ 'fs/readFile': () => read.promise });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-forgotten-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-forgotten-image', itemId: 'agent-forgotten-image',
+        delta: '![forgotten](/tmp/forgotten.png)',
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-forgotten-image', 'completed', []) },
+    });
+    await vi.waitFor(() => expect(requestsFor(transport, 'fs/readFile')).toHaveLength(1));
+
+    surface.forgetConversation('thread-existing');
+    read.resolve({ dataBase64: generatedPngBase64 });
+    await flushAsyncCallbacks();
+
+    expect(surface.getConversationSnapshot('thread-existing').messages).toStrictEqual([]);
+    await surface.close();
+  });
+
+  it('does not resurrect a pending image when a replacement conversation lacks its message', async () => {
+    const read = deferred<{ dataBase64: string }>();
+    const transport = new FakeTransport({ 'fs/readFile': () => read.promise });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-old-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-old-image', itemId: 'agent-old-image',
+        delta: '![old](/tmp/old.png)',
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-old-image', 'completed', []) },
+    });
+    await vi.waitFor(() => expect(requestsFor(transport, 'fs/readFile')).toHaveLength(1));
+
+    surface.forgetConversation('thread-existing');
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-replacement', 'inProgress', []) },
+    });
+    read.resolve({ dataBase64: generatedPngBase64 });
+    await flushAsyncCallbacks();
+
+    expect(surface.getConversationSnapshot('thread-existing').messages).toEqual([
+      expect.objectContaining({ id: 'assistant-turn-replacement', parts: [] }),
+    ]);
+    await surface.close();
+  });
+
+  it('discards an already-resolved hydration callback when close wins the microtask race', async () => {
+    const transport = new FakeTransport({
+      'fs/readFile': () => new Promise(() => undefined),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-closing-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-closing-image', itemId: 'agent-closing-image',
+        delta: '![closing](/tmp/closing.png)',
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-closing-image', 'completed', []) },
+    });
+    await vi.waitFor(() => expect(requestsFor(transport, 'fs/readFile')).toHaveLength(1));
+    const request = requestsFor(transport, 'fs/readFile')[0]!;
+    if (!('id' in request)) throw new Error('Expected fs/readFile to be a request');
+    transport.emit({ id: request.id, result: { dataBase64: generatedPngBase64 } });
+    await surface.close();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(surface.getSnapshot().messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        turnId: 'turn-closing-image',
+        parts: [expect.objectContaining({ type: 'text', text: '![closing](/tmp/closing.png)' })],
+      }),
+    ]));
   });
 
   it('hydrates a local Markdown image when a live assistant turn completes', async () => {
@@ -117,6 +322,16 @@ describe('CodexSurface local Markdown images', () => {
     transport.emit({
       method: 'turn/started',
       params: { threadId: 'thread-existing', turn: turn('turn-live-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-live-image', startedAtMs: 1,
+        item: {
+          type: 'commandExecution', id: 'tool-before-image', command: 'pwd', cwd: '/tmp/project',
+          source: 'unifiedExec', status: 'inProgress', commandActions: [],
+        },
+      },
     });
     transport.emit({
       method: 'item/agentMessage/delta',
@@ -138,11 +353,53 @@ describe('CodexSurface local Markdown images', () => {
       expect.objectContaining({
         turnId: 'turn-live-image',
         status: 'complete',
-        parts: [expect.objectContaining({ type: 'text', text: `![preview](${dataUrl})` })],
+        parts: expect.arrayContaining([
+          expect.objectContaining({ type: 'tool', id: 'tool-before-image' }),
+          expect.objectContaining({ type: 'text', text: `![preview](${dataUrl})` }),
+        ]),
       }),
     ])));
     expect(transport.sent.filter((message) => 'method' in message && message.method === 'fs/readFile')).toHaveLength(1);
 
+    await surface.close();
+  });
+
+  it('keeps an unreadable local image unchanged without publishing a fake update', async () => {
+    const transport = new FakeTransport({
+      'fs/readFile': () => { throw new Error('unreadable'); },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-unreadable-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-unreadable-image', itemId: 'agent-unreadable-image',
+        delta: '![local](/tmp/unreadable.png)',
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-unreadable-image', 'completed', []) },
+    });
+    await vi.waitFor(() => expect(requestsFor(transport, 'fs/readFile')).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(surface.getSnapshot().messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        turnId: 'turn-unreadable-image',
+        parts: [expect.objectContaining({ type: 'text', text: '![local](/tmp/unreadable.png)' })],
+      }),
+    ]));
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'message.updated',
+      turnId: 'turn-unreadable-image',
+    }));
     await surface.close();
   });
 
@@ -201,7 +458,7 @@ describe('CodexSurface local Markdown images', () => {
     });
 
     await surface.connect();
-    await surface.loadOlderConversationHistory('thread-existing');
+    await surface.conversation('thread-existing').loadOlderHistory();
     await vi.waitFor(() => expect(eventOrder).toHaveLength(3));
 
     expect(eventOrder).toEqual([
@@ -211,5 +468,231 @@ describe('CodexSurface local Markdown images', () => {
     ]);
 
     await surface.close();
+  });
+
+  it('does not publish an image update after close while history emission is pending', async () => {
+    const history = deferred<unknown>();
+    const transport = new FakeTransport({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: { data: [], nextCursor: 'older-page', backwardsCursor: null },
+      }),
+      'thread/turns/list': () => history.promise,
+      'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    await surface.selectConversation('thread-existing');
+    const load = surface.conversation('thread-existing').loadOlderHistory();
+    const settledLoad = load.catch((error: unknown) => error);
+    await vi.waitFor(() => expect(requestsFor(transport, 'thread/turns/list')).toHaveLength(1));
+
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-close-wait-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-close-wait-image', itemId: 'agent-close-wait-image',
+        delta: '![closing](/tmp/closing-while-history-loads.png)',
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-close-wait-image', 'completed', []) },
+    });
+    const dataUrl = `data:image/png;base64,${generatedPngBase64}`;
+    await vi.waitFor(() => expect(JSON.stringify(surface.getSnapshot().messages)).toContain(dataUrl));
+
+    await surface.close();
+    history.resolve({ data: [], nextCursor: null, backwardsCursor: null });
+    await expect(settledLoad).resolves.toEqual(expect.any(Error));
+    await flushAsyncCallbacks();
+
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'message.updated', turnId: 'turn-close-wait-image',
+    }));
+  });
+
+  it('does not publish an image update for a replacement message while history emission is pending', async () => {
+    const history = deferred<unknown>();
+    const transport = new FakeTransport({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: { data: [], nextCursor: 'older-page', backwardsCursor: null },
+      }),
+      'thread/turns/list': () => history.promise,
+      'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    await surface.selectConversation('thread-existing');
+    const load = surface.conversation('thread-existing').loadOlderHistory();
+    await vi.waitFor(() => expect(requestsFor(transport, 'thread/turns/list')).toHaveLength(1));
+
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-replaced-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-replaced-image', itemId: 'agent-replaced-image',
+        delta: '![replace me](/tmp/replace-me.png)',
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-replaced-image', 'completed', []) },
+    });
+    const dataUrl = `data:image/png;base64,${generatedPngBase64}`;
+    await vi.waitFor(() => expect(JSON.stringify(surface.getSnapshot().messages)).toContain(dataUrl));
+
+    surface.forgetConversation('thread-existing');
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-replaced-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-replaced-image', itemId: 'agent-replaced-image',
+        delta: 'Replacement response',
+      },
+    });
+    history.resolve({ data: [], nextCursor: null, backwardsCursor: null });
+    await load;
+    await flushAsyncCallbacks();
+
+    expect(surface.getConversationSnapshot('thread-existing').messages).toEqual([
+      expect.objectContaining({
+        id: 'assistant-turn-replaced-image',
+        parts: [expect.objectContaining({ type: 'text', text: 'Replacement response' })],
+      }),
+    ]);
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'message.updated', turnId: 'turn-replaced-image',
+    }));
+    await surface.close();
+  });
+
+  it('does not publish an image update after its conversation disappears during history emission', async () => {
+    const history = deferred<unknown>();
+    const transport = new FakeTransport({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: { data: [], nextCursor: 'older-page', backwardsCursor: null },
+      }),
+      'thread/turns/list': () => history.promise,
+      'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    await surface.selectConversation('thread-existing');
+    const load = surface.conversation('thread-existing').loadOlderHistory();
+    await vi.waitFor(() => expect(requestsFor(transport, 'thread/turns/list')).toHaveLength(1));
+
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-disappearing-image', 'inProgress', []) },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-disappearing-image', itemId: 'agent-disappearing-image',
+        delta: '![disappearing](/tmp/disappearing.png)',
+      },
+    });
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-disappearing-image', 'completed', []) },
+    });
+    const dataUrl = `data:image/png;base64,${generatedPngBase64}`;
+    await vi.waitFor(() => expect(JSON.stringify(surface.getSnapshot().messages)).toContain(dataUrl));
+
+    surface.forgetConversation('thread-existing');
+    history.resolve({ data: [], nextCursor: null, backwardsCursor: null });
+    await expect(load).resolves.toMatchObject({
+      conversationId: 'thread-existing', messages: [], hasOlder: false,
+    });
+    await flushAsyncCallbacks();
+
+    expect(events).not.toContainEqual(expect.objectContaining({
+      type: 'message.updated', turnId: 'turn-disappearing-image',
+    }));
+    expect(surface.getConversationSnapshot('thread-existing').messages).toStrictEqual([]);
+    await surface.close();
+  });
+
+  it('does not publish a stale hydrated history update after its message is replaced', async () => {
+    const markdown = '![stale history](/tmp/stale-history.png)';
+    const dataUrl = `data:image/png;base64,${generatedPngBase64}`;
+    const olderTurns = Array.from({ length: 5 }, (_, index) => historicalTurn(
+      `turn-racing-${index}`,
+      index,
+      index === 0 ? markdown : `Older ${index} first reply`,
+    ));
+    const transport = new FakeTransport({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: { data: [], nextCursor: 'older-page', backwardsCursor: null },
+      }),
+      'thread/turns/list': () => ({
+        data: [...olderTurns].reverse(), nextCursor: null, backwardsCursor: null,
+      }),
+      'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    vi.useFakeTimers();
+    try {
+      const load = surface.conversation('thread-existing').loadOlderHistory();
+      for (let index = 0; index < 20; index += 1) await Promise.resolve();
+      expect(JSON.stringify(surface.getSnapshot().messages)).toContain(dataUrl);
+      expect(events).not.toContainEqual(expect.objectContaining({
+        type: 'message.updated', turnId: 'turn-racing-0',
+      }));
+
+      surface.forgetConversation('thread-existing');
+      transport.emit({
+        method: 'turn/started',
+        params: { threadId: 'thread-existing', turn: turn('turn-racing-0', 'inProgress', []) },
+      });
+      transport.emit({
+        method: 'item/started',
+        params: {
+          threadId: 'thread-existing', turnId: 'turn-racing-0', startedAtMs: 2,
+          item: {
+            type: 'commandExecution', id: 'replacement-history-tool', command: 'pwd', cwd: '/tmp/project',
+            source: 'unifiedExec', status: 'inProgress', commandActions: [],
+          },
+        },
+      });
+      await vi.runAllTimersAsync();
+      await load;
+      await Promise.resolve();
+
+      expect(events).not.toContainEqual(expect.objectContaining({
+        type: 'message.updated', turnId: 'turn-racing-0',
+      }));
+      expect(surface.getConversationSnapshot('thread-existing').messages).toEqual([
+        expect.objectContaining({
+          id: 'assistant-turn-racing-0',
+          parts: [expect.objectContaining({ type: 'tool', id: 'replacement-history-tool' })],
+        }),
+      ]);
+    } finally {
+      vi.useRealTimers();
+      await surface.close();
+    }
   });
 });

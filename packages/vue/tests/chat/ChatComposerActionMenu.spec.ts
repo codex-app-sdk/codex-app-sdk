@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
+import { h } from 'vue';
 import { describe, expect, it } from 'vitest';
 import ChatComposerActionMenu from '../../src/chat/ChatComposerActionMenu.vue';
+import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../../src/composer-menu';
 
 describe('ChatComposerActionMenu', () => {
   it('closes when clicking outside the menu', async () => {
@@ -39,10 +41,33 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.text()).toContain('Approve for me');
     expect(wrapper.text()).toContain('Full access');
     expect(wrapper.find('.codex-composer-menu-list__chevron').exists()).toBe(true);
+    const approvalItems = wrapper.findAll('[role="menuitemradio"]');
+    expect(approvalItems.map((item) => item.attributes('aria-checked')))
+      .toStrictEqual(['false', 'false', 'true']);
+    expect(approvalItems.map((item) => item.get('svg').attributes('class'))).toStrictEqual([
+      expect.stringContaining('tabler-icon-hand-stop'),
+      expect.stringContaining('tabler-icon-sparkles'),
+      expect.stringContaining('tabler-icon-shield-check'),
+    ]);
     await wrapper.findAll('[role="menuitemradio"]')[1]?.trigger('click');
 
     expect(wrapper.emitted('selectApprovalPreset')).toStrictEqual([['approve-for-me']]);
     expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(false);
+  });
+
+  it.each([
+    [false, true],
+    [true, false],
+  ])('toggles plan mode from %s to %s', async (planMode, expected) => {
+    const wrapper = mountMenu({ planMode });
+
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+    const planItem = wrapper.get('[role="menuitemcheckbox"]');
+    expect(planItem.attributes('aria-checked')).toBe(String(planMode));
+    expect(planItem.find('.codex-composer-menu-list__switch').exists()).toBe(true);
+    await planItem.trigger('click');
+
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[expected]]);
   });
 
   it('selects an approval preset through the visible hover submenu', async () => {
@@ -145,6 +170,44 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.emitted('attach')).toStrictEqual([[]]);
   });
 
+  it('adds exactly one attachment separator only after an existing action', async () => {
+    const attachOnly = mountMenu({ attachEnabled: true, showPlanMode: false });
+    await attachOnly.get('.chat-composer-action-menu__button').trigger('click');
+    expect(attachOnly.findAll('.codex-composer-menu-list__separator')).toHaveLength(0);
+
+    const afterAction = mountMenu({ attachEnabled: true, showPlanMode: true });
+    await afterAction.get('.chat-composer-action-menu__button').trigger('click');
+    expect(afterAction.findAll('.codex-composer-menu-list__separator')).toHaveLength(1);
+
+    const afterSeparator = mountMenu({
+      attachEnabled: true,
+      items: [{ id: 'existing-separator', type: 'separator' }],
+      showPlanMode: false,
+    });
+    await afterSeparator.get('.chat-composer-action-menu__button').trigger('click');
+    expect(afterSeparator.findAll('.codex-composer-menu-list__separator')).toHaveLength(1);
+  });
+
+  it.each([
+    ['approval id without an action payload', { id: 'approval:host', type: 'custom', label: 'Approval host', payload: null }],
+    ['approval payload without an approval id', {
+      id: 'host-approval', type: 'custom', label: 'Host approval',
+      payload: { kind: 'approval', preset: 'full-access' },
+    }],
+    ['non-approval action payload', {
+      id: 'approval:attach', type: 'custom', label: 'Approval attach', payload: { kind: 'attach' },
+    }],
+    ['primitive payload', { id: 'approval:text', type: 'custom', label: 'Approval text', payload: 'host' }],
+  ] satisfies Array<[string, CodexComposerMenuItem<unknown>]>)('routes a host item with %s to the host', async (_, item) => {
+    const wrapper = mountMenu({ items: [item] });
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+    await wrapper.findAll('button').find((button) => button.text().includes(item.label))!.trigger('click');
+
+    expect(wrapper.emitted('select')).toStrictEqual([[item]]);
+    expect(wrapper.emitted('selectApprovalPreset')).toBeUndefined();
+    expect(wrapper.emitted('attach')).toBeUndefined();
+  });
+
   it('renders no action-menu root when every menu source is empty', () => {
     const wrapper = mountMenu({ attachEnabled: false, showPlanMode: false });
 
@@ -161,6 +224,45 @@ describe('ChatComposerActionMenu', () => {
     expect(wrapper.text()).not.toContain('Add Files & Photos');
     expect(wrapper.find('.codex-composer-menu-list__separator').exists()).toBe(false);
   });
+
+  it('forwards host item and icon slots through both composer menu layers', async () => {
+    const item: CodexComposerMenuItem<{ source: string }> = {
+      id: 'host-action',
+      type: 'custom',
+      label: 'Host action',
+      payload: { source: 'host' },
+    };
+    const itemSlotWrapper = mount(ChatComposerActionMenu, {
+      props: {
+        items: [item],
+        planMode: false,
+        showPlanMode: false,
+      },
+      slots: {
+        item: ({ item: slotItem }: { item: CodexComposerMenuSelectableItem }) => (
+          h('span', { class: 'host-menu-item' }, `item:${slotItem.label}`)
+        ),
+      },
+    });
+    await itemSlotWrapper.get('.chat-composer-action-menu__button').trigger('click');
+    expect(itemSlotWrapper.get('.host-menu-item').text()).toBe('item:Host action');
+
+    const iconSlotWrapper = mount(ChatComposerActionMenu, {
+      props: {
+        items: [item],
+        planMode: false,
+        showPlanMode: false,
+      },
+      slots: {
+        icon: ({ item: slotItem }: { item: CodexComposerMenuSelectableItem }) => (
+          h('span', { class: 'host-menu-icon' }, `icon:${slotItem.id}`)
+        ),
+      },
+    });
+    await iconSlotWrapper.get('.chat-composer-action-menu__button').trigger('click');
+
+    expect(iconSlotWrapper.get('.host-menu-icon').text()).toBe('icon:host-action');
+  });
 });
 
 function mountMenu(props: Partial<{
@@ -168,8 +270,8 @@ function mountMenu(props: Partial<{
   approvalPresets: ('ask-for-approval' | 'approve-for-me' | 'full-access')[];
   attachEnabled: boolean;
   disabled: boolean;
-  leadingMenuItems: { id: string; type: 'custom'; label: string; payload: { source: string } }[];
-  items: { id: string; type: 'custom'; label: string; payload: { source: string } }[];
+  leadingMenuItems: CodexComposerMenuItem<unknown>[];
+  items: CodexComposerMenuItem<unknown>[];
   planMode: boolean;
   showApprovalMenu: boolean;
   showPlanMode: boolean;

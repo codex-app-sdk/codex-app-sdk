@@ -33,9 +33,6 @@ export type CodexUserTextToken =
     skill?: CodexSurfaceSkill;
   };
 
-const userTextTokenRegex = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\n]+)\)|(?<![\w.%+-])([$@/])([A-Za-z0-9_.:-]+(?:[ \t]+\([A-Za-z0-9_.-]+\))?)|(\n)/g;
-const opaqueAppNameRegex = /^app[-_]?[a-f\d]{16,}$/i;
-
 export function parseCodexUserText(
   content: string,
   plugins: readonly CodexSurfacePlugin[] = [],
@@ -45,7 +42,7 @@ export function parseCodexUserText(
   const tokens: CodexUserTextToken[] = [];
   let lastIndex = 0;
 
-  for (const match of content.matchAll(userTextTokenRegex)) {
+  for (const match of content.matchAll(userTextTokenRegex())) {
     const index = match.index ?? 0;
     if (index > lastIndex) tokens.push({ type: 'text', text: content.slice(lastIndex, index) });
 
@@ -57,10 +54,10 @@ export function parseCodexUserText(
     const bareName = match[5];
     if (code !== undefined) {
       tokens.push({ type: 'code', text: code });
-    } else if (label !== undefined && href !== undefined) {
-      tokens.push(mentionToken(label, href, plugins, skills) ?? { type: 'text', text: raw });
-    } else if (bareTrigger !== undefined && bareName !== undefined) {
-      tokens.push(bareMentionToken(bareTrigger, bareName, plugins, skills, mentionGroups) ?? { type: 'text', text: raw });
+    } else if (label !== undefined) {
+      tokens.push(mentionToken(label, href!, plugins, skills) ?? { type: 'text', text: raw });
+    } else if (bareTrigger !== undefined) {
+      tokens.push(bareMentionToken(bareTrigger, bareName!, plugins, skills, mentionGroups) ?? { type: 'text', text: raw });
     } else {
       tokens.push({ type: 'line-break' });
     }
@@ -115,7 +112,7 @@ function bareMentionToken(
     };
   }
   const trailingMention = findComposerMention(
-    mentionGroups.filter((group) => group.placement === 'after'),
+    mentionGroups,
     name,
   );
   return trailingMention ? {
@@ -139,7 +136,7 @@ function mentionToken(
     const pluginId = safeDecode(href.slice('plugin://'.length));
     if (!pluginId) return null;
     const plugin = plugins.find((candidate) => candidate.id === pluginId);
-    const fallbackName = label.slice(1) || pluginId.split('@')[0] || 'App';
+    const fallbackName = label.slice(1) || pluginId.split('@')[0]!;
     return {
       type: 'plugin-mention',
       displayName: plugin?.displayName || humanizeMentionName(fallbackName, 'App'),
@@ -152,13 +149,12 @@ function mentionToken(
   if (label.startsWith('$')) {
     const skillPath = skillPathFromHref(href);
     if (!skillPath) return null;
-    const mentionName = label.slice(1);
     const skill = skills.find((candidate) => candidate.path === skillPath);
     return {
       type: 'skill-mention',
       displayName: skill
         ? skillDisplayName(skill, plugins)
-        : humanizeMentionName(mentionName, 'Skill'),
+        : humanizeMentionName(label, 'Skill'),
       href,
       label,
       ...(skill ? { skill } : {}),
@@ -176,7 +172,7 @@ function markdownDestination(value: string): string {
 }
 
 function skillPathFromHref(href: string): string | null {
-  const withoutFragment = href.split('#', 1)[0]?.split('?', 1)[0] ?? '';
+  const withoutFragment = href.split(/[?#]/, 1)[0]!;
   let path = safeDecode(withoutFragment);
   if (path.startsWith('file://')) {
     try {
@@ -198,12 +194,18 @@ function safeDecode(value: string): string {
 
 export function humanizeMentionName(value: string, fallback: string): string {
   const trimmed = value.trim().replace(/^[@$]/, '');
-  if (!trimmed || opaqueAppNameRegex.test(trimmed)) return fallback;
+  if (!trimmed || isOpaqueAppName(trimmed)) return fallback;
   return trimmed
-    .split(/[-_:\s]+/)
+    .split(/[-_:\s]/)
     .filter(Boolean)
-    .map((part) => part.length <= 3 && part === part.toUpperCase()
-      ? part
-      : `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(' ');
+}
+
+function userTextTokenRegex(): RegExp {
+  return /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\n]+)\)|(?<![\w.%+-])([$@/])([A-Za-z0-9_.:-]+(?:[ \t]+\([A-Za-z0-9_.-]+\))?)|(\n)/g;
+}
+
+function isOpaqueAppName(value: string): boolean {
+  return /^app[-_]?[a-f\d]{16,}$/i.test(value);
 }

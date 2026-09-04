@@ -98,6 +98,12 @@
     "lint:packages": "npm run lint -w @codex-app-sdk/core && npm run lint -w @codex-app-sdk/backend && npm run lint -w @codex-app-sdk/vue && npm run lint -w @codex-app-sdk/electron && npm run lint -w @codex-app-sdk/web",
     "lint:sdk": "npm run lint:packages && npm run lint:compat",
     "lint:workspaces": "npm run lint -w create-codex-app && npm run lint -w @codex-app-sdk/component-lab && npm run lint -w @codex-app-sdk/basic-sample && npm run lint -w @codex-app-sdk/spark-sample && npm run lint -w @codex-app-sdk/relay-sample && npm run lint -w @codex-app-sdk/basic-web-sample",
+    "mutation:all": "npm run mutation:core && npm run mutation:web && npm run mutation:electron && npm run mutation:backend && npm run mutation:vue",
+    "mutation:backend": "npm run test:mutation -w @codex-app-sdk/backend",
+    "mutation:core": "npm run test:mutation -w @codex-app-sdk/core",
+    "mutation:electron": "npm run test:mutation -w @codex-app-sdk/electron",
+    "mutation:vue": "npm run test:mutation -w @codex-app-sdk/vue",
+    "mutation:web": "npm run test:mutation -w @codex-app-sdk/web",
     "prepare": "npm run build",
     "preview:docs": "vitepress preview docs --port 4175",
     "start:electron": "npm run start -w @codex-app-sdk/basic-sample",
@@ -148,6 +154,8 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "^25.0.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "@vitest/coverage-v8": "^4.1.0",

@@ -2,12 +2,12 @@
 
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { nextTick } from 'vue';
+import { nextTick, reactive } from 'vue';
 import CodexComposer from '../src/components/CodexComposer.vue';
 import CodexComposerPluginMenu from '../src/chat/ChatComposerPluginMenu.vue';
 import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../src/chat/ChatRichTextEditor.vue';
 import { codexCommands } from '../src/chat/codex-commands';
-import type { CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../src/chat/contracts';
+import type { CodexCapabilities, CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../src/chat/contracts';
 import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import type { CodexComposerState } from '../src/composer-state';
 
@@ -99,6 +99,33 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('send')).toStrictEqual([['ship it']]);
   });
 
+  it('labels a draft as queued while Codex is working', async () => {
+    const wrapper = mountComposer({ isSending: true });
+
+    await setEditorValue(wrapper, 'follow up');
+
+    expect(wrapper.get('.chat-composer__send').attributes('aria-label')).toBe('Queue prompt');
+    expect(wrapper.get('.chat-composer__send').classes())
+      .not.toContain('codex-composer-send-button--busy');
+  });
+
+  it('labels an idle composer for sending', () => {
+    const wrapper = mountComposer();
+
+    expect(wrapper.get('.chat-composer__send').attributes('aria-label')).toBe('Send prompt');
+  });
+
+  it('submits attachment-only work instead of interrupting while Codex is working', async () => {
+    const wrapper = mountComposer({ hasAttachments: true, isSending: true });
+
+    const button = wrapper.get('.chat-composer__send');
+    expect(button.classes()).not.toContain('codex-composer-send-button--busy');
+    await button.trigger('click');
+
+    expect(wrapper.emitted('send')).toStrictEqual([['(no user instructions)']]);
+    expect(wrapper.emitted('interrupt')).toBeUndefined();
+  });
+
   it('recalls submitted prompts from an empty composer and exits navigation after an edit', async () => {
     const wrapper = mountComposer();
 
@@ -146,6 +173,22 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('draft');
   });
 
+  it('leaves ordinary typing alone while a recalled prompt is active', async () => {
+    const wrapper = mountComposer({ promptHistory: ['remembered'] });
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    const typing = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'x',
+    });
+
+    editor(wrapper).element.dispatchEvent(typing);
+
+    expect(typing.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('remembered');
+  });
+
   it('recalls from controlled caret state when the DOM selection is unavailable', async () => {
     const wrapper = mountComposer({ promptHistory: ['First prompt', 'Second prompt'] });
     vi.spyOn(richEditorVm(wrapper), 'getSelectionRange').mockReturnValue({
@@ -179,6 +222,31 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('Second prompt');
   });
 
+  it('trusts a valid live selection over stale controlled caret state for history navigation', async () => {
+    const wrapper = mountComposer(
+      { promptHistory: ['First prompt', 'Second prompt'] },
+      { attachTo: document.body },
+    );
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    const range = document.createRange();
+    range.setStart(editor(wrapper).element.firstChild as Text, 0);
+    range.collapse(true);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    const up = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowUp',
+    });
+
+    editor(wrapper).element.dispatchEvent(up);
+
+    expect(up.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('Second prompt');
+    wrapper.unmount();
+  });
+
   it('does not recall over a selected range at the prompt end', async () => {
     const wrapper = mountComposer({ promptHistory: ['First prompt', 'Second prompt'] });
     await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
@@ -205,6 +273,21 @@ describe('ChatComposer', () => {
     expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
   });
 
+  it('resumes skill suggestions after editing a recalled prompt', async () => {
+    const wrapper = mountComposer({
+      promptHistory: ['$frontend-design'],
+      skills,
+    });
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
+
+    await setEditorValue(wrapper, '$front');
+    await editor(wrapper).trigger('keyup');
+
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(true);
+  });
+
   it('replays Up presses made while prompt history is loading', async () => {
     const wrapper = mountComposer({ promptHistoryLoading: true });
 
@@ -221,6 +304,83 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('Second prompt');
   });
 
+  it('waits for history loading to finish before replaying queued navigation', async () => {
+    const wrapper = mountComposer({ promptHistoryLoading: true });
+    const up = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowUp',
+    });
+
+    editor(wrapper).element.dispatchEvent(up);
+    expect(up.defaultPrevented).toBe(true);
+    await wrapper.setProps({
+      promptHistory: ['First prompt', 'Second prompt'],
+    });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('');
+
+    await wrapper.setProps({ promptHistoryLoading: false });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('Second prompt');
+  });
+
+  it('does not consume history navigation while a loading composer has a draft', async () => {
+    const wrapper = mountComposer({ promptHistoryLoading: true });
+    await setEditorValue(wrapper, 'draft');
+    const up = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowUp',
+    });
+
+    editor(wrapper).element.dispatchEvent(up);
+
+    expect(up.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('draft');
+  });
+
+  it('does not replay loading-time history navigation after the user types', async () => {
+    const wrapper = mountComposer({ promptHistoryLoading: true });
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await setEditorValue(wrapper, 'new draft');
+    await wrapper.setProps({
+      promptHistory: ['First prompt', 'Second prompt'],
+      promptHistoryLoading: false,
+    });
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('new draft');
+  });
+
+  it('queues only unmodified ArrowUp while prompt history is loading', async () => {
+    const wrapper = mountComposer({ promptHistoryLoading: true });
+    const modifiedUp = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowUp',
+      metaKey: true,
+    });
+    const down = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowDown',
+    });
+
+    editor(wrapper).element.dispatchEvent(modifiedUp);
+    editor(wrapper).element.dispatchEvent(down);
+    await wrapper.setProps({
+      promptHistory: ['First prompt', 'Second prompt'],
+      promptHistoryLoading: false,
+    });
+    await nextTick();
+
+    expect(modifiedUp.defaultPrevented).toBe(false);
+    expect(down.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('');
+  });
+
   it('submits the attachment-only prompt sentinel', async () => {
     const wrapper = mountComposer({ hasAttachments: true });
 
@@ -228,6 +388,23 @@ describe('ChatComposer', () => {
     await wrapper.get('form').trigger('submit');
 
     expect(wrapper.emitted('send')).toStrictEqual([['(no user instructions)']]);
+  });
+
+  it('does not add the attachment-only sentinel to prompt history', async () => {
+    const wrapper = mountComposer({ hasAttachments: true });
+
+    await wrapper.get('form').trigger('submit');
+    await wrapper.setProps({ hasAttachments: false });
+    const up = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowUp',
+    });
+    editor(wrapper).element.dispatchEvent(up);
+    await nextTick();
+
+    expect(up.defaultPrevented).toBe(false);
+    expect(editorValue(wrapper)).toBe('');
   });
 
   it('steers the queued prompt from an empty Cmd Enter shortcut', async () => {
@@ -239,6 +416,41 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('steer')).toBeUndefined();
   });
 
+  it('steers the queued prompt from a whitespace-only Cmd Enter shortcut', async () => {
+    const wrapper = mountComposer({ queuedPromptId: 'queued-1' });
+    await setEditorValue(wrapper, '   ');
+
+    await editor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['queued-1']]);
+    expect(wrapper.emitted('steer')).toBeUndefined();
+  });
+
+  it('does not steer an empty, disabled, or attachment-only composer', async () => {
+    const empty = mountComposer();
+    const disabled = mountComposer({ disabled: true, queuedPromptId: 'queued-1' });
+    const attachments = mountComposer({ hasAttachments: true });
+
+    await editor(empty).trigger('keydown', { key: 'Enter', metaKey: true });
+    await editor(disabled).trigger('keydown', { key: 'Enter', metaKey: true });
+    await editor(attachments).trigger('keydown', { key: 'Enter', metaKey: true });
+
+    for (const wrapper of [empty, disabled, attachments]) {
+      expect(wrapper.emitted('steer')).toBeUndefined();
+      expect(wrapper.emitted('steerQueuedPrompt')).toBeUndefined();
+    }
+  });
+
+  it('does not submit a disabled composer through its form', async () => {
+    const wrapper = mountComposer({ disabled: true });
+    await setEditorValue(wrapper, 'must not send');
+
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('send')).toBeUndefined();
+    expect(editorValue(wrapper)).toBe('must not send');
+  });
+
   it('prefills and focuses the composer from a draft revision', async () => {
     const wrapper = mountComposer({
       draft: 'quoted prompt',
@@ -247,6 +459,72 @@ describe('ChatComposer', () => {
     await nextTick();
 
     expect(editorValue(wrapper)).toBe('quoted prompt');
+  });
+
+  it('applies draft text only when its revision changes and no controlled state exists', async () => {
+    const wrapper = mountComposer({ draft: 'not revised' });
+    expect(editorValue(wrapper)).toBe('');
+
+    await wrapper.setProps({ draftRevision: 1 });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('not revised');
+
+    await wrapper.setProps({
+      composerState: { text: 'controlled', selectionStart: 4, selectionEnd: 4 },
+      draft: 'ignored draft',
+      draftRevision: 2,
+    });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('controlled');
+  });
+
+  it('treats a revised missing draft as empty', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'stale local text');
+
+    await wrapper.setProps({ draftRevision: 1 });
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('');
+  });
+
+  it('exits prompt-history navigation when a revised draft is restored', async () => {
+    const wrapper = mountComposer({ promptHistory: ['first', 'second'] });
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('second');
+
+    await wrapper.setProps({ draft: 'fresh draft', draftRevision: 1 });
+    await nextTick();
+    await editor(wrapper).trigger('keydown', { key: 'ArrowDown' });
+
+    expect(editorValue(wrapper)).toBe('fresh draft');
+  });
+
+  it('focuses the rich editor only when autofocus is requested', async () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    const withoutAutofocus = mountComposer();
+    await nextTick();
+    expect(focus).not.toHaveBeenCalled();
+
+    const withAutofocus = mountComposer({ autofocus: true });
+    await nextTick();
+    expect(focus).toHaveBeenCalledOnce();
+    withoutAutofocus.unmount();
+    withAutofocus.unmount();
+  });
+
+  it('exposes a focus action that moves the caret to the end of the draft', async () => {
+    const wrapper = mountComposer({}, { attachTo: document.body });
+    await setEditorValue(wrapper, 'focus me');
+    richEditorVm(wrapper).setCaret(0);
+
+    (wrapper.vm as unknown as { focus(): void }).focus();
+    await nextTick();
+
+    expect(document.activeElement).toBe(editor(wrapper).element);
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 8, end: 8 });
+    wrapper.unmount();
   });
 
   it('emits controlled text and caret state for rich-editor input', async () => {
@@ -275,6 +553,131 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('update:composerState')?.at(-1)).toStrictEqual([{
       text: 'hello! world', selectionStart: 6, selectionEnd: 6,
     }]);
+  });
+
+  it('does not re-emit an unchanged controlled composer state', async () => {
+    const state = { text: 'controlled', selectionStart: 4, selectionEnd: 7 };
+    const wrapper = mountComposer({ composerState: state }, { attachTo: document.body });
+    await nextTick();
+    const countAfterRestore = wrapper.emitted('update:composerState')?.length ?? 0;
+
+    richEditorVm(wrapper).setSelection(4, 7);
+    await nextTick();
+
+    expect(wrapper.emitted('update:composerState')?.length ?? 0).toBe(countAfterRestore);
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 4, end: 7 });
+    wrapper.unmount();
+  });
+
+  it('emits state when each controlled field changes independently', async () => {
+    const wrapper = mountComposer({}, { attachTo: document.body });
+    await setEditorValue(wrapper, 'abc');
+    richEditorVm(wrapper).setCaret(2);
+    const baselineCount = wrapper.emitted('update:composerState')?.length ?? 0;
+
+    await appendNativeCharacter(wrapper, 'd', 2);
+    richEditorVm(wrapper).setSelection(1, 2);
+    richEditorVm(wrapper).setSelection(1, 3);
+
+    expect(wrapper.emitted('update:composerState')?.slice(baselineCount)).toStrictEqual([
+      [{ text: 'abcd', selectionStart: 2, selectionEnd: 2 }],
+      [{ text: 'abcd', selectionStart: 1, selectionEnd: 2 }],
+      [{ text: 'abcd', selectionStart: 1, selectionEnd: 3 }],
+    ]);
+    wrapper.unmount();
+  });
+
+  it('restores normalized controlled text and selection at the public editor boundary', async () => {
+    const wrapper = mountComposer({
+      composerState: { text: 'short', selectionStart: -10, selectionEnd: 99 },
+    }, { attachTo: document.body });
+    await nextTick();
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('short');
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 0, end: 5 });
+    expect(wrapper.emitted('update:composerState') ?? []).not.toContainEqual([{
+      text: 'short', selectionStart: -10, selectionEnd: 99,
+    }]);
+    wrapper.unmount();
+  });
+
+  it('restores each externally controlled field independently', async () => {
+    const wrapper = mountComposer({
+      composerState: { text: 'abc', selectionStart: 1, selectionEnd: 1 },
+    }, { attachTo: document.body });
+    await nextTick();
+    await nextTick();
+
+    await wrapper.setProps({
+      composerState: { text: 'abd', selectionStart: 1, selectionEnd: 1 },
+    });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('abd');
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 1, end: 1 });
+
+    await wrapper.setProps({
+      composerState: { text: 'abd', selectionStart: 0, selectionEnd: 1 },
+    });
+    await nextTick();
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 0, end: 1 });
+
+    await wrapper.setProps({
+      composerState: { text: 'abd', selectionStart: 0, selectionEnd: 2 },
+    });
+    await nextTick();
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 0, end: 2 });
+    wrapper.unmount();
+  });
+
+  it('reacts to in-place changes inside externally controlled state', async () => {
+    const composerState = reactive({ text: 'controlled', selectionStart: 4, selectionEnd: 4 });
+    const wrapper = mountComposer({ composerState }, { attachTo: document.body });
+    await nextTick();
+    await nextTick();
+
+    composerState.selectionStart = 1;
+    composerState.selectionEnd = 7;
+    await nextTick();
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('controlled');
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 1, end: 7 });
+    wrapper.unmount();
+  });
+
+  it('does not steal focus when externally controlled state is restored', async () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    const wrapper = mountComposer({}, { attachTo: document.body });
+    outside.focus();
+
+    await wrapper.setProps({
+      composerState: { text: 'controlled', selectionStart: 2, selectionEnd: 6 },
+    });
+    await nextTick();
+
+    expect(document.activeElement).toBe(outside);
+    wrapper.unmount();
+    outside.remove();
+  });
+
+  it('preserves suggestions and future emissions when the host echoes controlled state', async () => {
+    const wrapper = mountComposer({ skills }, { attachTo: document.body });
+    await setEditorValue(wrapper, '$front');
+    richEditorVm(wrapper).setCaret('$front'.length);
+    await editor(wrapper).trigger('keyup');
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(true);
+    const echoedState = wrapper.emitted('update:composerState')?.at(-1)?.[0] as CodexComposerState;
+
+    await wrapper.setProps({ composerState: echoedState });
+    await nextTick();
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(true);
+
+    const emissionCount = wrapper.emitted('update:composerState')?.length ?? 0;
+    await setEditorValue(wrapper, '$fronte');
+    expect(wrapper.emitted('update:composerState')).toHaveLength(emissionCount + 1);
+    wrapper.unmount();
   });
 
   it('grows the editor and caps it at twelve visible composer lines', async () => {
@@ -324,6 +727,27 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('send')).toBeUndefined();
   });
 
+  it('keeps an empty armed interrupt button actionable before sending starts', async () => {
+    const wrapper = mountComposer({ interruptArmed: true });
+    const button = wrapper.get('.chat-composer__send');
+
+    expect(button.attributes()).not.toHaveProperty('disabled');
+    await button.trigger('click');
+
+    expect(wrapper.emitted('interrupt')).toStrictEqual([[]]);
+  });
+
+  it('treats a whitespace-only draft as empty', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, '  \n  ');
+
+    expect(wrapper.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('send')).toBeUndefined();
+    expect(editorValue(wrapper)).toBe('  \n  ');
+  });
+
   it('submits with Enter and preserves Shift Enter for multiline drafts', async () => {
     const wrapper = mountComposer();
 
@@ -341,6 +765,24 @@ describe('ChatComposer', () => {
 
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
     expect(wrapper.emitted('send')).toStrictEqual([['first line\nsecond line']]);
+  });
+
+  it('prevents the browser default for handled history, plan, and multiline keys', async () => {
+    const wrapper = mountComposer({ promptHistory: ['remembered'] });
+    const events = [
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowUp' }),
+      new KeyboardEvent('keydown', {
+        bubbles: true, cancelable: true, key: 'Tab', shiftKey: true,
+      }),
+      new KeyboardEvent('keydown', {
+        bubbles: true, cancelable: true, key: 'Enter', shiftKey: true,
+      }),
+    ];
+
+    for (const event of events) editor(wrapper).element.dispatchEvent(event);
+    await nextTick();
+
+    expect(events.map((event) => event.defaultPrevented)).toStrictEqual([true, true, true]);
   });
 
   it('splits text with Shift Enter at the current caret position', async () => {
@@ -405,6 +847,55 @@ describe('ChatComposer', () => {
     expect(editor(wrapper).find('img').exists()).toBe(false);
   });
 
+  it.each([
+    ['an HTML flavor', { files: [], text: '', types: ['text/html'] }],
+    ['a file', { files: [new File(['png'], 'clipboard.png')], text: '', types: ['Files'] }],
+  ])('blocks a text-free paste containing %s', async (_label, clipboard) => {
+    const wrapper = mountComposer();
+    const paste = clipboardEvent(clipboard);
+
+    editor(wrapper).element.dispatchEvent(paste);
+    await nextTick();
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(editorValue(wrapper)).toBe('');
+  });
+
+  it('leaves an empty or unavailable clipboard paste to the browser', () => {
+    const wrapper = mountComposer();
+    const unavailable = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+    const empty = clipboardEvent({ files: [], text: '', types: [] });
+
+    editor(wrapper).element.dispatchEvent(unavailable);
+    editor(wrapper).element.dispatchEvent(empty);
+
+    expect(unavailable.defaultPrevented).toBe(false);
+    expect(empty.defaultPrevented).toBe(false);
+  });
+
+  it('inserts a plain-text-only paste and prevents native rich-editor insertion', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'before ');
+    const paste = clipboardEvent({ files: [], text: 'after', types: ['text/plain'] });
+
+    editor(wrapper).element.dispatchEvent(paste);
+    await nextTick();
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(editorValue(wrapper)).toBe('before after');
+  });
+
+  it('accepts plain text from a clipboard that omits the optional types list', async () => {
+    const wrapper = mountComposer();
+    const paste = clipboardEvent({ files: [], text: 'plain text' });
+
+    editor(wrapper).element.dispatchEvent(paste);
+    await nextTick();
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(editorValue(wrapper)).toBe('plain text');
+  });
+
   it('steers with Command Enter', async () => {
     const wrapper = mountComposer({ isSending: true });
 
@@ -413,6 +904,61 @@ describe('ChatComposer', () => {
 
     expect(wrapper.emitted('steer')).toStrictEqual([['switch to the smaller fix']]);
     expect(wrapper.emitted('send')).toBeUndefined();
+  });
+
+  it('ignores unsupported Enter modifier combinations', async () => {
+    const wrapper = mountComposer();
+    await setEditorValue(wrapper, 'keep this draft');
+
+    for (const init of [
+      { ctrlKey: true },
+      { altKey: true },
+      { metaKey: true, ctrlKey: true },
+      { metaKey: true, altKey: true },
+    ]) {
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Enter',
+        ...init,
+      });
+      editor(wrapper).element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    }
+
+    expect(wrapper.emitted('send')).toBeUndefined();
+    expect(wrapper.emitted('steer')).toBeUndefined();
+    expect(editorValue(wrapper)).toBe('keep this draft');
+  });
+
+  it('leaves modified Shift Tab alone', () => {
+    const wrapper = mountComposer();
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+      shiftKey: true,
+      ctrlKey: true,
+    });
+
+    editor(wrapper).element.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(wrapper.emitted('update:planMode')).toBeUndefined();
+  });
+
+  it('honors a host capability override when toggling plan mode and skills', async () => {
+    const wrapper = mountComposer({
+      capabilities: disabledCapabilities(),
+      skills,
+    });
+
+    await editor(wrapper).trigger('keydown', { key: 'Tab', shiftKey: true });
+    await setEditorValue(wrapper, '$front');
+    await editor(wrapper).trigger('keyup');
+
+    expect(wrapper.emitted('update:planMode')).toBeUndefined();
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
   });
 
   it('opens the composer action menu and toggles plan mode', async () => {
@@ -681,6 +1227,18 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('');
   });
 
+  it('remembers a submitted slash command for prompt recall', async () => {
+    const wrapper = mountComposer({ commands: codexCommands });
+    await setEditorValue(wrapper, '/comp');
+    await editor(wrapper).trigger('keyup');
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
+
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+
+    expect(editorValue(wrapper)).toBe('/compact');
+  });
+
   it('submits Codex review from the slash command menu without showing a slash prefix', async () => {
     const wrapper = mountComposer({
       commands: codexCommands,
@@ -769,6 +1327,21 @@ describe('ChatComposer', () => {
     expect(editor(wrapper).find('[data-file-mention="docs/research.md"]').exists()).toBe(true);
   });
 
+  it('continues typing at a mention inserted in the middle of a draft', async () => {
+    const wrapper = mountComposer({ files }, { attachTo: document.body });
+    await setEditorValue(wrapper, 'inspect @resea then');
+    richEditorVm(wrapper).setCaret('inspect @resea'.length);
+    await editor(wrapper).trigger('keyup');
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
+    await nextTick();
+
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 26, end: 26 });
+    richEditorVm(wrapper).insertTextAtSelection('!');
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('inspect @docs/research.md ! then');
+    wrapper.unmount();
+  });
+
   it('navigates @ file results with arrow keys', async () => {
     const wrapper = mountComposer({
       files: [
@@ -812,6 +1385,87 @@ describe('ChatComposer', () => {
     expect(transcribeAppleSpeech).toHaveBeenCalledWith(expect.any(ArrayBuffer), {
       locale: navigator.language,
     });
+  });
+
+  it('normalizes transcript whitespace and separates it from surrounding text', async () => {
+    installAudioRecordingMocks();
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(async () => ({ text: '  dictated change  ' })),
+    }, { attachTo: document.body });
+    await setEditorValue(wrapper, 'beforeafter');
+    richEditorVm(wrapper).setCaret('before'.length);
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(editorValue(wrapper)).toBe('before dictated change after');
+    });
+
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 23, end: 23 });
+    wrapper.unmount();
+  });
+
+  it('uses adjacent whitespace rather than whitespace elsewhere when inserting a transcript', async () => {
+    installAudioRecordingMocks();
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(async () => ({ text: 'middle' })),
+    }, { attachTo: document.body });
+    await setEditorValue(wrapper, 'two wordsafter more');
+    richEditorVm(wrapper).setCaret('two words'.length);
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(editorValue(wrapper)).toBe('two words middle after more');
+    });
+
+    wrapper.unmount();
+  });
+
+  it('replaces the selected draft text with the transcript', async () => {
+    installAudioRecordingMocks();
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(async () => ({ text: 'new words' })),
+    }, { attachTo: document.body });
+    await setEditorValue(wrapper, 'keep old ending');
+    richEditorVm(wrapper).setSelection(5, 8);
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(editorValue(wrapper)).toBe('keep new words ending');
+    });
+
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 14, end: 14 });
+    wrapper.unmount();
+  });
+
+  it('ignores an empty speech transcript without changing the draft', async () => {
+    installAudioRecordingMocks();
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(async () => ({ text: '   ' })),
+    });
+    await setEditorValue(wrapper, 'keep me');
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('false');
+    });
+
+    await vi.waitFor(() => expect(editorValue(wrapper)).toBe('keep me'));
   });
 
   it('keeps send enabled while recording and submits the completed transcript once', async () => {
@@ -889,6 +1543,79 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('send')).toHaveLength(1);
   });
 
+  it('disables send while voice-only transcription is pending', async () => {
+    installAudioRecordingMocks();
+    let resolveTranscription!: (value: { text: string }) => void;
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(() => new Promise<{ text: string }>((resolve) => {
+        resolveTranscription = resolve;
+      })),
+    });
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+
+    void wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
+    });
+    resolveTranscription({ text: 'finished' });
+    await vi.waitFor(() => expect(editorValue(wrapper)).toBe('finished'));
+  });
+
+  it('does not send an existing draft while a voice transcript is pending', async () => {
+    installAudioRecordingMocks();
+    let resolveTranscription!: (value: { text: string }) => void;
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(() => new Promise<{ text: string }>((resolve) => {
+        resolveTranscription = resolve;
+      })),
+    });
+    await setEditorValue(wrapper, 'typed first');
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+
+    void wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
+    });
+    await wrapper.get('.chat-composer__send').trigger('click');
+    expect(wrapper.emitted('send')).toBeUndefined();
+
+    resolveTranscription({ text: 'dictated second' });
+    await vi.waitFor(() => expect(editorValue(wrapper)).toBe('typed first dictated second'));
+  });
+
+  it('clears transcribe-and-send pending state after transcription fails', async () => {
+    installAudioRecordingMocks();
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(async () => ({ error: 'No speech', text: '' })),
+    });
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+
+    await wrapper.get('.chat-composer__send').trigger('click');
+    await vi.waitFor(() => expect(wrapper.emitted('error')).toContainEqual(['No speech']));
+    await setEditorValue(wrapper, 'typed instead');
+
+    expect(wrapper.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
+  });
+
+  it('keeps voice input disabled only for a disabled idle composer', () => {
+    installAudioRecordingMocks();
+    const transcribeAudio = vi.fn(async () => ({ text: 'hello' }));
+    const idle = mountComposer({ disabled: true, transcribeAudio });
+    const sending = mountComposer({ disabled: true, isSending: true, transcribeAudio });
+
+    expect(idle.get('.chat-composer__voice').attributes()).toHaveProperty('disabled');
+    expect(sending.get('.chat-composer__voice').attributes()).not.toHaveProperty('disabled');
+  });
+
   it('emits transcription failures and clears them when recording is retried', async () => {
     installAudioRecordingMocks();
     const transcribeAppleSpeech = vi.fn(async () => ({
@@ -951,7 +1678,29 @@ async function appendNativeCharacter(
   await nextTick();
 }
 
+function clipboardEvent({
+  files,
+  text,
+  types,
+}: {
+  files: File[];
+  text: string;
+  types?: string[];
+}): ClipboardEvent {
+  const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+  Object.defineProperty(event, 'clipboardData', {
+    value: {
+      files,
+      getData: (type: string) => type === 'text/plain' ? text : '',
+      types,
+    },
+  });
+  return event;
+}
+
 function mountComposer(overrides: Partial<ChatComposerProps & {
+  autofocus: boolean;
+  capabilities: CodexCapabilities;
   contextUsage: CodexContextUsage;
   commands: readonly CodexCommandSummary[];
   models: CodexModelOption[];
@@ -963,8 +1712,9 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
   skills: CodexSkillSummary[];
   plugins: CodexSurfacePlugin[];
   transcribeAudio: CodexChatTranscription;
-}> = {}) {
+}> = {}, options: { attachTo?: HTMLElement } = {}) {
   return mount(CodexComposer, {
+    ...options,
     props: {
       disabled: false,
       isSending: false,
@@ -972,6 +1722,24 @@ function mountComposer(overrides: Partial<ChatComposerProps & {
       ...overrides,
     },
   });
+}
+
+function disabledCapabilities(): CodexCapabilities {
+  return {
+    models: false,
+    skills: false,
+    reasoningEffort: false,
+    serviceTier: false,
+    planMode: false,
+    goals: false,
+    steerPrompt: false,
+    interrupt: false,
+    history: false,
+    rollback: false,
+    editMessage: false,
+    retryMessage: false,
+    approvals: false,
+  };
 }
 
 function installAudioRecordingMocks(): void {

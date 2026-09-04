@@ -17,18 +17,42 @@ const authentication: CodexSurfaceAuthentication = {
 describe('Codex surface runtime state', () => {
   it('creates the complete idle surface state', () => {
     const state = initialSurfaceSnapshot(authentication);
-    expect(state).toMatchObject({
+    expect(state).toStrictEqual({
       status: 'idle',
       authentication,
       conversations: [],
       activeConversationId: null,
+      messages: [],
+      clientRequests: [],
+      answeredClientRequestIds: [],
+      approvals: [],
+      models: [],
       modelCatalogStatus: 'notLoaded',
+      skills: [],
       skillCatalogStatus: 'notLoaded',
+      plugins: [],
       pluginCatalogStatus: 'notLoaded',
+      permissionProfiles: [],
+      approvalPresets: [],
       approvalPreset: null,
+      selectedModelId: null,
+      selectedReasoningEffort: null,
+      selectedServiceTier: null,
       planMode: false,
+      contextUsage: null,
+      goal: null,
+      turnGitDiff: null,
+      threadStatus: null,
+      rateLimits: null,
+      queuedPrompts: [],
       busy: false,
       historyLoading: false,
+      historyState: {
+        loadingStrategy: 'lazy',
+        hasOlder: false,
+        loadingOlder: false,
+        fullyLoaded: false,
+      },
       error: null,
     });
   });
@@ -42,17 +66,56 @@ describe('Codex surface runtime state', () => {
     state.skillCatalogStatus = 'loaded';
     state.selectedModelId = 'model-1';
     state.selectedReasoningEffort = 'high';
+    state.selectedServiceTier = 'priority';
+    state.historyState = {
+      loadingStrategy: 'eager',
+      hasOlder: true,
+      loadingOlder: true,
+      fullyLoaded: true,
+    };
 
     const runtime = createThreadRuntime('thread-1', state, { cwd: '/workspace', busy: true });
-    expect(runtime).toMatchObject({
-      threadId: 'thread-1', cwd: '/workspace', busy: true,
-      approvalPreset: 'approve-for-me', skillCatalogStatus: 'loaded',
-      selectedModelId: 'model-1', selectedReasoningEffort: 'high',
+    expect(runtime).toStrictEqual({
+      threadId: 'thread-1',
+      cwd: '/workspace',
+      hydrated: false,
+      activeTurnId: null,
+      turnIds: [],
+      messages: [],
+      answeredClientRequestIds: [],
+      approvalPreset: 'approve-for-me',
+      approvalPresets: ['ask-for-approval', 'approve-for-me'],
+      permissionProfiles: [{ id: ':workspace', description: null, allowed: true }],
+      skills: [{ name: 'review', path: '/skills/review/SKILL.md', enabled: true }],
+      skillCatalogStatus: 'loaded',
+      selectedModelId: 'model-1',
+      selectedReasoningEffort: 'high',
+      selectedServiceTier: 'priority',
+      planMode: false,
+      contextUsage: null,
+      goal: null,
+      turnGitDiff: null,
+      threadStatus: null,
+      queuedPrompts: [],
+      busy: true,
+      turnStartPending: false,
+      historyLoading: false,
+      loadingStrategy: 'eager',
+      historyCursor: null,
+      historyHasOlder: false,
+      historyLoadingOlder: false,
+      historyMode: 'legacy',
+      fullHistoryHydrated: false,
+      error: null,
+      planMarkdownByTurn: new Map(),
     });
     expect(runtime.approvalPresets).not.toBe(state.approvalPresets);
     expect(runtime.permissionProfiles).not.toBe(state.permissionProfiles);
     expect(runtime.skills).not.toBe(state.skills);
     expect(runtime.planMarkdownByTurn).toBeInstanceOf(Map);
+
+    expect(createThreadRuntime('fallback', { ...state, historyState: undefined }).loadingStrategy)
+      .toBe('lazy');
   });
 
   it('projects conversation-owned state with pending approvals and client requests', () => {
@@ -74,15 +137,34 @@ describe('Codex surface runtime state', () => {
       payload: { request: { itemId: 'item-1', questions: [] } },
     }];
 
-    expect(runtimeProjection(runtime, approvals, clientRequests)).toMatchObject({
-      approvals,
-      clientRequests,
-      messages: runtime.messages,
+    expect(runtimeProjection(runtime, approvals, clientRequests)).toStrictEqual({
+      approvalPreset: null,
+      approvalPresets: [],
       answeredClientRequestIds: ['answered'],
-      planMode: true,
+      approvals,
       busy: true,
-      historyLoading: true,
+      clientRequests,
+      contextUsage: null,
       error: 'waiting',
+      goal: null,
+      historyLoading: true,
+      historyState: {
+        loadingStrategy: 'lazy',
+        hasOlder: false,
+        loadingOlder: false,
+        fullyLoaded: false,
+      },
+      messages: runtime.messages,
+      permissionProfiles: [],
+      planMode: true,
+      queuedPrompts: [],
+      selectedModelId: null,
+      selectedReasoningEffort: null,
+      selectedServiceTier: null,
+      skillCatalogStatus: 'notLoaded',
+      skills: [],
+      threadStatus: null,
+      turnGitDiff: null,
     });
   });
 });

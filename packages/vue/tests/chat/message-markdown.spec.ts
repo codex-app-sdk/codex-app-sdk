@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import {
   renderInlineToken,
   renderMarkdown,
-  renderTaskItem,
   renderUserText,
   safeMarkdownHref,
 } from '../../src/chat/message-markdown';
@@ -13,9 +12,13 @@ describe('message markdown rendering', () => {
   it('renders task lists in chat messages', () => {
     const html = renderMarkdown('- [ ] Todo\n- [x] Done');
 
-    expect(html).toContain('type="checkbox"');
-    expect(html).toContain('Todo');
-    expect(html).toContain('Done');
+    expect(html).toBe([
+      '<ul>',
+      '<li><input disabled="" type="checkbox"> Todo</li>',
+      '<li><input checked="" disabled="" type="checkbox"> Done</li>',
+      '</ul>',
+      '',
+    ].join('\n'));
   });
 
   it('renders autolinked email addresses without recursing', () => {
@@ -31,6 +34,12 @@ describe('message markdown rendering', () => {
     expect(html).toContain('&lt;script&gt;bad&lt;/script&gt;');
     expect(html).toContain('<li>one</li>');
     expect(html).toContain('<code>code</code>');
+  });
+
+  it('escapes raw HTML exactly and converts soft line breaks', () => {
+    expect(renderMarkdown('<b title="x">raw & unsafe</b>'))
+      .toBe('<p>&lt;b title=&quot;x&quot;&gt;raw &amp; unsafe&lt;/b&gt;</p>\n');
+    expect(renderMarkdown('first\nsecond')).toBe('<p>first<br>second</p>\n');
   });
 
   it('renders Codex bracket-delimited display and inline LaTeX with KaTeX', () => {
@@ -52,12 +61,42 @@ describe('message markdown rendering', () => {
     expect(html).toContain('frac');
   });
 
+  it('trims bracket-delimited LaTeX source before rendering', () => {
+    const html = renderMarkdown('\\[\n  x + 1  \n\\]\n\nInline \\(  y + 2  \\)');
+
+    expect(html).toContain('<annotation encoding="application/x-tex">x + 1</annotation>');
+    expect(html).toContain('<annotation encoding="application/x-tex">y + 2</annotation>');
+  });
+
+  it('keeps inline LaTeX inline and refuses trusted HTML-producing commands', () => {
+    const inline = renderMarkdown('Inline \\(x + 1\\) only');
+    const untrusted = renderMarkdown('\\(\\href{javascript:alert(1)}{unsafe}\\)');
+
+    expect(inline).toContain('class="katex"');
+    expect(inline).not.toContain('class="katex-display"');
+    expect(inline).not.toContain('display="block"');
+    expect(untrusted).not.toContain('href="javascript:');
+    expect(untrusted).not.toContain('<a ');
+  });
+
   it('renders standard dollar-delimited inline and display LaTeX without interpreting currency', () => {
     const html = renderMarkdown('Inline $x^2$ and\n\n$$\n\\boxed{x^2 + x - 4}\n$$\n\nBudget is $5 and $10.');
 
     expect(html).toContain('display="block"');
     expect(html).toContain('class="katex"');
     expect(html).toContain('Budget is $5 and $10.');
+  });
+
+  it('keeps dollar-delimited LaTeX conservative, non-throwing, and untrusted', () => {
+    const adjacent = renderMarkdown('prefix$x=x^2$suffix');
+    const invalid = renderMarkdown('$\\notARealCommand{x}$');
+    const untrusted = renderMarkdown('$\\href{javascript:alert(1)}{unsafe}$');
+
+    expect(adjacent).toBe('<p>prefix$x=x^2$suffix</p>\n');
+    expect(invalid).toContain('class="katex"');
+    expect(invalid).toContain('notARealCommand');
+    expect(untrusted).not.toContain('href="javascript:');
+    expect(untrusted).not.toContain('<a ');
   });
 
   it('keeps incomplete, inline-code, and fenced LaTeX source as code or text', () => {
@@ -103,6 +142,30 @@ describe('message markdown rendering', () => {
     expect(html).not.toContain('<script>');
   });
 
+  it('adds escaped copy controls to every code block only when requested', () => {
+    const html = renderMarkdown([
+      '```text',
+      'first',
+      '```',
+      '',
+      '```text',
+      'second',
+      '```',
+    ].join('\n'), { codeCopyLabel: 'Copy "code"' });
+
+    expect(html.match(/data-chat-code-copy/g)).toHaveLength(2);
+    expect(html.match(/class="chat-code-block"/g)).toHaveLength(2);
+    expect(html.match(/chat-code-block__copy-icon/g)).toHaveLength(2);
+    expect(html.match(/chat-code-block__check-icon/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="Copy &quot;code&quot;"');
+    expect(html).toContain('title="Copy &quot;code&quot;"');
+    expect(html).toContain('</svg></button><pre');
+    expect(html).not.toContain('Stryker was here!');
+    expect(renderMarkdown('plain text', { codeCopyLabel: 'Copy' }))
+      .not.toContain('data-chat-code-copy');
+    expect(renderMarkdown('```text\ncode\n```')).not.toContain('data-chat-code-copy');
+  });
+
   it('renders safe link icons for web, mail, and file-style links', () => {
     const html = renderMarkdown([
       '[web](https://example.com/a)',
@@ -114,6 +177,8 @@ describe('message markdown rendering', () => {
     expect(html).toContain('chat-message-link__icon--mail');
     expect(html).toContain('chat-message-link__icon--file');
     expect(html).toContain('target="_blank" rel="noopener noreferrer"');
+    expect(renderMarkdown('[http](http://example.com)'))
+      .toContain('chat-message-link__icon--external');
   });
 
   it('adds safe link attributes to markdown links', () => {
@@ -137,11 +202,15 @@ describe('message markdown rendering', () => {
 
   it('renders relative links with a file icon', () => {
     const html = renderMarkdown('[Open file](src/index.html)');
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    const anchor = container.querySelector('a');
 
     expect(html).toContain('href="src/index.html"');
     expect(html).toContain('chat-message-link__icon--file');
     expect(html).not.toContain('target="_blank"');
     expect(html).not.toContain('googleusercontent.com');
+    expect(anchor?.getAttributeNames()).toEqual(['class', 'href']);
   });
 
   it('renders titled links, nested strong tokens, and task lists', () => {
@@ -212,6 +281,34 @@ describe('message markdown rendering', () => {
     expect(unsafe).not.toContain('<script>');
   });
 
+  it('allows relative images while blocking navigation-only and contact image sources', () => {
+    const relative = renderMarkdown('![local](images/diagram.png)');
+    const container = document.createElement('div');
+    container.innerHTML = relative;
+    const image = container.querySelector('img');
+    const blocked = [
+      '#section',
+      '?download=1',
+      'mailto:test@example.com',
+      'tel:+15551234567',
+    ].map((href) => renderMarkdown(`![blocked](${href})`));
+
+    expect(relative).toContain('<img class="chat-message-image" src="images/diagram.png"');
+    expect(image?.getAttributeNames()).toEqual([
+      'class',
+      'src',
+      'alt',
+      'loading',
+      'decoding',
+      'referrerpolicy',
+    ]);
+    for (const html of blocked) {
+      expect(html).toContain('chat-message-image--blocked');
+      expect(html).not.toContain('<img');
+      expect(html).not.toContain('src=');
+    }
+  });
+
   it('escapes backticks in relative link hrefs', () => {
     const html = renderMarkdown('[Open](docs/`draft`.md)');
 
@@ -245,7 +342,7 @@ describe('message markdown rendering', () => {
     expect(renderUserText('&<>"\'')).toBe('<p>&amp;&lt;&gt;&quot;&#39;</p>');
   });
 
-  it('covers defensive inline token and task item rendering branches', () => {
+  it('covers defensive inline token rendering branches', () => {
     expect(renderInlineToken(null)).toBe('');
     expect(renderInlineToken({ tokens: [{ text: 'loud' }], type: 'strong' })).toBe('<strong>loud</strong>');
     expect(renderInlineToken({ tokens: [{ text: 'quiet' }], type: 'em' })).toBe('<em>quiet</em>');
@@ -253,9 +350,21 @@ describe('message markdown rendering', () => {
     expect(renderInlineToken({ raw: '<raw>' })).toBe('&lt;raw&gt;');
     expect(renderInlineToken({})).toBe('');
 
-    expect(renderTaskItem(null)).toContain('<input disabled="" type="checkbox">');
-    expect(renderTaskItem({ checked: true, text: 'fallback' })).toContain('checked=""');
-    expect(renderTaskItem({ mainContent: 'main' })).toContain('main');
+  });
+
+  it('renders exact inline-token precedence and multi-token ordering', () => {
+    expect(renderInlineToken({
+      raw: 'ignored',
+      text: 'ignored',
+      tokens: [{ text: 'A&' }, { raw: '<B>' }],
+      type: 'strong',
+    })).toBe('<strong>A&amp;&lt;B&gt;</strong>');
+    expect(renderInlineToken({
+      raw: 'ignored',
+      text: '<code>',
+      type: 'codespan',
+    })).toBe('<code>&lt;code&gt;</code>');
+    expect(renderInlineToken({ raw: '<raw>', text: '<text>' })).toBe('&lt;text&gt;');
   });
 
   it('allows only non-executable absolute schemes and safe relative links', () => {
@@ -270,6 +379,9 @@ describe('message markdown rendering', () => {
     expect(safeMarkdownHref('D:/work/README.md')).toBe('D:/work/README.md');
     expect(safeMarkdownHref('#section')).toBe('#section');
     expect(safeMarkdownHref('?line=12')).toBe('?line=12');
+    expect(safeMarkdownHref('  https://example.com/trimmed  ')).toBe('https://example.com/trimmed');
+    expect(safeMarkdownHref('README.md:12')).toBe('README.md:12');
+    expect(safeMarkdownHref('docs/http:notes.md')).toBe('docs/http:notes.md');
   });
 
   it.each([
@@ -277,6 +389,7 @@ describe('message markdown rendering', () => {
     'JaVaScRiPt:alert(1)',
     'data:text/html,<script>alert(1)</script>',
     'vbscript:msgbox(1)',
+    'java1script:alert(1)',
     'blob:https://example.com/unsafe',
     '//example.com/inherited-scheme',
     '\\\\example.com\\share',

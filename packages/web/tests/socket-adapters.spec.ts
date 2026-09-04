@@ -108,6 +108,15 @@ describe('Node WebSocket adapter', () => {
     port.onMessage(vi.fn())();
     expect(removeListener).toHaveBeenCalledWith('message', expect.any(Function));
   });
+
+  it('allows cleanup when the socket has no listener-removal API', () => {
+    const socket = new NodeSocketStub();
+    Object.defineProperty(socket, 'off', { value: undefined });
+    Object.defineProperty(socket, 'removeListener', { value: undefined });
+    const port = createCodexNodeWebSocketPort(socket);
+
+    expect(() => port.onMessage(vi.fn())()).not.toThrow();
+  });
 });
 
 class BrowserSocketStub {
@@ -138,14 +147,16 @@ class NodeSocketStub implements CodexNodeWebSocketLike {
   readonly send = vi.fn();
   readonly close = vi.fn();
   readonly off = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
-    this.#listeners.get(event)?.delete(listener);
+    const listeners = this.#listeners.get(event);
+    const index = listeners?.indexOf(listener) ?? -1;
+    if (index >= 0) listeners?.splice(index, 1);
   });
   readonly removeListener = vi.fn();
-  readonly #listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+  readonly #listeners = new Map<string, Array<(...args: unknown[]) => void>>();
 
   on(event: 'message' | 'close' | 'error', listener: (...args: never[]) => void): unknown {
-    const listeners = this.#listeners.get(event) ?? new Set();
-    listeners.add(listener as (...args: unknown[]) => void);
+    const listeners = this.#listeners.get(event) ?? [];
+    listeners.push(listener as (...args: unknown[]) => void);
     this.#listeners.set(event, listeners);
     return this;
   }

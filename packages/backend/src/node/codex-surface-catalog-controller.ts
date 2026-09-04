@@ -28,7 +28,6 @@ import type { ConversationCatalogs, ThreadRuntimePatch, ThreadRuntimeState } fro
 
 export type CodexSurfaceCatalogHost = {
   authenticationBlocksBootstrap(): boolean;
-  emitConversationPermissions(threadId: string, origin: CodexSurfaceEventOrigin): void;
   emitConversationSkills(threadId: string, origin: CodexSurfaceEventOrigin): void;
   emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void;
   ensureConnected(): Promise<void>;
@@ -210,7 +209,7 @@ export class CodexSurfaceCatalogController {
     const loading = this.loadPluginCatalog(scope.cwds, scope.key);
     this.pluginPromise = loading;
     void loading.finally(() => {
-      if (this.pluginPromise === loading) this.pluginPromise = null;
+      this.pluginPromise = null;
       if (this.pluginRefreshRequested || this.pluginScope().key !== scope.key) this.schedulePluginRefresh();
     }).catch(() => undefined);
   }

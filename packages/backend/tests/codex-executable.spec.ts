@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   codexRuntimePathEntries,
   discoverCodexExecutable,
@@ -6,6 +6,10 @@ import {
 } from '../src/node';
 
 describe('Codex executable discovery', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('merges current, login-shell, user, Homebrew, and nvm paths', () => {
     const execFileSync = vi.fn()
       .mockReturnValueOnce('/usr/local/bin:/usr/bin')
@@ -137,5 +141,349 @@ describe('Codex executable discovery', () => {
       pathDelimiter: ';',
       platform: 'win32',
     })).toMatch(/codex\.exe$/i);
+  });
+
+  it('uses both bundled macOS locations in priority order and skips them elsewhere', () => {
+    const chatGpt = '/Applications/ChatGPT.app/Contents/Resources/codex';
+    const codex = '/Applications/Codex.app/Contents/Resources/codex';
+    const existsSync = vi.fn((filePath: string) => filePath === chatGpt || filePath === codex);
+    const base = {
+      env: { PATH: '' },
+      execFileSync: vi.fn(() => { throw new Error('no shell'); }),
+      existsSync,
+      homedir: () => '/Users/test',
+      pathDelimiter: ':',
+    };
+
+    expect(codexRuntimePathEntries({ ...base, platform: 'darwin' })).toStrictEqual([
+      '/Applications/ChatGPT.app/Contents/Resources',
+      '/Applications/Codex.app/Contents/Resources',
+    ]);
+    existsSync.mockClear();
+    expect(codexRuntimePathEntries({ ...base, platform: 'linux' })).toStrictEqual([]);
+    expect(existsSync.mock.calls.flat()).not.toContain(chatGpt);
+    expect(existsSync.mock.calls.flat()).not.toContain(codex);
+  });
+
+  it('uses the explicit login shell, exact command, environment, and process options', () => {
+    const env = { PATH: '/env/bin', SHELL: '/ignored/shell' };
+    const execFileSync = vi.fn()
+      .mockReturnValueOnce(Buffer.from('  /login/one:/login/two  \n'))
+      .mockReturnValueOnce(Buffer.from('  /nvm/v22/bin/node  \n'));
+    const existsSync = vi.fn((filePath: string) => filePath === '/nvm/v22/bin/node');
+
+    expect(codexRuntimePathEntries({
+      env,
+      execFileSync,
+      existsSync,
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux',
+      shell: '/custom/zsh',
+    })).toStrictEqual(['/env/bin', '/login/one', '/login/two', '/nvm/v22/bin']);
+    expect(execFileSync).toHaveBeenNthCalledWith(1, '/custom/zsh', ['-l', '-c', 'printf "%s" "$PATH"'], {
+      encoding: 'utf8', env, stdio: 'pipe',
+    });
+    expect(execFileSync).toHaveBeenNthCalledWith(2, '/custom/zsh', ['-l', '-c', 'nvm which current'], {
+      encoding: 'utf8', env, stdio: 'pipe',
+    });
+  });
+
+  it.each([
+    ['/bin/nu', 'print $env.PATH'],
+    ['nu', 'print $env.PATH'],
+    ['/bin/bash', 'printf "%s" "$PATH"'],
+  ])('selects the exact login command for shell %s', (shell, command) => {
+    const execFileSync = vi.fn((_file: string) => '');
+    codexRuntimePathEntries({
+      env: { PATH: '' },
+      execFileSync,
+      existsSync: vi.fn(() => false),
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux',
+      shell,
+    });
+
+    expect(execFileSync.mock.calls[0]?.slice(0, 2)).toStrictEqual([
+      shell, ['-l', '-c', command],
+    ]);
+  });
+
+  it('takes the environment shell before the process shell', () => {
+    vi.stubEnv('SHELL', '/process/fish');
+    const execFileSync = vi.fn((_file: string) => '');
+    codexRuntimePathEntries({
+      env: { PATH: '', SHELL: '/environment/zsh' },
+      execFileSync,
+      existsSync: vi.fn(() => false),
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux',
+    });
+
+    expect(execFileSync.mock.calls.map(([shell]) => shell)).toStrictEqual([
+      '/environment/zsh', '/environment/zsh',
+    ]);
+  });
+
+  it('falls back to the process shell and environment when dependencies omit both', () => {
+    vi.stubEnv('SHELL', '/process/fish');
+    const execFileSync = vi.fn(() => '');
+    codexRuntimePathEntries({
+      execFileSync,
+      existsSync: vi.fn(() => false),
+      homedir: () => '/home/test',
+      platform: 'linux',
+    });
+
+    expect(execFileSync).toHaveBeenNthCalledWith(1, '/process/fish', expect.any(Array), expect.objectContaining({
+      env: process.env,
+    }));
+    expect(execFileSync).toHaveBeenNthCalledWith(2, '/process/fish', expect.any(Array), expect.objectContaining({
+      env: process.env,
+    }));
+  });
+
+  it('uses bash when no shell source has a value', () => {
+    vi.stubEnv('SHELL', undefined);
+    const execFileSync = vi.fn((_file: string) => '');
+    codexRuntimePathEntries({
+      env: { PATH: '', SHELL: undefined },
+      execFileSync,
+      existsSync: vi.fn(() => false),
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux',
+    });
+
+    expect(execFileSync.mock.calls.map(([shell]) => shell)).toStrictEqual(['/bin/bash', '/bin/bash']);
+  });
+
+  it('skips all shell, user, and nvm discovery on Windows', () => {
+    const execFileSync = vi.fn(() => { throw new Error('must not run'); });
+    const existsSync = vi.fn(() => false);
+
+    expect(codexRuntimePathEntries({
+      env: { HOME: 'C:\\Users\\test', PATH: 'C:\\One;C:\\Two' },
+      execFileSync,
+      existsSync,
+      homedir: () => { throw new Error('must not resolve home'); },
+      pathDelimiter: ';',
+      platform: 'win32',
+    })).toStrictEqual(['C:\\One', 'C:\\Two']);
+    expect(execFileSync).not.toHaveBeenCalled();
+    expect(existsSync).not.toHaveBeenCalled();
+  });
+
+  it('includes only existing common user directories in their documented order', () => {
+    const existsSync = vi.fn((filePath: string) => [
+      '/explicit/home/.local/bin', '/usr/local/bin',
+    ].includes(filePath));
+
+    expect(codexRuntimePathEntries({
+      env: { HOME: '/environment/home', PATH: '' },
+      execFileSync: vi.fn(() => ''),
+      existsSync,
+      homedir: () => '/explicit/home',
+      pathDelimiter: ':',
+      platform: 'linux',
+    })).toStrictEqual(['/explicit/home/.local/bin', '/usr/local/bin']);
+  });
+
+  it('uses an existing nvm command result and rejects a missing executable', () => {
+    const execFileSync = vi.fn()
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(' /nvm/v22/bin/node \n');
+    const existsSync = vi.fn((filePath: string) => filePath === '/nvm/v22/bin/node');
+    const dependencies = {
+      env: { PATH: '' }, execFileSync, existsSync, homedir: () => '/home/test',
+      pathDelimiter: ':', platform: 'linux' as const,
+    };
+
+    expect(codexRuntimePathEntries(dependencies)).toContain('/nvm/v22/bin');
+    existsSync.mockReturnValue(false);
+    expect(codexRuntimePathEntries(dependencies)).not.toContain('/nvm/v22/bin');
+  });
+
+  it('requires both nvm metadata paths before reading the default alias', () => {
+    const readFileSync = vi.fn(() => '22');
+    const readdirSync = vi.fn(() => ['v22.1.0']);
+    const base = {
+      env: { PATH: '' },
+      execFileSync: vi.fn(() => { throw new Error('no nvm command'); }),
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux' as const,
+      readFileSync,
+      readdirSync,
+    };
+
+    codexRuntimePathEntries({ ...base, existsSync: vi.fn(() => false) });
+    codexRuntimePathEntries({
+      ...base,
+      existsSync: vi.fn((filePath: string) => filePath.endsWith('/.nvm/alias/default')),
+    });
+
+    expect(readFileSync).not.toHaveBeenCalled();
+    expect(readdirSync).not.toHaveBeenCalled();
+  });
+
+  it('does not scan nvm versions for an empty alias and reads a present alias as UTF-8', () => {
+    const home = '/home/test';
+    const readdirSync = vi.fn(() => ['v22.1.0']);
+    const readFileSync = vi.fn(() => '   \n');
+    codexRuntimePathEntries({
+      env: { PATH: '' },
+      execFileSync: vi.fn(() => { throw new Error('no nvm command'); }),
+      existsSync: vi.fn((filePath: string) => filePath.includes('/.nvm/')),
+      homedir: () => home,
+      pathDelimiter: ':',
+      platform: 'linux',
+      readFileSync,
+      readdirSync,
+    });
+
+    expect(readFileSync).toHaveBeenCalledWith(`${home}/.nvm/alias/default`, 'utf8');
+    expect(readdirSync).not.toHaveBeenCalled();
+  });
+
+  it('normalizes and selects the last matching nvm version independent of directory order', () => {
+    const home = '/home/test';
+    const existsSync = vi.fn((filePath: string) => [
+      `${home}/.nvm/alias/default`, `${home}/.nvm/versions/node`,
+    ].includes(filePath));
+
+    expect(codexRuntimePathEntries({
+      env: { PATH: '' },
+      execFileSync: vi.fn(() => { throw new Error('no nvm command'); }),
+      existsSync,
+      homedir: () => home,
+      pathDelimiter: ':',
+      platform: 'linux',
+      readFileSync: vi.fn(() => ' 22.10 \n'),
+      readdirSync: vi.fn(() => ['v23.0.0', 'v22.10.2', 'v22.10.1']),
+    })).toStrictEqual([`${home}/.nvm/versions/node/v22.10.2/bin`]);
+  });
+
+  it('returns no file-based nvm path when no version matches or directory reading fails', () => {
+    const home = '/home/test';
+    const existsSync = vi.fn((filePath: string) => filePath.includes('/.nvm/'));
+    const base = {
+      env: { PATH: '' },
+      execFileSync: vi.fn(() => { throw new Error('no nvm command'); }),
+      existsSync,
+      homedir: () => home,
+      pathDelimiter: ':',
+      platform: 'linux' as const,
+      readFileSync: vi.fn(() => '22'),
+    };
+
+    expect(codexRuntimePathEntries({ ...base, readdirSync: vi.fn(() => ['v20.1.0']) })).toStrictEqual([]);
+    expect(codexRuntimePathEntries({
+      ...base,
+      readdirSync: vi.fn(() => { throw new Error('unreadable versions'); }),
+    })).toStrictEqual([]);
+  });
+
+  it('normalizes explicit Windows extensions, ignores blanks, and preserves candidate priority', () => {
+    const probes: string[] = [];
+    expect(discoverCodexExecutable({
+      env: { PATH: 'C:\\Tools', PATHEXT: '.EXE;;.CmD;' },
+      existsSync: vi.fn((filePath: string) => {
+        probes.push(filePath);
+        return filePath.toLowerCase().endsWith('codex.cmd');
+      }),
+      pathDelimiter: ';',
+      platform: 'win32',
+    })).toMatch(/codex\.cmd$/i);
+    expect(probes.map((entry) => entry.slice(entry.lastIndexOf('/') + 1))).toStrictEqual([
+      'codex', 'codex.exe', 'codex.cmd',
+    ]);
+  });
+
+  it('uses process PATHEXT only when the supplied environment does not define it', () => {
+    vi.stubEnv('PATHEXT', '.Process;.CMD');
+    const probes: string[] = [];
+    discoverCodexExecutable({
+      env: { PATH: 'C:\\Tools' },
+      existsSync: vi.fn((filePath: string) => {
+        probes.push(filePath);
+        return false;
+      }),
+      pathDelimiter: ';',
+      platform: 'win32',
+    });
+
+    expect(probes.map((entry) => entry.slice(entry.lastIndexOf('/') + 1))).toStrictEqual([
+      'codex', 'codex.process', 'codex.cmd',
+    ]);
+  });
+
+  it('uses process PATH and PATHEXT when the dependency environment is absent', () => {
+    vi.stubEnv('PATH', 'C:\\ProcessTools');
+    vi.stubEnv('PATHEXT', '.EXE');
+
+    expect(discoverCodexExecutable({
+      existsSync: vi.fn((filePath: string) => filePath.toLowerCase().endsWith('codex.exe')),
+      pathDelimiter: ';',
+      platform: 'win32',
+    })).toMatch(/codex\.exe$/i);
+  });
+
+  it('uses process HOME when neither an explicit resolver nor environment is supplied', () => {
+    vi.stubEnv('HOME', '/process/home');
+    const existsSync = vi.fn((filePath: string) => filePath === '/process/home/bin');
+
+    expect(codexRuntimePathEntries({
+      execFileSync: vi.fn(() => ''),
+      existsSync,
+      pathDelimiter: ':',
+      platform: 'linux',
+    })).toContain('/process/home/bin');
+  });
+
+  it('trims, removes blank path entries, and deduplicates across all discovery sources', () => {
+    expect(codexRuntimePathEntries({
+      env: { PATH: ' /one :: /two :/one ' },
+      execFileSync: vi.fn()
+        .mockReturnValueOnce('/two:/three::')
+        .mockImplementationOnce(() => { throw new Error('no nvm'); }),
+      existsSync: vi.fn(() => false),
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux',
+    })).toStrictEqual(['/one', '/two', '/three']);
+  });
+
+  it('returns null after probing every executable candidate without a match', () => {
+    const existsSync = vi.fn(() => false);
+    expect(discoverCodexExecutable({
+      env: { PATH: '/one:/two' },
+      execFileSync: vi.fn(() => ''),
+      existsSync,
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux',
+    })).toBeNull();
+    expect(existsSync).toHaveBeenCalledWith('/one/codex');
+    expect(existsSync).toHaveBeenCalledWith('/two/codex');
+  });
+
+  it('probes only the unsuffixed executable outside Windows', () => {
+    const probes: string[] = [];
+    discoverCodexExecutable({
+      env: { PATH: '/only' },
+      execFileSync: vi.fn(() => ''),
+      existsSync: vi.fn((filePath: string) => {
+        if (filePath.startsWith('/only/')) probes.push(filePath);
+        return false;
+      }),
+      homedir: () => '/home/test',
+      pathDelimiter: ':',
+      platform: 'linux',
+    });
+
+    expect(probes).toStrictEqual(['/only/codex']);
   });
 });

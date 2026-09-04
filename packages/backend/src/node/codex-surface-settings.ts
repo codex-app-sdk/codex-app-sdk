@@ -202,14 +202,14 @@ export function nextSelection(
     : current.selectedServiceTier ?? null;
   const supported = model?.supportedReasoningEfforts?.map((option) => option.reasoningEffort) ?? [];
   if (settings.reasoningEffort && supported.length > 0 && !supported.includes(settings.reasoningEffort)) {
-    throw new Error(`Reasoning effort '${settings.reasoningEffort}' is not available for '${model?.displayName}'`);
+    throw new Error(`Reasoning effort '${settings.reasoningEffort}' is not available for '${model!.displayName}'`);
   }
   if (settings.modelId && supported.length > 0 && (!reasoningEffort || !supported.includes(reasoningEffort))) {
     reasoningEffort = model ? defaultReasoningEffort(model) : null;
   }
   if (settings.serviceTier !== undefined) validateServiceTier(model, serviceTier);
   if (settings.serviceTier === undefined && settings.modelId && serviceTier
-    && !model?.serviceTiers?.some((tier) => tier.id === serviceTier)) {
+    && !model!.serviceTiers?.some((tier) => tier.id === serviceTier)) {
     serviceTier = model ? defaultServiceTier(model) : null;
   }
 

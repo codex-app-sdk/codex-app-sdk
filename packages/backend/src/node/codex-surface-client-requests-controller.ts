@@ -229,7 +229,7 @@ export class CodexSurfaceClientRequestsController {
           params: { requestId, questions: normalizedQuestions },
         }),
         input: normalizedQuestions,
-        metadata: { requestId, question: normalizedQuestions[0]?.question },
+        metadata: { requestId, question: normalizedQuestions[0]!.question },
       }),
     });
     const requestToolMessage = this.host.messageContainingTool(threadId, turnId, itemId);
@@ -253,7 +253,7 @@ export class CodexSurfaceClientRequestsController {
     responder: CodexServerRequestResponder<'mcpServer/elicitation/request'>,
   ): boolean {
     const params = request.params;
-    const meta = params.mode === 'form' ? params._meta : null;
+    const meta = params._meta;
     if (params.mode !== 'form' || !isRecord(meta) || meta.codex_approval_kind !== 'mcp_tool_call') return false;
     const requestId = String(request.id);
     const toolName = stringValue(meta.tool_name) ?? stringValue(meta.tool_title) ?? 'tool';

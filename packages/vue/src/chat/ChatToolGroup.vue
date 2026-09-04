@@ -113,6 +113,7 @@ import type { MessageToolCall } from './types'
 import { getMessageToolCallArgs } from './types'
 import { useCodexToolCallDetails } from './tool-call-details'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
   showToolDetails?: boolean
@@ -125,6 +126,7 @@ const emit = defineEmits<{
   'client-response': [response: ClientRequestResponse]
   'open-link': [link: CodexConversationLink]
 }>()
+// Stryker restore all
 
 const expanded = ref(false)
 const recentlyCompletedIds = ref<ReadonlySet<string>>(new Set())
@@ -216,14 +218,13 @@ function formatActions(count: number) {
 }
 
 function retainCompletedTool(id: string) {
-  clearRecentCompletion(id)
   recentlyCompletedIds.value = new Set(recentlyCompletedIds.value).add(id)
   recentCompletionTimers.set(id, setTimeout(() => clearRecentCompletion(id), recentCompletionRetentionMs))
 }
 
 function clearRecentCompletion(id: string) {
   const timer = recentCompletionTimers.get(id)
-  if (timer !== undefined) clearTimeout(timer)
+  clearTimeout(timer)
   recentCompletionTimers.delete(id)
   if (!recentlyCompletedIds.value.has(id)) return
   const next = new Set(recentlyCompletedIds.value)

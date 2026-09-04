@@ -22,6 +22,7 @@ vi.mock('../src/codex-surface-ipc', () => ({
 
 import { registerCodexElectronMain } from '../src/codex-electron-integration';
 import { exposeCodexElectronPreload } from '../src/codex-electron-preload';
+import type { CodexElectronAttachmentRegistry } from '../src/codex-attachment-registry';
 
 describe('combined Electron integration', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -45,6 +46,18 @@ describe('combined Electron integration', () => {
       options.native,
       expect.any(Object),
     );
+    const nativeCall = mocks.registerNative.mock.calls[0] as unknown as [unknown, unknown, CodexElectronAttachmentRegistry];
+    const surfaceCall = mocks.registerSurface.mock.calls[0] as unknown as [unknown, unknown, unknown, {
+      resolveAttachment(attachment: { reference: string; type: 'file' }): unknown;
+    }];
+    const registry = nativeCall[2];
+    const surfaceOptions = surfaceCall[3];
+    const registered = registry.register({
+      type: 'file', path: '/private/notes.txt', name: 'notes.txt', mimeType: 'text/plain', size: 5,
+    });
+    expect(surfaceOptions.resolveAttachment({ type: 'file', reference: registered.reference })).toMatchObject({
+      type: 'file', path: '/private/notes.txt', name: 'notes.txt',
+    });
     dispose();
     expect(mocks.disposeNative).toHaveBeenCalledOnce();
     expect(mocks.disposeSurface).toHaveBeenCalledOnce();

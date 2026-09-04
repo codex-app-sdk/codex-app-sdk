@@ -22,7 +22,6 @@ type ChatComposerSuggestionOptions<Payload = unknown> = {
   disabled: () => boolean
   files: () => readonly CodexFileSearchItem[]
   plugins?: () => readonly CodexSurfacePlugin[]
-  pluginsEnabled?: () => boolean
   mentionGroups?: () => readonly CodexComposerMentionGroup<Payload>[]
   onMentionSelected?: (
     item: CodexComposerMentionItem<Payload>,
@@ -40,14 +39,11 @@ type ChatComposerSuggestionOptions<Payload = unknown> = {
 }
 
 export function useChatComposerSuggestions<Payload = unknown>(options: ChatComposerSuggestionOptions<Payload>) {
-  const fileMenuOpen = ref(false)
+  const openMenu = ref<'at' | 'skill' | 'slash' | null>(null)
   const activeFileIndex = ref(0)
-  const skillMenuOpen = ref(false)
   const activeSkillIndex = ref(0)
-  const pluginMenuOpen = ref(false)
   const activePluginIndex = ref(0)
   const activeAtIndex = ref(0)
-  const slashMenuOpen = ref(false)
   const activeSlashIndex = ref(0)
   let dismissedSuggestionContext: string | null = null
   let suggestionsSuspended = false
@@ -55,18 +51,18 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   const activeFileMention = computed(() => findActiveFileMention(options.prompt.value, options.caretPosition.value))
   const visibleFiles = computed(() => {
     const mention = activeFileMention.value
-    if (!mention?.query.trim()) {
+    if (!mention?.query) {
       return []
     }
     return filterFileSearchItems([...options.files()], mention.query, 5)
   })
   const fileMenuShowsHint = computed(() => (
     activeFileMention.value !== null &&
-    !activeFileMention.value.query.trim() &&
+    !activeFileMention.value.query &&
     options.files().length > 0
   ))
   const fileMenuVisible = computed(() => (
-    fileMenuOpen.value &&
+    openMenu.value === 'at' &&
     activeFileMention.value !== null &&
     options.files().length > 0 &&
     !inputDisabled()
@@ -80,7 +76,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     options.plugins?.() ?? [],
   ))
   const skillMenuVisible = computed(() => (
-    skillMenuOpen.value &&
+    openMenu.value === 'skill' &&
     options.skillsEnabled() &&
     activeSkillSlash.value !== null &&
     options.skills().length > 0 &&
@@ -97,13 +93,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   const visibleTrailingMentionItems = computed(() => visibleMentionGroups.value
     .filter((group) => group.placement === 'after')
     .flatMap((group) => group.items.map((item) => ({ group, item }))))
-  const pluginMenuVisible = computed(() => (
-    pluginMenuOpen.value &&
-    (options.pluginsEnabled?.() ?? false) &&
-    activePluginMention.value?.trigger === '$' &&
-    visiblePlugins.value.length > 0 &&
-    !inputDisabled()
-  ))
+  const pluginMenuVisible = computed(() => false)
   const atItemCount = computed(() => (
     visibleLeadingMentionItems.value.length
     + visiblePlugins.value.length
@@ -111,7 +101,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     + visibleTrailingMentionItems.value.length
   ))
   const atMenuVisible = computed(() => (
-    (pluginMenuOpen.value || fileMenuOpen.value) &&
+    openMenu.value === 'at' &&
     activeFileMention.value !== null &&
     (atItemCount.value > 0 || fileMenuShowsHint.value) &&
     !inputDisabled()
@@ -123,7 +113,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     : [])
   const slashItemCount = computed(() => visibleSlashCommands.value.length + visibleSlashSkills.value.length)
   const slashMenuVisible = computed(() => (
-    slashMenuOpen.value &&
+    openMenu.value === 'slash' &&
     activeCommandSlash.value !== null &&
     slashItemCount.value > 0 &&
     !inputDisabled()
@@ -305,15 +295,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   }
 
   function close(): void {
-    fileMenuOpen.value = false
-    skillMenuOpen.value = false
-    pluginMenuOpen.value = false
-    slashMenuOpen.value = false
-  }
-
-  function dismiss(): void {
-    dismissedSuggestionContext = suggestionContext()
-    close()
+    openMenu.value = null
   }
 
   function suspend(): void {
@@ -339,23 +321,15 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
       dismissedSuggestionContext = null
     }
     if (activeFileMention.value !== null) {
-      pluginMenuOpen.value = true
-      fileMenuOpen.value = true
-      skillMenuOpen.value = false
-      slashMenuOpen.value = false
+      openMenu.value = 'at'
       return
     }
     if (activeSkillSlash.value !== null) {
-      skillMenuOpen.value = true
-      pluginMenuOpen.value = false
-      fileMenuOpen.value = false
-      slashMenuOpen.value = false
+      openMenu.value = 'skill'
       return
     }
     if (activeCommandSlash.value !== null) {
-      slashMenuOpen.value = true
-      fileMenuOpen.value = false
-      skillMenuOpen.value = false
+      openMenu.value = 'slash'
       return
     }
     close()
@@ -378,7 +352,6 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     atMenuVisible,
     close,
     closeSoon,
-    dismiss,
     resume,
     fileMenuShowsHint,
     fileMenuVisible,

@@ -37,7 +37,20 @@ describe('Codex surface bridge', () => {
     expect(isCodexSurfaceBridgeOperation('toString')).toBe(false);
     expect(isCodexSurfaceBridgeOperation('__proto__')).toBe(false);
     expect(isCodexSurfaceBridgeOperation(42)).toBe(false);
-    expect(Object.keys(codexSurfaceBridgeArities)).toStrictEqual([...codexSurfaceBridgeOperations]);
+    expect(codexSurfaceBridgeArities).toStrictEqual({
+      archiveConversation: [1, 1], cancelLogin: [0, 1], clearGoal: [0, 0],
+      compactConversation: [0, 0], connect: [0, 0], createConversation: [0, 1],
+      deleteConversation: [1, 1], deleteMessage: [1, 1], deleteQueuedPrompt: [1, 1],
+      editMessage: [2, 2], forkMessage: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
+      listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
+      logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
+      refreshAccount: [0, 0], refreshConversations: [0, 0], renameConversation: [1, 1],
+      respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryMessage: [1, 1],
+      selectConversation: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
+      startChatGptLogin: [0, 0], startReview: [0, 1], steerMessage: [1, 2],
+      steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1], updateConversationSettings: [1, 1],
+      updateQueuedPrompt: [2, 2],
+    });
   });
 
   it('routes every supported operation with validated arguments', async () => {
@@ -198,30 +211,73 @@ describe('Codex surface bridge', () => {
     await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', ['hello']);
     await invokeCodexSurfaceBridgeOperation(target, 'setGoal', ['goal']);
     await invokeCodexSurfaceBridgeOperation(target, 'startReview', []);
+    await invokeCodexSurfaceBridgeOperation(target, 'createConversation', [{}]);
+    await invokeCodexSurfaceBridgeOperation(target, 'listConversations', [{}]);
+    await invokeCodexSurfaceBridgeOperation(target, 'listModels', [{}]);
+    await invokeCodexSurfaceBridgeOperation(target, 'updateConversationSettings', [{}]);
+    await invokeCodexSurfaceBridgeOperation(target, 'respondToClientRequest', [{ id: 'request', payload: {} }]);
+    await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', ['hello', {}]);
     expect(calls.get('cancelLogin')).toStrictEqual([[undefined]]);
-    expect(calls.get('sendMessage')).toStrictEqual([['hello', undefined]]);
+    expect(calls.get('createConversation')).toStrictEqual([[undefined], [{}]]);
+    expect(calls.get('listConversations')).toStrictEqual([[undefined], [{}]]);
+    expect(calls.get('listModels')).toStrictEqual([[undefined], [{}]]);
+    expect(calls.get('loadOlderConversationHistory')).toStrictEqual([[undefined]]);
+    expect(calls.get('readConversationHistory')).toStrictEqual([[undefined]]);
+    expect(calls.get('readConversationPromptHistory')).toStrictEqual([[undefined]]);
+    expect(calls.get('setGoal')).toStrictEqual([['goal', undefined]]);
+    expect(calls.get('startReview')).toStrictEqual([[undefined]]);
+    expect(calls.get('updateConversationSettings')).toStrictEqual([[{}]]);
+    expect(calls.get('respondToClientRequest')).toStrictEqual([[{ id: 'request', payload: {} }]]);
+    expect(calls.get('sendMessage')).toStrictEqual([['hello', undefined], ['hello', {}]]);
   });
 
   it('accepts alternate list, response, approval, goal, and review forms', async () => {
     const { calls, target } = recordingTarget();
     await invokeCodexSurfaceBridgeOperation(target, 'listConversations', [{ cwd: '/workspace' }]);
+    await invokeCodexSurfaceBridgeOperation(target, 'listConversations', [{ limit: 0 }]);
     await invokeCodexSurfaceBridgeOperation(target, 'respondToClientRequest', [{ id: 'request-1' }]);
     await invokeCodexSurfaceBridgeOperation(target, 'respondToClientRequest', [{ id: 'request-2', payload: { decision: null } }]);
+    for (const decision of ['allow', 'always_allow', 'deny'] as const) {
+      await invokeCodexSurfaceBridgeOperation(target, 'respondToClientRequest', [{
+        id: `request-${decision}`,
+        payload: { decision },
+      }]);
+    }
     await invokeCodexSurfaceBridgeOperation(target, 'resolveApproval', ['approval-1', 'deny']);
+    await invokeCodexSurfaceBridgeOperation(target, 'resolveApproval', ['approval-2', 'approve', 'once']);
+    await invokeCodexSurfaceBridgeOperation(target, 'createConversation', [{ approvalPreset: 'ask-for-approval' }]);
     await invokeCodexSurfaceBridgeOperation(target, 'setGoal', ['goal', null]);
     await invokeCodexSurfaceBridgeOperation(target, 'startReview', [{}]);
     await invokeCodexSurfaceBridgeOperation(target, 'startReview', [{ target: { type: 'uncommittedChanges' } }]);
     await invokeCodexSurfaceBridgeOperation(target, 'startReview', [{ target: { type: 'baseBranch', branch: 'main' } }]);
     await invokeCodexSurfaceBridgeOperation(target, 'startReview', [{ target: { type: 'commit', sha: 'abc123' } }]);
     await invokeCodexSurfaceBridgeOperation(target, 'startReview', [{ target: { type: 'commit', sha: 'abc123', title: null } }]);
-    expect(calls.get('listConversations')).toStrictEqual([[{ cwd: '/workspace' }]]);
+    await invokeCodexSurfaceBridgeOperation(target, 'startReview', [{ target: { type: 'commit', sha: 'abc123', title: 'Review title' } }]);
+    expect(calls.get('listConversations')).toStrictEqual([[{ cwd: '/workspace' }], [{ limit: 0 }]]);
     expect(calls.get('respondToClientRequest')).toStrictEqual([
       [{ id: 'request-1' }],
       [{ id: 'request-2', payload: { decision: null } }],
+      [{ id: 'request-allow', payload: { decision: 'allow' } }],
+      [{ id: 'request-always_allow', payload: { decision: 'always_allow' } }],
+      [{ id: 'request-deny', payload: { decision: 'deny' } }],
+    ]);
+    expect(calls.get('resolveApproval')).toStrictEqual([
+      ['approval-1', 'deny', undefined],
+      ['approval-2', 'approve', 'once'],
+    ]);
+    expect(calls.get('createConversation')).toStrictEqual([[{ approvalPreset: 'ask-for-approval' }]]);
+    expect(calls.get('startReview')).toStrictEqual([
+      [{}],
+      [{ target: { type: 'uncommittedChanges' } }],
+      [{ target: { type: 'baseBranch', branch: 'main' } }],
+      [{ target: { type: 'commit', sha: 'abc123' } }],
+      [{ target: { type: 'commit', sha: 'abc123', title: null } }],
+      [{ target: { type: 'commit', sha: 'abc123', title: 'Review title' } }],
     ]);
   });
 
   it.each([
+    ['archiveConversation', [' '], 'Conversation id must be a non-empty string'],
     ['createConversation', [null], 'Conversation options must be an object'],
     ['createConversation', [{ unknown: true }], 'Conversation options contains unsupported property "unknown"'],
     ['createConversation', [{ model: '' }], 'Conversation model must be a non-empty string'],
@@ -229,60 +285,99 @@ describe('Codex surface bridge', () => {
     ['createConversation', [{ serviceTier: 1 }], 'Conversation service tier must be a non-empty string'],
     ['createConversation', [{ approvalPreset: 'sometimes' }], 'Conversation approval preset is invalid'],
     ['listConversations', [{ archived: 'yes' }], 'Conversation list archived flag must be a boolean'],
+    ['listConversations', [null], 'Conversation list options must be an object'],
+    ['listConversations', [{ extra: true }], 'Conversation list options contains unsupported property "extra"'],
     ['listConversations', [{ limit: -1 }], 'Conversation list limit must be a non-negative integer'],
     ['listConversations', [{ limit: 1.5 }], 'Conversation list limit must be a non-negative integer'],
     ['listConversations', [{ cwd: [''] }], 'Conversation list cwd must be a non-empty string'],
+    ['listConversations', [{ cwd: '' }], 'Conversation list cwd must be a non-empty string'],
     ['listConversations', [{ searchTerm: '' }], 'Conversation list search term must be a non-empty string'],
     ['listModels', [{ includeHidden: 'yes' }], 'Model list includeHidden must be a boolean'],
+    ['listModels', [null], 'Model list options must be an object'],
+    ['listModels', [{ extra: true }], 'Model list options contains unsupported property "extra"'],
     ['listModels', [{ forceReload: 1 }], 'Model list forceReload must be a boolean'],
     ['updateConversationSettings', [{ modelId: '' }], 'Conversation model id must be a non-empty string'],
+    ['updateConversationSettings', [null], 'Conversation settings must be an object'],
+    ['updateConversationSettings', [{ extra: true }], 'Conversation settings contains unsupported property "extra"'],
     ['updateConversationSettings', [{ reasoningEffort: '' }], 'Conversation reasoning effort must be a non-empty string'],
     ['updateConversationSettings', [{ serviceTier: false }], 'Conversation service tier must be a non-empty string'],
     ['updateConversationSettings', [{ approvalPreset: null }], 'Conversation approval preset is invalid'],
     ['updateConversationSettings', [{ planMode: 'yes' }], 'Conversation plan mode must be a boolean'],
     ['cancelLogin', [false], 'Login id must be a non-empty string'],
+    ['deleteConversation', [' '], 'Conversation id must be a non-empty string'],
+    ['deleteQueuedPrompt', [' '], 'Queued prompt id must be a non-empty string'],
+    ['editMessage', [0, ' '], 'Message content must be a non-empty string'],
+    ['loadOlderConversationHistory', [' '], 'Conversation id must be a non-empty string'],
+    ['readConversationHistory', [' '], 'Conversation id must be a non-empty string'],
+    ['readConversationPromptHistory', [' '], 'Conversation id must be a non-empty string'],
+    ['renameConversation', [' '], 'Conversation title must be a non-empty string'],
     ['resolveApproval', ['approval-1', 'later'], 'Approval decision is invalid'],
+    ['resolveApproval', [' ', 'approve'], 'Approval id must be a non-empty string'],
     ['resolveApproval', ['approval-1', 'approve', 'forever'], 'Approval scope is invalid'],
     ['setGoal', ['goal', 0], 'Goal token budget must be a positive number or null'],
+    ['setGoal', [' ', 1], 'Goal objective must be a non-empty string'],
     ['setGoal', ['goal', Number.POSITIVE_INFINITY], 'Goal token budget must be a positive number or null'],
     ['deleteMessage', [-1], 'Message index must be a non-negative integer'],
     ['forkMessage', [1.5], 'Message index must be a non-negative integer'],
     ['retryMessage', ['1'], 'Message index must be a non-negative integer'],
+    ['selectConversation', [' '], 'Conversation id must be a non-empty string'],
+    ['sendMessage', [' '], 'Message prompt must be a non-empty string'],
+    ['steerMessage', [' '], 'Steer prompt must be a non-empty string'],
+    ['steerQueuedPrompt', [' ', 'prompt'], 'Queued prompt id must be a non-empty string'],
+    ['steerQueuedPrompt', ['queue', ' '], 'Queued prompt must be a non-empty string'],
+    ['unarchiveConversation', [' '], 'Conversation id must be a non-empty string'],
+    ['updateQueuedPrompt', [' ', 'prompt'], 'Queued prompt id must be a non-empty string'],
+    ['updateQueuedPrompt', ['queue', ' '], 'Queued prompt must be a non-empty string'],
   ] as const)('rejects invalid %s input', async (operation, args, message) => {
     await expectRejected(operation, args, message);
   });
 
   it.each([
+    [null, 'Client request response must be an object'],
     [{ id: '' }, 'Client request id must be a non-empty string'],
     [{ id: 'request', extra: true }, 'Client request response contains unsupported property "extra"'],
     [{ id: 'request', payload: [] }, 'Client request response payload must be an object'],
     [{ id: 'request', payload: { extra: true } }, 'Client request response payload contains unsupported property "extra"'],
     [{ id: 'request', payload: { decision: 'maybe' } }, 'Client request decision is invalid'],
     [{ id: 'request', payload: { cancelled: 'no' } }, 'Client request cancelled flag must be a boolean'],
+    [{ id: 'request', payload: { answers: [] } }, 'Client request answers must be an object'],
     [{ id: 'request', payload: { answers: { ' ': { answers: [] } } } }, 'Client request question id must be non-empty'],
     [{ id: 'request', payload: { answers: { question: null } } }, 'Client request answer must be an object'],
     [{ id: 'request', payload: { answers: { question: { extra: [] } } } }, 'Client request answer contains unsupported property "extra"'],
     [{ id: 'request', payload: { answers: { question: { answers: 'one' } } } }, 'Client request answer values must be an array of strings'],
     [{ id: 'request', payload: { answers: { question: { answers: [1] } } } }, 'Client request answer values must be an array of strings'],
+    [{ id: 'request', payload: { answers: { question: { answers: ['one', 2] } } } }, 'Client request answer values must be an array of strings'],
   ] as const)('rejects malformed client responses', async (response, message) => {
     await expectRejected('respondToClientRequest', [response], message);
   });
 
   it.each([
+    [null, 'Review options must be an object'],
+    [{ extra: true }, 'Review options contains unsupported property "extra"'],
+    [{ target: null }, 'Review target must be an object'],
     [{ target: { type: 'commit', sha: 'abc', title: 123 } }, 'Review commit title must be a string or null'],
     [{ target: { type: 'baseBranch', branch: '' } }, 'Review branch must be a non-empty string'],
     [{ target: { type: 'commit', sha: '' } }, 'Review commit SHA must be a non-empty string'],
     [{ target: { type: 'custom', instructions: '' } }, 'Review instructions must be a non-empty string'],
     [{ target: { type: 'other' } }, 'Review target type is invalid'],
     [{ target: { type: 'uncommittedChanges', extra: true } }, 'Review target contains unsupported property "extra"'],
+    [{ target: { type: 'baseBranch', branch: 'main', extra: true } }, 'Review target contains unsupported property "extra"'],
+    [{ target: { type: 'commit', sha: 'abc', extra: true } }, 'Review target contains unsupported property "extra"'],
+    [{ target: { type: 'custom', instructions: 'Review', extra: true } }, 'Review target contains unsupported property "extra"'],
   ] as const)('rejects malformed review options', async (options, message) => {
     await expectRejected('startReview', [options], message);
   });
 
   it('rejects non-plain and symbol-bearing objects', async () => {
+    await expectRejected('createConversation', ['options'], 'Conversation options must be an object');
     await expectRejected('createConversation', [new Date()], 'Conversation options must be a plain object');
     const options = { model: 'gpt-5' } as Record<PropertyKey, unknown>;
     options[Symbol('secret')] = true;
     await expectRejected('createConversation', [options], 'Conversation options must not contain symbol properties');
+
+    const nullPrototype = Object.assign(Object.create(null) as Record<string, unknown>, { model: 'gpt-5' });
+    const { calls, target } = recordingTarget();
+    await invokeCodexSurfaceBridgeOperation(target, 'createConversation', [nullPrototype]);
+    expect(calls.get('createConversation')).toStrictEqual([[{ model: 'gpt-5' }]]);
   });
 });

@@ -5,6 +5,83 @@ import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { FakeTransport, createSurface, lastRequest, lastResponse, requestsFor, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('preserves the status of a newly announced background thread', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+
+    transport.emit({
+      method: 'thread/started',
+      params: {
+        thread: { ...thread('thread-announced', false), status: { type: 'active', activeFlags: [] } },
+      },
+    });
+
+    expect(surface.getConversationSnapshot('thread-announced').threadStatus).toEqual({
+      type: 'active', activeFlags: [],
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.activityChanged',
+      origin: 'notification',
+      conversationId: 'thread-announced',
+      payload: expect.objectContaining({ threadStatus: { type: 'active', activeFlags: [] } }),
+    }));
+    await surface.close();
+  });
+
+  it('publishes pending-work resolution when a thread closes', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+
+    transport.emit({
+      id: 'closed-approval',
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-closed', itemId: 'command-closed',
+        command: 'npm test', cwd: '/tmp/project', reason: null, environmentId: null,
+        commandActions: [], networkApprovalContext: null, additionalPermissions: null,
+        availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
+      },
+    });
+    transport.emit({
+      id: 'closed-input',
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-closed', itemId: 'input-closed',
+        autoResolutionMs: null,
+        questions: [{
+          id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
+          options: null,
+        }],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      approvals: [expect.objectContaining({ id: 'closed-approval' })],
+      clientRequests: [expect.objectContaining({ id: 'closed-input' })],
+    }));
+    events.length = 0;
+
+    transport.emit({ method: 'thread/closed', params: { threadId: 'thread-existing' } });
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'approval.resolved',
+        origin: 'notification',
+        payload: expect.objectContaining({ reason: 'conversation_closed' }),
+      }),
+      expect.objectContaining({
+        type: 'clientRequest.resolved',
+        origin: 'notification',
+        payload: expect.objectContaining({ reason: 'conversation_closed' }),
+      }),
+    ]));
+    await surface.close();
+  });
+
   it('emits headless sub-agent events without adding standard message UI', async () => {
     const { surface, transport } = createSurface();
     const events: CodexSurfaceEvent[] = [];
@@ -371,6 +448,24 @@ describe('CodexSurface', () => {
     );
   });
 
+  it('hydrates an unloaded conversation before starting its realtime session', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+
+    const session = await surface.conversation('thread-unloaded').startRealtime({
+      outputModality: 'text',
+      version: 'v2',
+    });
+
+    expect(lastRequest(transport, 'thread/resume')).toMatchObject({
+      params: { threadId: 'thread-unloaded' },
+    });
+    expect(lastRequest(transport, 'thread/realtime/start')).toMatchObject({
+      params: { threadId: 'thread-unloaded', outputModality: 'text' },
+    });
+    await session.stop();
+  });
+
   it('negotiates WebRTC realtime before returning the session handle', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -504,6 +599,10 @@ describe('CodexSurface', () => {
     expect(onUnknownNotification).toHaveBeenCalledOnce();
     expect(onUnknownNotification).toHaveBeenCalledWith(notification);
     expect(surface.getSnapshot()).toStrictEqual(before);
+
+    const withoutCallback = createSurface();
+    await withoutCallback.surface.connect();
+    expect(() => withoutCallback.transport.emit(notification)).not.toThrow();
   });
 
   it('reports typed notifications that are not projected by the surface', async () => {
@@ -528,26 +627,33 @@ describe('CodexSurface', () => {
   it('makes every non-UI server-request policy explicit and fail-closed', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_123_999);
     transport.emit({ id: 'time', method: 'currentTime/read', params: { threadId: 'thread-existing' } });
     await vi.waitFor(() => expect(lastResponse(transport, 'time')).toMatchObject({
-      result: { currentTimeAt: expect.any(Number) },
+      result: { currentTimeAt: 1_700_000_123 },
     }));
+    now.mockRestore();
 
     const unsupported = [
       {
         id: 'dynamic', method: 'item/tool/call',
         params: { threadId: 'thread-existing', turnId: 'turn', callId: 'call', namespace: null, tool: 'host', arguments: {} },
+        message: "Unknown dynamic host tool 'host'",
       },
       {
         id: 'auth', method: 'account/chatgptAuthTokens/refresh',
         params: { reason: 'unauthorized', previousAccountId: null },
+        message: 'ChatGPT token refresh must be provided by the host application',
       },
-      { id: 'attestation', method: 'attestation/generate', params: {} },
+      {
+        id: 'attestation', method: 'attestation/generate', params: {},
+        message: 'Client attestation must be provided by the host application',
+      },
     ];
     for (const request of unsupported) {
       transport.emit(request);
       await vi.waitFor(() => expect(lastResponse(transport, request.id)).toMatchObject({
-        error: { code: -32601 },
+        error: { code: -32601, message: request.message },
       }));
     }
   });
@@ -572,6 +678,47 @@ describe('CodexSurface', () => {
     });
     expect(surface.getSnapshot().approvals).toStrictEqual([]);
     await expect(surface.resolveApproval('external-approval', 'approve')).rejects.toThrow('Unknown approval');
+  });
+
+  it('labels notification-driven summary changes and removal with notification origin', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+
+    transport.emit({
+      method: 'thread/status/changed',
+      params: { threadId: 'thread-existing', status: { type: 'active', activeFlags: [] } },
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.summaryUpserted',
+      origin: 'notification',
+      payload: expect.objectContaining({ summary: expect.objectContaining({ status: 'active' }) }),
+    }));
+    events.length = 0;
+
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-origin', 'inProgress', []) },
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.summaryUpserted',
+      origin: 'notification',
+      payload: expect.objectContaining({ summary: expect.objectContaining({ turnCount: 2 }) }),
+    }));
+    transport.emit({ method: 'thread/closed', params: { threadId: 'thread-existing' } });
+    expect(events.filter((event) => event.type === 'conversation.summaryUpserted').at(-1))
+      .toMatchObject({ origin: 'notification', payload: { summary: { status: 'idle' } } });
+    events.length = 0;
+
+    transport.emit({ method: 'thread/deleted', params: { threadId: 'thread-existing' } });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.summaryRemoved',
+      origin: 'notification',
+      payload: { reason: 'deleted' },
+    }));
+    await surface.close();
   });
 
 });

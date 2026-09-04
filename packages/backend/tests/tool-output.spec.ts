@@ -28,6 +28,10 @@ describe('tool output text', () => {
       content: [{ type: 'text', text: 'Result returned in structuredContent.' }],
       structuredContent: { answer: 42 },
     })).toBe('{"answer":42}');
+    expect(toolOutputText({
+      content: [{ type: 'text', text: '  Result returned in structuredContent.\n' }],
+      structuredContent: { answer: 42 },
+    })).toBe('{"answer":42}');
     expect(toolOutputText({ structuredContent: 'structured' })).toBe('structured');
   });
 

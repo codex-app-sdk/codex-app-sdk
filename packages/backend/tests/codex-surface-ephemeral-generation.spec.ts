@@ -9,6 +9,29 @@ import {
 } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface ephemeral generation', () => {
+  it('connects on demand and rejects active generation when the app-server disconnects', async () => {
+    const transport = new FakeTransport({
+      'thread/start': () => resumeResponse({
+        ...thread('thread-disconnected', false),
+        ephemeral: true,
+      }),
+      'turn/start': () => ({ turn: turn('turn-disconnected', 'inProgress', []) }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+
+    const result = surface.generateText('Generate until disconnected');
+    await vi.waitFor(() => expect(transport.sent.some((message) => (
+      'method' in message && message.method === 'turn/start'
+    ))).toBe(true));
+    expect(transport.start).toHaveBeenCalledOnce();
+    expect(transport.sent).toContainEqual(expect.objectContaining({ method: 'initialize' }));
+
+    transport.fail(new Error('generation transport lost'));
+
+    await expect(result).rejects.toThrow('generation transport lost');
+    await surface.close();
+  });
+
   it('returns structured text without changing or emitting visible surface state', async () => {
     const transport = new FakeTransport({
       'thread/start': () => resumeResponse({
@@ -148,6 +171,26 @@ describe('CodexSurface ephemeral generation', () => {
       method: 'thread/unsubscribe',
       params: { threadId: 'thread-aborted' },
     });
+  });
+
+  it('rejects an active generation when the owning surface closes', async () => {
+    const transport = new FakeTransport({
+      'thread/start': () => resumeResponse({
+        ...thread('thread-closing', false),
+        ephemeral: true,
+      }),
+      'turn/start': () => ({ turn: turn('turn-closing', 'inProgress', []) }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    const result = surface.generateText('Generate until closed');
+    await vi.waitFor(() => expect(transport.sent.some((message) => (
+      'method' in message && message.method === 'turn/start'
+    ))).toBe(true));
+
+    await surface.close();
+
+    await expect(result).rejects.toThrow();
   });
 
   it('deletes and rejects a thread when app-server does not honor ephemeral creation', async () => {

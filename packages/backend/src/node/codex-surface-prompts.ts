@@ -30,14 +30,14 @@ export function mcpElicitationResponse(
 }
 
 export function parsePlanSlashCommand(prompt: string): { prompt: string | null } | null {
-  const match = /^\/plan(?:\s+(.*))?$/s.exec(prompt.trim());
+  const match = /^\/plan(?:\s(.*))?$/s.exec(prompt.trim());
   if (!match) return null;
   const planPrompt = match[1]?.trim() ?? '';
   return { prompt: planPrompt || null };
 }
 
 export function parseGoalSlashCommand(prompt: string): GoalSlashCommand | null {
-  const match = /^\/goal(?:\s+(.*))?$/s.exec(prompt.trim());
+  const match = /^\/goal(?:\s(.*))?$/s.exec(prompt.trim());
   if (!match) return null;
   const rest = match[1]?.trim() ?? '';
   if (!rest) return { action: 'show' };
@@ -48,7 +48,7 @@ export function parseGoalSlashCommand(prompt: string): GoalSlashCommand | null {
 }
 
 export function parseReviewSlashCommand(prompt: string): CodexSurfaceReviewTarget | null {
-  const match = /^\/review(?:\s+(.*))?$/s.exec(prompt.trim());
+  const match = /^\/review(?:\s(.*))?$/s.exec(prompt.trim());
   if (!match) return null;
   const instructions = match[1]?.trim() ?? '';
   return instructions ? { type: 'custom', instructions } : { type: 'uncommittedChanges' };
@@ -67,8 +67,7 @@ export function promptSkillInputsFromText(
   const pattern = /(?:^|[^\w.%+-])[$/]([A-Za-z0-9_.-]+)/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
-    const name = match[1];
-    if (name) names.add(name);
+    names.add(match[1]!);
   }
   return skills
     .filter((skill) => skill.enabled && names.has(skill.name) && Boolean(skill.path))
@@ -121,7 +120,6 @@ export function findPendingMcpToolPart(
     const metadataTool = stringValue(part.metadata?.tool);
     return (
       (metadataServer === server && metadataTool === tool)
-      || part.title === `${server}.${tool}`
       || part.title.endsWith(`.${tool}`)
     );
   });

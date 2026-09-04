@@ -68,7 +68,7 @@ export class CodexSurfaceAuthenticationController {
     })();
     this.chatGptLoginPromise = start;
     void start.finally(() => {
-      if (this.chatGptLoginPromise === start) this.chatGptLoginPromise = null;
+      this.chatGptLoginPromise = null;
     }).catch(() => undefined);
     return start;
   }
@@ -131,7 +131,7 @@ export class CodexSurfaceAuthenticationController {
     })();
     this.accountRefreshPromise = refresh;
     void refresh.finally(() => {
-      if (this.accountRefreshPromise === refresh) this.accountRefreshPromise = null;
+      this.accountRefreshPromise = null;
     }).catch(() => undefined);
     return refresh;
   }

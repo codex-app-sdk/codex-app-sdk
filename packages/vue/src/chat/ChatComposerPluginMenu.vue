@@ -39,6 +39,7 @@ import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { PlugIcon } from '../icons/app-icons';
 import { pluginDescription, pluginDisplayName } from './composer-plugins';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   activeIndex: number;
   visiblePlugins: CodexSurfacePlugin[];
@@ -47,6 +48,7 @@ const props = defineProps<{
 defineEmits<{
   select: [plugin: CodexSurfacePlugin];
 }>();
+// Stryker restore all
 
 const menuEl = ref<HTMLElement | null>(null);
 

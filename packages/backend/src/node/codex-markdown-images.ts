@@ -23,20 +23,19 @@ export class CodexMarkdownImageHydrator {
     const replacements = await Promise.all(Array.from(content.matchAll(markdownImageRegex), async (match) => {
       const matchStart = match.index ?? 0;
       if (isInsideCodeBlock(matchStart, codeBlocks)) return null;
-      const source = match[2];
-      if (!source) return null;
+      const source = match[2]!;
       const path = localImagePath(source, cwd);
       if (!path) return null;
 
       try {
         const response = await this.client.request('fs/readFile', { path });
-        const dataUrl = codexImageDataUrl(response.dataBase64)?.url;
-        if (!dataUrl) return null;
+        const image = codexImageDataUrl(response.dataBase64);
+        if (!image) return null;
         const sourceOffset = match[0].indexOf('](') + 2;
         return {
           start: matchStart + sourceOffset,
           end: matchStart + sourceOffset + source.length,
-          value: dataUrl,
+          value: image.url,
         } satisfies SourceReplacement;
       } catch {
         return null;
@@ -93,18 +92,17 @@ function findCodeBlocks(content: string): CodeBlockRange[] {
   let match: RegExpExecArray | null;
 
   while ((match = fenceRegex.exec(content)) !== null) {
-    const fence = match[2];
-    const prefix = match[1] ?? '';
-    if (!fence) continue;
+    const fence = match[2]!;
+    const prefix = match[1]!;
     const start = match.index + prefix.length;
-    const closeRegex = new RegExp(`(^|\\n)${escapeRegex(fence)}`, 'g');
+    const closeRegex = new RegExp(`(^|\\n)${fence}`, 'g');
     closeRegex.lastIndex = start + fence.length;
     const close = closeRegex.exec(content);
     if (!close) {
       ranges.push({ start, end: content.length });
       break;
     }
-    const end = close.index + (close[1]?.length ?? 0) + fence.length;
+    const end = close.index + close[1]!.length + fence.length;
     ranges.push({ start, end });
     fenceRegex.lastIndex = end;
   }
@@ -114,8 +112,4 @@ function findCodeBlocks(content: string): CodeBlockRange[] {
 
 function isInsideCodeBlock(index: number, ranges: CodeBlockRange[]): boolean {
   return ranges.some((range) => index >= range.start && index <= range.end);
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

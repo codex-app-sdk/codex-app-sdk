@@ -51,6 +51,26 @@ describe('Codex surface prompt policy', () => {
     });
   });
 
+  it('anchors slash commands and normalizes surrounding and separator whitespace', () => {
+    expect(parsePlanSlashCommand('prefix /plan ship')).toBeNull();
+    expect(parsePlanSlashCommand('/planner ship')).toBeNull();
+    expect(parsePlanSlashCommand('/plan    ship')).toStrictEqual({ prompt: 'ship' });
+
+    expect(parseGoalSlashCommand('prefix /goal clear')).toBeNull();
+    expect(parseGoalSlashCommand('/goals clear')).toBeNull();
+    expect(parseGoalSlashCommand(' \n/goal    ship it \n')).toStrictEqual({
+      action: 'set',
+      objective: 'ship it',
+    });
+
+    expect(parseReviewSlashCommand('prefix /review auth')).toBeNull();
+    expect(parseReviewSlashCommand('/reviewer auth')).toBeNull();
+    expect(parseReviewSlashCommand(' \n/review    auth boundaries \n')).toStrictEqual({
+      type: 'custom',
+      instructions: 'auth boundaries',
+    });
+  });
+
   it('derives, validates, and deduplicates catalog-backed skill inputs', () => {
     const catalog: CodexSurfaceSkill[] = [
       { name: 'cp', path: '/skills/cp/SKILL.md', enabled: true },
@@ -79,6 +99,26 @@ describe('Codex surface prompt policy', () => {
     ]);
   });
 
+  it('recognizes a unique skill at the beginning of a prompt', () => {
+    const catalog: CodexSurfaceSkill[] = [
+      { name: 'start-only', path: '/skills/start/SKILL.md', enabled: true },
+    ];
+    expect(promptSkillInputsFromText('$start-only and no second mention', catalog)).toStrictEqual([
+      { name: 'start-only', path: '/skills/start/SKILL.md' },
+    ]);
+  });
+
+  it('requires both the catalog skill name and path to match explicit input', () => {
+    const catalog: CodexSurfaceSkill[] = [
+      { name: 'actual', path: '/skills/shared/SKILL.md', enabled: true },
+    ];
+    expect(() => validateSkillInputs([
+      { name: 'spoofed', path: '/skills/shared/SKILL.md' },
+    ], catalog)).toThrowError(
+      new Error("Skill 'spoofed' is not an enabled skill in the Codex catalog"),
+    );
+  });
+
   it('matches pending MCP tools by metadata, title, suffix, or unambiguous fallback', () => {
     const metadataMatch = runningMcp('metadata', 'Friendly title', { server: 'gmail', tool: 'search' });
     const titleMatch = runningMcp('title', 'drive.read');
@@ -100,6 +140,32 @@ describe('Codex surface prompt policy', () => {
     expect(findPendingMcpToolPart(messages, 'another-turn', 'gmail', 'search')).toBeNull();
   });
 
+  it('ignores incomplete metadata and non-tool lookalikes when matching pending MCP tools', () => {
+    const serverOnly = runningMcp('server-only', 'Unrelated', { server: 'gmail', tool: 'other' });
+    const toolOnly = runningMcp('tool-only', 'Unrelated', { server: 'other', tool: 'search' });
+    const exact = runningMcp('exact', 'Friendly', { server: 'gmail', tool: 'search' });
+    const messages = [{
+      id: 'without-metadata',
+      role: 'assistant' as const,
+      status: 'streaming' as const,
+      parts: [],
+    }, {
+      id: 'assistant',
+      role: 'assistant' as const,
+      status: 'streaming' as const,
+      metadata: { turnId: 'turn-1' },
+      parts: [{
+        type: 'text',
+        text: 'spoofed',
+        kind: 'mcp',
+        status: 'running',
+        title: 'gmail.search',
+      }, serverOnly, toolOnly, exact],
+    }] as SurfaceMessage[];
+
+    expect(findPendingMcpToolPart(messages, 'turn-1', 'gmail', 'search')).toBe(exact);
+  });
+
   it('formats MCP argument metadata and persistence capabilities safely', () => {
     expect(argumentsPreview({
       tool_params_display: [
@@ -111,6 +177,9 @@ describe('Codex surface prompt policy', () => {
     })).toBe('Search: in:inbox\nlimit: 10');
     expect(argumentsPreview({ tool_params_display: [], tool_params: { query: 'fallback' } }))
       .toBe('{\n  "query": "fallback"\n}');
+    expect(argumentsPreview({
+      tool_params_display: [{ name: 'filter', value: { unread: true } }],
+    })).toBe('filter: {"unread":true}');
     expect(argumentsPreview({})).toBe('');
     expect(persistSupports('always', 'always')).toBe(true);
     expect(persistSupports(['session', 'always'], 'session')).toBe(true);

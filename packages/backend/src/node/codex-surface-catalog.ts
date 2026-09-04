@@ -3,7 +3,6 @@ import type { v2 } from '../codex/index';
 import type { CodexSurfaceModel, CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 
 const MAX_CATALOG_ICON_BYTES = 256 * 1024;
-const MAX_CATALOG_ICON_BASE64_LENGTH = Math.ceil(MAX_CATALOG_ICON_BYTES / 3) * 4;
 
 export function codexModelToSurfaceModel(model: v2.Model): CodexSurfaceModel {
   return {
@@ -117,12 +116,10 @@ export async function firstLocalPluginIcon(
 
 export function safeRemoteImageUrl(value: string | null | undefined): string | undefined {
   const url = nonEmpty(value);
-  if (!url) return undefined;
   try {
-    return new URL(url).protocol === 'https:' ? url : undefined;
-  } catch {
-    return undefined;
-  }
+    return new URL(url!).protocol === 'https:' ? url : undefined;
+  } catch {}
+  return undefined;
 }
 
 export function catalogIconMimeType(path: string): string | undefined {
@@ -136,13 +133,13 @@ export function catalogIconMimeType(path: string): string | undefined {
     case '.png': return 'image/png';
     case '.svg': return 'image/svg+xml';
     case '.webp': return 'image/webp';
-    default: return undefined;
   }
+  return undefined;
 }
 
 export function boundedImageDataUrl(mimeType: string, dataBase64: string): string | undefined {
   const encoded = dataBase64.trim();
-  if (!encoded || encoded.length > MAX_CATALOG_ICON_BASE64_LENGTH || !/^[a-z\d+/]+={0,2}$/i.test(encoded)) {
+  if (!/^[a-z\d+/]+={0,2}$/i.test(encoded)) {
     return undefined;
   }
   const unpadded = encoded.replace(/=+$/, '');

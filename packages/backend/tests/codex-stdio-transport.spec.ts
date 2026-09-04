@@ -282,9 +282,327 @@ describe('CodexAppServerStdioTransport', () => {
 
     const closing = transport.close();
     await vi.advanceTimersByTimeAsync(10);
+    expect(child.listenerCount('exit')).toBe(2);
     child.emit('exit', null, 'SIGKILL');
 
     await expect(closing).resolves.toBeUndefined();
     expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
+  });
+
+  it('recovers from oversized discard mode when the next chunk starts with a newline', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ maxOutputLineChars: 20 });
+    const messages: unknown[] = [];
+    const errors: Error[] = [];
+    transport.onMessage((message) => messages.push(message));
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', '{"id":7,"payload":"xxxxxxxx');
+    child.stdout.emit('data', '\n{"id":8}\n');
+    child.stdout.emit('data', '{"id":9}\n');
+
+    expect(messages).toStrictEqual([{ id: 8 }, { id: 9 }]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ requestId: 7 });
+  });
+
+  it('keeps discarding an oversized frame until a later chunk supplies its newline', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ maxOutputLineChars: 20 });
+    const messages: unknown[] = [];
+    const errors: Error[] = [];
+    transport.onMessage((message) => messages.push(message));
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', '{"id":7,"payload":"xxxxxxxx');
+    child.stdout.emit('data', '{"id":8}');
+    child.stdout.emit('data', '\n{"id":9}\n');
+
+    expect(messages).toStrictEqual([{ id: 9 }]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ requestId: 7 });
+  });
+
+  it('ignores whitespace-only output lines', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport();
+    const errors: Error[] = [];
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', '  \t  \n');
+
+    expect(errors).toStrictEqual([]);
+  });
+
+  it('accepts complete and buffered JSON lines at the exact configured character limit', async () => {
+    const frame = '{"id":123,"result":{}}';
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ maxOutputLineChars: frame.length });
+    const messages: unknown[] = [];
+    const errors: Error[] = [];
+    transport.onMessage((message) => messages.push(message));
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', frame);
+    expect(errors).toStrictEqual([]);
+    child.stdout.emit('data', '\n');
+    child.stdout.emit('data', `${frame}\n`);
+
+    expect(messages).toStrictEqual([
+      { id: 123, result: {} }, { id: 123, result: {} },
+    ]);
+    expect(errors).toStrictEqual([]);
+  });
+
+  it.each([
+    ['  { "id" : -12,"result":{}}', -12],
+    ['{"id":"escaped\\\\id","result":{}}', 'escaped\\id'],
+    ['{"id":9007199254740992,"result":{}}', undefined],
+    ['{"method":"event","payload":"large"}', undefined],
+  ])('correlates oversized response prefixes %#', async (frame, requestId) => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ maxOutputLineChars: 5 });
+    const errors: Error[] = [];
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', `${frame}\n`);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      message: 'Codex app-server output line exceeded the configured limit', requestId,
+    });
+  });
+
+  it.each([
+    ['junk before the object', 'junk {"id":12,"result":{}}'],
+    ['non-whitespace prefix', 'x{"id":"request","result":{}}'],
+    ['invalid JSON string escape', '{"id":"bad\\q","result":{}}'],
+  ])('does not invent request correlation for %s', async (_label, frame) => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ maxOutputLineChars: 5 });
+    const errors: Error[] = [];
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', `${frame}\n`);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      message: 'Codex app-server output line exceeded the configured limit', requestId: undefined,
+    });
+  });
+
+  it('ignores stdin errors from stale and intentionally closing child processes', async () => {
+    const first = createFakeChild();
+    const second = createFakeChild();
+    spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const errors: Error[] = [];
+    const transport = new CodexAppServerStdioTransport({ shutdownTimeoutMs: 10 });
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+    first.emit('error', new Error('first failed'));
+    await transport.start();
+
+    first.stdin.emit('error', new Error('stale write'));
+    const closing = transport.close();
+    second.stdin.emit('error', new Error('expected close write'));
+    second.emit('exit', 0, null);
+    await closing;
+
+    expect(errors.map((error) => error.message)).toStrictEqual(['first failed']);
+    expect(first.kill).not.toHaveBeenCalled();
+    expect(second.kill).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a late stdin error from an unexpectedly exited child after restart', async () => {
+    const first = createFakeChild();
+    const second = createFakeChild();
+    spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const errors: Error[] = [];
+    const transport = new CodexAppServerStdioTransport();
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+    first.emit('exit', 1, null);
+    await transport.start();
+
+    first.stdin.emit('error', new Error('late stale write'));
+    transport.send({ method: 'initialized' });
+
+    expect(errors.map((error) => error.message)).toStrictEqual(['Codex app-server exited (1)']);
+    expect(first.kill).not.toHaveBeenCalled();
+    expect(second.stdin.write).toHaveBeenCalledWith('{"method":"initialized"}\n');
+  });
+
+  it('does not let late process errors or exits clear or report over a replacement child', async () => {
+    const first = createFakeChild();
+    const second = createFakeChild();
+    spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const errors: Error[] = [];
+    const transport = new CodexAppServerStdioTransport();
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+    first.stdin.emit('error', new Error('first stdin failed'));
+    await transport.start();
+
+    first.emit('error', new Error('late process error'));
+    first.emit('exit', 1, null);
+    transport.send({ method: 'initialized' });
+
+    expect(errors.map((error) => error.message)).toStrictEqual(['first stdin failed']);
+    expect(second.stdin.write).toHaveBeenCalledWith('{"method":"initialized"}\n');
+  });
+
+  it('clears the active child after an unexpected exit', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport();
+    await transport.start();
+
+    child.emit('exit', 1, null);
+
+    expect(() => transport.send({ method: 'initialized' })).toThrow(
+      'Codex app-server transport is not started',
+    );
+  });
+
+  it('reports a process error only once when its exit follows', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const errors: Error[] = [];
+    const transport = new CodexAppServerStdioTransport();
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.emit('error', new Error('spawn failed'));
+    child.emit('exit', 1, null);
+
+    expect(errors.map((error) => error.message)).toStrictEqual(['spawn failed']);
+  });
+
+  it('suppresses process errors raised during an explicit close', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const errors: Error[] = [];
+    const transport = new CodexAppServerStdioTransport();
+    transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    const closing = transport.close();
+    child.emit('error', new Error('kill race'));
+    child.emit('exit', 0, null);
+    await closing;
+
+    expect(errors).toStrictEqual([]);
+  });
+
+  it('reports signal and unknown unexpected exits without inventing stderr detail', async () => {
+    for (const [code, signal, message] of [
+      [null, 'SIGABRT', 'Codex app-server exited (SIGABRT)'],
+      [null, null, 'Codex app-server exited (unknown)'],
+    ] as const) {
+      const child = createFakeChild();
+      spawnMock.mockReturnValueOnce(child);
+      const onExit = vi.fn();
+      const errors: Error[] = [];
+      const transport = new CodexAppServerStdioTransport({ onExit });
+      transport.onError((error) => errors.push(error));
+      await transport.start();
+
+      child.emit('exit', code, signal);
+
+      expect(onExit).toHaveBeenCalledWith({ code, signal, stderr: '' });
+      expect(errors.map((error) => error.message)).toStrictEqual([message]);
+    }
+  });
+
+  it('preserves diagnostics exactly at the configured bound and clamps non-positive limits', async () => {
+    const exact = createFakeChild();
+    const clamped = createFakeChild();
+    spawnMock.mockReturnValueOnce(exact).mockReturnValueOnce(clamped);
+    const exactExit = vi.fn();
+    const clampedExit = vi.fn();
+    const clampedErrors: Error[] = [];
+    const exactTransport = new CodexAppServerStdioTransport({ maxDiagnosticBufferChars: 4, onExit: exactExit });
+    const clampedTransport = new CodexAppServerStdioTransport({
+      maxDiagnosticBufferChars: 0, maxOutputLineChars: 0, onExit: clampedExit,
+    });
+    clampedTransport.onError((error) => clampedErrors.push(error));
+    await exactTransport.start();
+    exact.stderr.emit('data', 'ab');
+    exact.stderr.emit('data', 'cd');
+    exact.emit('exit', 0, null);
+
+    await clampedTransport.start();
+    clamped.stderr.emit('data', 'abc');
+    clamped.stdout.emit('data', '{}\n');
+    clamped.emit('exit', 0, null);
+
+    expect(exactExit).toHaveBeenCalledWith({ code: 0, signal: null, stderr: 'abcd' });
+    expect(clampedExit).toHaveBeenCalledWith({ code: 0, signal: null, stderr: 'c' });
+    expect(clampedErrors.map((error) => error.message)).toStrictEqual([
+      'Codex app-server output line exceeded the configured limit',
+      'Codex app-server exited (0): c',
+    ]);
+  });
+
+  it('emits a precise protocol error for malformed JSON and honors error unsubscription', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport();
+    const errors: Error[] = [];
+    const unsubscribe = transport.onError((error) => errors.push(error));
+    await transport.start();
+
+    child.stdout.emit('data', 'not-json\n');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      name: 'RpcTransportProtocolError', message: 'Codex app-server sent malformed JSON',
+      cause: expect.any(SyntaxError),
+    });
+    unsubscribe();
+    child.stdout.emit('data', 'still-not-json\n');
+    expect(errors).toHaveLength(1);
+  });
+
+  it('removes the graceful-exit timeout after an early exit', async () => {
+    vi.useFakeTimers();
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ shutdownTimeoutMs: 10 });
+    await transport.start();
+
+    const closing = transport.close();
+    child.emit('exit', 0, null);
+    await closing;
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    ['exit code', { exitCode: 0, signalCode: null }],
+    ['signal code', { exitCode: null, signalCode: 'SIGTERM' as NodeJS.Signals }],
+  ])('closes immediately when the child already has an %s', async (_label, status) => {
+    vi.useFakeTimers();
+    const child = createFakeChild();
+    Object.assign(child, status);
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport({ shutdownTimeoutMs: 10 });
+    await transport.start();
+
+    await expect(transport.close()).resolves.toBeUndefined();
+
+    expect(child.kill).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

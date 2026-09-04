@@ -11,6 +11,7 @@
 <script setup lang="ts">
 import { FileTextIcon, PlugIcon, SparklesIcon } from '../icons/app-icons';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 withDefaults(defineProps<{
   iconUrl?: string | null;
   kind: 'file' | 'plugin' | 'skill';
@@ -18,6 +19,7 @@ withDefaults(defineProps<{
 }>(), {
   iconUrl: null,
 });
+// Stryker restore all
 </script>
 
 <style scoped>

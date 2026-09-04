@@ -40,7 +40,11 @@ describe('syntax highlighting', () => {
     ['config.yaml', 'yaml'],
     ['config.yml', 'yaml'],
     ['archive.custom', 'custom'],
+    ['archive.ts.bak', 'bak'],
+    ['containers/app/Dockerfile', 'docker'],
+    ['  SRC/App.TS  ', 'typescript'],
     ['', undefined],
+    [undefined, undefined],
   ])('maps %s to %s', (filePath, language) => {
     expect(languageForFilePath(filePath)).toBe(language);
   });
@@ -54,5 +58,15 @@ describe('syntax highlighting', () => {
       ].join('\n'),
     );
     expect(renderCodeBlock('&', undefined)).toBe('<pre><code><span class="line">&amp;</span></code></pre>');
+  });
+
+  it('renders known languages with both packaged themes', () => {
+    const html = renderCodeBlock('const answer = 42', ' typescript extra ');
+
+    expect(html).toContain('class="shiki shiki-themes');
+    expect(html).toContain('--shiki-light');
+    expect(html).toContain('--shiki-dark');
+    expect(html).toContain('const');
+    expect(html).toContain('answer');
   });
 });

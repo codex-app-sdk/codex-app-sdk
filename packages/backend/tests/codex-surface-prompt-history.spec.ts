@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
+import { promptsFromSummaryTurns } from '../src/node/codex-surface-prompt-history';
 import { FakeTransport, responseFor, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface prompt history', () => {
@@ -51,7 +52,7 @@ describe('CodexSurface prompt history', () => {
     const stateChanged = vi.fn();
     const unsubscribe = surface.onStateChange(stateChanged);
 
-    await expect(surface.readConversationPromptHistory(' thread-prompts ')).resolves.toStrictEqual({
+    await expect(surface.conversation(' thread-prompts ').readPromptHistory()).resolves.toStrictEqual({
       conversationId: 'thread-prompts',
       prompts: ['First prompt', '$cp'],
     });
@@ -70,4 +71,77 @@ describe('CodexSurface prompt history', () => {
 
     await expect(surface.readConversationPromptHistory()).rejects.toThrow('Conversation id cannot be empty');
   });
+
+  it('joins adjacent text inputs without separators and ignores non-text inputs', () => {
+    expect(promptsFromSummaryTurns([promptTurn([
+      { type: 'text', text: 'first', text_elements: [] },
+      { type: 'image', url: 'data:image/png;base64,abc', text: 'must not leak' },
+      { type: 'text', text: ' second', text_elements: [] },
+    ])])).toStrictEqual(['first second']);
+  });
+
+  it('strips multiline context tags without requiring surrounding whitespace', () => {
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '<context>hidden line one\nhidden line two</context>Visible prompt',
+      text_elements: [],
+    }])])).toStrictEqual(['Visible prompt']);
+  });
+
+  it('strips browser context with or without attributes and then removes its ambient heading', () => {
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '<in-app-browser-context>hidden\ncontext</in-app-browser-context>## My request for Codex:\nVisible',
+      text_elements: [],
+    }])])).toStrictEqual(['Visible']);
+
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '<in-app-browser-context   data-url="https://example.test">browser</in-app-browser-context>\n  ## My request for Codex:  \nVisible',
+      text_elements: [],
+    }])])).toStrictEqual(['Visible']);
+  });
+
+  it('preserves ambient-looking headings when no browser context was removed', () => {
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '## My request for Codex:\nVisible',
+      text_elements: [],
+    }])])).toStrictEqual(['## My request for Codex:\nVisible']);
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '<in-app-browser-context>browser</in-app-browser-context>Prefix ## My request for Codex:\nVisible',
+      text_elements: [],
+    }])])).toStrictEqual(['Prefix ## My request for Codex:\nVisible']);
+  });
+
+  it('removes an indented ambient heading when browser context appears later', () => {
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '  ## My request for Codex:\nVisible\n<in-app-browser-context>browser</in-app-browser-context>',
+      text_elements: [],
+    }])])).toStrictEqual(['Visible']);
+  });
+
+  it('preserves an ambient heading that has inline request text', () => {
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '<in-app-browser-context>browser</in-app-browser-context>## My request for Codex: keep this inline',
+      text_elements: [],
+    }])])).toStrictEqual(['## My request for Codex: keep this inline']);
+  });
+
+  it('filters a browser-generated ambient heading with no following newline', () => {
+    expect(promptsFromSummaryTurns([promptTurn([{
+      type: 'text',
+      text: '<in-app-browser-context>browser</in-app-browser-context>## My request for Codex:',
+      text_elements: [],
+    }])])).toStrictEqual([]);
+  });
 });
+
+function promptTurn(content: unknown[]): v2.Turn {
+  return turn('turn', 'completed', [
+    { type: 'userMessage', id: 'user', clientId: null, content },
+  ]) as unknown as v2.Turn;
+}

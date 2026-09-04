@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import {
@@ -12,6 +13,256 @@ import {
 } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('routes item-only turn activity through the surface runtime and summary', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-item-only', itemId: 'agent-item-only',
+        delta: 'Recovered from item event',
+      },
+    });
+
+    expect(surface.getSnapshot()).toMatchObject({
+      busy: true,
+      messages: [
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          id: 'assistant-turn-item-only',
+          parts: [expect.objectContaining({ type: 'text', text: 'Recovered from item event' })],
+        }),
+      ],
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'message.delta',
+      origin: 'notification',
+      conversationId: 'thread-existing',
+      turnId: 'turn-item-only',
+      payload: {
+        messageId: 'assistant-turn-item-only', itemId: 'agent-item-only', delta: 'Recovered from item event',
+      },
+    }));
+
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-item-only', 'completed', []) },
+    });
+
+    expect(surface.getSnapshot()).toMatchObject({
+      busy: false,
+      conversations: [expect.objectContaining({ id: 'thread-existing', status: 'idle', turnCount: 2 })],
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.summaryUpserted',
+      origin: 'notification',
+      payload: expect.objectContaining({
+        summary: expect.objectContaining({ id: 'thread-existing', status: 'idle', turnCount: 2 }),
+        reason: 'updated',
+      }),
+    }));
+    await surface.close();
+  });
+
+  it('publishes activity when a started turn completes', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+
+    transport.emit({
+      method: 'turn/started',
+      params: { threadId: 'thread-existing', turn: turn('turn-activity', 'inProgress', []) },
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.activityChanged',
+      origin: 'notification',
+      conversationId: 'thread-existing',
+      payload: expect.objectContaining({ busy: true }),
+    }));
+    events.length = 0;
+
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-activity', 'completed', []) },
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.activityChanged',
+      origin: 'notification',
+      conversationId: 'thread-existing',
+      payload: expect.objectContaining({ busy: false }),
+    }));
+    await surface.close();
+  });
+
+  it('projects approval-only activity and clears busy state only without an active turn', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+
+    transport.emit({
+      id: 'legacy-approval-only',
+      method: 'execCommandApproval',
+      params: {
+        conversationId: 'thread-existing', callId: 'legacy-item', approvalId: null,
+        command: ['npm', 'test'], cwd: '/tmp/project', reason: null, parsedCmd: [],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      busy: true,
+      approvals: [expect.objectContaining({ id: 'legacy-approval-only' })],
+      conversations: [expect.objectContaining({ id: 'thread-existing', status: 'active' })],
+    }));
+    transport.emit({
+      method: 'serverRequest/resolved',
+      params: { threadId: 'thread-existing', requestId: 'legacy-approval-only' },
+    });
+    expect(surface.getSnapshot()).toMatchObject({ busy: false, approvals: [] });
+
+    transport.emit({
+      id: 'turn-approval-only',
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-from-approval', itemId: 'command-from-approval',
+        command: 'npm test', cwd: '/tmp/project', reason: null, environmentId: null,
+        commandActions: [], networkApprovalContext: null, additionalPermissions: null,
+        availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+    transport.emit({
+      method: 'serverRequest/resolved',
+      params: { threadId: 'thread-existing', requestId: 'turn-approval-only' },
+    });
+
+    expect(surface.getSnapshot()).toMatchObject({ busy: true, approvals: [] });
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'approval.requested', origin: 'notification', conversationId: 'thread-existing',
+      }),
+      expect.objectContaining({
+        type: 'approval.resolved', origin: 'notification', conversationId: 'thread-existing',
+        payload: expect.objectContaining({ reason: 'server' }),
+      }),
+    ]));
+    await surface.close();
+  });
+
+  it('keeps approval-only work busy while resolving a turnless MCP confirmation', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+    transport.emit({
+      id: 'legacy-pending',
+      method: 'execCommandApproval',
+      params: {
+        conversationId: 'thread-existing', callId: 'legacy-pending-item', approvalId: null,
+        command: ['npm', 'test'], cwd: '/tmp/project', reason: null, parsedCmd: [],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().approvals).toHaveLength(1));
+
+    transport.emit({
+      id: 'mcp-turnless',
+      method: 'mcpServer/elicitation/request',
+      params: {
+        threadId: 'thread-existing', turnId: null, serverName: 'calendar', mode: 'form',
+        message: 'Allow calendar lookup?', requestedSchema: { type: 'object', properties: {} },
+        _meta: {
+          codex_approval_kind: 'mcp_tool_call', tool_name: 'lookup', persist: null, tool_params: {},
+        },
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().clientRequests).toHaveLength(1));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'tool.started',
+      origin: 'notification',
+      conversationId: 'thread-existing',
+      turnId: 'client-request-mcp-turnless',
+      payload: expect.objectContaining({ messageId: 'assistant-client-request-mcp-turnless' }),
+    }));
+
+    await surface.respondToClientRequest({ id: 'mcp-turnless', payload: { decision: 'deny' } });
+    expect(surface.getSnapshot()).toMatchObject({
+      busy: true,
+      approvals: [expect.objectContaining({ id: 'legacy-pending' })],
+      clientRequests: [],
+    });
+    await surface.resolveApproval('legacy-pending', 'deny');
+    expect(surface.getSnapshot()).toMatchObject({ busy: false, approvals: [] });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.activityChanged',
+      origin: 'action',
+      conversationId: 'thread-existing',
+      payload: expect.objectContaining({ busy: false }),
+    }));
+
+    transport.emit({
+      id: 'question-active-turn',
+      method: 'item/tool/requestUserInput',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-question', itemId: 'question-item', autoResolutionMs: null,
+        questions: [{
+          id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
+          options: null,
+        }],
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().clientRequests).toHaveLength(1));
+    transport.emit({
+      method: 'serverRequest/resolved',
+      params: { threadId: 'thread-existing', requestId: 'question-active-turn' },
+    });
+    expect(surface.getSnapshot()).toMatchObject({ busy: true, clientRequests: [] });
+    await surface.close();
+  });
+
+  it('publishes activity when a turnless client request becomes idle', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    events.length = 0;
+
+    transport.emit({
+      id: 'mcp-turnless-only',
+      method: 'mcpServer/elicitation/request',
+      params: {
+        threadId: 'thread-existing', turnId: null, serverName: 'calendar', mode: 'form',
+        message: 'Allow calendar lookup?', requestedSchema: { type: 'object', properties: {} },
+        _meta: {
+          codex_approval_kind: 'mcp_tool_call', tool_name: 'lookup', persist: null, tool_params: {},
+        },
+      },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
+      busy: true,
+      clientRequests: [expect.objectContaining({ id: 'mcp-turnless-only' })],
+    }));
+
+    await surface.respondToClientRequest({ id: 'mcp-turnless-only', payload: { decision: 'deny' } });
+
+    expect(surface.getSnapshot()).toMatchObject({ busy: false, clientRequests: [] });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.activityChanged',
+      origin: 'action',
+      conversationId: 'thread-existing',
+      payload: expect.objectContaining({ busy: false }),
+    }));
+    await surface.close();
+  });
+
   it('renders app-server plans and raw response tools instead of dropping them', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
@@ -144,7 +395,10 @@ describe('CodexSurface', () => {
       'thread/goal/set': () => ({ goal }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
     await surface.connect();
+    events.length = 0;
     await surface.sendMessage('/compact');
     expect(lastRequest(transport, 'thread/compact/start')).toMatchObject({ params: { threadId: 'thread-existing' } });
     await surface.sendMessage('/plan');
@@ -153,6 +407,12 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot().goal).toMatchObject({ objective: 'Ship it' });
 
     await surface.sendMessage('First');
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'conversation.activityChanged',
+      origin: 'action',
+      conversationId: 'thread-existing',
+      payload: expect.objectContaining({ busy: true }),
+    }));
     await surface.sendMessage('Second');
     expect(surface.getSnapshot().queuedPrompts).toMatchObject([{ text: 'Second' }]);
     transport.emit({
@@ -210,7 +470,7 @@ describe('CodexSurface', () => {
       goal: { objective: 'Finish', tokenBudget: 1000 },
       turnGitDiff: { addedLines: 2, removedLines: 1 },
     });
-    await surface.deleteMessage(0);
+    await surface.conversation('thread-existing').deleteMessage(0);
     expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
       params: { threadId: 'thread-existing', numTurns: 1 },
     });
@@ -296,12 +556,18 @@ describe('CodexSurface', () => {
       params: { threadId: 'thread-new', objective: 'Ship', status: 'active' },
     });
     await expect(surface.setGoal('   ')).rejects.toThrow('cannot be empty');
-    await surface.setGoal(' Ship ', null);
+    const activeConversation = surface.conversation('thread-new');
+    await activeConversation.setGoal(' Ship ', null);
     expect(lastRequest(transport, 'thread/goal/set')).toMatchObject({
       params: { threadId: 'thread-new', objective: 'Ship', status: 'active', tokenBudget: null },
     });
-    await surface.clearGoal();
+    await activeConversation.clearGoal();
     expect(lastRequest(transport, 'thread/goal/clear')).toMatchObject({ params: { threadId: 'thread-new' } });
+    await surface.compactConversation();
+    await activeConversation.compact();
+    expect(transport.sent.filter((message) => (
+      'method' in message && message.method === 'thread/compact/start'
+    ))).toHaveLength(2);
     await surface.sendMessage('/review');
     expect(surface.getSnapshot().busy).toBe(false);
   });
@@ -425,6 +691,10 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot()).toMatchObject({
       approvalPreset: 'full-access', selectedModelId: 'gpt-mini', selectedReasoningEffort: 'high', planMode: true,
     });
+    await surface.conversation('thread-new').updateSettings({ planMode: false });
+    expect(lastRequest(transport, 'thread/settings/update')).toMatchObject({
+      params: { threadId: 'thread-new', collaborationMode: { mode: 'default' } },
+    });
   });
 
   it('uses an explicitly switched model default instead of inheriting incompatible reasoning', async () => {
@@ -455,7 +725,7 @@ describe('CodexSurface', () => {
     await expect(edited.surface.deleteMessage(-1)).rejects.toThrow('Unknown message index');
     await expect(edited.surface.editMessage(1, 'Nope')).rejects.toThrow('Only user messages');
     await expect(edited.surface.editMessage(0, '   ')).rejects.toThrow('empty content');
-    await edited.surface.editMessage(0, 'Edited prompt');
+    await edited.surface.conversation('thread-existing').editMessage(0, 'Edited prompt');
     expect(lastRequest(edited.transport, 'thread/rollback')).toMatchObject({ params: { numTurns: 1 } });
     expect(lastRequest(edited.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Edited prompt' }] },
@@ -463,10 +733,30 @@ describe('CodexSurface', () => {
 
     const retried = createSurface();
     await retried.surface.connect();
-    await retried.surface.retryMessage(1);
+    await retried.surface.conversation('thread-existing').retryMessage(1);
     expect(lastRequest(retried.transport, 'thread/rollback')).toMatchObject({ params: { numTurns: 1 } });
     expect(lastRequest(retried.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Hello' }] },
+    });
+
+    const retriedThroughSurface = createSurface();
+    await retriedThroughSurface.surface.connect();
+    await retriedThroughSurface.surface.retryMessage(1);
+    expect(lastRequest(retriedThroughSurface.transport, 'turn/start')).toMatchObject({
+      params: { input: [{ type: 'text', text: 'Hello' }] },
+    });
+
+    const steered = createSurface();
+    await steered.surface.connect();
+    const steeredConversation = steered.surface.conversation('thread-existing');
+    await steeredConversation.sendMessage('First');
+    await steeredConversation.steerMessage('Refine this');
+    expect(lastRequest(steered.transport, 'turn/steer')).toMatchObject({
+      params: { threadId: 'thread-existing', input: [{ type: 'text', text: 'Refine this' }] },
+    });
+    await steeredConversation.interrupt();
+    expect(lastRequest(steered.transport, 'turn/interrupt')).toMatchObject({
+      params: { threadId: 'thread-existing', turnId: 'turn-live' },
     });
 
     const queued = createSurface();
@@ -474,18 +764,19 @@ describe('CodexSurface', () => {
     await queued.surface.sendMessage('First');
     const firstQueue = await queued.surface.sendMessage('Delete me');
     const deleteId = firstQueue.queuedPrompts[0]!.id;
-    await queued.surface.deleteQueuedPrompt(deleteId);
+    const queuedConversation = queued.surface.conversation('thread-existing');
+    await queuedConversation.deleteQueuedPrompt(deleteId);
     await expect(queued.surface.deleteQueuedPrompt(deleteId)).rejects.toThrow('Unknown queued prompt');
     await queued.surface.sendMessage('Keep my position');
     const secondQueue = await queued.surface.sendMessage('Edit me');
     const editId = secondQueue.queuedPrompts[1]!.id;
     await expect(queued.surface.updateQueuedPrompt(editId, '   ')).rejects.toThrow('empty content');
-    const updatedQueue = await queued.surface.updateQueuedPrompt(editId, 'Edited in place');
+    const updatedQueue = await queuedConversation.updateQueuedPrompt(editId, 'Edited in place');
     expect(updatedQueue.queuedPrompts.map(({ id, text }) => ({ id, text }))).toStrictEqual([
       { id: secondQueue.queuedPrompts[0]!.id, text: 'Keep my position' },
       { id: editId, text: 'Edited in place' },
     ]);
-    await queued.surface.steerQueuedPrompt(editId, 'Edited and steered');
+    await queuedConversation.steerQueuedPrompt(editId, 'Edited and steered');
     expect(lastRequest(queued.transport, 'turn/steer')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Edited and steered' }] },
     });

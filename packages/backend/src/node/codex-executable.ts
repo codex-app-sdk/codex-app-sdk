@@ -87,10 +87,9 @@ function loginShellPath(dependencies: CodexExecutableDiscoveryDependencies): str
       encoding: 'utf8',
       env: dependencies.env ?? process.env,
       stdio: 'pipe',
-    }).toString().trim();
-  } catch {
-    return null;
-  }
+    }).toString();
+  } catch {}
+  return null;
 }
 
 function commonUserBinaryPaths(dependencies: CodexExecutableDiscoveryDependencies): string[] {
@@ -123,9 +122,8 @@ function nvmBinaryPathFromCommand(dependencies: CodexExecutableDiscoveryDependen
       stdio: 'pipe',
     }).toString().trim();
     return executableExists(nodePath, dependencies) ? path.dirname(nodePath) : null;
-  } catch {
-    return null;
-  }
+  } catch {}
+  return null;
 }
 
 function nvmBinaryPathFromFiles(dependencies: CodexExecutableDiscoveryDependencies): string | null {
@@ -145,13 +143,12 @@ function nvmBinaryPathFromFiles(dependencies: CodexExecutableDiscoveryDependenci
       current = `v${current}`;
     }
     const best = (dependencies.readdirSync ?? nodeReaddirSync)(versionsPath)
-      .filter((version) => version === current || version.startsWith(current))
+      .filter((version) => version.startsWith(current))
       .sort()
       .at(-1);
     return best ? path.join(versionsPath, best, 'bin') : null;
-  } catch {
-    return null;
-  }
+  } catch {}
+  return null;
 }
 
 function executableCandidates(executable: string, dependencies: CodexExecutableDiscoveryDependencies): string[] {
@@ -163,7 +160,7 @@ function executableCandidates(executable: string, dependencies: CodexExecutableD
 }
 
 function pathEntries(value: string | undefined | null, delimiter: string): string[] {
-  return value ? value.split(delimiter).map((entry) => entry.trim()).filter(Boolean) : [];
+  return value ? value.split(delimiter).map((entry) => entry.trim()) : [];
 }
 
 function unique(entries: Array<string | null | undefined>): string[] {

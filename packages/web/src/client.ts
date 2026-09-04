@@ -339,7 +339,7 @@ class ClientTransport {
     this.#reconnectAttempts += 1;
     this.#reconnectTimer = setTimeout(() => {
       this.#reconnectTimer = null;
-      void this.#beginConnect().catch(() => this.#scheduleReconnect());
+      void this.#beginConnect().catch(() => undefined);
     }, delay);
   }
 

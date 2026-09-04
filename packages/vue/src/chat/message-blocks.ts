@@ -63,10 +63,6 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
 
   const toolCalls = message.toolCalls ?? []
   const parts = message.parts ?? []
-  if (!message.content && toolCalls.length === 0 && parts.length === 0) {
-    return []
-  }
-
   if (parts.length > 0) {
     return computeMessageBlocksFromParts(parts, toolCalls)
   }
@@ -147,7 +143,6 @@ function parseTextBlocks(
   const { content, prompts } = extractFollowUps(completeStreamingCustomTags(rawContent))
   const codeBlocks = findCodeBlocks(content)
   const blocks: MessageBlock[] = []
-  addReferencedToolCallIds(content, toolCalls, anchoredToolCallIds)
   let lastIndex = 0
 
   for (const item of findSpecialBlocks(content, codeBlocks)) {
@@ -349,7 +344,6 @@ function completeStreamingToolTag(content: string) {
   const closeTag = '</tool>'
   const partialCloseIndex = toolText.lastIndexOf('</')
   const openingText = partialCloseIndex >= 0 ? toolText.slice(0, partialCloseIndex) : toolText
-  const partialClose = partialCloseIndex >= 0 ? toolText.slice(partialCloseIndex) : ''
   const openingEnd = openingText.indexOf('>')
 
   if (openingEnd === -1) {
@@ -359,10 +353,6 @@ function completeStreamingToolTag(content: string) {
 
   const completedOpening = openingText.slice(0, openingEnd + 1)
   const trailingText = openingText.slice(openingEnd + 1)
-  if (partialClose && closeTag.startsWith(partialClose)) {
-    return `${beforeTool}${completedOpening}${closeTag}${trailingText}`
-  }
-
   return `${beforeTool}${completedOpening}${closeTag}${trailingText}`
 }
 
@@ -371,20 +361,7 @@ function findToolCall(kind: string, value: string, toolCalls: MessageToolCall[])
     return toolCalls.find((toolCall) => toolCall.id === value)
   }
 
-  if (kind === 'index') {
-    return toolCalls[Number.parseInt(value, 10)]
-  }
-
-  return undefined
-}
-
-function addReferencedToolCallIds(content: string, toolCalls: MessageToolCall[], ids: Set<string>) {
-  for (const match of content.matchAll(toolTagRegex)) {
-    const toolCall = findToolCall(match[1] ?? '', match[2] ?? '', toolCalls)
-    if (toolCall) {
-      ids.add(toolCall.id)
-    }
-  }
+  return toolCalls[Number.parseInt(value, 10)]
 }
 
 function findMediaToolCall(media: MessageMedia, toolCalls: MessageToolCall[]) {
@@ -438,9 +415,9 @@ function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[]) {
   }
 
   for (const match of content.matchAll(visualizationAnnotationRegex)) {
-    const start = match.index ?? 0
+    const start = match.index
     if (isInsideCodeBlock(start, codeBlocks)) continue
-    const payload = visualizationPayload(match[1] ?? '')
+    const payload = visualizationPayload(match[1]!)
     blocks.push({
       end: start + match[0].length,
       start,
@@ -451,7 +428,7 @@ function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[]) {
   }
 
   for (const match of content.matchAll(toolTagRegex)) {
-    const start = match.index ?? 0
+    const start = match.index
     if (isInsideCodeBlock(start, codeBlocks)) {
       continue
     }
@@ -472,16 +449,13 @@ function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[]) {
   }
 
   for (const match of content.matchAll(markdownImageRegex)) {
-    const start = match.index ?? 0
+    const start = match.index
     if (isInsideCodeBlock(start, codeBlocks)) {
       continue
     }
 
-    const alt = (match[1] ?? '').trim()
-    const url = match[2]
-    if (!url) {
-      continue
-    }
+    const alt = match[1]!.trim()
+    const url = match[2]!
     const title = match[3]?.trim()
     blocks.push({
       end: start + match[0].length,
@@ -519,11 +493,8 @@ function findMermaidCodeBlocks(content: string): SpecialBlock[] {
   let match: RegExpExecArray | null
 
   while ((match = fenceRegex.exec(content)) !== null) {
-    const fence = match[2]
-    const prefix = match[1] ?? ''
-    if (!fence) {
-      continue
-    }
+    const fence = match[2]!
+    const prefix = match[1]!
     const start = match.index + prefix.length
     const codeStart = start + match[0].length - prefix.length
     const closeRegex = new RegExp(`(^|\\n)${escapeRegex(fence)}[ \\t]*(?=\\n|$)`, 'g')
@@ -552,11 +523,8 @@ function findCodeBlocks(content: string): CodeBlockRange[] {
   let match: RegExpExecArray | null
 
   while ((match = fenceRegex.exec(content)) !== null) {
-    const fence = match[2]
-    const prefix = match[1] ?? ''
-    if (!fence) {
-      continue
-    }
+    const fence = match[2]!
+    const prefix = match[1]!
     const start = match.index + prefix.length
     const closeRegex = new RegExp(`(^|\\n)${escapeRegex(fence)}`, 'g')
     closeRegex.lastIndex = start + fence.length
@@ -567,7 +535,7 @@ function findCodeBlocks(content: string): CodeBlockRange[] {
       break
     }
 
-    const end = close.index + (close[1]?.length ?? 0) + fence.length
+    const end = close.index + close[1]!.length + fence.length
     ranges.push({ start, end })
     fenceRegex.lastIndex = end
   }

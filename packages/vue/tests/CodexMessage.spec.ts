@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
 import ChatCompactionMessage from '../src/chat/ChatCompactionMessage.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
+import ChatMessageActions from '../src/chat/ChatMessageActions.vue';
+import ChatMessageBlock from '../src/chat/ChatMessageBlock.vue';
 import ChatMessageEditor from '../src/chat/ChatMessageEditor.vue';
 
 const clipboardWriteText = vi.fn();
@@ -19,6 +21,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -103,6 +106,85 @@ describe('CodexMessage', () => {
     expect(wrapper.get('.chat-message__thinking').text()).toBe('Thinking');
     expect(wrapper.get('.chat-message__thinking').classes()).toContain('codex-text-shimmer');
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+  });
+
+  it.each([
+    ['attachment', [{
+      type: 'attachment',
+      attachment: { kind: 'file', name: 'result.txt', path: '/tmp/result.txt' },
+    }]],
+    ['media', [{
+      type: 'media',
+      media: { mimeType: 'image/png', title: 'Result', url: 'data:image/png;base64,cG5n' },
+    }]],
+    ['tool', [{
+      type: 'tool',
+      toolCall: {
+        args: {}, done: false, function: 'ask_user_question', id: 'question-1', result: null, state: 'running',
+      },
+    }]],
+    ['tool-group', [{
+      type: 'tool',
+      toolCall: { args: {}, done: false, function: 'shell', id: 'shell-1', result: null, state: 'running' },
+    }]],
+  ])('uses the streaming status dot for visible %s activity', (blockType, parts) => {
+    const wrapper = mount(CodexMessage, {
+      props: {
+        message: { id: `assistant-${blockType}`, role: 'assistant', content: '', parts, streaming: true },
+      } as never,
+      slots: {
+        block: ({ block }: { block: { type: string } }) => h('span', { 'data-block-type': block.type }, block.type),
+      },
+    });
+
+    expect(wrapper.get('[data-block-type]').attributes('data-block-type')).toBe(blockType);
+    expect(wrapper.get('.chat-message__stream-dot').attributes('aria-label')).toBe('Streaming');
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+    expect(wrapper.find('.chat-message__empty-response').exists()).toBe(false);
+  });
+
+  it.each([
+    ['mermaid', ['```mermaid', 'graph TD; A-->B;', '```'].join('\n')],
+    ['visualization', '\uE200visualize\uE202{"path":"/tmp/chart.html","title":"Chart"}\uE201'],
+  ])('treats a streaming %s block as visible assistant activity', (blockType, content) => {
+    const wrapper = mount(CodexMessage, {
+      props: { message: { id: `assistant-${blockType}`, role: 'assistant', content, streaming: true } },
+      slots: {
+        block: ({ block }: { block: { type: string } }) => h('span', { 'data-block-type': block.type }, block.type),
+      },
+    });
+
+    expect(wrapper.get('[data-block-type]').attributes('data-block-type')).toBe(blockType);
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+    expect(wrapper.get('.chat-message__stream-dot').attributes('aria-label')).toBe('Streaming');
+  });
+
+  it('does not treat a follow-up suggestion as streamed assistant response content', () => {
+    const wrapper = mount(CodexMessage, {
+      props: {
+        message: {
+          id: 'assistant-follow-up-only',
+          role: 'assistant',
+          content: '<follow-up>Try the next step</follow-up>',
+          streaming: true,
+        },
+      },
+      slots: {
+        block: ({ block }: { block: { type: string } }) => h('span', { 'data-block-type': block.type }, block.type),
+      },
+    });
+
+    expect(wrapper.get('[data-block-type]').attributes('data-block-type')).toBe('follow-ups');
+    expect(wrapper.get('.chat-message__thinking').text()).toBe('Thinking');
+    expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(false);
+  });
+
+  it('does not render assistant-only status UI for an empty user message', () => {
+    const wrapper = mountMessage({ message: { id: 'user-empty', role: 'user', content: '' } });
+
+    expect(wrapper.find('.chat-message__empty-response').exists()).toBe(false);
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+    expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(false);
   });
 
   it('expands phased work while active and collapses it when the final answer starts', async () => {
@@ -221,6 +303,54 @@ describe('CodexMessage', () => {
     expect(seenTypes).not.toContain('work-group');
   });
 
+  it('forwards every action emitted by a phased work group', async () => {
+    const wrapper = mount(CodexMessage, {
+      props: {
+        message: {
+        id: 'assistant-work-actions',
+        role: 'assistant',
+        status: 'streaming',
+          parts: [
+            {
+              type: 'reasoning',
+              summary: 'Waiting for a decision',
+              itemId: 'reasoning-1',
+              summaryIndex: 0,
+            },
+            {
+              type: 'text',
+              text: 'Checking the available choices',
+              itemId: 'commentary-1',
+              phase: 'commentary',
+            },
+          ],
+        },
+      },
+      slots: {
+        text: ({ content }: { content: string }) => `Custom work text: ${content}`,
+      },
+    });
+    const response = { id: 'question-1', payload: { answers: { choice: 'yes' } } };
+    const link = { href: 'https://example.com/result', kind: 'external' as const };
+    const visualization = { path: '/tmp/chart.html', title: 'Chart' };
+    const workGroup = wrapper.getComponent(ChatMessageBlock);
+
+    expect(wrapper.text()).toContain('Custom work text: Checking the available choices');
+
+    workGroup.vm.$emit('cancel');
+    workGroup.vm.$emit('client-response', response);
+    workGroup.vm.$emit('open-link', link);
+    workGroup.vm.$emit('open-visualization', visualization);
+    workGroup.vm.$emit('send-follow-up', 'Continue');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
+    expect(wrapper.emitted('client-response')).toStrictEqual([[response]]);
+    expect(wrapper.emitted('open-link')).toStrictEqual([[link]]);
+    expect(wrapper.emitted('open-visualization')).toStrictEqual([[visualization]]);
+    expect(wrapper.emitted('send-follow-up')).toStrictEqual([['Continue']]);
+  });
+
   it('renders a muted italic fallback for an empty completed assistant response', () => {
     const wrapper = mountMessage({
       message: {
@@ -284,6 +414,23 @@ describe('CodexMessage', () => {
     expect(wrapper.findAll('.chat-attachment-block').map((block) => block.text()))
       .toStrictEqual(['', 'notes.md']);
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/notes.md');
+  });
+
+  it('keeps assistant attachments in the response stack', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-attachment',
+        role: 'assistant',
+        status: 'complete',
+        parts: [{
+          type: 'attachment',
+          attachment: { kind: 'file', name: 'result.txt', path: '/tmp/result.txt' },
+        }],
+      },
+    });
+
+    expect(wrapper.find('.chat-message__attachments').exists()).toBe(false);
+    expect(wrapper.get('.chat-message__stack .chat-attachment-block').text()).toBe('result.txt');
   });
 
   it('hides ambient context from rendering, editing, and clipboard output', async () => {
@@ -439,6 +586,49 @@ describe('CodexMessage', () => {
     expect(wrapper.emitted('quote-message')).toStrictEqual([[2]]);
     expect(wrapper.emitted('delete-message')).toStrictEqual([[2]]);
     expect(wrapper.emitted('edit-message')).toStrictEqual([[{ content: 'New prompt', index: 2 }]]);
+    expect(wrapper.findComponent(ChatMessageEditor).exists()).toBe(false);
+  });
+
+  it('closes editing on cancel without emitting a replacement', async () => {
+    const wrapper = mountMessage({ message: { id: 'user-cancel', role: 'user', content: 'Keep me' } });
+
+    await wrapper.get('[aria-label="Edit"]').trigger('click');
+    wrapper.getComponent(ChatMessageEditor).vm.$emit('cancel');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findComponent(ChatMessageEditor).exists()).toBe(false);
+    expect(wrapper.emitted('edit-message')).toBeUndefined();
+  });
+
+  it('rejects child mutation events that violate role, capability, or thread policy', async () => {
+    const unavailable = mountMessage({
+      canDeleteMessage: false,
+      canEditMessage: false,
+      canForkMessage: false,
+      canRetryMessage: false,
+      message: { id: 'user-unavailable', role: 'user', content: 'Locked' },
+    });
+    const unavailableActions = unavailable.getComponent(ChatMessageActions);
+    for (const event of ['delete', 'edit', 'fork', 'retry'] as const) unavailableActions.vm.$emit(event);
+    await unavailable.vm.$nextTick();
+    expect(unavailable.findComponent(ChatMessageEditor).exists()).toBe(false);
+    expect(unavailable.emitted('delete-message')).toBeUndefined();
+    expect(unavailable.emitted('fork-message')).toBeUndefined();
+    expect(unavailable.emitted('retry-message')).toBeUndefined();
+
+    const disabled = mountMessage({
+      canForkMessage: true,
+      message: { id: 'assistant-disabled', role: 'assistant', content: 'Locked' },
+      threadActionsDisabled: true,
+    });
+    const disabledActions = disabled.getComponent(ChatMessageActions);
+    for (const event of ['delete', 'fork', 'retry'] as const) disabledActions.vm.$emit(event);
+    disabledActions.vm.$emit('edit');
+    await disabled.vm.$nextTick();
+    expect(disabled.findComponent(ChatMessageEditor).exists()).toBe(false);
+    expect(disabled.emitted('delete-message')).toBeUndefined();
+    expect(disabled.emitted('fork-message')).toBeUndefined();
+    expect(disabled.emitted('retry-message')).toBeUndefined();
   });
 
   it('copies messages without tool markers or follow-up chips', async () => {
@@ -454,6 +644,39 @@ describe('CodexMessage', () => {
 
     expect(clipboardWriteText).toHaveBeenCalledWith('Done.');
     expect(wrapper.emitted('copy-message')).toStrictEqual([[4]]);
+  });
+
+  it('shows copied state for 1.5 seconds, extends it on repeat copy, and cancels cleanup on unmount', async () => {
+    vi.useFakeTimers();
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    const wrapper = mountMessage({
+      index: 6,
+      message: { id: 'assistant-copy-state', role: 'assistant', content: 'Copy me' },
+    });
+
+    await wrapper.get('[aria-label="Copy"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[aria-label="Copied"]').exists()).toBe(true);
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 1_500);
+    const firstResetTimer = setTimeoutSpy.mock.results.at(-1)!.value;
+
+    vi.advanceTimersByTime(1_000);
+    await wrapper.get('[aria-label="Copied"]').trigger('click');
+    await flushPromises();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(firstResetTimer);
+    vi.advanceTimersByTime(1_499);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[aria-label="Copied"]').exists()).toBe(true);
+    vi.advanceTimersByTime(1);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
+
+    await wrapper.get('[aria-label="Copy"]').trigger('click');
+    await flushPromises();
+    const unmountResetTimer = setTimeoutSpy.mock.results.at(-1)!.value;
+    wrapper.unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(unmountResetTimer);
   });
 
   it('renders assistant retry actions and reserves them while streaming', async () => {
@@ -483,5 +706,16 @@ describe('CodexMessage', () => {
     });
 
     expect(wrapper.get('.chat-message').classes()).toContain('chat-message--actions-visible');
+  });
+
+  it('does not mark a reserved action slot as persistently visible', () => {
+    const wrapper = mountMessage({
+      actionsAlwaysVisible: true,
+      actionsDisabled: true,
+      message: { id: 'assistant-reserved', role: 'assistant', content: 'Answer' },
+    });
+
+    expect(wrapper.get('.chat-message__actions').classes()).toContain('chat-message__actions--reserved');
+    expect(wrapper.get('.chat-message').classes()).not.toContain('chat-message--actions-visible');
   });
 });

@@ -52,6 +52,8 @@ export class ManualSocket implements CodexWebSocketPort {
   readonly #closeListeners = new Set<(close: CodexWebSocketClose) => void>();
   readonly #errors = new Set<(error: unknown) => void>();
 
+  constructor(private readonly retainListeners = false) {}
+
   send(data: string): void {
     if (this.sendError !== undefined) throw this.sendError;
     this.sent.push(data);
@@ -63,17 +65,23 @@ export class ManualSocket implements CodexWebSocketPort {
 
   onMessage(listener: (data: unknown) => void): () => void {
     this.#messages.add(listener);
-    return () => this.#messages.delete(listener);
+    return () => {
+      if (!this.retainListeners) this.#messages.delete(listener);
+    };
   }
 
   onClose(listener: (close: CodexWebSocketClose) => void): () => void {
     this.#closeListeners.add(listener);
-    return () => this.#closeListeners.delete(listener);
+    return () => {
+      if (!this.retainListeners) this.#closeListeners.delete(listener);
+    };
   }
 
   onError(listener: (error: unknown) => void): () => void {
     this.#errors.add(listener);
-    return () => this.#errors.delete(listener);
+    return () => {
+      if (!this.retainListeners) this.#errors.delete(listener);
+    };
   }
 
   emitMessage(data: unknown): void {
@@ -86,6 +94,14 @@ export class ManualSocket implements CodexWebSocketPort {
 
   emitError(error: unknown): void {
     for (const listener of this.#errors) listener(error);
+  }
+
+  listenerCounts(): { close: number; error: number; message: number } {
+    return {
+      close: this.#closeListeners.size,
+      error: this.#errors.size,
+      message: this.#messages.size,
+    };
   }
 }
 
@@ -104,6 +120,8 @@ export function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
   const connect = vi.fn(async () => initialSnapshot);
   const archiveConversation = vi.fn(async () => initialSnapshot);
   const refreshAccount = vi.fn(async () => initialSnapshot);
+  const offState = vi.fn(() => { stateListener = undefined; });
+  const offEvent = vi.fn(() => { eventListener = undefined; });
   const target = {
     connect,
     archiveConversation,
@@ -111,11 +129,11 @@ export function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
     getSnapshot: vi.fn(() => initialSnapshot),
     onStateChange: vi.fn((listener: (value: CodexSurfaceSnapshot) => void) => {
       stateListener = listener;
-      return () => { stateListener = undefined; };
+      return offState;
     }),
     onEvent: vi.fn((listener: (value: CodexSurfaceEvent) => void) => {
       eventListener = listener;
-      return () => { eventListener = undefined; };
+      return offEvent;
     }),
   };
   return {
@@ -123,6 +141,8 @@ export function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
     connect,
     archiveConversation,
     refreshAccount,
+    offState,
+    offEvent,
     emitState: (value: CodexSurfaceSnapshot) => stateListener?.(value),
     emitEvent: (value: CodexSurfaceEvent) => eventListener?.(value),
   };

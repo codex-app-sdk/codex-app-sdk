@@ -14,6 +14,7 @@
 </template>
 
 <script setup lang="ts">
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   disabled?: boolean
   prompts: string[]
@@ -22,6 +23,7 @@ defineProps<{
 const emit = defineEmits<{
   'send-follow-up': [prompt: string]
 }>()
+// Stryker restore all
 </script>
 
 <style scoped>

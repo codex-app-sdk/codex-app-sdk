@@ -30,16 +30,20 @@ import type {
   CodexSurfaceRequestedPermission,
 } from '@codex-app-sdk/core/surface';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   approval: CodexSurfaceApproval;
   disabled?: boolean;
 }>(), {
   disabled: false,
 });
+// Stryker restore all
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const emit = defineEmits<{
   resolve: [decision: CodexSurfaceApprovalDecision, scope: CodexSurfaceApprovalScope];
 }>();
+// Stryker restore all
 
 const allowedScopes = computed(() => props.approval.allowedScopes ?? ['once', 'session']);
 const canDeny = computed(() => props.approval.canDeny ?? true);

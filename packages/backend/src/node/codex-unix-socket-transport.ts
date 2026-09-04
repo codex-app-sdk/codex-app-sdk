@@ -56,7 +56,7 @@ export class CodexAppServerUnixSocketTransport implements RpcTransport {
         const remainder = this.handshakeBuffer.subarray(boundary + 4);
         this.handshakeBuffer = Buffer.alloc(0);
         if (!/^HTTP\/1\.1 101(?: |$)/m.test(header)) {
-          fail(new Error(`Codex app-server rejected Unix socket WebSocket upgrade: ${header.split('\r\n', 1)[0] ?? 'invalid response'}`));
+          fail(new Error(`Codex app-server rejected Unix socket WebSocket upgrade: ${header.split('\r\n', 1)[0]}`));
           return;
         }
         cleanup();
@@ -64,7 +64,7 @@ export class CodexAppServerUnixSocketTransport implements RpcTransport {
         socket.on('error', (error) => this.handleSocketError(error));
         socket.on('close', () => this.handleSocketClose());
         this.started = true;
-        if (remainder.length > 0) this.handleFrameData(remainder);
+        this.handleFrameData(remainder);
         resolve();
       };
       const cleanup = (): void => {
@@ -83,7 +83,7 @@ export class CodexAppServerUnixSocketTransport implements RpcTransport {
 
   send(message: RpcMessage): void {
     if (!this.socket || !this.started) throw new Error('Codex app-server Unix socket transport is not started');
-    this.writeFrame(0x1, Buffer.from(JSON.stringify(message)));
+    this.writeFrame(0x1, Buffer.from(JSON.stringify(message)), this.socket);
   }
 
   async close(): Promise<void> {
@@ -120,11 +120,16 @@ export class CodexAppServerUnixSocketTransport implements RpcTransport {
 
   private handleFrameData(chunk: Buffer): void {
     this.frameBuffer = Buffer.concat([this.frameBuffer, chunk]);
-    while (true) {
-      const frame = readFrame(this.frameBuffer, this.options.maxFrameBytes ?? DEFAULT_MAX_FRAME_BYTES);
-      if (!frame) return;
-      this.frameBuffer = this.frameBuffer.subarray(frame.bytesRead);
-      this.handleFrame(frame.fin, frame.opcode, frame.payload);
+    try {
+      while (true) {
+        const frame = readFrame(this.frameBuffer, this.options.maxFrameBytes ?? DEFAULT_MAX_FRAME_BYTES);
+        if (!frame) return;
+        this.frameBuffer = this.frameBuffer.subarray(frame.bytesRead);
+        this.handleFrame(frame.fin, frame.opcode, frame.payload);
+      }
+    } catch (error) {
+      this.frameBuffer = Buffer.alloc(0);
+      this.emitError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -134,7 +139,7 @@ export class CodexAppServerUnixSocketTransport implements RpcTransport {
       return;
     }
     if (opcode === 0x9) {
-      if (this.socket && !this.socket.destroyed) this.writeFrame(0xA, payload);
+      if (this.socket && !this.socket.destroyed) this.writeFrame(0xA, payload, this.socket);
       return;
     }
     if (opcode === 0xA) return;
@@ -164,8 +169,7 @@ export class CodexAppServerUnixSocketTransport implements RpcTransport {
     }
   }
 
-  private writeFrame(opcode: number, payload: Buffer, target = this.socket): void {
-    if (!target) return;
+  private writeFrame(opcode: number, payload: Buffer, target: Socket): void {
     target.write(encodeClientFrame(opcode, payload));
   }
 

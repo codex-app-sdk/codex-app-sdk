@@ -30,12 +30,51 @@ describe('CodexAppBackend', () => {
     expect(() => createCodexAppBackend({
       surface,
       modules: [
-        { id: 'app', create },
+        { id: ' app ', create },
         { id: 'app', create: () => null },
       ],
     })).toThrow("Duplicate Codex backend module 'app'");
     expect(create).not.toHaveBeenCalled();
+    expect(() => createCodexAppBackend({
+      surface,
+      modules: [{ id: '   ', create }],
+    })).toThrow('Codex backend module IDs cannot be empty');
     expect(() => createCodexAppBackend({ surface }).module('missing')).toThrow("Unknown Codex backend module 'missing'");
+  });
+
+  it('normalizes module lookup and exposes working cache and close helpers', async () => {
+    const surface = new CodexSurface();
+    const closeSurface = vi.spyOn(surface, 'close').mockResolvedValue();
+    const backend = createCodexAppBackend({
+      surface,
+      modules: [{
+        id: ' app.worker ',
+        create: ({ closeBackend, createTtlCache }) => ({ closeBackend, createTtlCache }),
+      }],
+    });
+    const module = backend.module<{
+      closeBackend(): Promise<void>;
+      createTtlCache: typeof backend.createTtlCache;
+    }>(' app.worker ');
+    const cache = module.createTtlCache({
+      ttlMs: 100,
+      identity: (value: { id: string }) => value.id,
+      canEvict: () => true,
+      onEvict: () => undefined,
+    });
+    const closeCache = vi.spyOn(cache, 'close');
+
+    const closing = module.closeBackend();
+    expect(closing).toBe(backend.close());
+    await closing;
+    expect(closeCache).toHaveBeenCalledOnce();
+    expect(closeSurface).toHaveBeenCalledOnce();
+    expect(() => backend.createTtlCache({
+      ttlMs: 100,
+      identity: (value: { id: string }) => value.id,
+      canEvict: () => true,
+      onEvict: () => undefined,
+    })).toThrow('Cannot create a cache after the Codex backend is closed');
   });
 
   it('shares one idempotent close operation with modules', async () => {

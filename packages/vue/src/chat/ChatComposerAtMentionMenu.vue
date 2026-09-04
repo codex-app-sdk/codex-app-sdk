@@ -80,6 +80,7 @@ import type {
   CodexComposerVisibleMentionGroup,
 } from './composer-mentions-custom';
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   activeIndex: number;
   mentionGroups?: readonly CodexComposerVisibleMentionGroup<Payload>[];
@@ -101,6 +102,7 @@ defineSlots<{
     item: CodexComposerMentionItem<Payload>;
   }): unknown;
 }>();
+// Stryker restore all
 
 const leadingMentionGroups = computed(() => props.mentionGroups?.filter((group) => group.placement !== 'after') ?? []);
 const trailingMentionGroups = computed(() => props.mentionGroups?.filter((group) => group.placement === 'after') ?? []);

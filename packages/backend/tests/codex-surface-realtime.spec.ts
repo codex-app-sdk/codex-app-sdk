@@ -52,6 +52,12 @@ describe('Codex surface realtime codecs', () => {
       numChannels: 1,
       samplesPerChannel: 7,
     })).toMatchObject({ samplesPerChannel: 7, itemId: null });
+    expect(realtimeAudioChunkParams({
+      data: new Uint8Array(),
+      sampleRate: 16_000,
+      numChannels: 1,
+      samplesPerChannel: 0,
+    })).toMatchObject({ samplesPerChannel: 0, itemId: null });
   });
 
   it.each([

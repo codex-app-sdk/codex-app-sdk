@@ -171,6 +171,48 @@ describe('message block computation', () => {
     })).toStrictEqual([{ type: 'visualization', title: 'Visualization' }]);
   });
 
+  it('normalizes visualization payloads and ignores annotations inside code fences', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Before \uE200visualize\uE202{"path":" /tmp/map.html ","title":" Map "}\uE201 after',
+    })).toStrictEqual([
+      { type: 'text', content: 'Before ' },
+      { type: 'visualization', path: '/tmp/map.html', title: 'Map' },
+      { type: 'text', content: ' after' },
+    ]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '\uE200visualize\uE202{"path":42,"title":"   "}\uE201',
+    })).toStrictEqual([{ type: 'visualization', title: 'Visualization' }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '\uE200visualize\uE202{"path":42,"title":"Kept title"}\uE201',
+    })).toStrictEqual([{ type: 'visualization', title: 'Kept title' }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '\uE200visualize\uE202{"path":"/tmp/kept.html","title":42}\uE201',
+    })).toStrictEqual([{
+      type: 'visualization',
+      path: '/tmp/kept.html',
+      title: 'Visualization',
+    }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        '```text',
+        '\uE200visualize\uE202{"path":"/tmp/hidden.html","title":"Hidden"}\uE201',
+        '```',
+      ].join('\n'),
+    })).toStrictEqual([{
+      type: 'text',
+      content: [
+        '```text',
+        '\uE200visualize\uE202{"path":"/tmp/hidden.html","title":"Hidden"}\uE201',
+        '```',
+      ].join('\n'),
+    }]);
+  });
+
   it('uses ordered message parts to place Codex tool calls between text chunks', () => {
     const blocks = computeMessageBlocks({
       role: 'assistant',
@@ -246,6 +288,67 @@ describe('message block computation', () => {
     })).toStrictEqual([{ type: 'attachment', attachment: file }]);
   });
 
+  it('keeps user media parts and drops context-only text parts', () => {
+    const media = {
+      url: 'file:///tmp/user-image.png',
+      mimeType: 'image/png',
+      title: 'User image',
+    };
+
+    expect(computeMessageBlocks({
+      role: 'user',
+      content: 'ignored fallback',
+      parts: [
+        { type: 'text', content: '<context>hidden</context>' },
+        { type: 'tool', toolCall: completedTool },
+        { type: 'media', media },
+      ],
+    })).toStrictEqual([{ type: 'media', media }]);
+  });
+
+  it('projects assistant messages driven only by tools or ordered attachment parts', () => {
+    const attachment = {
+      kind: 'file' as const,
+      name: 'notes.md',
+      path: '/tmp/notes.md',
+    };
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '',
+      toolCalls: [completedTool],
+    })).toStrictEqual([{ type: 'tool-group', toolCalls: [completedTool] }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '',
+      parts: [{ type: 'attachment', attachment }],
+    })).toStrictEqual([{ type: 'attachment', attachment }]);
+  });
+
+  it('collects follow-ups across text parts and appends only unanchored tools', () => {
+    const trailingTool = { ...runningTool, id: 'tool-trailing' };
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '',
+      parts: [
+        { type: 'text', content: 'Before <follow-up> First choice </follow-up>' },
+        { type: 'tool', toolCall: completedTool },
+        {
+          type: 'text',
+          content: 'After <follow-up>Second choice</follow-up><follow-up>   </follow-up>',
+        },
+      ],
+      toolCalls: [completedTool, trailingTool],
+    })).toStrictEqual([
+      { type: 'text', content: 'Before ' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+      { type: 'text', content: 'After ' },
+      { type: 'tool-group', toolCalls: [trailingTool] },
+      { type: 'follow-ups', prompts: ['First choice', 'Second choice'] },
+    ]);
+  });
+
   it('completes partial streaming follow-up and tool tags', () => {
     const blocks = computeMessageBlocks({
       role: 'assistant',
@@ -277,6 +380,88 @@ describe('message block computation', () => {
     }).map((block) => block.type)).toStrictEqual(['tool-group']);
   });
 
+  it('repairs unfinished streaming tags without swallowing trailing text', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Lead <follow-up>Continue',
+    })).toStrictEqual([
+      { type: 'text', content: 'Lead ' },
+      { type: 'follow-ups', prompts: ['Continue'] },
+    ]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Before <tool id="tool-1">trailing',
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'text', content: 'Before ' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+      { type: 'text', content: 'trailing' },
+    ]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Before <tool id="tool-1">trailing</to',
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'text', content: 'Before ' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+      { type: 'text', content: 'trailing' },
+    ]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Before <tool id=',
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'text', content: 'Before ' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+    ]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Before <tool id="tool-1" junk',
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'text', content: 'Before ' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+    ]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Lead <follow-up>Keep </other',
+    })).toStrictEqual([
+      { type: 'text', content: 'Lead ' },
+      { type: 'follow-ups', prompts: ['Keep </other'] },
+    ]);
+  });
+
+  it('resolves exact tool ids and numeric indices without dropping unmatched tools', () => {
+    const secondTool = { ...runningTool, id: 'second-tool' };
+    const toolCalls = [completedTool, secondTool];
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '<tool index="1"></tool>',
+      toolCalls,
+    })).toStrictEqual([{ type: 'tool-group', toolCalls: [secondTool, completedTool] }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '<tool id="second-tool"></tool>',
+      toolCalls,
+    })).toStrictEqual([{ type: 'tool-group', toolCalls: [secondTool, completedTool] }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '<tool   id="second-tool"',
+      toolCalls,
+    })).toStrictEqual([{ type: 'tool-group', toolCalls: [secondTool, completedTool] }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '<tool id="missing"></tool>',
+      toolCalls,
+    })).toStrictEqual([{ type: 'tool-group', toolCalls }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '<tool index="bad"></tool>',
+      toolCalls,
+    })).toStrictEqual([{ type: 'tool-group', toolCalls }]);
+  });
+
   it('keeps ask-user and running confirmation-style tools ungrouped', () => {
     const askTool: MessageToolCall = {
       ...runningTool,
@@ -306,6 +491,61 @@ describe('message block computation', () => {
       { type: 'tool', toolCall: planTool },
       { type: 'tool', toolCall: askTool },
       { type: 'tool', toolCall: mcpTool },
+    ]);
+  });
+
+  it('ungroups only active MCP or home requests with string request ids', () => {
+    const statusTool = (id: string, status: unknown, state = 'running'): MessageToolCall => ({
+      ...runningTool,
+      id,
+      state: state as MessageToolCall['state'],
+      status: status as MessageToolCall['status'],
+    });
+    const missingParams = statusTool('missing-params', '{"source":"mcp","action":"confirm"}');
+    const numericRequest = statusTool(
+      'numeric-request',
+      '{"source":"mcp","params":{"requestId":42}}',
+    );
+    const completedRequest = statusTool(
+      'completed-request',
+      '{"source":"mcp","params":{"requestId":"r-complete"}}',
+      'completed',
+    );
+    const malformedStatus = statusTool('malformed', '{not-json');
+    const paddedStatus = statusTool(
+      'padded',
+      ' {"source":"home","params":{"requestId":"r-padded"}}',
+    );
+    const nonStringStatus = statusTool('non-string', { source: 'mcp' });
+    const homeRequest = statusTool(
+      'home-request',
+      '{"source":"home","params":{"requestId":"r-home"}}',
+    );
+
+    expect(groupToolBlocks([
+      ...[
+        missingParams,
+        numericRequest,
+        completedRequest,
+        malformedStatus,
+        paddedStatus,
+        nonStringStatus,
+      ]
+        .map((toolCall) => ({ type: 'tool' as const, toolCall })),
+      { type: 'tool', toolCall: homeRequest },
+    ])).toStrictEqual([
+      {
+        type: 'tool-group',
+        toolCalls: [
+          missingParams,
+          numericRequest,
+          completedRequest,
+          malformedStatus,
+          paddedStatus,
+          nonStringStatus,
+        ],
+      },
+      { type: 'tool', toolCall: homeRequest },
     ]);
   });
 
@@ -345,6 +585,192 @@ describe('message block computation', () => {
     });
   });
 
+  it('does not treat a literal fenced tool tag as the tool call anchor', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        '```xml',
+        '<tool id="tool-1"></tool>',
+        '```',
+      ].join('\n'),
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      {
+        type: 'text',
+        content: [
+          '```xml',
+          '<tool id="tool-1"></tool>',
+          '```',
+        ].join('\n'),
+      },
+      { type: 'tool-group', toolCalls: [completedTool] },
+    ]);
+  });
+
+  it('parses repeated marker whitespace and preserves exact anchored tool identity', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        'Before',
+        '<tool   id="tool-1"></tool>',
+        '![ chart ](https://example.com/chart.png   " Chart title ")',
+      ].join('\n'),
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'text', content: 'Before\n' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+      {
+        type: 'media',
+        media: {
+          alt: 'chart',
+          prompt: undefined,
+          title: 'Chart title',
+          url: 'https://example.com/chart.png',
+        },
+        toolCall: undefined,
+      },
+    ]);
+  });
+
+  it('preserves malformed tool anchors and empty image labels as literal boundaries', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: 'Before <tool id=""></tool>',
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'text', content: 'Before <tool id=""></tool>' },
+      { type: 'tool-group', toolCalls: [completedTool] },
+    ]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '![](https://example.com/unlabelled.png)',
+    })).toStrictEqual([{
+      type: 'media',
+      media: {
+        alt: undefined,
+        prompt: undefined,
+        title: undefined,
+        url: 'https://example.com/unlabelled.png',
+      },
+      toolCall: undefined,
+    }]);
+  });
+
+  it('recognizes exact Mermaid fence syntax at the start of a message', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        '~~~MERMAID theme=neutral',
+        '  graph TD; A-->B;  ',
+        '~~~',
+      ].join('\n'),
+    })).toStrictEqual([{ type: 'mermaid', code: 'graph TD; A-->B;' }]);
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        '```notmermaid',
+        'graph TD; A-->B;',
+        '```',
+      ].join('\n'),
+    })).toStrictEqual([{
+      type: 'text',
+      content: [
+        '```notmermaid',
+        'graph TD; A-->B;',
+        '```',
+      ].join('\n'),
+    }]);
+  });
+
+  it('preserves text boundaries around an embedded Mermaid fence', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        'Intro',
+        '```mermaid',
+        'graph TD; A-->B;',
+        '```',
+        'Outro',
+      ].join('\n'),
+    })).toStrictEqual([
+      { type: 'text', content: 'Intro\n' },
+      { type: 'mermaid', code: 'graph TD; A-->B;' },
+      { type: 'text', content: '\nOutro' },
+    ]);
+  });
+
+  it('finds Mermaid fences after earlier ordinary fenced code', () => {
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        '```text',
+        'ordinary',
+        '```',
+        '```mermaid',
+        'graph TD; A-->B;',
+        '```',
+      ].join('\n'),
+    })).toStrictEqual([
+      { type: 'text', content: ['```text', 'ordinary', '```', ''].join('\n') },
+      { type: 'mermaid', code: 'graph TD; A-->B;' },
+    ]);
+  });
+
+  it('keeps empty and unclosed Mermaid fences as ordinary message text', () => {
+    for (const content of [
+      ['```mermaid', '', '```'].join('\n'),
+      ['```mermaid', 'graph TD; A-->B;'].join('\n'),
+    ]) {
+      expect(computeMessageBlocks({ role: 'assistant', content })).toStrictEqual([
+        { type: 'text', content },
+      ]);
+    }
+  });
+
+  it('does not parse protocol markers inside an unclosed code fence', () => {
+    const content = [
+      '```text',
+      '<tool id="tool-1"></tool>',
+      '![hidden](https://example.com/hidden.png)',
+      '\uE200visualize\uE202{"path":"/tmp/hidden.html","title":"Hidden"}\uE201',
+    ].join('\n');
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content,
+      toolCalls: [completedTool],
+    })).toStrictEqual([
+      { type: 'text', content },
+      { type: 'tool-group', toolCalls: [completedTool] },
+    ]);
+  });
+
+  it('strips ambient context only at exact protocol heading boundaries', () => {
+    expect(stripMessageContext('<context>hidden</context>visible')).toBe('visible');
+    expect(stripMessageContext([
+      'Prefix ## My request for Codex:',
+      'Keep this heading.',
+      '<in-app-browser-context>hidden</in-app-browser-context>',
+    ].join('\n'))).toBe('Prefix ## My request for Codex:\nKeep this heading.');
+    expect(stripMessageContext([
+      'Prefix## My request for Codex:',
+      'Keep this glued heading.',
+      '<in-app-browser-context>hidden</in-app-browser-context>',
+    ].join('\n'))).toBe('Prefix## My request for Codex:\nKeep this glued heading.');
+    expect(stripMessageContext([
+      '## My request for Codex:not a protocol heading',
+      '<in-app-browser-context>hidden</in-app-browser-context>',
+    ].join('\n'))).toBe('## My request for Codex:not a protocol heading');
+    expect(stripMessageContext([
+      '## My request for Codex:not-a-protocol-heading',
+      '<in-app-browser-context>hidden</in-app-browser-context>',
+    ].join('\n'))).toBe('## My request for Codex:not-a-protocol-heading');
+    expect(stripMessageContext([
+      '<in-app-browser-context>hidden</in-app-browser-context>',
+      '## My request for Codex:',
+    ].join('\n'))).toBe('');
+  });
+
   it('projects hydrated Markdown data URLs as renderer media', () => {
     const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
 
@@ -361,5 +787,112 @@ describe('message block computation', () => {
       },
       toolCall: undefined,
     }]);
+  });
+
+  it('correlates image tools through every result URL and prompt source', () => {
+    const externalTool: MessageToolCall = {
+      ...completedTool,
+      args: { prompt: 'ignored argument' },
+      function: 'image_generation',
+      id: 'external-image',
+      result: {
+        externalUrl: 'https://example.com/external.png',
+        prompt: '  result prompt  ',
+      },
+    };
+    const pathTool: MessageToolCall = {
+      ...completedTool,
+      args: { prompt: '  argument prompt  ' },
+      function: 'image_generation',
+      id: 'path-image',
+      result: { path: 'file:///tmp/path.png', prompt: '   ' },
+    };
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: [
+        '![external](https://example.com/external.png)',
+        '![path](file:///tmp/path.png)',
+      ].join('\n'),
+      toolCalls: [externalTool, pathTool],
+    })).toStrictEqual([
+      {
+        type: 'media',
+        media: {
+          alt: 'external',
+          prompt: 'result prompt',
+          title: 'external',
+          url: 'https://example.com/external.png',
+        },
+        toolCall: externalTool,
+      },
+      {
+        type: 'media',
+        media: {
+          alt: 'path',
+          prompt: 'argument prompt',
+          title: 'path',
+          url: 'file:///tmp/path.png',
+        },
+        toolCall: pathTool,
+      },
+    ]);
+  });
+
+  it('does not correlate media with non-image or malformed image results', () => {
+    const lookalike = { ...completedTool, id: 'lookalike', result: { url: 'asset://image' } };
+    const malformedImages: MessageToolCall[] = [null, 'asset://image', ['asset://image']]
+      .map((result, index) => ({
+        ...completedTool,
+        function: 'image_generation',
+        id: `malformed-${index}`,
+        result: result as MessageToolCall['result'],
+      }));
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: '![asset](asset://image)',
+      toolCalls: [lookalike, ...malformedImages],
+    })).toStrictEqual([
+      {
+        type: 'media',
+        media: {
+          alt: 'asset',
+          prompt: undefined,
+          title: 'asset',
+          url: 'asset://image',
+        },
+        toolCall: undefined,
+      },
+      { type: 'tool-group', toolCalls: [lookalike, ...malformedImages] },
+    ]);
+  });
+
+  it('keeps matched image media when its prompt arguments are malformed', () => {
+    const invalidArgs: unknown[] = [null, 'prompt', ['prompt'], { prompt: 42 }];
+    const toolCalls = invalidArgs.map((args, index): MessageToolCall => ({
+      ...completedTool,
+      args,
+      function: 'image_generation',
+      id: `invalid-args-${index}`,
+      result: { url: `asset://invalid-${index}` },
+    }));
+
+    expect(computeMessageBlocks({
+      role: 'assistant',
+      content: toolCalls
+        .map((_, index) => `![asset ${index}](asset://invalid-${index})`)
+        .join('\n'),
+      toolCalls,
+    })).toStrictEqual(toolCalls.map((toolCall, index) => ({
+      type: 'media',
+      media: {
+        alt: `asset ${index}`,
+        prompt: undefined,
+        title: `asset ${index}`,
+        url: `asset://invalid-${index}`,
+      },
+      toolCall,
+    })));
   });
 });

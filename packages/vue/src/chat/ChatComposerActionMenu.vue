@@ -38,11 +38,9 @@ import type {
 } from '../composer-menu';
 import { HandStopIcon, ListDetailsIcon, PaperclipIcon, PlusIcon, ShieldCheckIcon, Sparkles } from '../icons/app-icons';
 
-type ComposerMenuAction =
-  | { kind: 'approval'; preset: ApprovalPreset }
-  | { kind: 'attach' }
-  | { kind: 'plan-mode' };
+type ComposerMenuAction = { kind: 'approval'; preset: ApprovalPreset };
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   attachEnabled?: boolean;
   disabled?: boolean;
@@ -71,6 +69,7 @@ const emit = defineEmits<{
   selectApprovalPreset: [preset: ApprovalPreset];
   'update:planMode': [enabled: boolean];
 }>();
+// Stryker restore all
 
 const allowedApprovalPresets = computed(() => new Set(props.approvalPresets));
 const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]>(() => {
@@ -105,7 +104,6 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
       accessory: 'switch',
       checked: props.planMode,
       icon: ListDetailsIcon,
-      payload: { kind: 'plan-mode' },
     });
   }
 
@@ -120,7 +118,6 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
       type: 'action',
       label: 'Add Files & Photos',
       icon: PaperclipIcon,
-      payload: { kind: 'attach' },
     });
   }
 

@@ -233,6 +233,130 @@ describe('ChatRichTextEditor', () => {
     expect(element.findAll('br')).toHaveLength(2);
     expect(element.findAll('br')[1]?.attributes()).toHaveProperty('data-trailing-line-break');
   });
+
+  it('applies external text and catalog updates without stealing focus', async () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    const wrapper = mount(ChatRichTextEditor, {
+      attachTo: document.body,
+      props: { modelValue: '@gmail tail' },
+    });
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+    richEditor.setCaret(8);
+    outside.focus();
+
+    await wrapper.setProps({ modelValue: 'xy' });
+    expect(richEditor.readText()).toBe('xy');
+    expect(document.activeElement).toBe(outside);
+
+    await wrapper.setProps({ modelValue: '@gmail' });
+    await wrapper.setProps({
+      plugins: [{ id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', enabled: true }],
+    });
+    expect(wrapper.get('[data-plugin-name="gmail"]').text()).toContain('Gmail');
+    expect(richEditor.readText()).toBe('@gmail');
+    expect(document.activeElement).toBe(outside);
+
+    wrapper.unmount();
+    outside.remove();
+  });
+
+  it('renders one canonical chip when text and catalogs arrive together', async () => {
+    const wrapper = mount(ChatRichTextEditor, { props: { modelValue: '' } });
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+
+    await wrapper.setProps({
+      modelValue: '@gmail',
+      plugins: [{ id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', enabled: true }],
+    });
+
+    expect(wrapper.findAll('[data-plugin-name="gmail"]')).toHaveLength(1);
+    expect(richEditor.readText()).toBe('@gmail');
+  });
+
+  it('publishes document selection changes only while mounted', async () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      attachTo: document.body,
+      props: { modelValue: 'selection' },
+    });
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+    richEditor.setSelection(2, 6);
+    await nextTick();
+    const before = wrapper.emitted('caret-change')?.length ?? 0;
+
+    document.dispatchEvent(new Event('selectionchange'));
+    expect(wrapper.emitted('caret-change')?.at(-1)).toStrictEqual([
+      { end: 6, start: 2, valid: true },
+    ]);
+    expect(wrapper.emitted('caret-change')).toHaveLength(before + 1);
+    const events = wrapper.emitted('caret-change')!;
+
+    wrapper.unmount();
+    document.dispatchEvent(new Event('selectionchange'));
+    expect(events).toHaveLength(before + 1);
+  });
+
+  it('emits exact text and selection state for valid and invalid browser input', async () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      attachTo: document.body,
+      props: { modelValue: 'abcd' },
+    });
+    const element = wrapper.get('[role="textbox"]');
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+    richEditor.setSelection(1, 3);
+    await element.trigger('input');
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['abcd']);
+    expect(wrapper.emitted('caret-change')?.at(-1)).toStrictEqual([
+      { end: 3, start: 1, valid: true },
+    ]);
+    expect(wrapper.emitted('input')?.at(-1)).toStrictEqual([]);
+
+    const outside = document.createTextNode('outside');
+    document.body.append(outside);
+    const range = document.createRange();
+    range.setStart(outside, 0);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    element.element.replaceChildren(document.createTextNode('changed'));
+    await element.trigger('input');
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['changed']);
+    expect(wrapper.emitted('caret-change')?.at(-1)).toStrictEqual([
+      { end: 7, start: 7, valid: false },
+    ]);
+    outside.remove();
+    wrapper.unmount();
+  });
+
+  it('resizes through the public editor API and remains safe after unmount', () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      props: { maxHeight: 50, modelValue: 'draft' },
+    });
+    const element = wrapper.get('[role="textbox"]').element as HTMLElement;
+    Object.defineProperty(element, 'scrollHeight', { configurable: true, value: 120 });
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+
+    richEditor.autoResize();
+    expect(element.style.height).toBe('50px');
+    wrapper.unmount();
+    expect(() => richEditor.autoResize()).not.toThrow();
+  });
+
+  it('keeps an existing focused selection when rendering with implicit focus ownership', () => {
+    const wrapper = mount(ChatRichTextEditor, {
+      attachTo: document.body,
+      props: { modelValue: 'draft' },
+    });
+    const element = wrapper.get('[role="textbox"]').element as HTMLElement;
+    const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+    richEditor.setSelection(1, 4);
+    expect(document.activeElement).toBe(element);
+
+    richEditor.setText('updated', 3);
+    expect(document.activeElement).toBe(element);
+    expect(richEditor.getSelectionRange()).toStrictEqual({ end: 3, start: 3, valid: true });
+    wrapper.unmount();
+  });
 });
 
 function domRect(top: number, bottom: number): DOMRect {

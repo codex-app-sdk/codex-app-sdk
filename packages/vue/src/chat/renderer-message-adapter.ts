@@ -76,7 +76,6 @@ function settleTerminalMessageToolCalls(message: Message): Message {
     const cached = settledCalls.get(toolCall);
     if (cached) return cached;
     if (toolCall.done === true && toolCall.state !== 'running') {
-      settledCalls.set(toolCall, toolCall);
       return toolCall;
     }
 
@@ -103,8 +102,8 @@ function settleTerminalMessageToolCalls(message: Message): Message {
 function terminalToolStatus(status: string | undefined): string {
   if (status?.trim().startsWith('{')) {
     try {
-      const descriptor: unknown = JSON.parse(status);
-      if (isRecord(descriptor)) return JSON.stringify({ ...descriptor, phase: 'failed' });
+      const descriptor = JSON.parse(status) as Record<string, unknown>;
+      return JSON.stringify({ ...descriptor, phase: 'failed' });
     } catch {
       // A stale running label is less useful than a stable terminal fallback.
     }

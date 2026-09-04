@@ -57,6 +57,7 @@ describe('useChatComposerVoice', () => {
     await voice.toggle();
     expect(voice.isRecording.value).toBe(true);
     expect(voice.buttonLabel.value).toBe('Stop recording');
+    expect(voice.buttonTitle.value).toBe('Stop recording');
 
     await voice.toggle();
     expect(voice.isRecording.value).toBe(false);
@@ -176,5 +177,200 @@ describe('useChatComposerVoice', () => {
 
     expect(voice.buttonDisabled.value).toBe(true);
     expect(voice.buttonTitle.value).toBe('Speech transcription is not available.');
+  });
+
+  it('blocks disabled idle input but permits voice control while sending', async () => {
+    const blockedRecorder = fakeRecorder();
+    const blocked = useChatComposerVoice({
+      isDisabled: () => true,
+      isSending: () => false,
+      onTranscript: vi.fn(),
+    }, {
+      canTranscribe: () => true,
+      createRecorder: () => blockedRecorder,
+      isRecordingSupported: () => true,
+    });
+    expect(blocked.buttonDisabled.value).toBe(true);
+    await blocked.toggle();
+    expect(blockedRecorder.start).not.toHaveBeenCalled();
+
+    const sendingRecorder = fakeRecorder();
+    const sending = useChatComposerVoice({
+      isDisabled: () => true,
+      isSending: () => true,
+      onTranscript: vi.fn(),
+    }, {
+      canTranscribe: () => true,
+      createRecorder: () => sendingRecorder,
+      isRecordingSupported: () => true,
+    });
+    expect(sending.buttonDisabled.value).toBe(false);
+    await sending.toggle();
+    expect(sendingRecorder.start).toHaveBeenCalledOnce();
+  });
+
+  it('reports recording unavailability before transcription state', () => {
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript: vi.fn(),
+    }, {
+      canTranscribe: () => false,
+      isRecordingSupported: () => false,
+    });
+
+    expect(voice.buttonDisabled.value).toBe(true);
+    expect(voice.buttonTitle.value).toBe('Audio recording is not available.');
+  });
+
+  it('exposes transcribing state until transcription and transcript handling settle', async () => {
+    let resolveTranscription!: (result: { text: string }) => void;
+    const transcription = new Promise<{ text: string }>((resolve) => {
+      resolveTranscription = resolve;
+    });
+    const recorder = fakeRecorder();
+    const onTranscript = vi.fn(async () => undefined);
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript,
+    }, {
+      canTranscribe: () => true,
+      createRecorder: () => recorder,
+      isRecordingSupported: () => true,
+      transcribe: () => transcription,
+    });
+
+    await voice.toggle();
+    const stopping = voice.stop();
+    await Promise.resolve();
+    expect(voice.isRecording.value).toBe(false);
+    expect(voice.isTranscribing.value).toBe(true);
+    expect(voice.recorder.value).toBeNull();
+    expect(voice.buttonDisabled.value).toBe(true);
+    expect(voice.buttonTitle.value).toBe('Transcribing...');
+
+    resolveTranscription({ text: 'settled transcript' });
+    await expect(stopping).resolves.toBe(true);
+    expect(onTranscript).toHaveBeenCalledWith('settled transcript');
+    expect(voice.isTranscribing.value).toBe(false);
+  });
+
+  it('returns false without an active recorder', async () => {
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript: vi.fn(),
+    }, {
+      canTranscribe: () => true,
+      isRecordingSupported: () => true,
+    });
+
+    await expect(voice.stop()).resolves.toBe(false);
+    expect(voice.error.value).toBeNull();
+    expect(voice.isTranscribing.value).toBe(false);
+  });
+
+  it('returns the default unavailable error when forced transcription has no native host', async () => {
+    const wav = new Blob([], { type: 'audio/wav' });
+    Object.defineProperty(wav, 'arrayBuffer', {
+      configurable: true,
+      value: vi.fn(async () => new ArrayBuffer(0)),
+    });
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript: vi.fn(),
+    }, {
+      canTranscribe: () => true,
+      createRecorder: () => fakeRecorder({
+        stop: vi.fn(async () => ({ blob: wav, durationMs: 1 })),
+      }),
+      isRecordingSupported: () => true,
+    });
+
+    await voice.toggle();
+    await expect(voice.stop()).resolves.toBe(false);
+    expect(voice.error.value).toBe('Speech transcription is not available.');
+  });
+
+  it('does not register scope cleanup when created outside an active scope', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript: vi.fn(),
+    }, {
+      canTranscribe: () => true,
+      isRecordingSupported: () => true,
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+    voice.dispose();
+  });
+
+  it('surfaces transcription result errors without publishing a transcript', async () => {
+    const onTranscript = vi.fn();
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript,
+    }, {
+      canTranscribe: () => true,
+      createRecorder: () => fakeRecorder(),
+      isRecordingSupported: () => true,
+      transcribe: vi.fn(async () => ({ error: 'No speech detected', text: '' })),
+    });
+
+    await voice.toggle();
+    await expect(voice.stop()).resolves.toBe(false);
+    expect(voice.error.value).toBe('No speech detected');
+    expect(voice.buttonTitle.value).toBe('No speech detected');
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(voice.isTranscribing.value).toBe(false);
+  });
+
+  it.each([
+    ['transcription', () => { throw 'transcription failed'; }],
+    ['transcript callback', async () => ({ text: 'result' })],
+  ] as const)('normalizes a %s failure and always clears transcribing state', async (kind, transcribe) => {
+    const onTranscript = kind === 'transcript callback'
+      ? vi.fn(async () => { throw new Error('callback failed'); })
+      : vi.fn();
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript,
+    }, {
+      canTranscribe: () => true,
+      createRecorder: () => fakeRecorder(),
+      isRecordingSupported: () => true,
+      transcribe: async () => await transcribe(),
+    });
+
+    await voice.toggle();
+    await expect(voice.stop()).resolves.toBe(false);
+    expect(voice.error.value).toBe(kind === 'transcription' ? 'transcription failed' : 'callback failed');
+    expect(voice.isTranscribing.value).toBe(false);
+  });
+
+  it('disposes an active recorder and resets public recording state', async () => {
+    const recorder = fakeRecorder();
+    const voice = useChatComposerVoice({
+      isDisabled: () => false,
+      isSending: () => false,
+      onTranscript: vi.fn(),
+    }, {
+      canTranscribe: () => true,
+      createRecorder: () => recorder,
+      isRecordingSupported: () => true,
+    });
+    await voice.toggle();
+
+    voice.dispose();
+
+    expect(recorder.release).toHaveBeenCalledOnce();
+    expect(voice.recorder.value).toBeNull();
+    expect(voice.isRecording.value).toBe(false);
   });
 });

@@ -23,4 +23,25 @@ describe('ChatWorkGroup', () => {
     expect(wrapper.get('.chat-fold').classes()).toContain('chat-fold--open');
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
   });
+
+  it('auto-expands untouched active work but preserves a reader toggle until the final answer starts', async () => {
+    const wrapper = mount(ChatWorkGroup, {
+      props: { active: false, finalStarted: false },
+      slots: { default: 'Inspecting the renderer' },
+    });
+
+    expect(wrapper.get('.chat-fold').classes()).not.toContain('chat-fold--open');
+    await wrapper.setProps({ active: true });
+    expect(wrapper.get('.chat-fold').classes()).toContain('chat-fold--open');
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+    await wrapper.setProps({ active: false });
+    await wrapper.setProps({ active: true });
+    expect(wrapper.get('.chat-fold').classes()).not.toContain('chat-fold--open');
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+    expect(wrapper.get('.chat-fold').classes()).toContain('chat-fold--open');
+    await wrapper.setProps({ finalStarted: true });
+    expect(wrapper.get('.chat-fold').classes()).not.toContain('chat-fold--open');
+  });
 });

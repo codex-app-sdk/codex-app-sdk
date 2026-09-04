@@ -21,8 +21,8 @@ export function useConversationEscapeInterrupt(options: ConversationEscapeInterr
   let clearTimer: ReturnType<typeof setTimeout> | null = null;
   let listenerInstalled = false;
 
-  watch([options.busy, options.enabled], ([busy, enabled]) => {
-    if (!busy || !enabled) clear();
+  watch([options.busy, options.enabled], () => {
+    clear();
     syncListener();
   });
 
@@ -37,7 +37,7 @@ export function useConversationEscapeInterrupt(options: ConversationEscapeInterr
     if (shouldListen && !listenerInstalled) {
       document.addEventListener('keydown', handleKeydown);
       listenerInstalled = true;
-    } else if (!shouldListen) {
+    } else {
       removeListener();
     }
   }
@@ -70,7 +70,6 @@ export function useConversationEscapeInterrupt(options: ConversationEscapeInterr
     event.preventDefault();
     if (!armed.value) {
       armed.value = true;
-      if (clearTimer) clearTimeout(clearTimer);
       clearTimer = setTimeout(clear, 2_000);
       return;
     }

@@ -68,12 +68,12 @@ function markdownToText(content: string) {
   template.innerHTML = html
   const blocks: string[] = []
   template.content.childNodes.forEach((node) => collectTextBlocks(node, blocks))
-  return blocks.join('\n').trim()
+  return blocks.join('\n')
 }
 
 function collectTextBlocks(node: Node, blocks: string[]) {
   if (node.nodeType === Node.TEXT_NODE) {
-    const text = node.textContent?.trim()
+    const text = node.textContent!.trim()
     if (text) {
       blocks.push(normalizeText(text))
     }
@@ -85,13 +85,25 @@ function collectTextBlocks(node: Node, blocks: string[]) {
   }
 
   const tagName = node.tagName.toLowerCase()
-  if (tagName === 'br') {
-    blocks.push('')
+  if (node.classList.contains('katex')) {
+    const text = readableInlineText(node).trim()
+    if (text) {
+      blocks.push(normalizeText(text))
+    }
     return
   }
 
-  if (tagName === 'li' || tagName === 'p' || tagName === 'pre' || tagName === 'blockquote' || /^h[1-6]$/.test(tagName)) {
-    const text = node.textContent?.trim()
+  if (tagName === 'pre') {
+    const highlightedLines = [...node.querySelectorAll(':scope > code > .line')]
+    const text = highlightedLines.map((line) => line.textContent ?? '').join('\n').trim()
+    if (text) {
+      blocks.push(normalizeText(text))
+    }
+    return
+  }
+
+  if (tagName === 'li' || tagName === 'p' || /^h[1-6]$/.test(tagName)) {
+    const text = readableInlineText(node).trim()
     if (text) {
       blocks.push(normalizeText(text))
     }
@@ -99,6 +111,19 @@ function collectTextBlocks(node: Node, blocks: string[]) {
   }
 
   node.childNodes.forEach((child) => collectTextBlocks(child, blocks))
+}
+
+function readableInlineText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent!
+  }
+  if (!(node instanceof HTMLElement)) {
+    return ''
+  }
+  if (node.classList.contains('katex')) {
+    return node.querySelector('annotation[encoding="application/x-tex"]')?.textContent ?? ''
+  }
+  return [...node.childNodes].map(readableInlineText).join('')
 }
 
 function normalizeText(text: string) {

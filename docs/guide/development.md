@@ -151,3 +151,64 @@ Tests should prove risky boundaries:
 - package export and scoped-style completeness.
 
 Avoid shallow coverage padding and brittle product-name scans.
+
+## Mutation testing
+
+The five SDK packages own independent StrykerJS/Vitest campaigns. Run a whole
+package from the repository root with the verb-first shortcuts:
+
+```bash
+npm run mutation:core
+npm run mutation:web
+npm run mutation:electron
+npm run mutation:backend
+npm run mutation:vue
+npm run mutation:all
+```
+
+Each package check enforces at least 95% statement, branch, function, and line
+coverage. That conventional floor is necessary but not sufficient: mutation
+campaigns must also leave no unclassified mutant and no meaningful survivor in
+critical behavior.
+
+Backend and Vue are large enough that local investigation should normally use
+exact `--mutate` shards through the authoritative workspace command:
+
+```bash
+npm run test:mutation -w @codex-app-sdk/backend -- \
+  --mutate 'packages/backend/src/node/codex-surface-message-state.ts'
+```
+
+Incremental results and HTML reports live under
+`reports/mutation/<package>/`. Those local artifacts, including sandboxes and
+campaign notes, are ignored by Git. Core, Web, Electron, and Backend use
+incremental mode. Vue runs fresh because incremental per-test attribution
+misclassifies exercised SFC and API-boundary paths as uncovered. After a test
+change, force the exact affected source range so cached mutant results do not
+hide the result:
+
+```bash
+npm run test:mutation -w @codex-app-sdk/core -- \
+  --force --mutate 'packages/core/src/surface-bridge.ts:167-185'
+```
+
+Treat every survivor as work to classify, not merely a score penalty. Inspect
+the production contract and tests, then record one of: genuine test gap,
+equivalent behavior, dead or unreachable code, generated/type-only or
+out-of-contract code, or tool limitation. Add the smallest externally
+observable regression test for every genuine gap and prove that it kills the
+exact mutant with a forced run. Explain equivalent mutants in the campaign log;
+prefer a separately committed production simplification when the code is truly
+redundant. Timeouts and errors are harness failures, never kills.
+
+The cleaned package break thresholds are Core 99%, Web 91%, Electron 99%,
+Backend 98%, and Vue 95%. Ratchet them only upward after a fresh forced package
+run and complete survivor classification. Web, Electron, Backend, and Vue run
+with related-test discovery disabled because focused validation found false
+NoCoverage or survivor results at their API/component boundaries; Core retains
+related discovery.
+
+Generated protocol bindings, declarations, fixtures, type-only files, and pure
+re-export barrels are outside mutation scope. Any further exclusion requires a
+written reason. Mutation testing is intentionally on-demand in GitHub Actions
+so normal pull-request CI remains fast.

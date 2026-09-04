@@ -576,6 +576,7 @@ describe('Codex surface Electron bridge', () => {
     await api.forkMessage(4);
     await api.readConversationHistory('thread-2');
     await api.readConversationPromptHistory('thread-2');
+    await api.loadOlderConversationHistory?.('thread-2');
     await api.listConversations({ cwd: '/tmp/project', limit: 10 });
     await api.listModels({ includeHidden: true, forceReload: true });
     await api.logout();
@@ -619,6 +620,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:fork-message', 4],
       ['codex-surface:read-conversation-history', 'thread-2'],
       ['codex-surface:read-conversation-prompt-history', 'thread-2'],
+      ['codex-surface:load-older-conversation-history', 'thread-2'],
       ['codex-surface:list-conversations', { cwd: '/tmp/project', limit: 10 }],
       ['codex-surface:list-models', { includeHidden: true, forceReload: true }],
       ['codex-surface:logout'],
@@ -646,6 +648,20 @@ describe('Codex surface Electron bridge', () => {
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(snapshot);
     expect(eventListener).toHaveBeenCalledWith(surfaceEvent);
+  });
+
+  it('rejects history paging when the host does not implement it', async () => {
+    const main = new FakeMainPort();
+    const surface = {
+      onStateChange: vi.fn(() => vi.fn()),
+      onEvent: vi.fn(() => vi.fn()),
+    } as unknown as Parameters<typeof registerCodexSurfaceIpc>[2];
+    const dispose = registerCodexSurfaceIpc(main, { send: vi.fn() }, surface);
+
+    await expect(main.call('codex-surface:load-older-conversation-history', 'thread-1')).rejects.toThrow(
+      'Conversation history paging is not available.',
+    );
+    dispose();
   });
 });
 

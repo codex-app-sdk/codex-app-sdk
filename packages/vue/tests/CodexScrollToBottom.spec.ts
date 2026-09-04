@@ -5,6 +5,13 @@ import { describe, expect, it } from 'vitest';
 import CodexScrollToBottom from '../src/components/CodexScrollToBottom.vue';
 
 describe('CodexScrollToBottom', () => {
+  it('uses its accessible default label when no override is supplied', () => {
+    const wrapper = mount(CodexScrollToBottom);
+
+    expect(wrapper.attributes('aria-label')).toBe('Scroll to bottom');
+    expect(wrapper.attributes('title')).toBe('Scroll to bottom');
+  });
+
   it('renders an accessible circular arrow control and emits click', async () => {
     const wrapper = mount(CodexScrollToBottom, {
       props: { label: 'Jump to latest' },

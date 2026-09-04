@@ -136,6 +136,7 @@ import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
 
+// Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
   toolCall: MessageToolCall
@@ -144,6 +145,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'client-response': [response: { id: string; payload: { answers: AskUserAnswers; cancelled?: boolean } }]
 }>()
+// Stryker restore all
 
 const currentIndex = ref(0)
 const localAnswered = ref(false)
@@ -304,8 +306,8 @@ function buildAnswer(question: AskUserQuestion): { answers: string[] } {
   return { answers }
 }
 
-function formatAnswer(answer: { answers: string[] } | undefined) {
-  return answer?.answers.filter(Boolean).join(', ') || '-'
+function formatAnswer(answer: { answers: string[] }) {
+  return answer.answers.filter(Boolean).join(', ') || '-'
 }
 
 function normalizeQuestions(value: unknown): AskUserQuestion[] {

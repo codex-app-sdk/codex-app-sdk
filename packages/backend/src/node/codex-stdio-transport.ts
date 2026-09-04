@@ -201,8 +201,7 @@ export class CodexAppServerStdioTransport implements RpcTransport {
 }
 
 function appendBounded(current: string, chunk: string, limit: number): string {
-  const combined = current + chunk;
-  return combined.length <= limit ? combined : combined.slice(-limit);
+  return (current + chunk).slice(-limit);
 }
 
 function rpcResponseIdFromPrefix(frame: string): string | number | undefined {
@@ -213,11 +212,9 @@ function rpcResponseIdFromPrefix(frame: string): string | number | undefined {
     return Number.isSafeInteger(id) ? id : undefined;
   }
   try {
-    const id: unknown = JSON.parse(match[2] ?? '');
-    return typeof id === 'string' ? id : undefined;
-  } catch {
-    return undefined;
-  }
+    return JSON.parse(match[2] as string) as string;
+  } catch {}
+  return undefined;
 }
 
 function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {

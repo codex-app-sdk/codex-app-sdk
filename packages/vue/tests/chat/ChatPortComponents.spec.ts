@@ -179,6 +179,31 @@ describe('ported id8 chat components', () => {
     expect(wrapper.attributes('aria-label')).toBe('Added lines: +0');
   });
 
+  it('keeps animated digit columns aligned by decimal place as values grow', async () => {
+    const wrapper = mount(ChatAnimatedDiffStat, {
+      props: {
+        kind: 'deleted',
+        label: 'Deleted lines',
+        value: 98,
+      },
+    });
+    const originalColumns = wrapper.findAll('.chat-animated-diff-stat__digit-column')
+      .map((column) => column.element);
+
+    expect(wrapper.findAll('.chat-animated-diff-stat__digit').map((digit) => digit.text()))
+      .toStrictEqual(['9', '8']);
+
+    await wrapper.setProps({ value: 1_098 });
+    const expandedColumns = wrapper.findAll('.chat-animated-diff-stat__digit-column')
+      .map((column) => column.element);
+
+    expect(wrapper.findAll('.chat-animated-diff-stat__digit').map((digit) => digit.text()))
+      .toStrictEqual(['1', '0', '9', '8']);
+    expect(expandedColumns[2]).toBe(originalColumns[0]);
+    expect(expandedColumns[3]).toBe(originalColumns[1]);
+    expect(wrapper.attributes('aria-label')).toBe('Deleted lines: -1098');
+  });
+
   it('renders queued prompts and emits deletes', async () => {
     const wrapper = mount(ChatQueuedPrompts, {
       props: {
@@ -296,6 +321,19 @@ describe('ported id8 chat components', () => {
 
     await wrapper.setProps({ presentation: { goal: false, queuedPrompts: false, turnGitDiff: false } });
     expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+  });
+
+  it('omits an entirely empty composer shelf', () => {
+    const wrapper = mount(ChatComposerShelf, {
+      props: {
+        goal: null,
+        queuedPrompts: [],
+        turnGitDiff: null,
+      },
+    });
+
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+    expect(wrapper.html()).toBe('<!--v-if-->');
   });
 
   it('renders collapsible tool calls with params and result', async () => {

@@ -76,7 +76,7 @@ export class CodexSurfaceConversationSettingsController {
         : null
     );
     if (preset) return approvalPresetStartParams(preset);
-    const approvalMode = options.approvalMode ?? this.defaults.approvalMode ?? 'never';
+    const approvalMode = options.approvalMode ?? this.defaults.approvalMode;
     const permissionMode = options.permissionMode ?? this.defaults.permissionMode ?? 'read-only';
     return {
       approvalPolicy: approvalMode === 'ask' ? 'on-request' : 'never',
