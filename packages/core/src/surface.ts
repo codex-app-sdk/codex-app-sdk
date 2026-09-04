@@ -831,6 +831,7 @@ export type CreateCodexRendererConversationOptions = Pick<
 
 export type SendCodexMessageOptions = {
   attachments?: readonly CodexSurfaceAttachment[];
+  inputMethod?: 'typed' | 'dictated';
   model?: string;
   reasoningEffort?: string;
   serviceTier?: string | null;

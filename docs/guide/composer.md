@@ -207,6 +207,11 @@ The microphone control records without disabling the normal Send button:
   prompt, and submits the completed text exactly once;
 - duplicate submission is disabled while transcribe-and-send is pending.
 
+When transcription contributes to a submission, the stock composer includes
+`inputMethod: 'dictated'` in the emitted `CodexRendererSendMessageOptions` and
+resets that provenance after submission. Typed submissions keep the option
+absent.
+
 Custom composer layouts can reuse the same state machine:
 
 ```ts

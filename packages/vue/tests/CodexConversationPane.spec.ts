@@ -462,6 +462,29 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
   });
 
+  it('forwards dictated input provenance with attachment options', async () => {
+    const attachment: CodexNativeAttachment = {
+      id: 'notes', type: 'file', reference: 'attachment:notes', name: 'Notes', mimeType: 'text/markdown', size: 1,
+    };
+    const wrapper = mount(CodexConversationPane, {
+      props: { attachments: [attachment], messages, modelValue: '' },
+    });
+
+    wrapper.getComponent({ name: 'CodexComposer' }).vm.$emit(
+      'send',
+      'Dictated task',
+      { inputMethod: 'dictated' },
+    );
+
+    expect(wrapper.emitted('submit')).toStrictEqual([[
+      'Dictated task',
+      {
+        inputMethod: 'dictated',
+        attachments: [{ type: 'file', reference: 'attachment:notes' }],
+      },
+    ]]);
+  });
+
   it('submits attachment-only prompts with the no-instructions sentinel', async () => {
     const attachment: CodexNativeAttachment = {
       id: 'image', type: 'image', reference: 'attachment:image', name: 'image.png', mimeType: 'image/png', size: 1,

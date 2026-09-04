@@ -204,8 +204,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   error: [message: string | null];
-  send: [prompt: string];
-  steer: [prompt: string];
+  send: [prompt: string, options?: { inputMethod: 'dictated' }];
+  steer: [prompt: string, options?: { inputMethod: 'dictated' }];
   steerQueuedPrompt: [promptId: string];
   attach: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
@@ -222,6 +222,7 @@ const emit = defineEmits<{
 const hostCapabilities = useCodexHostCapabilities();
 
 const prompt = ref('');
+const dictatedInput = ref(false);
 const editorEl = ref<CodexRichTextEditorExpose | null>(null);
 const caretPosition = ref(0);
 const selectionStart = ref(0);
@@ -399,17 +400,21 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
     return;
   }
   const submittedPrompt = trimmed || '(no user instructions)';
+  const submissionOptions = dictatedInput.value ? { inputMethod: 'dictated' as const } : undefined;
   if (trimmed) rememberSubmittedPrompt(submittedPrompt);
 
   prompt.value = '';
+  dictatedInput.value = false;
   selectionStart.value = 0;
   selectionEnd.value = 0;
   caretPosition.value = 0;
   closeComposerMenus();
   if (intent === 'send') {
-    emit('send', submittedPrompt);
+    if (submissionOptions) emit('send', submittedPrompt, submissionOptions);
+    else emit('send', submittedPrompt);
   } else {
-    emit('steer', submittedPrompt);
+    if (submissionOptions) emit('steer', submittedPrompt, submissionOptions);
+    else emit('steer', submittedPrompt);
   }
   void nextTick(resizeEditor);
 }
@@ -430,6 +435,7 @@ async function insertTranscript(text: string): Promise<void> {
   const insertion = `${prefix}${transcript}${suffix}`;
   const nextCaret = before.length + insertion.length;
   prompt.value = `${before}${insertion}${after}`;
+  dictatedInput.value = true;
   caretPosition.value = nextCaret;
   selectionStart.value = nextCaret;
   selectionEnd.value = nextCaret;

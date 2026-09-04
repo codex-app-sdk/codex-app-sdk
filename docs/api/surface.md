@@ -122,6 +122,7 @@ Renderer-safe subset: model, reasoning effort, service tier, and advertised appr
 ```ts
 type SendCodexMessageOptions = {
   attachments?: readonly CodexSurfaceAttachment[];
+  inputMethod?: 'typed' | 'dictated';
   model?: string;
   reasoningEffort?: string;
   serviceTier?: string | null;
@@ -148,6 +149,11 @@ type CodexRendererSendMessageOptions =
 Electron resolves references through its integration-scoped attachment
 registry. A web lease may provide `resolveAttachment`; the website owns upload
 authorization and reference lifetime.
+
+The stock Vue composer sets `inputMethod: 'dictated'` when voice transcription
+contributed to the submitted prompt. Hosts can use this renderer-safe metadata
+for product policy such as spoken-response gating; it is not sent to Codex as
+user-visible prompt text.
 
 ## `CodexSurfaceApi`
 

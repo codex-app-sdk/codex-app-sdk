@@ -833,7 +833,7 @@ function mergePromptHistories(
   return [...older, ...visible.slice(overlap)].slice(-100);
 }
 
-function submit(prompt: string): void {
+function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>): void {
   updateDraft('');
   const queuedPromptId = editingQueuedPromptId.value;
   if (queuedPromptId) {
@@ -842,7 +842,7 @@ function submit(prompt: string): void {
     replaceAttachments([]);
     return;
   }
-  const options = sendOptionsForAttachments(selectedAttachments.value);
+  const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
   if (dispatchControllerAction('submit', prompt, options)) {
     replaceAttachments([]);
     return;
@@ -1016,8 +1016,9 @@ function replaceAttachments(attachments: CodexHostAttachment[]): void {
 
 function sendOptionsForAttachments(
   attachments: readonly CodexHostAttachment[],
+  composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>,
 ): CodexRendererSendMessageOptions | undefined {
-  if (attachments.length === 0) return undefined;
+  if (attachments.length === 0) return composerOptions;
   const surfaceAttachments: CodexRendererAttachment[] = attachments.map((attachment) => (
     attachment.type === 'image'
       ? {
@@ -1028,7 +1029,7 @@ function sendOptionsForAttachments(
         type: 'file', reference: attachment.reference,
       }
   ));
-  return { attachments: surfaceAttachments };
+  return { ...composerOptions, attachments: surfaceAttachments };
 }
 
 function updateDraft(value: string): void {
@@ -1156,7 +1157,7 @@ function interrupt(): void {
   if (props.surface) void runSurfaceAction(() => props.surface!.interrupt());
 }
 
-function steer(prompt: string): void {
+function steer(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>): void {
   const queuedPromptId = editingQueuedPromptId.value;
   if (queuedPromptId) {
     updateDraft('');
@@ -1165,7 +1166,7 @@ function steer(prompt: string): void {
     replaceAttachments([]);
     return;
   }
-  const options = sendOptionsForAttachments(selectedAttachments.value);
+  const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
   if (dispatchControllerAction('steer', prompt, options)) {
     replaceAttachments([]);
     return;

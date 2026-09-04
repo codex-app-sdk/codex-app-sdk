@@ -827,12 +827,37 @@ describe('ChatComposer', () => {
 
     await wrapper.get('.chat-composer__send').trigger('click');
     await vi.waitFor(() => {
-      expect(wrapper.emitted('send')).toStrictEqual([['dictated change']]);
+      expect(wrapper.emitted('send')).toStrictEqual([[
+        'dictated change',
+        { inputMethod: 'dictated' },
+      ]]);
     });
 
     expect(wrapper.emitted('send')).toHaveLength(1);
     expect(transcribeAppleSpeech).toHaveBeenCalledOnce();
     expect(editorValue(wrapper)).toBe('');
+  });
+
+  it('resets dictated input provenance after submission', async () => {
+    installAudioRecordingMocks();
+    const wrapper = mountComposer({
+      transcribeAudio: vi.fn(async () => ({ text: 'dictated change' })),
+    });
+
+    await wrapper.get('.chat-composer__voice').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
+    });
+    await wrapper.get('.chat-composer__send').trigger('click');
+    await vi.waitFor(() => expect(wrapper.emitted('send')).toHaveLength(1));
+
+    await setEditorValue(wrapper, 'typed follow-up');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('send')).toStrictEqual([
+      ['dictated change', { inputMethod: 'dictated' }],
+      ['typed follow-up'],
+    ]);
   });
 
   it('prevents duplicate sends while transcribe-and-send is pending', async () => {
@@ -856,7 +881,10 @@ describe('ChatComposer', () => {
 
     resolveTranscription({ text: 'queued voice prompt' });
     await vi.waitFor(() => {
-      expect(wrapper.emitted('send')).toStrictEqual([['queued voice prompt']]);
+      expect(wrapper.emitted('send')).toStrictEqual([[
+        'queued voice prompt',
+        { inputMethod: 'dictated' },
+      ]]);
     });
     expect(wrapper.emitted('send')).toHaveLength(1);
   });
