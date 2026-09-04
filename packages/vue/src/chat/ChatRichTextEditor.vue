@@ -497,7 +497,7 @@ defineExpose<CodexRichTextEditorExpose>({
   cursor: not-allowed;
 }
 
-.chat-rich-text-editor__chip-token-host {
+.chat-rich-text-editor :deep(.chat-rich-text-editor__chip-token-host) {
   display: inline-block;
   max-width: 220px;
   margin: 0 var(--space-1);
