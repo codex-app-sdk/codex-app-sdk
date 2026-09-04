@@ -30,6 +30,9 @@ const templates: Record<string, string> = {
   'chat.files.hint': 'Start typing to search files in this project.',
   'chat.files.title': 'Files',
   'chat.message.emptyResponse': 'Empty response',
+  'chat.work.doneHideDetails': 'Done · Hide details',
+  'chat.work.doneViewDetails': 'Done · View details',
+  'chat.work.working': 'Working',
   'chat.skills.empty': 'No matching skills',
   'chat.skills.title': 'Skills',
 };

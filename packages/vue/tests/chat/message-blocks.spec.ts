@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { computeMessageBlocks, groupToolBlocks, stripMessageContext } from '../../src/chat/message-blocks';
+import {
+  computeMessageBlocks,
+  groupAssistantWorkBlocks,
+  groupToolBlocks,
+  stripMessageContext,
+} from '../../src/chat/message-blocks';
 import type { Message, MessageToolCall } from '../../src/chat/types';
 
 const completedTool: MessageToolCall = {
@@ -77,6 +82,48 @@ describe('message block computation', () => {
   it('returns no blocks for empty assistant messages without tools', () => {
     expect(computeMessageBlocks({ role: 'user', content: '' })).toStrictEqual([]);
     expect(computeMessageBlocks({ role: 'assistant', content: '' })).toStrictEqual([]);
+  });
+
+  it('groups only explicitly phased assistant work before the final answer', () => {
+    const message: Message = {
+      role: 'assistant',
+      content: 'Checking.\n\nDone.',
+      streaming: true,
+      parts: [
+        { type: 'reasoning', summary: 'Inspecting the source' },
+        { type: 'text', content: 'Checking.', phase: 'commentary' },
+        { type: 'tool', toolCall: completedTool },
+        { type: 'text', content: 'Done.', phase: 'final_answer' },
+      ],
+      toolCalls: [completedTool],
+    };
+    const grouped = groupAssistantWorkBlocks(message, computeMessageBlocks(message));
+
+    expect(grouped).toStrictEqual([
+      {
+        type: 'work-group',
+        active: false,
+        finalStarted: true,
+        blocks: [
+          { type: 'reasoning', content: 'Inspecting the source', phase: 'commentary' },
+          { type: 'text', content: 'Checking.', phase: 'commentary' },
+          { type: 'tool-group', toolCalls: [completedTool] },
+        ],
+      },
+      { type: 'text', content: 'Done.', phase: 'final_answer' },
+    ]);
+
+    const unphased: Message = {
+      role: 'assistant',
+      content: 'Claude text',
+      parts: [
+        { type: 'text', content: 'Claude text' },
+        { type: 'tool', toolCall: completedTool },
+      ],
+      toolCalls: [completedTool],
+    };
+    const unphasedBlocks = computeMessageBlocks(unphased);
+    expect(groupAssistantWorkBlocks(unphased, unphasedBlocks)).toStrictEqual(unphasedBlocks);
   });
 
   it('extracts text, follow-ups, mermaid, images, anchored tools, and grouped trailing tools', () => {

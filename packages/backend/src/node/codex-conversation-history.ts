@@ -128,6 +128,22 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       continue;
     }
 
+    if (item.type === 'reasoning') {
+      const summaries = item.summary
+        .map((summary, summaryIndex) => ({ summary: summary.trim(), summaryIndex }))
+        .filter(({ summary }) => summary.length > 0);
+      if (summaries.length > 0) {
+        sawAssistantActivity = true;
+        assistantParts.push(...summaries.map(({ summary, summaryIndex }) => ({
+          type: 'reasoning' as const,
+          summary,
+          itemId: item.id,
+          summaryIndex,
+        })));
+      }
+      continue;
+    }
+
     if (item.type === 'exitedReviewMode') {
       const text = typeof item.review === 'string' ? item.review : '';
       if (text) {
@@ -187,6 +203,27 @@ export function codexItemToSurfaceMessage(
         itemId: item.id,
         ...(item.type === 'agentMessage' && item.phase ? { phase: item.phase } : {}),
       }],
+      createdAt,
+      metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
+    } : null;
+  }
+
+  if (item.type === 'reasoning') {
+    const parts = item.summary
+      .map((summary, summaryIndex) => ({ summary: summary.trim(), summaryIndex }))
+      .filter(({ summary }) => summary.length > 0)
+      .map(({ summary, summaryIndex }) => ({
+        type: 'reasoning' as const,
+        summary,
+        itemId: item.id,
+        summaryIndex,
+      }));
+    return parts.length > 0 ? {
+      id: `assistant-${item.id}`,
+      role: 'assistant',
+      status: surfaceMessageStatus(turn.status),
+      turnId: turn.id,
+      parts,
       createdAt,
       metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
     } : null;

@@ -55,7 +55,33 @@
         />
         <template v-else>
           <template v-for="({ block, blockIndex }) in stackBlocks" :key="block.type === 'tool' ? block.toolCall.id : `${block.type}-${blockIndex}`">
-            <slot name="block" :block="block" :block-index="blockIndex" :index="index" :message="chatMessage">
+            <ChatMessageBlock
+              v-if="block.type === 'work-group'"
+              :answered-client-request-ids="answeredClientRequestIds"
+              :block="block"
+              :follow-ups-disabled="followUpsDisabled"
+              :mention-groups="mentionGroups"
+              :plugins="plugins"
+              :open-image="openImage"
+              :show-tool-details="showToolDetails"
+              :skills="skills"
+              @cancel="emit('cancel')"
+              @client-response="emit('client-response', $event)"
+              @open-link="emit('open-link', $event)"
+              @open-visualization="emit('open-visualization', $event)"
+              @send-follow-up="emit('send-follow-up', $event)"
+            >
+              <template v-if="$slots.block" #block="scope">
+                <slot name="block" v-bind="scope" :index="index" :message="chatMessage" />
+              </template>
+              <template v-if="$slots.text" #text="scope">
+                <slot name="text" v-bind="scope" :index="index" :message="chatMessage" />
+              </template>
+              <template v-if="$slots.tool" #tool="scope">
+                <slot name="tool" v-bind="scope" :index="index" :message="chatMessage" />
+              </template>
+            </ChatMessageBlock>
+            <slot v-else name="block" :block="block" :block-index="blockIndex" :index="index" :message="chatMessage">
               <ChatMessageBlock
                 :answered-client-request-ids="answeredClientRequestIds"
                 :block="block"
@@ -147,7 +173,7 @@ import type { ClientRequestResponse, CodexConversationLink, CodexConversationPre
 import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { CodexSurfacePlugin, CodexSurfaceSkill, SurfaceMessage } from '@codex-app-sdk/core/surface'
-import type { MessageBlock } from '../chat/message-blocks'
+import type { MessageBlock, RenderedMessageBlock } from '../chat/message-blocks'
 import type {
   CodexMessageImage,
   CodexMessageImageContext,
@@ -158,7 +184,7 @@ import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
 import ChatCompactionMessage from '../chat/ChatCompactionMessage.vue'
 import ChatMessageEditor from '../chat/ChatMessageEditor.vue'
-import { computeMessageBlocks, stripMessageContext } from '../chat/message-blocks'
+import { computeMessageBlocks, groupAssistantWorkBlocks, stripMessageContext } from '../chat/message-blocks'
 import { copyMessageToClipboard } from '../chat/message-actions'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import { useCodexHostCapabilities } from '../native-capabilities'
@@ -233,18 +259,22 @@ const t = useCodexChatTranslate()
 const chatMessage = computed(() => chatMessageFromInput(props.message))
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
 const allBlocks = computed(() => computeMessageBlocks(chatMessage.value))
-const blocks = computed(() => allBlocks.value.filter((block) => (
-  effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
-)))
+const blocks = computed(() => groupAssistantWorkBlocks(
+  chatMessage.value,
+  allBlocks.value.filter((block) => (
+    effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
+  )),
+))
 const indexedBlocks = computed(() => blocks.value.map((block, blockIndex) => ({ block, blockIndex })))
+const indexedAllBlocks = computed(() => allBlocks.value.map((block, blockIndex) => ({ block, blockIndex })))
 const userAttachmentBlocks = computed(() => (
   chatMessage.value.role === 'user'
-    ? indexedBlocks.value.filter(({ block }) => block.type === 'attachment')
+    ? indexedAllBlocks.value.filter(({ block }) => block.type === 'attachment')
     : []
 ))
 const stackBlocks = computed(() => (
   chatMessage.value.role === 'user'
-    ? indexedBlocks.value.filter(({ block }) => block.type !== 'attachment')
+    ? indexedAllBlocks.value.filter(({ block }) => block.type !== 'attachment')
     : indexedBlocks.value
 ))
 const visibleUserContent = computed(() => stripMessageContext(chatMessage.value.content))
@@ -343,12 +373,17 @@ async function copyMessage() {
   }, 1500)
 }
 
-function isVisibleAssistantBlock(block: MessageBlock) {
+function isVisibleAssistantBlock(block: RenderedMessageBlock) {
   if (block.type === 'text') {
     return block.content.trim().length > 0
   }
 
-  return block.type === 'attachment' || block.type === 'media' || block.type === 'tool' || block.type === 'tool-group'
+  return block.type === 'attachment'
+    || block.type === 'media'
+    || block.type === 'reasoning'
+    || block.type === 'tool'
+    || block.type === 'tool-group'
+    || block.type === 'work-group'
 }
 
 onBeforeUnmount(() => {

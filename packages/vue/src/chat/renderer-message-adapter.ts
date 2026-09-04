@@ -33,6 +33,21 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
         type: 'media',
         media: { ...part.media },
       });
+    } else if (part.type === 'reasoning') {
+      parts.push({
+        type: 'reasoning',
+        summary: part.summary,
+        itemId: part.itemId,
+        summaryIndex: part.summaryIndex,
+      });
+    } else if (part.type === 'text') {
+      contentParts.push(part.text);
+      parts.push({
+        type: 'text',
+        content: part.text,
+        ...(part.itemId ? { itemId: part.itemId } : {}),
+        ...(part.phase ? { phase: part.phase } : {}),
+      });
     } else {
       contentParts.push(part.text);
       parts.push({ type: 'text', content: part.text });

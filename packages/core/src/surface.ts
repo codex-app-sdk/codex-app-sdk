@@ -5,6 +5,13 @@ export type SurfaceMessageTextPart = {
   phase?: 'commentary' | 'final_answer';
 };
 
+export type SurfaceMessageReasoningPart = {
+  type: 'reasoning';
+  summary: string;
+  itemId: string;
+  summaryIndex: number;
+};
+
 export type SurfaceMessageStatusPart = {
   type: 'status';
   text: string;
@@ -67,6 +74,7 @@ export type SurfaceMessageToolPartUpdate = {
 export type SurfaceMessagePart =
   | SurfaceMessageAttachmentPart
   | SurfaceMessageMediaPart
+  | SurfaceMessageReasoningPart
   | SurfaceMessageTextPart
   | SurfaceMessageStatusPart
   | SurfaceMessageToolPart;
@@ -720,6 +728,7 @@ export type CodexSurfaceEvent =
     messageId: string;
     itemId: string;
     delta: string;
+    phase?: SurfaceMessageTextPart['phase'];
   }>
   | CodexTurnEventEnvelope<'message.updated', {
     message: SurfaceMessage;

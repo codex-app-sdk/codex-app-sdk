@@ -24,6 +24,25 @@ While a turn is accepted but no assistant row exists yet, the list renders a
 materialized. A completed assistant message whose text is empty and which has
 no other visible content renders a muted italic `Empty response` fallback.
 
+## Phased assistant work
+
+Codex assistant items can distinguish intermediate `commentary` from the
+`final_answer`. The SDK preserves that phase on text parts and exposes completed
+reasoning summaries as separate `reasoning` parts. It never exposes raw
+reasoning content.
+
+The stock Vue renderer groups commentary, reasoning summaries, and tool calls
+under an expanded `Working` section while the turn is active. When the final
+answer starts, the section becomes `Done · View details` and collapses
+automatically; the reader can reopen it at any time. The final answer remains
+visible below it.
+
+This presentation is capability-by-data rather than provider-specific. Messages
+without explicit phases or reasoning summaries keep the existing flat layout,
+so custom backends do not need to invent a final-answer boundary. Applications
+using the `message-block` slot continue to receive the original leaf blocks;
+the work-group wrapper itself is not passed through that customization slot.
+
 ## Image previews
 
 Clicking an image attachment or generated assistant image opens the SDK

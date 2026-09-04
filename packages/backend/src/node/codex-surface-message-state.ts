@@ -2,6 +2,7 @@ import type { v2 } from '../codex/index';
 import type {
   SurfaceMessage,
   SurfaceMessageMediaPart,
+  SurfaceMessageReasoningPart,
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
@@ -79,6 +80,7 @@ export function appendAssistantTextDelta(
   turnId: string,
   itemId: string,
   delta: string,
+  phase?: SurfaceMessageTextPart['phase'],
 ): SurfaceMessage[] {
   if (!delta) return [...messages];
   const next = ensureAssistantTurnMessage(messages, threadId, turnId);
@@ -92,10 +94,49 @@ export function appendAssistantTextDelta(
   const parts = [...message.parts];
   const lastPart = parts.at(-1);
   if (lastPart?.type === 'text' && lastPart.itemId === itemId) {
-    parts.splice(parts.length - 1, 1, { ...lastPart, text: `${lastPart.text}${delta}` });
+    parts.splice(parts.length - 1, 1, {
+      ...lastPart,
+      text: `${lastPart.text}${delta}`,
+      ...(phase ? { phase } : {}),
+    });
   } else {
-    parts.push({ type: 'text', text: delta, itemId });
+    parts.push({ type: 'text', text: delta, itemId, ...(phase ? { phase } : {}) });
   }
+  next.splice(messageIndex, 1, { ...message, status: 'streaming', parts });
+  return pruneEmptyAssistantPlaceholders(next, threadId);
+}
+
+export function upsertAssistantReasoningSummaries(
+  messages: readonly SurfaceMessage[],
+  threadId: string,
+  turnId: string,
+  itemId: string,
+  summaries: readonly string[],
+): SurfaceMessage[] {
+  const normalized = summaries
+    .map((summary, summaryIndex): SurfaceMessageReasoningPart | null => {
+      const text = summary.trim();
+      return text ? { type: 'reasoning', summary: text, itemId, summaryIndex } : null;
+    })
+    .filter((part): part is SurfaceMessageReasoningPart => part !== null);
+  if (normalized.length === 0) return [...messages];
+
+  const next = ensureAssistantTurnMessage(messages, threadId, turnId);
+  const messageIndex = findLastIndex(next, (message) => (
+    message.role === 'assistant'
+    && message.kind === undefined
+    && message.metadata?.turnId === turnId
+  ));
+  const message = messageIndex >= 0 ? next[messageIndex] : undefined;
+  if (!message) return next;
+
+  const firstExistingIndex = message.parts.findIndex((part) => (
+    part.type === 'reasoning' && part.itemId === itemId
+  ));
+  const parts = message.parts.filter((part) => (
+    part.type !== 'reasoning' || part.itemId !== itemId
+  ));
+  parts.splice(firstExistingIndex >= 0 ? firstExistingIndex : parts.length, 0, ...normalized);
   next.splice(messageIndex, 1, { ...message, status: 'streaming', parts });
   return pruneEmptyAssistantPlaceholders(next, threadId);
 }

@@ -4,6 +4,7 @@ import type {
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
   SurfaceMessage,
+  SurfaceMessageTextPart,
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
 } from '@codex-app-sdk/core/surface';
@@ -25,6 +26,7 @@ import {
   surfaceMediaPartsEqual,
   updateAssistantToolPart,
   upsertAssistantMediaPart,
+  upsertAssistantReasoningSummaries,
   upsertAssistantText,
   upsertAssistantToolPart,
 } from './codex-surface-message-state';
@@ -89,16 +91,25 @@ export class CodexSurfaceItemsController {
   applyAgentDelta(params: v2.AgentMessageDeltaNotification): void {
     const runtime = this.host.requireRuntime(params.threadId);
     this.host.markRuntimeTurnActive(runtime, params.turnId);
+    const phase = runtime.messages.flatMap((message) => message.parts)
+      .find((part): part is SurfaceMessageTextPart => (
+        part.type === 'text' && part.itemId === params.itemId
+      ))?.phase;
     this.host.patchRuntime(params.threadId, {
       messages: appendAssistantTextDelta(
-        runtime.messages, params.threadId, params.turnId, params.itemId, params.delta,
+        runtime.messages, params.threadId, params.turnId, params.itemId, params.delta, phase,
       ),
     });
     const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
     if (message) {
       this.host.emitEvent('notification', {
         type: 'message.delta', conversationId: params.threadId, turnId: params.turnId,
-        payload: { messageId: message.id, itemId: params.itemId, delta: params.delta },
+        payload: {
+          messageId: message.id,
+          itemId: params.itemId,
+          delta: params.delta,
+          ...(phase ? { phase } : {}),
+        },
       });
     }
   }
@@ -215,6 +226,31 @@ export class CodexSurfaceItemsController {
       return;
     }
 
+    if (params.item.type === 'reasoning') {
+      const summaries = params.item.summary.filter((summary) => summary.trim().length > 0);
+      if (summaries.length === 0) return;
+      const previousMessage = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+      const previousParts = previousMessage ? JSON.stringify(previousMessage.parts) : null;
+      this.host.patchRuntime(params.threadId, {
+        messages: upsertAssistantReasoningSummaries(
+          runtime.messages,
+          params.threadId,
+          params.turnId,
+          params.item.id,
+          params.item.summary,
+        ),
+      });
+      const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+      if (!message || JSON.stringify(message.parts) === previousParts) return;
+      this.host.emitEvent('notification', {
+        type: previousMessage ? 'message.updated' : 'message.appended',
+        conversationId: params.threadId,
+        turnId: params.turnId,
+        payload: { message: structuredClone(message) },
+      });
+      return;
+    }
+
     if (params.item.type === 'agentMessage' || params.item.type === 'exitedReviewMode') {
       const text = params.item.type === 'agentMessage' ? params.item.text : params.item.review;
       const phase = params.item.type === 'agentMessage' ? params.item.phase ?? undefined : undefined;
@@ -249,7 +285,12 @@ export class CodexSurfaceItemsController {
           const delta = text.slice(previousText.length);
           if (delta) this.host.emitEvent('notification', {
             type: 'message.delta', conversationId: params.threadId, turnId: params.turnId,
-            payload: { messageId: message.id, itemId: params.item.id, delta },
+            payload: {
+              messageId: message.id,
+              itemId: params.item.id,
+              delta,
+              ...(phase ? { phase } : {}),
+            },
           });
         } else {
           this.host.emitEvent('notification', {

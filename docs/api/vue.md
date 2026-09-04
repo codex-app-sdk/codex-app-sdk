@@ -219,7 +219,7 @@ delivered to `onTranscript`, or `false` when recording/transcription fails.
 `CodexMessageBlock`, `CodexUserText`, `CodexAttachmentBlock`, `CodexMediaBlock`,
 `CodexImageLightbox`,
 `CodexMermaidBlock`, `CodexVisualizationBlock`, `CodexCompactionMessage`, `CodexMessageActions`,
-`CodexMessageEditor`, and `CodexFoldTransition`.
+`CodexMessageEditor`, `CodexWorkGroup`, and `CodexFoldTransition`.
 
 Image attachments and media open `CodexImageLightbox` by default. Override
 message image clicks with either `CodexConversationPane`'s `openImage` prop or

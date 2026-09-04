@@ -79,7 +79,8 @@ type SurfaceMessage = {
 
 `SurfaceMessagePart` is a discriminated union of:
 
-- text/user text;
+- text, with an optional `commentary` or `final_answer` phase;
+- completed reasoning summaries;
 - attachments;
 - generated and attached media;
 - streaming/status information;
@@ -88,6 +89,25 @@ type SurfaceMessage = {
 This is the stable renderer model for both restored and live conversations.
 When a message is terminal (`complete` or `error`), SDK adapters settle any
 stale `running` tool parts rather than exposing a nested streaming state.
+
+```ts
+type SurfaceMessageTextPart = {
+  type: 'text';
+  text: string;
+  itemId?: string;
+  phase?: 'commentary' | 'final_answer';
+};
+
+type SurfaceMessageReasoningPart = {
+  type: 'reasoning';
+  summary: string;
+  itemId: string;
+  summaryIndex: number;
+};
+```
+
+Reasoning parts contain only completed app-server summaries. Raw reasoning
+content and reasoning deltas are not exposed through the surface contract.
 
 ## History state
 

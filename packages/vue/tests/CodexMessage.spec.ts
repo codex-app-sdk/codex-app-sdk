@@ -105,6 +105,122 @@ describe('CodexMessage', () => {
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
   });
 
+  it('expands phased work while active and collapses it when the final answer starts', async () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-phased',
+        role: 'assistant',
+        status: 'streaming',
+        parts: [
+          {
+            type: 'reasoning',
+            summary: 'Inspecting the message pipeline',
+            itemId: 'reasoning-1',
+            summaryIndex: 0,
+          },
+          {
+            type: 'text',
+            text: 'I am checking the renderer.',
+            itemId: 'commentary-1',
+            phase: 'commentary',
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
+    expect(wrapper.get('.chat-work-group .chat-fold').classes()).toContain('chat-fold--open');
+    expect(wrapper.get('.chat-message-block--reasoning').text()).toContain('Inspecting the message pipeline');
+
+    await wrapper.setProps({
+      message: {
+        id: 'assistant-phased',
+        role: 'assistant',
+        status: 'streaming',
+        parts: [
+          {
+            type: 'reasoning',
+            summary: 'Inspecting the message pipeline',
+            itemId: 'reasoning-1',
+            summaryIndex: 0,
+          },
+          {
+            type: 'text',
+            text: 'I am checking the renderer.',
+            itemId: 'commentary-1',
+            phase: 'commentary',
+          },
+          {
+            type: 'text',
+            text: 'The renderer is fixed.',
+            itemId: 'answer-1',
+            phase: 'final_answer',
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.get('.chat-work-group .chat-fold').classes()).not.toContain('chat-fold--open');
+    expect(wrapper.get('.chat-message__stack').text()).toContain('The renderer is fixed.');
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+    expect(wrapper.get('.chat-work-group .chat-fold').classes()).toContain('chat-fold--open');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+  });
+
+  it('keeps unphased assistant output on the existing flat rendering path', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-unphased',
+        role: 'assistant',
+        status: 'complete',
+        parts: [{ type: 'text', text: 'Claude response' }],
+      },
+    });
+
+    expect(wrapper.find('.chat-work-group').exists()).toBe(false);
+    expect(wrapper.get('.chat-message-block--text').text()).toBe('Claude response');
+  });
+
+  it('keeps phased work wrappers out of the public block slot', () => {
+    const seenTypes: string[] = [];
+    const wrapper = mount(CodexMessage, {
+      props: {
+        message: {
+          id: 'assistant-custom-blocks',
+          role: 'assistant',
+          status: 'streaming',
+          parts: [
+            {
+              type: 'reasoning',
+              summary: 'Checking the public slot',
+              itemId: 'reasoning-1',
+              summaryIndex: 0,
+            },
+            {
+              type: 'text',
+              text: 'Still working',
+              itemId: 'commentary-1',
+              phase: 'commentary',
+            },
+          ],
+        },
+      },
+      slots: {
+        block: ({ block }: { block: { type: string } }) => {
+          seenTypes.push(block.type);
+          return h('div', { class: `custom-${block.type}` }, block.type);
+        },
+      },
+    });
+
+    expect(seenTypes).toStrictEqual(['reasoning', 'text']);
+    expect(wrapper.find('.custom-reasoning').exists()).toBe(true);
+    expect(wrapper.find('.custom-text').exists()).toBe(true);
+    expect(seenTypes).not.toContain('work-group');
+  });
+
   it('renders a muted italic fallback for an empty completed assistant response', () => {
     const wrapper = mountMessage({
       message: {

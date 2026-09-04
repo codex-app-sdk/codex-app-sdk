@@ -16,6 +16,7 @@ import {
   surfaceMediaPartsEqual,
   updateAssistantToolPart,
   upsertAssistantMediaPart,
+  upsertAssistantReasoningSummaries,
   upsertAssistantText,
   upsertAssistantToolPart,
 } from '../src/node/codex-surface-message-state';
@@ -80,6 +81,18 @@ describe('Codex surface message state', () => {
       { type: 'text', text: 'hello', itemId: 'item-1' },
       { type: 'text', text: '!', itemId: 'item-2' },
     ]);
+
+    const phased = appendAssistantTextDelta(
+      untouched,
+      'thread-1',
+      'turn-1',
+      'commentary-1',
+      'Checking',
+      'commentary',
+    );
+    expect(phased.at(-1)?.parts).toStrictEqual([
+      { type: 'text', text: 'Checking', itemId: 'commentary-1', phase: 'commentary' },
+    ]);
   });
 
   it('updates existing assistant text or inserts a phased text part', () => {
@@ -96,6 +109,44 @@ describe('Codex surface message state', () => {
     ]);
     const withoutPhase = upsertAssistantText([], 'thread-1', 'turn-1', 'item-3', 'plain');
     expect(withoutPhase[0]?.parts[0]).toStrictEqual({ type: 'text', text: 'plain', itemId: 'item-3' });
+  });
+
+  it('inserts and replaces safe reasoning summaries without exposing reasoning content', () => {
+    const first = upsertAssistantReasoningSummaries(
+      [],
+      'thread-1',
+      'turn-1',
+      'reasoning-1',
+      ['Inspecting the renderer', '', 'Checking the event flow'],
+    );
+    expect(first[0]?.parts).toStrictEqual([
+      {
+        type: 'reasoning',
+        summary: 'Inspecting the renderer',
+        itemId: 'reasoning-1',
+        summaryIndex: 0,
+      },
+      {
+        type: 'reasoning',
+        summary: 'Checking the event flow',
+        itemId: 'reasoning-1',
+        summaryIndex: 2,
+      },
+    ]);
+
+    const replaced = upsertAssistantReasoningSummaries(
+      first,
+      'thread-1',
+      'turn-1',
+      'reasoning-1',
+      ['Verified the renderer'],
+    );
+    expect(replaced[0]?.parts).toStrictEqual([{
+      type: 'reasoning',
+      summary: 'Verified the renderer',
+      itemId: 'reasoning-1',
+      summaryIndex: 0,
+    }]);
   });
 
   it('inserts and merges tool parts while preserving incremental fields', () => {

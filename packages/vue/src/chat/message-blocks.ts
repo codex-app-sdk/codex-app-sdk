@@ -1,15 +1,27 @@
-import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageAttachment, type MessageMedia, type MessageToolCall, type MessagePart } from './types'
+import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageAttachment, type MessageMedia, type MessagePhase, type MessageToolCall, type MessagePart } from './types'
+
+type PhasedMessageBlock = {
+  phase?: MessagePhase
+}
 
 export type MessageBlock =
   | { type: 'attachment'; attachment: MessageAttachment }
-  | { type: 'text'; content: string }
+  | ({ type: 'text'; content: string } & PhasedMessageBlock)
   | { type: 'user-text'; content: string }
-  | { type: 'mermaid'; code: string }
-  | { type: 'visualization'; path?: string; title: string }
-  | { type: 'media'; media: MessageMedia; toolCall?: MessageToolCall }
+  | ({ type: 'reasoning'; content: string } & PhasedMessageBlock)
+  | ({ type: 'mermaid'; code: string } & PhasedMessageBlock)
+  | ({ type: 'visualization'; path?: string; title: string } & PhasedMessageBlock)
+  | ({ type: 'media'; media: MessageMedia; toolCall?: MessageToolCall } & PhasedMessageBlock)
   | { type: 'tool'; toolCall: MessageToolCall }
   | { type: 'tool-group'; toolCalls: MessageToolCall[] }
-  | { type: 'follow-ups'; prompts: string[] }
+  | ({ type: 'follow-ups'; prompts: string[] } & PhasedMessageBlock)
+
+export type RenderedMessageBlock = MessageBlock | {
+  type: 'work-group'
+  active: boolean
+  blocks: MessageBlock[]
+  finalStarted: boolean
+}
 
 type CodeBlockRange = {
   start: number
@@ -66,6 +78,28 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
   return finalizeAssistantBlocks(blocks, prompts)
 }
 
+export function groupAssistantWorkBlocks(message: Message, blocks: MessageBlock[]): RenderedMessageBlock[] {
+  if (message.role !== 'assistant' || !hasExplicitWorkPhases(message)) return blocks
+
+  const workBlocks: MessageBlock[] = []
+  const answerBlocks: MessageBlock[] = []
+  for (const block of blocks) {
+    if (isAssistantWorkBlock(block)) workBlocks.push(block)
+    else answerBlocks.push(block)
+  }
+  if (workBlocks.length === 0) return blocks
+
+  const finalStarted = message.parts?.some((part) => (
+    part.type === 'text' && part.phase === 'final_answer' && part.content.trim().length > 0
+  )) ?? false
+  return [{
+    type: 'work-group',
+    active: message.streaming === true && !finalStarted,
+    blocks: workBlocks,
+    finalStarted,
+  }, ...answerBlocks]
+}
+
 function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageToolCall[]): MessageBlock[] {
   const blocks: MessageBlock[] = []
   const prompts: string[] = []
@@ -88,7 +122,14 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
       continue
     }
 
-    const parsed = parseTextBlocks(part.content, toolCalls, anchoredToolCallIds)
+    if (part.type === 'reasoning') {
+      if (part.summary.trim()) {
+        blocks.push({ type: 'reasoning', content: part.summary, phase: 'commentary' })
+      }
+      continue
+    }
+
+    const parsed = parseTextBlocks(part.content, toolCalls, anchoredToolCallIds, part.phase)
     blocks.push(...parsed.blocks)
     prompts.push(...parsed.prompts)
   }
@@ -97,7 +138,12 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
   return finalizeAssistantBlocks(blocks, prompts)
 }
 
-function parseTextBlocks(rawContent: string, toolCalls: MessageToolCall[], anchoredToolCallIds: Set<string>) {
+function parseTextBlocks(
+  rawContent: string,
+  toolCalls: MessageToolCall[],
+  anchoredToolCallIds: Set<string>,
+  phase?: MessagePhase,
+) {
   const { content, prompts } = extractFollowUps(completeStreamingCustomTags(rawContent))
   const codeBlocks = findCodeBlocks(content)
   const blocks: MessageBlock[] = []
@@ -106,16 +152,17 @@ function parseTextBlocks(rawContent: string, toolCalls: MessageToolCall[], ancho
 
   for (const item of findSpecialBlocks(content, codeBlocks)) {
     if (item.start > lastIndex) {
-      pushTextBlock(blocks, content.slice(lastIndex, item.start))
+      pushTextBlock(blocks, content.slice(lastIndex, item.start), phase)
     }
 
     if (item.type === 'mermaid') {
-      blocks.push({ type: 'mermaid', code: item.code })
+      blocks.push({ type: 'mermaid', code: item.code, ...(phase ? { phase } : {}) })
     } else if (item.type === 'visualization') {
       blocks.push({
         type: 'visualization',
         title: item.title,
         ...(item.path ? { path: item.path } : {}),
+        ...(phase ? { phase } : {}),
       })
     } else if (item.type === 'tool') {
       const toolCall = findToolCall(item.kind, item.value, toolCalls)
@@ -134,7 +181,8 @@ function parseTextBlocks(rawContent: string, toolCalls: MessageToolCall[], ancho
           ...item.media,
           prompt: item.media.prompt ?? getToolCallPrompt(toolCall),
         },
-        toolCall
+        toolCall,
+        ...(phase ? { phase } : {}),
       })
     }
 
@@ -142,7 +190,7 @@ function parseTextBlocks(rawContent: string, toolCalls: MessageToolCall[], ancho
   }
 
   if (lastIndex < content.length) {
-    pushTextBlock(blocks, content.slice(lastIndex))
+    pushTextBlock(blocks, content.slice(lastIndex), phase)
   }
 
   return { blocks, prompts }
@@ -238,10 +286,21 @@ function parseToolStatus(status: unknown) {
   }
 }
 
-function pushTextBlock(blocks: MessageBlock[], content: string) {
+function pushTextBlock(blocks: MessageBlock[], content: string, phase?: MessagePhase) {
   if (content.trim()) {
-    blocks.push({ type: 'text', content })
+    blocks.push({ type: 'text', content, ...(phase ? { phase } : {}) })
   }
+}
+
+function hasExplicitWorkPhases(message: Message) {
+  return message.parts?.some((part) => (
+    part.type === 'reasoning' || (part.type === 'text' && part.phase !== undefined)
+  )) ?? false
+}
+
+function isAssistantWorkBlock(block: MessageBlock) {
+  if (block.type === 'reasoning' || block.type === 'tool' || block.type === 'tool-group') return true
+  return 'phase' in block && block.phase === 'commentary'
 }
 
 function extractFollowUps(content: string) {

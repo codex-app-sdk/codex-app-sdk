@@ -57,6 +57,11 @@ Event families cover:
 - `approval.*`
 - `clientRequest.*`
 
+`message.delta` includes `messageId`, `itemId`, `delta`, and an optional
+`phase: 'commentary' | 'final_answer'`. Completed reasoning summaries arrive
+through the full message carried by `message.updated`, avoiding a second
+streaming protocol for reasoning content.
+
 `remoteControl.statusChanged` projects app-server remote-control connection
 notifications into the surface event stream. Its payload contains the current
 typed status so hosts can update native behavior such as sleep prevention

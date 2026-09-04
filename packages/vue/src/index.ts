@@ -74,6 +74,7 @@ export { default as CodexToolUserInputRequest } from './chat/ChatToolUserInputRe
 export { default as CodexTurnGitInfo } from './chat/ChatTurnGitInfo.vue';
 export { default as CodexUserText } from './chat/ChatUserText.vue';
 export { default as CodexVisualizationBlock } from './chat/ChatVisualizationBlock.vue';
+export { default as CodexWorkGroup } from './chat/ChatWorkGroup.vue';
 export { codexCapabilities } from './chat/codex-capabilities';
 export { codexCommands } from './chat/codex-commands';
 export {

@@ -53,10 +53,13 @@ export type MessageAttachment = {
   mimeType?: string;
 };
 
+export type MessagePhase = 'commentary' | 'final_answer';
+
 export type MessagePart =
   | { type: 'attachment'; attachment: MessageAttachment }
   | { type: 'media'; media: MessageMedia }
-  | { type: 'text'; content: string }
+  | { type: 'reasoning'; summary: string; itemId?: string; summaryIndex?: number }
+  | { type: 'text'; content: string; itemId?: string; phase?: MessagePhase }
   | { type: 'tool'; toolCall: MessageToolCall };
 
 export type MessageSuggestedPrompt = {

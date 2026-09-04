@@ -458,7 +458,7 @@ describe('CodexSurface', () => {
     expect(events).toHaveLength(surfaceEventCount);
   });
 
-  it('keeps reasoning internal and exposes an empty streaming assistant message for thinking UI', async () => {
+  it('exposes safe reasoning summaries while keeping raw reasoning content internal', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
     await surface.sendMessage('Think carefully');
@@ -483,16 +483,21 @@ describe('CodexSurface', () => {
       id: 'assistant-turn-live',
       role: 'assistant',
       status: 'streaming',
-      parts: [],
+      parts: [{
+        type: 'reasoning',
+        summary: 'Internal',
+        itemId: 'reasoning-live',
+        summaryIndex: 0,
+      }],
     });
-    expect(surface.getSnapshot().messages.some((message) => (
-      message.parts.some((part) => part.type === 'tool' && part.kind === 'reasoning')
-    ))).toBe(false);
+    expect(JSON.stringify(surface.getSnapshot().messages)).not.toContain('Hidden');
   });
 
   it('preserves agent message phase before and during streaming', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
     transport.emit({
       method: 'turn/started',
       params: { threadId: 'thread-existing', turn: turn('turn-live', 'inProgress', []) },
@@ -532,6 +537,14 @@ describe('CodexSurface', () => {
         }),
       ]),
     );
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'message.delta',
+      payload: expect.objectContaining({
+        itemId: 'agent-final',
+        delta: 'Final response',
+        phase: 'final_answer',
+      }),
+    }));
   });
 
 });

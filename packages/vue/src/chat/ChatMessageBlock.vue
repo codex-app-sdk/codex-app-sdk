@@ -17,6 +17,12 @@
       @click="copyCodeBlock"
     />
   </slot>
+  <div
+    v-else-if="block.type === 'reasoning'"
+    class="codex-chat-theme chat-message-block chat-message-block--reasoning codex-markdown"
+    v-html="renderMarkdown(block.content, { codeCopyLabel: t('chat.code.copy') })"
+    @click="copyCodeBlock"
+  />
   <slot v-else-if="block.type === 'mermaid'" name="mermaid" :block="block" :code="block.code">
     <ChatMermaidBlock :code="block.code" />
   </slot>
@@ -58,8 +64,37 @@
       @open-link="emit('open-link', $event)"
     />
   </slot>
+  <ChatWorkGroup
+    v-else-if="block.type === 'work-group'"
+    :active="block.active"
+    :final-started="block.finalStarted"
+  >
+    <template v-for="(child, index) in block.blocks" :key="child.type === 'tool' ? child.toolCall.id : `${child.type}-${index}`">
+      <slot name="block" :block="child" :block-index="index">
+        <ChatMessageBlock
+          :answered-client-request-ids="answeredClientRequestIds"
+          :block="child"
+          :follow-ups-disabled="followUpsDisabled"
+          :mention-groups="mentionGroups"
+          :open-image="openImage"
+          :plugins="plugins"
+          :show-tool-details="showToolDetails"
+          :skills="skills"
+          @cancel="emit('cancel')"
+          @client-response="emit('client-response', $event)"
+          @open-link="emit('open-link', $event)"
+          @open-visualization="emit('open-visualization', $event)"
+          @send-follow-up="emit('send-follow-up', $event)"
+        >
+          <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
+          <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
+          <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
+        </ChatMessageBlock>
+      </slot>
+    </template>
+  </ChatWorkGroup>
   <ChatFollowUps
-    v-else
+    v-else-if="block.type === 'follow-ups'"
     :disabled="followUpsDisabled"
     :prompts="block.prompts"
     @send-follow-up="emit('send-follow-up', $event)"
@@ -76,10 +111,11 @@ import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import ChatUserText from './ChatUserText.vue'
 import ChatVisualizationBlock from './ChatVisualizationBlock.vue'
+import ChatWorkGroup from './ChatWorkGroup.vue'
 import { renderMarkdown } from './message-markdown'
 import { copyTextToClipboard } from './message-actions'
 import { useCodexChatTranslate } from './chat-i18n'
-import type { MessageBlock } from './message-blocks'
+import type { MessageBlock, RenderedMessageBlock } from './message-blocks'
 import type { ClientRequestResponse, CodexConversationLink } from './contracts'
 import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface'
 import type { CodexMessageImageOpenHandler } from './message-image'
@@ -88,6 +124,7 @@ import type { CodexComposerMentionGroup, CodexComposerMentionItem } from './comp
 import { useCodexHostCapabilities } from '../native-capabilities'
 
 defineSlots<{
+  block(props: { block: MessageBlock; blockIndex: number }): unknown
   attachment(props: {
     attachment: Extract<MessageBlock, { type: 'attachment' }>['attachment']
     block: Extract<MessageBlock, { type: 'attachment' }>
@@ -105,7 +142,7 @@ defineSlots<{
 }>()
 
 withDefaults(defineProps<{
-  block: MessageBlock
+  block: RenderedMessageBlock
   answeredClientRequestIds?: ReadonlySet<string>
   followUpsDisabled?: boolean
   mentionGroups?: readonly CodexComposerMentionGroup[]
@@ -161,6 +198,13 @@ onBeforeUnmount(() => {
 .chat-message-block--text {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.chat-message-block--reasoning {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-20);
 }
 
 </style>

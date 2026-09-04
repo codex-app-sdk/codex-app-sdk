@@ -5,6 +5,36 @@ import { chatMessageFromInput, surfaceMessageToChatMessage } from '../../src/cha
 import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
 
 describe('renderer message adapter', () => {
+  it('preserves assistant phases and safe reasoning summaries as structured parts', () => {
+    const message = surfaceMessageToChatMessage({
+      id: 'assistant-phased',
+      role: 'assistant',
+      status: 'streaming',
+      parts: [
+        {
+          type: 'reasoning',
+          summary: 'Checking the renderer contract',
+          itemId: 'reasoning-1',
+          summaryIndex: 0,
+        },
+        { type: 'text', text: 'I am checking the UI.', itemId: 'commentary-1', phase: 'commentary' },
+        { type: 'text', text: 'The fix is ready.', itemId: 'answer-1', phase: 'final_answer' },
+      ],
+    });
+
+    expect(message.parts).toStrictEqual([
+      {
+        type: 'reasoning',
+        summary: 'Checking the renderer contract',
+        itemId: 'reasoning-1',
+        summaryIndex: 0,
+      },
+      { type: 'text', content: 'I am checking the UI.', itemId: 'commentary-1', phase: 'commentary' },
+      { type: 'text', content: 'The fix is ready.', itemId: 'answer-1', phase: 'final_answer' },
+    ]);
+    expect(message.content).toBe('I am checking the UI.\n\nThe fix is ready.');
+  });
+
   it('maps surface parts into rich chat messages without losing tool display data', () => {
     const rendererMessage: SurfaceMessage = {
       createdAt: '2026-06-05T00:00:00.000Z',
