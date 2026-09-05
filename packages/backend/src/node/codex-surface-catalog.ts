@@ -48,6 +48,7 @@ export async function surfaceSkill(
   localIconDataUrl: (path: string) => Promise<string | undefined>,
 ): Promise<CodexSurfaceSkill> {
   const brandColor = nonEmpty(skill.interface?.brandColor);
+  const defaultPrompt = stringOrUndefined(skill.interface?.defaultPrompt);
   const [iconSmall, iconLarge] = await Promise.all([
     skill.interface?.iconSmall ? localIconDataUrl(skill.interface.iconSmall) : undefined,
     skill.interface?.iconLarge ? localIconDataUrl(skill.interface.iconLarge) : undefined,
@@ -60,7 +61,7 @@ export async function surfaceSkill(
     iconSmall,
     iconLarge,
     ...(brandColor ? { brandColor } : {}),
-    defaultPrompt: skill.interface?.defaultPrompt,
+    ...(defaultPrompt !== undefined ? { defaultPrompt } : {}),
     path: skill.path,
     scope: skill.scope,
     enabled: skill.enabled,
@@ -157,4 +158,8 @@ export function boundedImageDataUrl(mimeType: string, dataBase64: string): strin
 function nonEmpty(value: unknown): string | undefined {
   const trimmed = typeof value === 'string' ? value.trim() : undefined;
   return trimmed || undefined;
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }

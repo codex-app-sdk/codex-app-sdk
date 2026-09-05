@@ -147,6 +147,25 @@ describe('Codex surface catalog codecs', () => {
     }
   });
 
+  it('normalizes provider skill default prompts to string-or-absent', async () => {
+    for (const defaultPrompt of [null, 42, [], {}]) {
+      const malformedProviderSkill = skill({
+        interface: { defaultPrompt },
+      } as unknown as Partial<v2.SkillMetadata>);
+      const surfaced = await surfaceSkill(malformedProviderSkill, async () => undefined);
+      expect(surfaced).not.toHaveProperty('defaultPrompt');
+
+      await expect(surfaceSkills([malformedProviderSkill], async () => undefined))
+        .resolves.toStrictEqual([surfaced]);
+    }
+
+    for (const exactPrompt of ['', '   ', '  Preserve this prompt exactly.  ']) {
+      await expect(surfaceSkill(skill({
+        interface: { iconSmallUrl: null, iconLargeUrl: null, defaultPrompt: exactPrompt },
+      }), async () => undefined)).resolves.toHaveProperty('defaultPrompt', exactPrompt);
+    }
+  });
+
   it('prefers safe remote plugin art and omits blank optional metadata', async () => {
     const loadIcon = vi.fn(async () => 'data:local');
     const plugin = await surfacePlugin(pluginSummary({

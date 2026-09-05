@@ -62,6 +62,12 @@ type CodexSurfaceServiceTier = {
 };
 ```
 
+## Skills
+
+`CodexSurfaceSkill.defaultPrompt` is exposed only when the app-server provides
+an actual string. Provider values with any other runtime type are omitted;
+valid strings are preserved exactly.
+
 ## Messages
 
 ```ts
