@@ -116,6 +116,37 @@ describe('Codex surface catalog codecs', () => {
       .resolves.toMatchObject({ shortDescription: undefined, displayName: undefined });
   });
 
+  it('normalizes provider skill brand colors to string-or-absent', async () => {
+    const providerSkill = skill({
+      interface: {
+        displayName: 'Commit and Push',
+        iconSmallUrl: null,
+        iconLargeUrl: null,
+        brandColor: null,
+      },
+    } as unknown as Partial<v2.SkillMetadata>);
+
+    const withoutBrandColor = await surfaceSkill(providerSkill, async () => undefined);
+    expect(withoutBrandColor).not.toHaveProperty('brandColor');
+
+    await expect(surfaceSkill(skill({
+      interface: {
+        displayName: 'Commit and Push',
+        iconSmallUrl: null,
+        iconLargeUrl: null,
+        brandColor: '  #00aaff  ',
+      },
+    }), async () => undefined)).resolves.toHaveProperty('brandColor', '#00aaff');
+
+    for (const brandColor of ['', '   ', 42]) {
+      const malformedProviderSkill = skill({
+        interface: { brandColor },
+      } as unknown as Partial<v2.SkillMetadata>);
+      await expect(surfaceSkill(malformedProviderSkill, async () => undefined))
+        .resolves.not.toHaveProperty('brandColor');
+    }
+  });
+
   it('prefers safe remote plugin art and omits blank optional metadata', async () => {
     const loadIcon = vi.fn(async () => 'data:local');
     const plugin = await surfacePlugin(pluginSummary({
