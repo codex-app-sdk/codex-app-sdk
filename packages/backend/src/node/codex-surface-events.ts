@@ -1,5 +1,10 @@
 import type { v2 } from '../codex/index';
-import type { CodexSurfaceEvent, CodexSurfaceJsonValue, CodexSurfaceTurnError } from '@codex-app-sdk/core/surface';
+import type {
+  CodexSurfaceEvent,
+  CodexSurfaceJsonValue,
+  CodexSurfaceTurn,
+  CodexSurfaceTurnError,
+} from '@codex-app-sdk/core/surface';
 
 export type SurfaceEventInput = CodexSurfaceEvent extends infer Event
   ? Event extends CodexSurfaceEvent
@@ -30,6 +35,29 @@ export function surfaceTurnError(error: v2.TurnError | null): CodexSurfaceTurnEr
     additionalDetails: error.additionalDetails,
     codexErrorInfo: error.codexErrorInfo as CodexSurfaceJsonValue | null,
   };
+}
+
+export function surfaceTurn(turn: v2.Turn, willRetry = false): CodexSurfaceTurn {
+  return {
+    id: turn.id,
+    status: turn.status,
+    error: surfaceTurnError(turn.error),
+    willRetry,
+    startedAt: timestampToIsoOrNull(turn.startedAt),
+    completedAt: timestampToIsoOrNull(turn.completedAt),
+    durationMs: turn.durationMs ?? null,
+  };
+}
+
+export function upsertSurfaceTurn(
+  turns: readonly CodexSurfaceTurn[],
+  turn: CodexSurfaceTurn,
+): CodexSurfaceTurn[] {
+  const index = turns.findIndex((candidate) => candidate.id === turn.id);
+  if (index < 0) return [...turns, turn];
+  const next = [...turns];
+  next.splice(index, 1, turn);
+  return next;
 }
 
 export function sameValue(left: unknown, right: unknown): boolean {

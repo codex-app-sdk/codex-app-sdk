@@ -371,9 +371,6 @@ export class CodexSurface {
           this.lifecycle.rememberHostOptions(threadId, hostOptions)
         ),
         requireRuntime: (threadId) => this.requireRuntime(threadId),
-        sendMessageToThread: (threadId, prompt, sendOptions) => (
-          this.messagesController.sendToThread(threadId, prompt, sendOptions)
-        ),
         snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
       },
     );
@@ -607,17 +604,17 @@ export class CodexSurface {
     return this.conversationForkResult(conversationId);
   }
 
-  /** Forks at a user or assistant message without selecting the new conversation. */
-  async forkConversationAtMessage(
+  /** Forks after a completed turn without selecting the new conversation. */
+  async forkConversationAtTurn(
     sourceConversationId: string,
-    index: number,
+    turnId: string,
     options: ForkCodexConversationOptions = {},
     hostOptions: CodexConversationHostOptions = {},
   ): Promise<CodexConversationForkResult> {
     const sourceThreadId = normalizedConversationId(sourceConversationId);
     await this.ensureThreadReady(sourceThreadId);
     const inheritedHostOptions = this.lifecycle.hostOptions(sourceThreadId) ?? {};
-    const conversationId = await this.forks.forkMessage(sourceThreadId, index, options, {
+    const conversationId = await this.forks.forkTurn(sourceThreadId, turnId, options, {
       ...inheritedHostOptions,
       ...hostOptions,
     });
@@ -646,6 +643,8 @@ export class CodexSurface {
     if (!wasActive) return;
     this.patch({
       activeConversationId: null,
+      activeTurnId: null,
+      turns: [],
       messages: [],
       answeredClientRequestIds: [],
       approvals: [],
@@ -726,23 +725,23 @@ export class CodexSurface {
     return this.turnActions.interrupt();
   }
 
-  async deleteMessage(index: number): Promise<CodexSurfaceSnapshot> {
-    return this.turnActions.deleteMessage(index);
+  async deleteTurn(turnId: string): Promise<CodexSurfaceSnapshot> {
+    return this.turnActions.deleteTurn(turnId);
   }
 
-  async editMessage(index: number, content: string): Promise<CodexSurfaceSnapshot> {
-    return this.turnActions.editMessage(index, content);
+  async editTurn(turnId: string, content: string): Promise<CodexSurfaceSnapshot> {
+    return this.turnActions.editTurn(turnId, content);
   }
 
-  async retryMessage(index: number): Promise<CodexSurfaceSnapshot> {
-    return this.turnActions.retryMessage(index);
+  async retryTurn(turnId: string): Promise<CodexSurfaceSnapshot> {
+    return this.turnActions.retryTurn(turnId);
   }
 
-  /** Forks at an active-conversation message and selects the new conversation. */
-  async forkMessage(index: number): Promise<CodexSurfaceSnapshot> {
+  /** Forks after an active-conversation turn and selects the new conversation. */
+  async forkTurn(turnId: string): Promise<CodexSurfaceSnapshot> {
     const conversationId = this.state.activeConversationId;
     if (!conversationId) throw new Error('There is no active conversation');
-    const result = await this.forkConversationAtMessage(conversationId, index);
+    const result = await this.forkConversationAtTurn(conversationId, turnId);
     return result.conversation.select();
   }
 
@@ -779,13 +778,13 @@ export class CodexSurface {
     const handle = createCodexConversationHandle(id, {
       clearGoal: () => this.conversationSettings.clearGoalForThread(id),
       compact: () => this.turnActions.compactForThread(id),
-      deleteMessage: (index) => this.turnActions.deleteMessageForThread(id, index),
+      deleteTurn: (turnId) => this.turnActions.deleteTurnForThread(id, turnId),
       deleteQueuedPrompt: (promptId) => this.messagesController.deleteQueuedPromptForThread(id, promptId),
       updateQueuedPrompt: (promptId, prompt) => this.messagesController.updateQueuedPromptForThread(id, promptId, prompt),
-      editMessage: (index, content) => this.turnActions.editMessageForThread(id, index, content),
+      editTurn: (turnId, content) => this.turnActions.editTurnForThread(id, turnId, content),
       fork: (options, hostOptions) => this.forkConversation(id, options, hostOptions),
-      forkMessage: (index, options, hostOptions) => (
-        this.forkConversationAtMessage(id, index, options, hostOptions)
+      forkTurn: (turnId, options, hostOptions) => (
+        this.forkConversationAtTurn(id, turnId, options, hostOptions)
       ),
       getSnapshot: () => this.getConversationSnapshot(id),
       interrupt: () => this.turnActions.interruptThread(id),
@@ -800,8 +799,7 @@ export class CodexSurface {
         this.approvals.resolve(id, approvalId, decision, scope)
       ),
       respondToClientRequest: (response) => this.clientRequests.respond(id, response),
-      retryMessage: (index) => this.turnActions.retryMessageForThread(id, index),
-      rollbackToTurn: (turnId) => this.turnActions.rollbackToTurn(id, turnId),
+      retryTurn: (turnId) => this.turnActions.retryTurnForThread(id, turnId),
       select: async () => { await this.selectConversation(id); },
       sendMessage: (prompt, options) => this.messagesController.sendToThread(id, prompt, options),
       setGoal: (objective, tokenBudget) => this.conversationSettings.setGoalForThread(id, objective, tokenBudget),
@@ -898,7 +896,14 @@ export class CodexSurface {
       runtime.turnStartPending = false;
     }
     await this.client.close();
-    this.patch({ status: 'idle', busy: false, approvals: [], clientRequests: [], historyLoading: false });
+    this.patch({
+      status: 'idle',
+      activeTurnId: null,
+      busy: false,
+      approvals: [],
+      clientRequests: [],
+      historyLoading: false,
+    });
     this.emitSurfaceStatus('lifecycle');
   }
 

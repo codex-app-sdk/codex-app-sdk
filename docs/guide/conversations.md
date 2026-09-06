@@ -63,27 +63,24 @@ Forking the latest state of an actively running source is rejected so the
 result always has an unambiguous latest completed turn. The source conversation
 is not modified.
 
-### Fork at a message
+### Fork at a turn
 
-Message-level forking creates the same loaded, unselected result while choosing
-an explicit conversation boundary:
+Turn-level forking creates the same loaded, unselected result while choosing an
+explicit conversation boundary:
 
 ```ts
 const fork = await surface
   .conversation(sourceConversationId)
-  .forkMessage(messageIndex);
+  .forkTurn(turnId);
 ```
 
-- An assistant message forks through that message's turn and omits every later
-  turn.
-- A user message forks through the preceding assistant turn, then submits that
-  user's text and attachments as the first prompt in the new conversation.
-- The first user message forks before its original turn, then submits it to the
-  empty fork.
+- The selected turn is included and every later turn is omitted.
+- The source prompt is not replayed; the fork is the exact state after the
+  selected turn.
 
 Because the boundary is explicit, a point before the current active turn may be
 forked while later work is still running. The source is never interrupted or
-modified. `surface.forkConversationAtMessage(sourceId, messageIndex, ...)`
+modified. `surface.forkConversationAtTurn(sourceId, turnId, ...)`
 exposes the same operation without first obtaining a handle.
 
 ## Release inactive local state
@@ -181,15 +178,17 @@ await build.updateSettings({
 
 await build.interrupt();
 await build.compact();
-await build.rollbackToTurn(turnId);
+await build.deleteTurn(turnId);
 ```
 
-`rollbackToTurn`, message deletion, editing, and retrying use one stable SDK
-contract. The SDK selects app-server's paginated `thread/revert` operation or
-the legacy `thread/rollback` operation internally and reconciles the retained
-history page and cursor for the host.
+Delete, edit, retry, and fork all use one stable turn-ID contract. The SDK
+selects app-server's paginated `thread/revert` operation or the legacy
+`thread/rollback` operation internally and reconciles the retained history page
+and cursor for the host. Deleting a turn removes that turn and every later turn;
+the standard pane exposes the destructive control on the latest eligible turn,
+where it behaves as a single-turn delete.
 
-Handles also expose edit, retry, delete-message, steering, reviews, goals,
+Handles also expose edit, retry, delete-turn, steering, reviews, goals,
 queued-prompt actions, approval resolution, and app-server question responses.
 
 `sendMessage('/review')` selects uncommitted changes. `/review instructions`

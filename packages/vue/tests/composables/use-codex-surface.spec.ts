@@ -48,11 +48,11 @@ describe('useCodexSurface', () => {
     await surface.createConversation(conversationOptions);
     await surface.compactConversation();
     await surface.deleteConversation('thread-delete');
-    await surface.deleteMessage(2);
+    await surface.deleteTurn('turn-2');
     await surface.deleteQueuedPrompt('queued-1');
     await surface.updateQueuedPrompt('queued-2', 'Edited queue');
-    await surface.editMessage(1, 'Replacement');
-    await surface.forkMessage(4);
+    await surface.editTurn('turn-1', 'Replacement');
+    await surface.forkTurn('turn-4');
     await expect(surface.readConversationHistory('thread-1')).resolves.toStrictEqual({
       conversationId: 'thread-1', messages: [], threadStatus: null,
     });
@@ -76,7 +76,7 @@ describe('useCodexSurface', () => {
     expect(surface.answeredClientRequestIds.has('question-1')).toBe(true);
     expectTypeOf(surface.answeredClientRequestIds).toEqualTypeOf<ReadonlySet<string>>();
     await surface.resolveApproval('approval-1', 'approve', 'session');
-    await surface.retryMessage(3);
+    await surface.retryTurn('turn-3');
     await surface.steerQueuedPrompt('queued-2', 'Edited steer');
 
     expect(api.onStateChange).toHaveBeenCalledOnce();
@@ -85,11 +85,11 @@ describe('useCodexSurface', () => {
     expect(api.createConversation).toHaveBeenCalledWith(conversationOptions);
     expect(api.compactConversation).toHaveBeenCalledWith();
     expect(api.deleteConversation).toHaveBeenCalledWith('thread-delete');
-    expect(api.deleteMessage).toHaveBeenCalledWith(2);
+    expect(api.deleteTurn).toHaveBeenCalledWith('turn-2');
     expect(api.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
     expect(api.updateQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited queue');
-    expect(api.editMessage).toHaveBeenCalledWith(1, 'Replacement');
-    expect(api.forkMessage).toHaveBeenCalledWith(4);
+    expect(api.editTurn).toHaveBeenCalledWith('turn-1', 'Replacement');
+    expect(api.forkTurn).toHaveBeenCalledWith('turn-4');
     expect(api.readConversationHistory).toHaveBeenCalledWith('thread-1');
     expect(api.renameConversation).toHaveBeenCalledWith('Renamed');
     expect(api.selectConversation).toHaveBeenCalledWith('thread-1');
@@ -108,7 +108,7 @@ describe('useCodexSurface', () => {
     expect(api.refreshConversations).toHaveBeenCalledWith();
     expect(api.respondToClientRequest).toHaveBeenCalledWith({ id: 'question-1', payload: { answers: {} } });
     expect(api.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
-    expect(api.retryMessage).toHaveBeenCalledWith(3);
+    expect(api.retryTurn).toHaveBeenCalledWith('turn-3');
     expect(api.steerQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited steer');
     scope.stop();
     expect(unsubscribe).toHaveBeenCalledOnce();
@@ -290,6 +290,8 @@ const readySnapshot: CodexSurfaceSnapshot = {
   },
   conversations: [],
   activeConversationId: null,
+  activeTurnId: null,
+  turns: [],
   messages: [],
   clientRequests: [],
   answeredClientRequestIds: [],
@@ -328,6 +330,8 @@ const idleSnapshot: CodexSurfaceSnapshot = {
   },
   conversations: [],
   activeConversationId: null,
+  activeTurnId: null,
+  turns: [],
   messages: [],
   clientRequests: [],
   answeredClientRequestIds: [],
@@ -368,11 +372,11 @@ function fakeApi(
     connect: vi.fn(async () => readySnapshot),
     createConversation: vi.fn(async () => readySnapshot),
     deleteConversation: vi.fn(async () => readySnapshot),
-    deleteMessage: vi.fn(async () => readySnapshot),
+    deleteTurn: vi.fn(async () => readySnapshot),
     deleteQueuedPrompt: vi.fn(async () => readySnapshot),
     updateQueuedPrompt: vi.fn(async () => readySnapshot),
-    editMessage: vi.fn(async () => readySnapshot),
-    forkMessage: vi.fn(async () => readySnapshot),
+    editTurn: vi.fn(async () => readySnapshot),
+    forkTurn: vi.fn(async () => readySnapshot),
     getSnapshot: vi.fn(async () => readySnapshot),
     interrupt: vi.fn(async () => readySnapshot),
     listConversations: vi.fn(async () => []),
@@ -397,7 +401,7 @@ function fakeApi(
       answeredClientRequestIds: [response.id],
     })),
     resolveApproval: vi.fn(async () => readySnapshot),
-    retryMessage: vi.fn(async () => readySnapshot),
+    retryTurn: vi.fn(async () => readySnapshot),
     setGoal: vi.fn(async () => readySnapshot),
     selectConversation: vi.fn(async () => readySnapshot),
     sendMessage: vi.fn(async () => readySnapshot),

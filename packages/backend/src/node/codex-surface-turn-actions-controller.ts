@@ -8,8 +8,6 @@ import type {
 } from '@codex-app-sdk/core/surface';
 import { codexThreadToSurfaceMessages, codexTurnToSurfaceMessages } from './codex-conversation-history';
 import {
-  messageAt,
-  messageTurnId,
   messageTurnIdOrNull,
   surfaceMessageAttachments,
   surfaceMessageText,
@@ -17,7 +15,7 @@ import {
   upsertConversation,
 } from './codex-surface-data';
 import type { SurfaceEventInput } from './codex-surface-events';
-import { timestampToIso } from './codex-surface-events';
+import { surfaceTurn, timestampToIso, upsertSurfaceTurn } from './codex-surface-events';
 import { errorMessage, normalizeReviewTarget } from './codex-surface-prompts';
 import { ensureAssistantTurnMessage } from './codex-surface-message-state';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
@@ -116,6 +114,7 @@ export class CodexSurfaceTurnActionsController {
       this.host.patchRuntime(threadId, {
         busy: runtime.activeTurnId !== null,
         turnStartPending: false,
+        turns: upsertSurfaceTurn(runtime.turns, surfaceTurn(response.turn)),
         messages: runtime.activeTurnId
           ? ensureAssistantTurnMessage(messages, threadId, response.turn.id)
           : messages,
@@ -155,45 +154,49 @@ export class CodexSurfaceTurnActionsController {
     await this.client.request('turn/interrupt', { threadId, turnId: runtime.activeTurnId });
   }
 
-  async deleteMessage(index: number): Promise<CodexSurfaceSnapshot> {
+  async deleteTurn(turnId: string): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.deleteMessageForThread(threadId, index);
+    await this.deleteTurnForThread(threadId, turnId);
     return this.host.getSnapshot();
   }
 
-  async deleteMessageForThread(threadId: string, index: number): Promise<void> {
-    const runtime = await this.host.ensureThreadReady(threadId);
-    await this.rollbackToTurn(threadId, messageTurnId(messageAt(runtime.messages, index)));
+  async deleteTurnForThread(threadId: string, turnId: string): Promise<void> {
+    await this.rollbackToTurn(threadId, turnId);
   }
 
-  async editMessage(index: number, content: string): Promise<CodexSurfaceSnapshot> {
+  async editTurn(turnId: string, content: string): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.editMessageForThread(threadId, index, content);
+    await this.editTurnForThread(threadId, turnId, content);
     return this.host.getSnapshot();
   }
 
-  async editMessageForThread(threadId: string, index: number, content: string): Promise<void> {
+  async editTurnForThread(threadId: string, turnId: string, content: string): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
-    const message = messageAt(runtime.messages, index);
-    if (message.role !== 'user') throw new Error('Only user messages can be edited');
+    const message = runtime.messages.find((candidate) => (
+      candidate.role === 'user'
+      && candidate.kind !== 'steer'
+      && messageTurnIdOrNull(candidate) === turnId
+    ));
+    if (!message) throw new Error(`Could not find the user prompt for Codex turn '${turnId}'`);
     const text = content.trim();
-    if (!text) throw new Error('Cannot replace a message with empty content');
+    if (!text) throw new Error('Cannot replace a turn prompt with empty content');
     const attachments = surfaceMessageAttachments(message);
-    await this.rollbackToTurn(threadId, messageTurnId(message));
+    await this.rollbackToTurn(threadId, turnId);
     await this.host.sendMessageToThread(threadId, text, attachments.length > 0 ? { attachments } : {});
   }
 
-  async retryMessage(index: number): Promise<CodexSurfaceSnapshot> {
+  async retryTurn(turnId: string): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.retryMessageForThread(threadId, index);
+    await this.retryTurnForThread(threadId, turnId);
     return this.host.getSnapshot();
   }
 
-  async retryMessageForThread(threadId: string, index: number): Promise<void> {
+  async retryTurnForThread(threadId: string, turnId: string): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
-    const turnId = messageTurnId(messageAt(runtime.messages, index));
-    const prompt = [...runtime.messages.slice(0, index + 1)].reverse().find((candidate) => (
-      candidate.role === 'user' && messageTurnIdOrNull(candidate) === turnId
+    const prompt = runtime.messages.find((candidate) => (
+      candidate.role === 'user'
+      && candidate.kind !== 'steer'
+      && messageTurnIdOrNull(candidate) === turnId
     ));
     if (!prompt) throw new Error('Could not find the user prompt for this turn');
     const text = surfaceMessageText(prompt);
@@ -223,6 +226,7 @@ export class CodexSurfaceTurnActionsController {
       throw new Error(`Codex thread/rollback returned '${response.thread.id}' for requested thread '${threadId}'`);
     }
     runtime.turnIds = response.thread.turns.map((turn) => turn.id);
+    runtime.turns = response.thread.turns.map((turn) => surfaceTurn(turn));
     runtime.activeTurnId = null;
     const summary = threadToSummary(response.thread);
     this.host.patch({
@@ -258,6 +262,7 @@ export class CodexSurfaceTurnActionsController {
       return messageTurnId === null || retainedTurnIdSet.has(messageTurnId);
     });
     runtime.turnIds = retainedTurnIds;
+    runtime.turns = runtime.turns.filter((turn) => retainedTurnIdSet.has(turn.id));
     runtime.activeTurnId = null;
     const summary = { ...threadToSummary(response.thread), turnCount: retainedTurnIds.length };
     this.host.patch({

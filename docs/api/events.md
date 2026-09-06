@@ -62,6 +62,11 @@ Event families cover:
 through the full message carried by `message.updated`, avoiding a second
 streaming protocol for reasoning content.
 
+A locally submitted prompt is first published optimistically through
+`message.appended`. After `turn/start` returns, `message.updated` republishes
+that same message ID with its authoritative `turnId`; event-replicating hosts
+should replace the optimistic message so turn actions remain available.
+
 `remoteControl.statusChanged` projects app-server remote-control connection
 notifications into the surface event stream. Its payload contains the current
 typed status so hosts can update native behavior such as sleep prevention

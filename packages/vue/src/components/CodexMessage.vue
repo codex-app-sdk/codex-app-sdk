@@ -148,15 +148,16 @@
           :can-fork="canFork"
           :can-retry="canRetry"
           :copied="copied"
+          :deleting="deletingTurn"
           :message="chatMessage"
           :mutation-disabled="threadActionsDisabled"
           :presentation="effectivePresentation.messages.actions"
           @copy="copyMessage"
-          @delete="deleteMessage"
+          @delete="deleteTurn"
           @edit="startEdit"
-          @fork="forkMessage"
+          @fork="forkTurn"
           @quote="emit('quote-message', index)"
-          @retry="retryMessage"
+          @retry="retryTurn"
         />
       </slot>
       <div v-if="chatMessage.type === 'steer'" class="chat-message--steer chat-message--steer-below">
@@ -196,10 +197,11 @@ const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
   actionsAlwaysVisible?: boolean
   answeredClientRequestIds?: ReadonlySet<string>
-  canDeleteMessage?: boolean
-  canEditMessage?: boolean
-  canForkMessage?: boolean
-  canRetryMessage?: boolean
+  canDeleteTurn?: boolean
+  canEditTurn?: boolean
+  canForkTurn?: boolean
+  canRetryTurn?: boolean
+  deletingTurn?: boolean
   followUpsDisabled?: boolean
   index?: number
   message: Message | SurfaceMessage
@@ -211,10 +213,10 @@ const props = withDefaults(defineProps<{
   skills?: readonly CodexSurfaceSkill[]
   threadActionsDisabled?: boolean
 }>(), {
-  canDeleteMessage: true,
-  canEditMessage: true,
-  canForkMessage: false,
-  canRetryMessage: true,
+  canDeleteTurn: true,
+  canEditTurn: true,
+  canForkTurn: false,
+  canRetryTurn: true,
   index: 0,
   showToolDetails: undefined,
 })
@@ -247,11 +249,11 @@ const emit = defineEmits<{
   'open-link': [link: CodexConversationLink]
   'open-visualization': [visualization: CodexConversationVisualization]
   'copy-message': [index: number]
-  'delete-message': [index: number]
-  'edit-message': [payload: { content: string; index: number }]
-  'fork-message': [index: number]
+  'delete-turn': [turnId: string]
+  'edit-turn': [payload: { content: string; turnId: string }]
+  'fork-turn': [turnId: string]
   'quote-message': [index: number]
-  'retry-message': [index: number]
+  'retry-turn': [turnId: string]
   'send-follow-up': [prompt: string]
 }>()
 // Stryker restore all
@@ -343,10 +345,10 @@ const reserveActionSlot = computed(() => (
   (chatMessage.value.role === 'assistant' && chatMessage.value.streaming === true)
 ))
 const renderActionSlot = computed(() => showActions.value)
-const canDelete = computed(() => props.canDeleteMessage && effectivePresentation.value.messages.actions.delete)
-const canEdit = computed(() => props.canEditMessage && effectivePresentation.value.messages.actions.edit)
-const canFork = computed(() => props.canForkMessage && effectivePresentation.value.messages.actions.fork)
-const canRetry = computed(() => props.canRetryMessage && effectivePresentation.value.messages.actions.retry)
+const canDelete = computed(() => Boolean(chatMessage.value.turnId) && props.canDeleteTurn && effectivePresentation.value.messages.actions.delete)
+const canEdit = computed(() => Boolean(chatMessage.value.turnId) && props.canEditTurn && effectivePresentation.value.messages.actions.edit)
+const canFork = computed(() => Boolean(chatMessage.value.turnId) && props.canForkTurn && effectivePresentation.value.messages.actions.fork)
+const canRetry = computed(() => Boolean(chatMessage.value.turnId) && props.canRetryTurn && effectivePresentation.value.messages.actions.retry)
 const hasVisibleAssistantActivity = computed(() => blocks.value.some(isVisibleAssistantBlock))
 const isLatestStreamingAssistantSegment = computed(() => (
   messageTurnState.value?.latestStreamingAssistantIndex.value === undefined
@@ -382,29 +384,34 @@ function cancelEdit() {
 }
 
 function saveEdit(content: string) {
-  emit('edit-message', { content, index: props.index })
+  const turnId = chatMessage.value.turnId
+  if (!turnId) return
+  emit('edit-turn', { content, turnId })
   cancelEdit()
 }
 
-function deleteMessage() {
+function deleteTurn() {
   if (!canDelete.value || props.threadActionsDisabled) {
     return
   }
 
-  emit('delete-message', props.index)
+  const turnId = chatMessage.value.turnId
+  if (turnId) emit('delete-turn', turnId)
 }
 
-function forkMessage() {
+function forkTurn() {
   if (!canFork.value || props.threadActionsDisabled) return
-  emit('fork-message', props.index)
+  const turnId = chatMessage.value.turnId
+  if (turnId) emit('fork-turn', turnId)
 }
 
-function retryMessage() {
+function retryTurn() {
   if (!canRetry.value || props.threadActionsDisabled) {
     return
   }
 
-  emit('retry-message', props.index)
+  const turnId = chatMessage.value.turnId
+  if (turnId) emit('retry-turn', turnId)
 }
 
 function openImage(image: CodexMessageImage, context?: CodexMessageImageContext) {

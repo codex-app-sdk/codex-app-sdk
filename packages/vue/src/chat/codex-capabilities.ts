@@ -10,9 +10,9 @@ export const codexCapabilities: CodexCapabilities = {
   steerPrompt: true,
   interrupt: true,
   history: true,
-  rollback: true,
-  editMessage: true,
-  retryMessage: true,
+  deleteTurn: true,
+  editTurn: true,
+  retryTurn: true,
   approvals: true,
   approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'],
 } as const;

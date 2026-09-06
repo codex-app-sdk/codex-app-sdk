@@ -315,19 +315,19 @@ describe('CodexSurfaceTurnActionsController', () => {
     });
   });
 
-  it('requires an active conversation for message action wrappers', async () => {
+  it('requires an active conversation for turn action wrappers', async () => {
     const setup = createController({ active: false });
-    await expect(setup.controller.deleteMessage(0)).rejects.toThrow('There is no active conversation');
-    await expect(setup.controller.editMessage(0, 'text')).rejects.toThrow('There is no active conversation');
-    await expect(setup.controller.retryMessage(0)).rejects.toThrow('There is no active conversation');
+    await expect(setup.controller.deleteTurn('turn-1')).rejects.toThrow('There is no active conversation');
+    await expect(setup.controller.editTurn('turn-1', 'text')).rejects.toThrow('There is no active conversation');
+    await expect(setup.controller.retryTurn('turn-1')).rejects.toThrow('There is no active conversation');
     expect(setup.host.ensureThreadReady).not.toHaveBeenCalled();
   });
 
-  it('deletes the turn containing the selected message', async () => {
+  it('deletes the selected turn by stable id', async () => {
     const setup = createController({ messages: [userMessage('user', 'turn-2', 'Prompt')] });
     const rollback = vi.spyOn(setup.controller, 'rollbackToTurn').mockResolvedValue();
 
-    await expect(setup.controller.deleteMessage(0)).resolves.toBe(setup.state);
+    await expect(setup.controller.deleteTurn('turn-2')).resolves.toBe(setup.state);
 
     expect(rollback).toHaveBeenCalledExactlyOnceWith('thread-1', 'turn-2');
   });
@@ -340,7 +340,7 @@ describe('CodexSurfaceTurnActionsController', () => {
     const setup = createController({ messages: [message] });
     const rollback = vi.spyOn(setup.controller, 'rollbackToTurn').mockResolvedValue();
 
-    await setup.controller.editMessageForThread('thread-1', 0, ' Edited ');
+    await setup.controller.editTurnForThread('thread-1', 'turn-2', ' Edited ');
 
     expect(rollback).toHaveBeenCalledExactlyOnceWith('thread-1', 'turn-2');
     expect(setup.host.sendMessageToThread).toHaveBeenCalledExactlyOnceWith(
@@ -348,18 +348,18 @@ describe('CodexSurfaceTurnActionsController', () => {
     );
 
     setup.runtime.messages = [assistantMessage('assistant', 'turn-2', 'Answer')];
-    await expect(setup.controller.editMessageForThread('thread-1', 0, 'text'))
-      .rejects.toThrow('Only user messages can be edited');
+    await expect(setup.controller.editTurnForThread('thread-1', 'turn-2', 'text'))
+      .rejects.toThrow("Could not find the user prompt for Codex turn 'turn-2'");
     setup.runtime.messages = [userMessage('user', 'turn-2', 'Prompt')];
-    await expect(setup.controller.editMessageForThread('thread-1', 0, '   '))
-      .rejects.toThrow('Cannot replace a message with empty content');
+    await expect(setup.controller.editTurnForThread('thread-1', 'turn-2', '   '))
+      .rejects.toThrow('Cannot replace a turn prompt with empty content');
   });
 
   it('edits an attachment-free message without inventing an attachments option', async () => {
     const setup = createController({ messages: [userMessage('user', 'turn-2', 'Original')] });
     vi.spyOn(setup.controller, 'rollbackToTurn').mockResolvedValue();
 
-    await setup.controller.editMessageForThread('thread-1', 0, 'Edited');
+    await setup.controller.editTurnForThread('thread-1', 'turn-2', 'Edited');
 
     expect(setup.host.sendMessageToThread).toHaveBeenCalledExactlyOnceWith('thread-1', 'Edited', {});
   });
@@ -375,7 +375,7 @@ describe('CodexSurfaceTurnActionsController', () => {
     ] });
     const rollback = vi.spyOn(setup.controller, 'rollbackToTurn').mockResolvedValue();
 
-    await setup.controller.retryMessageForThread('thread-1', 1);
+    await setup.controller.retryTurnForThread('thread-1', 'turn-2');
 
     expect(rollback).toHaveBeenCalledExactlyOnceWith('thread-1', 'turn-2');
     expect(setup.host.sendMessageToThread).toHaveBeenCalledExactlyOnceWith(
@@ -383,25 +383,25 @@ describe('CodexSurfaceTurnActionsController', () => {
     );
   });
 
-  it('retries the nearest matching user prompt without inventing attachment options', async () => {
+  it('retries the initial non-steer user prompt without inventing attachment options', async () => {
     const setup = createController({ messages: [
       userMessage('older', 'turn-2', 'Older'),
       { ...userMessage('system', 'turn-2', 'Not a prompt'), role: 'system' },
-      userMessage('newer', 'turn-2', 'Newer'),
+      { ...userMessage('newer', 'turn-2', 'Newer'), kind: 'steer' },
       userMessage('other-turn', 'turn-3', 'Wrong turn'),
       assistantMessage('assistant', 'turn-2', 'Answer'),
-      userMessage('after-selection', 'turn-2', 'After selection'),
+      { ...userMessage('after-selection', 'turn-2', 'After selection'), kind: 'steer' },
     ] });
     vi.spyOn(setup.controller, 'rollbackToTurn').mockResolvedValue();
 
-    await setup.controller.retryMessageForThread('thread-1', 4);
+    await setup.controller.retryTurnForThread('thread-1', 'turn-2');
 
-    expect(setup.host.sendMessageToThread).toHaveBeenCalledExactlyOnceWith('thread-1', 'Newer', {});
+    expect(setup.host.sendMessageToThread).toHaveBeenCalledExactlyOnceWith('thread-1', 'Older', {});
   });
 
   it('rejects retry when its turn has no nonempty user prompt', async () => {
     const setup = createController({ messages: [assistantMessage('assistant', 'turn-2', 'Answer')] });
-    await expect(setup.controller.retryMessageForThread('thread-1', 0))
+    await expect(setup.controller.retryTurnForThread('thread-1', 'turn-2'))
       .rejects.toThrow('Could not find the user prompt for this turn');
     expect(setup.host.sendMessageToThread).not.toHaveBeenCalled();
   });
@@ -410,7 +410,7 @@ describe('CodexSurfaceTurnActionsController', () => {
     const blank = userMessage('blank', 'turn-2', '   ');
     const setup = createController({ messages: [blank, assistantMessage('assistant', 'turn-2', 'Answer')] });
 
-    await expect(setup.controller.retryMessageForThread('thread-1', 1))
+    await expect(setup.controller.retryTurnForThread('thread-1', 'turn-2'))
       .rejects.toThrow('Could not find the user prompt for this turn');
 
     expect(setup.host.sendMessageToThread).not.toHaveBeenCalled();

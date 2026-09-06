@@ -456,6 +456,8 @@ function snapshot(overrides: Partial<CodexSurfaceSnapshot> = {}): CodexSurfaceSn
     },
     conversations: [],
     activeConversationId: null,
+    activeTurnId: null,
+    turns: [],
     messages: [],
     clientRequests: [],
     answeredClientRequestIds: [],

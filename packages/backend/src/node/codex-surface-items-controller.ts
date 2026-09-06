@@ -15,7 +15,13 @@ import {
 } from './codex-conversation-history';
 import { rawResponseItemToEvent } from './codex-raw-response-item-adapter';
 import type { SurfaceEventInput } from './codex-surface-events';
-import { surfaceTurnError, threadItemKey, timestampToIsoOrNull } from './codex-surface-events';
+import {
+  surfaceTurn,
+  surfaceTurnError,
+  threadItemKey,
+  timestampToIsoOrNull,
+  upsertSurfaceTurn,
+} from './codex-surface-events';
 import {
   appendAssistantTextDelta,
   appendCompactionMarker,
@@ -190,6 +196,7 @@ export class CodexSurfaceItemsController {
 
   applyItem(params: v2.ItemStartedNotification | v2.ItemCompletedNotification, completed: boolean): void {
     const runtime = this.host.requireRuntime(params.threadId);
+    const turnStartPending = runtime.turnStartPending;
     if (!completed) this.host.markRuntimeTurnActive(runtime, params.turnId);
     const turn = {
       id: params.turnId,
@@ -205,6 +212,31 @@ export class CodexSurfaceItemsController {
         && candidate.metadata?.turnId === params.turnId
         && candidate.parts.length > 0
       ));
+      const pendingOptimisticIndex = !isSteer && turnStartPending
+        ? runtime.messages.map((candidate) => (
+          candidate.role === 'user'
+          && candidate.kind !== 'steer'
+          && !candidate.turnId
+          && JSON.stringify(candidate.parts) === JSON.stringify(message.parts)
+        )).lastIndexOf(true)
+        : -1;
+      if (pendingOptimisticIndex >= 0) {
+        const pending = runtime.messages[pendingOptimisticIndex]!;
+        const reconciled = {
+          ...message,
+          id: pending.id,
+          createdAt: pending.createdAt ?? message.createdAt,
+          metadata: { ...pending.metadata, ...message.metadata },
+        };
+        const messages = [...runtime.messages];
+        messages.splice(pendingOptimisticIndex, 1, reconciled);
+        this.host.patchRuntime(params.threadId, { messages });
+        this.host.emitEvent('notification', {
+          type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
+          payload: { message: structuredClone(reconciled) },
+        });
+        return;
+      }
       const duplicateInitialMessage = !isSteer && runtime.messages.some((candidate) => (
         candidate.role === 'user'
         && candidate.turnId === params.turnId
@@ -485,7 +517,11 @@ export class CodexSurfaceItemsController {
         && message.kind === undefined && message.parts.length === 0
       ));
     this.host.patchRuntime(params.threadId, {
-      busy: false, turnStartPending: false, error: params.turn.error?.message ?? null, messages,
+      busy: false,
+      turnStartPending: false,
+      error: params.turn.error?.message ?? null,
+      messages,
+      turns: upsertSurfaceTurn(runtime.turns, surfaceTurn(params.turn)),
     });
     this.host.patch({
       conversations: this.host.getState().conversations.map((conversation) => conversation.id === params.threadId

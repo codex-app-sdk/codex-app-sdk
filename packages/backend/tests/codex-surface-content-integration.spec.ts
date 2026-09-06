@@ -136,7 +136,7 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    await surface.conversation('thread-existing').rollbackToTurn('turn-old');
+    await surface.conversation('thread-existing').deleteTurn('turn-old');
 
     expect(lastRequest(transport, 'thread/turns/list')).toMatchObject({
       params: { threadId: 'thread-existing', cursor: 'older-page', itemsView: 'full' },
@@ -186,7 +186,7 @@ describe('CodexSurface', () => {
     await surface.close();
   });
 
-  it('provides scoped conversation discovery, skill catalogs, attachments, and direct rollback', async () => {
+  it('provides scoped conversation discovery, skill catalogs, attachments, and turn deletion', async () => {
     const transport = new FakeTransport({
       'thread/list': (params) => ({
         data: [{ ...thread('thread-existing', true), cwd: String((params as { cwd?: string }).cwd ?? '/tmp/project') }],
@@ -266,12 +266,16 @@ describe('CodexSurface', () => {
     expect(conversation.getSnapshot()).toMatchObject({
       activeTurnId: null,
       turnIds: ['turn-history', 'turn-live'],
+      turns: [
+        { id: 'turn-history', status: 'completed' },
+        { id: 'turn-live', status: 'completed' },
+      ],
     });
     expect(surface.getSnapshot().conversations).toContainEqual(expect.objectContaining({
       id: 'thread-existing', turnCount: 2,
     }));
     events.length = 0;
-    const rolledBack = await conversation.rollbackToTurn('turn-history');
+    const rolledBack = await conversation.deleteTurn('turn-history');
     expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
       params: { threadId: 'thread-existing', numTurns: 2 },
     });
@@ -317,10 +321,7 @@ describe('CodexSurface', () => {
       method: 'turn/completed',
       params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
     });
-    const sentIndex = surface.getSnapshot().messages.findIndex((message) => (
-      message.role === 'user' && message.parts.some((part) => part.type === 'attachment')
-    ));
-    await surface.retryMessage(sentIndex);
+    await surface.retryTurn('turn-live');
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: {
         input: [
@@ -334,10 +335,7 @@ describe('CodexSurface', () => {
       method: 'turn/completed',
       params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
     });
-    const retriedIndex = surface.getSnapshot().messages.findIndex((message) => (
-      message.role === 'user' && message.parts.some((part) => part.type === 'attachment')
-    ));
-    await surface.editMessage(retriedIndex, 'Edited prompt');
+    await surface.editTurn('turn-live', 'Edited prompt');
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: {
         input: [

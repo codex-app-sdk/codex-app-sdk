@@ -18,6 +18,9 @@
           v-else
           :key="group.key"
           :entries="group.entries"
+          :active="activeTurnId === undefined
+            ? undefined
+            : group.turnId !== undefined && group.turnId === activeTurnId"
           :show-tool-blocks="effectivePresentation.messages.toolBlocks"
           :turn-id="group.turnId"
         >
@@ -28,10 +31,11 @@
               :actions-disabled="actionsDisabled"
               :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
               :answered-client-request-ids="answeredClientRequestIds"
-              :can-delete-message="canDeleteMessage"
-              :can-edit-message="canEditMessage"
-              :can-fork-message="canForkMessage"
-              :can-retry-message="canRetryMessage"
+              :can-delete-turn="canDeleteTurn && isTerminalTurn(group.turnId)"
+              :can-edit-turn="canEditTurn && isTerminalTurn(group.turnId)"
+              :can-fork-turn="canForkTurn && isForkableTurn(group.turnId)"
+              :can-retry-turn="canRetryTurn && isTerminalTurn(group.turnId)"
+              :deleting-turn="group.turnId === deletingTurnId"
               :follow-ups-disabled="followUpsDisabled"
               :index="entry.index"
               :message="entry.message"
@@ -45,13 +49,13 @@
               @cancel="emit('cancel')"
               @client-response="emit('client-response', $event)"
               @copy-message="emit('copy-message', $event)"
-              @delete-message="emit('delete-message', $event)"
-              @edit-message="emit('edit-message', $event)"
-              @fork-message="emit('fork-message', $event)"
+              @delete-turn="emit('delete-turn', $event)"
+              @edit-turn="emit('edit-turn', $event)"
+              @fork-turn="emit('fork-turn', $event)"
               @open-link="emit('open-link', $event)"
               @open-visualization="emit('open-visualization', $event)"
               @quote-message="emit('quote-message', $event)"
-              @retry-message="emit('retry-message', $event)"
+              @retry-turn="emit('retry-turn', $event)"
               @send-follow-up="emit('send-follow-up', $event)"
             >
               <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
@@ -83,6 +87,7 @@ import type {
   CodexConversationRenderStrategy,
   CodexSurfacePlugin,
   CodexSurfaceSkill,
+  CodexSurfaceTurn,
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
@@ -100,14 +105,16 @@ import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../cha
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   actionsDisabled?: boolean
+  activeTurnId?: string | null
   ariaLabel?: string
   answeredClientRequestIds?: ReadonlySet<string>
   busy?: boolean
   bottomThreshold?: number
-  canDeleteMessage?: boolean
-  canEditMessage?: boolean
-  canForkMessage?: boolean
-  canRetryMessage?: boolean
+  canDeleteTurn?: boolean
+  canEditTurn?: boolean
+  canForkTurn?: boolean
+  canRetryTurn?: boolean
+  deletingTurnId?: string | null
   emptyLabel?: string
   followUpsDisabled?: boolean
   hasOlderMessages?: boolean
@@ -127,14 +134,15 @@ const props = withDefaults(defineProps<{
   scrollToBottomLabel?: string
   showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]
+  turns?: readonly CodexSurfaceTurn[]
 }>(), {
   ariaLabel: 'Conversation',
   busy: false,
   bottomThreshold: 24,
-  canDeleteMessage: true,
-  canEditMessage: true,
-  canForkMessage: false,
-  canRetryMessage: true,
+  canDeleteTurn: true,
+  canEditTurn: true,
+  canForkTurn: false,
+  canRetryTurn: true,
   emptyLabel: 'No messages yet',
   hasOlderMessages: false,
   lazyMessages: undefined,
@@ -171,14 +179,14 @@ const emit = defineEmits<{
   cancel: []
   'client-response': [response: ClientRequestResponse]
   'copy-message': [index: number]
-  'delete-message': [index: number]
-  'edit-message': [payload: { content: string; index: number }]
-  'fork-message': [index: number]
+  'delete-turn': [turnId: string]
+  'edit-turn': [payload: { content: string; turnId: string }]
+  'fork-turn': [turnId: string]
   'load-older-messages': []
   'open-link': [link: CodexConversationLink]
   'open-visualization': [visualization: CodexConversationVisualization]
   'quote-message': [index: number]
-  'retry-message': [index: number]
+  'retry-turn': [turnId: string]
   'send-follow-up': [prompt: string]
   'stickiness-change': [stuckToBottom: boolean]
 }>()
@@ -262,6 +270,28 @@ const displayGroups = computed(() => {
   }
   return groups
 })
+const inferredActiveTurnId = computed(() => {
+  if (props.activeTurnId !== undefined) return props.activeTurnId
+  return [...props.messages]
+    .reverse()
+    .map(chatMessageFromInput)
+    .find((message) => message.role === 'assistant' && message.streaming)
+    ?.turnId?.trim() || null
+})
+const turnStatusById = computed(() => new Map(
+  props.turns?.map((turn) => [turn.id, turn.status] as const) ?? [],
+))
+
+function isTerminalTurn(turnId: string | undefined): boolean {
+  if (!turnId || turnId === inferredActiveTurnId.value) return false
+  return turnStatusById.value.get(turnId) !== 'inProgress'
+}
+
+function isForkableTurn(turnId: string | undefined): boolean {
+  if (!isTerminalTurn(turnId)) return false
+  const status = turnStatusById.value.get(turnId!)
+  return status === undefined || status === 'completed'
+}
 const latestAssistantIndex = computed(() => [...displayEntries.value]
   .reverse()
   .find((entry) => entry.message.role === 'assistant')
@@ -380,7 +410,7 @@ async function loadOlderMessages(): Promise<void> {
 
 function reconcileMessageWindow(nextLength: number, previousLength: number): boolean {
   const batchSize = normalizedBatchSize(effectiveInitialMessageBatchSize.value)
-  const previousTailStart = Math.max(0, previousLength - batchSize)
+  const previousTailStart = turnAlignedStart(props.messages.slice(0, previousLength), Math.max(0, previousLength - batchSize))
   const wasTailWindow = renderStartIndex.value === previousTailStart
   if (nextLength < previousLength) {
     setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value))
@@ -418,8 +448,9 @@ function reconcileMessageWindow(nextLength: number, previousLength: number): boo
 }
 
 function setRenderStartIndex(nextIndex: number): void {
-  renderStartIndex.value = nextIndex
-  renderedAnchor = messageIdentityAt(props.messages, nextIndex)
+  const alignedIndex = turnAlignedStart(props.messages, nextIndex)
+  renderStartIndex.value = alignedIndex
+  renderedAnchor = messageIdentityAt(props.messages, alignedIndex)
 }
 
 function observeMessageBounds(): void {
@@ -453,7 +484,16 @@ function initialRenderStart(
 }
 
 function tailRenderStart(messages: readonly (Message | SurfaceMessage)[], batchSize: number): number {
-  return Math.max(0, messages.length - batchSize)
+  return turnAlignedStart(messages, Math.max(0, messages.length - batchSize))
+}
+
+function turnAlignedStart(messages: readonly (Message | SurfaceMessage)[], candidate: number): number {
+  let start = Math.max(0, Math.min(messages.length, candidate))
+  if (start >= messages.length) return start
+  const turnId = chatMessageFromInput(messages[start]!).turnId?.trim()
+  if (!turnId) return start
+  while (start > 0 && chatMessageFromInput(messages[start - 1]!).turnId?.trim() === turnId) start -= 1
+  return start
 }
 
 function updateStickiness(): void {

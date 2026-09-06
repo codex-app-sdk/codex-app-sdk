@@ -22,6 +22,8 @@ describe('Codex surface runtime state', () => {
       authentication,
       conversations: [],
       activeConversationId: null,
+      activeTurnId: null,
+      turns: [],
       messages: [],
       clientRequests: [],
       answeredClientRequestIds: [],
@@ -80,6 +82,7 @@ describe('Codex surface runtime state', () => {
       cwd: '/workspace',
       hydrated: false,
       activeTurnId: null,
+      turns: [],
       turnIds: [],
       messages: [],
       answeredClientRequestIds: [],
@@ -142,6 +145,7 @@ describe('Codex surface runtime state', () => {
       approvalPresets: [],
       answeredClientRequestIds: ['answered'],
       approvals,
+      activeTurnId: null,
       busy: true,
       clientRequests,
       contextUsage: null,
@@ -165,6 +169,7 @@ describe('Codex surface runtime state', () => {
       skills: [],
       threadStatus: null,
       turnGitDiff: null,
+      turns: [],
     });
   });
 });

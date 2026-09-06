@@ -9,9 +9,9 @@ export const sparkCapabilities: CodexCapabilities = {
   steerPrompt: false,
   interrupt: true,
   history: true,
-  rollback: false,
-  editMessage: false,
-  retryMessage: false,
+  deleteTurn: false,
+  editTurn: false,
+  retryTurn: false,
   approvals: false,
   approvalPresets: [],
 };

@@ -9,18 +9,21 @@ const messages: SurfaceMessage[] = [
     id: 'user-complete',
     role: 'user',
     status: 'complete',
+    turnId: 'turn-complete',
     parts: [{ type: 'text', text: 'Run the tests.' }],
   },
   {
     id: 'assistant-complete',
     role: 'assistant',
     status: 'complete',
+    turnId: 'turn-complete',
     parts: [{ type: 'text', text: 'The earlier result.' }],
   },
   {
     id: 'assistant-streaming',
     role: 'assistant',
     status: 'streaming',
+    turnId: 'turn-streaming',
     parts: [{ type: 'text', text: 'Working…' }],
   },
 ];
@@ -28,7 +31,7 @@ const messages: SurfaceMessage[] = [
 describe('message action availability while busy', () => {
   it('keeps completed actions visible but disables thread mutations', async () => {
     const wrapper = mount(CodexConversationPane, {
-      props: { busy: true, canForkMessage: true, messages, modelValue: '' },
+      props: { busy: true, canForkTurn: true, messages, modelValue: '' },
     });
     const renderedMessages = wrapper.findAllComponents(CodexMessage);
     const user = renderedMessages[0]!;
@@ -52,7 +55,7 @@ describe('message action availability while busy', () => {
     expect(streaming.get('.chat-message__actions').attributes('aria-hidden')).toBe('true');
 
     await assistant.get('[aria-label="Fork"]').trigger('click');
-    expect(wrapper.emitted('forkMessage')).toBeUndefined();
+    expect(wrapper.emitted('forkTurn')).toBeUndefined();
 
     await wrapper.setProps({ busy: false });
     expect(assistant.get('[aria-label="Retry"]').attributes()).not.toHaveProperty('disabled');

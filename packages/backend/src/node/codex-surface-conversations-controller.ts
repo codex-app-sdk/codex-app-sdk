@@ -12,6 +12,7 @@ import {
 import { normalizedConversationId, errorMessage } from './codex-surface-prompts';
 import { threadToSummary, upsertConversation } from './codex-surface-data';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
+import { surfaceTurn } from './codex-surface-events';
 
 const HISTORY_INITIAL_PAGE_SIZE = 50;
 const HISTORY_PAGE_SIZE = 25;
@@ -317,6 +318,7 @@ export class CodexSurfaceConversationsController {
       .map((turn) => turn.id));
     const historicalTurns = turns.filter((turn) => replaceableTurnIds.has(turn.id));
     const preservedTurnIds = current.turnIds.filter((turnId) => !replaceableTurnIds.has(turnId));
+    const preservedTurns = current.turns.filter((turn) => !replaceableTurnIds.has(turn.id));
     const preservedMessages = current.messages.filter((message) => (
       message.turnId === undefined || !replaceableTurnIds.has(message.turnId)
     ));
@@ -326,6 +328,7 @@ export class CodexSurfaceConversationsController {
     );
     this.host.patchRuntime(threadId, {
       turnIds: [...historicalTurns.map((turn) => turn.id), ...preservedTurnIds],
+      turns: [...historicalTurns.map((turn) => surfaceTurn(turn)), ...preservedTurns],
       messages: [...historyMessages, ...preservedMessages],
     });
     const turnCount = this.host.requireRuntime(threadId).turnIds.length;

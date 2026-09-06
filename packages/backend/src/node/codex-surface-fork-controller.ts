@@ -2,7 +2,6 @@ import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
   CodexSurfaceSnapshot,
-  SendCodexMessageOptions,
 } from '@codex-app-sdk/core/surface';
 import { codexThreadToSurfaceMessages } from './codex-conversation-history';
 import { CodexSurfaceCatalogController } from './codex-surface-catalog-controller';
@@ -19,11 +18,6 @@ import {
   validateServiceTier,
 } from './codex-surface-settings';
 import {
-  messageAt,
-  messageTurnId,
-  messageTurnIdOrNull,
-  surfaceMessageAttachments,
-  surfaceMessageText,
   surfaceThreadStatus,
   threadToSummary,
   upsertConversation,
@@ -33,6 +27,7 @@ import type {
   ForkCodexConversationOptions,
 } from './codex-surface-contracts';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
+import { surfaceTurn } from './codex-surface-events';
 
 const FORK_HISTORY_PAGE_SIZE = 5;
 
@@ -49,7 +44,6 @@ export type CodexSurfaceForkHost = {
   patch(patch: Partial<CodexSurfaceSnapshot>): void;
   rememberHostOptions(threadId: string, options: CodexConversationLoadOptions): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
-  sendMessageToThread(threadId: string, prompt: string, options?: SendCodexMessageOptions): Promise<void>;
   snapshotForRuntime(runtime: ThreadRuntimeState): CodexSurfaceSnapshot;
 };
 
@@ -163,6 +157,7 @@ export class CodexSurfaceForkController {
       fullHistoryHydrated: initialPage.nextCursor === null,
       cwd: response.cwd ?? response.thread.cwd ?? cwd ?? null,
       activeTurnId: runningTurnId,
+      turns: turns.map((turn) => surfaceTurn(turn)),
       turnIds: turns.map((turn) => turn.id),
       messages,
       busy: Boolean(runningTurnId),
@@ -197,39 +192,17 @@ export class CodexSurfaceForkController {
     return response.thread.id;
   }
 
-  async forkMessage(
+  async forkTurn(
     sourceThreadId: string,
-    index: number,
+    turnId: string,
     options: ForkCodexConversationOptions = {},
     hostOptions: CodexConversationLoadOptions = {},
   ): Promise<string> {
     const runtime = this.host.requireRuntime(sourceThreadId);
-    const message = messageAt(runtime.messages, index);
-    if (message.role === 'assistant') {
-      return this.fork(sourceThreadId, options, hostOptions, {
-        lastTurnId: messageTurnId(message),
-      });
+    if (!runtime.turnIds.includes(turnId)) {
+      throw new Error(`Cannot fork at unknown Codex turn '${turnId}'`);
     }
-    if (message.role !== 'user') throw new Error('Only user and assistant messages can be forked');
-
-    const currentTurnId = messageTurnId(message);
-    const previousAssistant = [...runtime.messages.slice(0, index)].reverse().find((candidate) => (
-      candidate.role === 'assistant' && messageTurnIdOrNull(candidate) !== null
-    ));
-    const boundary: CodexForkBoundary = previousAssistant
-      ? { lastTurnId: messageTurnId(previousAssistant) }
-      : { beforeTurnId: currentTurnId };
-    const attachments = surfaceMessageAttachments(message);
-    const prompt = surfaceMessageText(message)
-      || (attachments.length > 0 ? '(no user instructions)' : '');
-    if (!prompt) throw new Error('Cannot fork an empty user message');
-    const conversationId = await this.fork(sourceThreadId, options, hostOptions, boundary);
-    await this.host.sendMessageToThread(
-      conversationId,
-      prompt,
-      attachments.length > 0 ? { attachments } : {},
-    );
-    return conversationId;
+    return this.fork(sourceThreadId, options, hostOptions, { lastTurnId: turnId });
   }
 }
 

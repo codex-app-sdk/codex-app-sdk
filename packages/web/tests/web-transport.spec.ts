@@ -22,6 +22,8 @@ const snapshot: CodexSurfaceSnapshot = {
   },
   conversations: [],
   activeConversationId: null,
+  activeTurnId: null,
+  turns: [],
   messages: [],
   clientRequests: [],
   answeredClientRequestIds: [],

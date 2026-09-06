@@ -25,6 +25,7 @@ export { default as CodexComposerMenuList } from './components/CodexComposerMenu
 export { default as CodexComposerSendButton } from './components/CodexComposerSendButton.vue';
 export { default as CodexMessage } from './components/CodexMessage.vue';
 export { default as CodexMessageList } from './components/CodexMessageList.vue';
+export { default as CodexMessageTurn } from './components/CodexMessageTurn.vue';
 export { default as CodexScrollToBottom } from './components/CodexScrollToBottom.vue';
 export { default as CodexWorkbenchLayout } from './components/CodexWorkbenchLayout.vue';
 export type { CodexConversationRenderStrategy } from '@codex-app-sdk/core/surface';

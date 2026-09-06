@@ -2,6 +2,7 @@
   <div
     class="codex-chat-theme chat-message-actions"
     :class="`chat-message-actions--${message.role}`"
+    :aria-busy="deleting ? 'true' : undefined"
     :aria-label="t('chat.actions.label')"
   >
     <span
@@ -13,6 +14,7 @@
     </span>
     <ChatIconButton
       v-if="showCopy"
+      :disabled="deleting"
       :label="copied ? t('chat.actions.copied') : t('chat.actions.copy')"
       @click="emit('copy')"
     >
@@ -21,6 +23,7 @@
     </ChatIconButton>
     <ChatIconButton
       v-if="message.role === 'user' && canEdit && showEdit"
+      :disabled="deleting"
       :label="t('chat.actions.edit')"
       @click="emit('edit')"
     >
@@ -28,6 +31,7 @@
     </ChatIconButton>
     <ChatIconButton
       v-if="message.role === 'user' && showQuote"
+      :disabled="deleting"
       :label="t('chat.actions.quote')"
       @click="emit('quote')"
     >
@@ -35,7 +39,7 @@
     </ChatIconButton>
     <ChatIconButton
       v-if="message.role === 'assistant' && canRetry && showRetry"
-      :disabled="mutationDisabled"
+      :disabled="mutationDisabled || deleting"
       :label="t('chat.actions.retry')"
       @click="emit('retry')"
     >
@@ -43,7 +47,7 @@
     </ChatIconButton>
     <ChatIconButton
       v-if="canFork && showFork"
-      :disabled="mutationDisabled"
+      :disabled="mutationDisabled || deleting"
       :label="t('chat.actions.fork')"
       @click="emit('fork')"
     >
@@ -52,11 +56,12 @@
     <ChatIconButton
       v-if="canDelete && showDelete"
       danger
-      :disabled="mutationDisabled"
-      :label="t('chat.actions.delete')"
+      :disabled="mutationDisabled || deleting"
+      :label="deleting ? t('chat.actions.deleting') : t('chat.actions.delete')"
       @click="emit('delete')"
     >
-      <Trash2Icon />
+      <Loader2Icon v-if="deleting" class="chat-message-actions__spinner" />
+      <Trash2Icon v-else />
     </ChatIconButton>
     <span
       v-if="sentAtLabel && message.role === 'assistant'"
@@ -69,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowForkIcon, CheckIcon, CopyIcon, PencilIcon, QuoteIcon, RotateClockwiseIcon, Trash2Icon } from '../icons/app-icons'
+import { ArrowForkIcon, CheckIcon, CopyIcon, Loader2Icon, PencilIcon, QuoteIcon, RotateClockwiseIcon, Trash2Icon } from '../icons/app-icons'
 import { computed } from 'vue'
 import { useCodexChatTranslate } from './chat-i18n'
 import ChatIconButton from './ChatIconButton.vue'
@@ -84,6 +89,7 @@ const props = withDefaults(defineProps<{
   canFork?: boolean
   canRetry?: boolean
   copied?: boolean
+  deleting?: boolean
   message: Message
   mutationDisabled?: boolean
   presentation?: CodexMessageActionsPresentation
@@ -142,5 +148,15 @@ const sentAtTitle = computed(() => props.message.createdAt ? fullMessageSentAt(p
 
 .chat-message-actions__fork-icon {
   transform: rotate(90deg);
+}
+
+.chat-message-actions__spinner {
+  animation: chat-message-actions-spin 800ms linear infinite;
+}
+
+@keyframes chat-message-actions-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

@@ -13,7 +13,7 @@ import {
 } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface conversation forks', () => {
-  it.each(['latest', 'message'] as const)(
+  it.each(['latest', 'turn'] as const)(
     'inherits source host context when forking the %s boundary',
     async (boundary) => {
       const configureConversation = vi.fn(async () => ({}));
@@ -31,7 +31,7 @@ describe('CodexSurface conversation forks', () => {
       if (boundary === 'latest') {
         await surface.forkConversation('thread-existing');
       } else {
-        await surface.forkConversationAtMessage('thread-existing', 1);
+        await surface.forkConversationAtTurn('thread-existing', 'turn-history');
       }
 
       expect(configureConversation).toHaveBeenCalledWith(expect.objectContaining({
@@ -233,7 +233,7 @@ describe('CodexSurface conversation forks', () => {
     expect(requestsFor(transport, 'thread/fork')).toHaveLength(0);
   });
 
-  it('forks an assistant message through its turn and discards later turns', async () => {
+  it('forks through the selected turn and discards later turns', async () => {
     const transport = forkTransport({
       sourceTurns: [
         turn('turn-one', 'completed', [
@@ -249,7 +249,7 @@ describe('CodexSurface conversation forks', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    const result = await surface.forkMessage(1);
+    const result = await surface.forkTurn('turn-one');
 
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({
       params: { threadId: 'thread-existing', lastTurnId: 'turn-one' },
@@ -258,7 +258,7 @@ describe('CodexSurface conversation forks', () => {
     expect(requestsFor(transport, 'turn/start')).toHaveLength(0);
   });
 
-  it('forks a user message through the previous assistant and resubmits its input', async () => {
+  it('forks through a later selected turn without resubmitting its prompt', async () => {
     const transport = forkTransport({
       sourceTurns: [
         turn('turn-one', 'completed', [
@@ -280,37 +280,24 @@ describe('CodexSurface conversation forks', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    const result = await surface.forkConversationAtMessage('thread-existing', 2);
+    const result = await surface.forkConversationAtTurn('thread-existing', 'turn-two');
 
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({
-      params: { threadId: 'thread-existing', lastTurnId: 'turn-one' },
+      params: { threadId: 'thread-existing', lastTurnId: 'turn-two' },
     });
-    expect(lastRequest(transport, 'turn/start')).toMatchObject({
-      params: {
-        threadId: 'thread-forked',
-        input: [
-          { type: 'text', text: 'Second request' },
-          { type: 'localImage', path: '/tmp/second.png' },
-        ],
-      },
-    });
-    expect(result.snapshot).toMatchObject({ activeConversationId: 'thread-forked', busy: true });
+    expect(requestsFor(transport, 'turn/start')).toHaveLength(0);
+    expect(result.snapshot).toMatchObject({ activeConversationId: 'thread-forked', busy: false });
     expect(surface.getSnapshot().activeConversationId).toBe('thread-existing');
   });
 
-  it('forks the first user message before its turn and resubmits it', async () => {
+  it('rejects an unknown turn id', async () => {
     const transport = forkTransport();
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    await surface.conversation('thread-existing').forkMessage(0);
-
-    expect(lastRequest(transport, 'thread/fork')).toMatchObject({
-      params: { threadId: 'thread-existing', beforeTurnId: 'turn-history' },
-    });
-    expect(lastRequest(transport, 'turn/start')).toMatchObject({
-      params: { threadId: 'thread-forked', input: [{ type: 'text', text: 'Hello' }] },
-    });
+    await expect(surface.conversation('thread-existing').forkTurn('missing'))
+      .rejects.toThrow("Cannot fork at unknown Codex turn 'missing'");
+    expect(requestsFor(transport, 'thread/fork')).toHaveLength(0);
   });
 });
 

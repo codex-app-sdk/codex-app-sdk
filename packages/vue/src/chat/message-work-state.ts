@@ -13,5 +13,5 @@ export type AssistantWorkTurnContext = {
   toggle: () => void
 }
 
-export const assistantWorkTurnKey: InjectionKey<AssistantWorkTurnContext> = Symbol('codex-assistant-work-turn')
-export const assistantWorkMessageIndexKey: InjectionKey<ComputedRef<number>> = Symbol('codex-assistant-work-message-index')
+export const assistantWorkTurnKey: InjectionKey<AssistantWorkTurnContext> = Symbol('codex-app-sdk-assistant-work-turn')
+export const assistantWorkMessageIndexKey: InjectionKey<ComputedRef<number>> = Symbol('codex-app-sdk-assistant-work-message-index')

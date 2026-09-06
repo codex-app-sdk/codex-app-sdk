@@ -10,6 +10,7 @@ import type { Message } from '../../src/chat/types';
 function mountActions(
   message: Message,
   options: {
+    deleting?: boolean;
     canFork?: boolean;
     copied?: boolean;
     mutationDisabled?: boolean;
@@ -20,6 +21,7 @@ function mountActions(
     props: {
       canFork: options.canFork,
       copied: options.copied,
+      deleting: options.deleting,
       message,
       mutationDisabled: options.mutationDisabled,
       presentation: options.presentation,
@@ -89,6 +91,23 @@ describe('ChatMessageActions', () => {
       await user.get(`button[aria-label="${label}"]`).trigger('click');
       expect(user.emitted(event)).toStrictEqual([[]]);
     }
+  });
+
+  it('shows deletion progress and disables every action while deletion is pending', async () => {
+    const user = mountActions(
+      { role: 'user', content: 'Question' },
+      { canFork: true, deleting: true },
+    );
+
+    expect(actionLabels(user)).toStrictEqual(['Copy', 'Edit', 'Quote', 'Fork', 'Deleting']);
+    expect(user.get('.chat-message-actions').attributes('aria-busy')).toBe('true');
+    for (const button of user.findAll('button')) {
+      expect(button.attributes('disabled')).toBeDefined();
+    }
+    expect(user.find('button[aria-label="Deleting"] .chat-message-actions__spinner').exists()).toBe(true);
+
+    await user.get('button[aria-label="Deleting"]').trigger('click');
+    expect(user.emitted('delete')).toBeUndefined();
   });
 
   it('places an exact accessible timestamp on the role-appropriate edge', () => {

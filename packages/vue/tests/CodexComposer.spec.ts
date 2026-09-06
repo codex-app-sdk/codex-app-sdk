@@ -1735,9 +1735,9 @@ function disabledCapabilities(): CodexCapabilities {
     steerPrompt: false,
     interrupt: false,
     history: false,
-    rollback: false,
-    editMessage: false,
-    retryMessage: false,
+    deleteTurn: false,
+    editTurn: false,
+    retryTurn: false,
     approvals: false,
   };
 }

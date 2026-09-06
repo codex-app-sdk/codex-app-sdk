@@ -417,6 +417,8 @@ export type CodexSurfaceSnapshot = {
   authentication: CodexSurfaceAuthentication;
   conversations: CodexConversationSummary[];
   activeConversationId: string | null;
+  activeTurnId: string | null;
+  turns: CodexSurfaceTurn[];
   messages: SurfaceMessage[];
   clientRequests: CodexSurfaceClientRequest[];
   answeredClientRequestIds: string[];
@@ -449,7 +451,6 @@ export type CodexSurfaceSnapshot = {
 
 export type CodexConversationSnapshot = CodexSurfaceSnapshot & {
   activeConversationId: string;
-  activeTurnId: string | null;
   turnIds: string[];
 };
 
@@ -526,6 +527,15 @@ export type CodexSurfaceTurnError = {
   message: string;
   additionalDetails: string | null;
   codexErrorInfo: CodexSurfaceJsonValue | null;
+};
+export type CodexSurfaceTurn = {
+  id: string;
+  status: CodexSurfaceTurnStatus;
+  error: CodexSurfaceTurnError | null;
+  willRetry: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
 };
 
 /**
@@ -933,10 +943,10 @@ export type CodexSurfaceApi = {
   startReview(options?: StartCodexReviewOptions): Promise<CodexSurfaceSnapshot>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
   interrupt(): Promise<CodexSurfaceSnapshot>;
-  deleteMessage(index: number): Promise<CodexSurfaceSnapshot>;
-  editMessage(index: number, content: string): Promise<CodexSurfaceSnapshot>;
-  forkMessage(index: number): Promise<CodexSurfaceSnapshot>;
-  retryMessage(index: number): Promise<CodexSurfaceSnapshot>;
+  deleteTurn(turnId: string): Promise<CodexSurfaceSnapshot>;
+  editTurn(turnId: string, content: string): Promise<CodexSurfaceSnapshot>;
+  forkTurn(turnId: string): Promise<CodexSurfaceSnapshot>;
+  retryTurn(turnId: string): Promise<CodexSurfaceSnapshot>;
   deleteQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot>;
   updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot>;
   steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot>;

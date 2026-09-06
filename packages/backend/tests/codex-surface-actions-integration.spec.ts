@@ -425,7 +425,7 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot()).toMatchObject({ busy: true, queuedPrompts: [] });
   });
 
-  it('exposes skills, goals, context usage, diffs, and rollback-backed message deletion', async () => {
+  it('exposes skills, goals, context usage, diffs, and rollback-backed turn deletion', async () => {
     const transport = new FakeTransport({
       'skills/list': () => ({
         data: [{
@@ -470,7 +470,7 @@ describe('CodexSurface', () => {
       goal: { objective: 'Finish', tokenBudget: 1000 },
       turnGitDiff: { addedLines: 2, removedLines: 1 },
     });
-    await surface.conversation('thread-existing').deleteMessage(0);
+    await surface.conversation('thread-existing').deleteTurn('turn-history');
     expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
       params: { threadId: 'thread-existing', numTurns: 1 },
     });
@@ -502,7 +502,7 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
     await surface.connect();
 
-    await surface.deleteMessage(2);
+    await surface.deleteTurn('turn-second');
 
     expect(lastRequest(transport, 'thread/revert')).toMatchObject({
       params: { threadId: 'thread-existing', beforeTurnId: 'turn-second' },
@@ -722,10 +722,10 @@ describe('CodexSurface', () => {
   it('backs edit, retry, delete, and queued prompt actions with real surface operations', async () => {
     const edited = createSurface();
     await edited.surface.connect();
-    await expect(edited.surface.deleteMessage(-1)).rejects.toThrow('Unknown message index');
-    await expect(edited.surface.editMessage(1, 'Nope')).rejects.toThrow('Only user messages');
-    await expect(edited.surface.editMessage(0, '   ')).rejects.toThrow('empty content');
-    await edited.surface.conversation('thread-existing').editMessage(0, 'Edited prompt');
+    await expect(edited.surface.deleteTurn('missing')).rejects.toThrow("unknown Codex turn 'missing'");
+    await expect(edited.surface.editTurn('missing', 'Nope')).rejects.toThrow("user prompt for Codex turn 'missing'");
+    await expect(edited.surface.editTurn('turn-history', '   ')).rejects.toThrow('empty content');
+    await edited.surface.conversation('thread-existing').editTurn('turn-history', 'Edited prompt');
     expect(lastRequest(edited.transport, 'thread/rollback')).toMatchObject({ params: { numTurns: 1 } });
     expect(lastRequest(edited.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Edited prompt' }] },
@@ -733,7 +733,7 @@ describe('CodexSurface', () => {
 
     const retried = createSurface();
     await retried.surface.connect();
-    await retried.surface.conversation('thread-existing').retryMessage(1);
+    await retried.surface.conversation('thread-existing').retryTurn('turn-history');
     expect(lastRequest(retried.transport, 'thread/rollback')).toMatchObject({ params: { numTurns: 1 } });
     expect(lastRequest(retried.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Hello' }] },
@@ -741,7 +741,7 @@ describe('CodexSurface', () => {
 
     const retriedThroughSurface = createSurface();
     await retriedThroughSurface.surface.connect();
-    await retriedThroughSurface.surface.retryMessage(1);
+    await retriedThroughSurface.surface.retryTurn('turn-history');
     expect(lastRequest(retriedThroughSurface.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Hello' }] },
     });

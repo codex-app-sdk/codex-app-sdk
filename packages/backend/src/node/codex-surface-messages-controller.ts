@@ -14,7 +14,13 @@ import {
   validatedSendOptions,
 } from './codex-surface-data';
 import type { SurfaceEventInput } from './codex-surface-events';
-import { createMessageId, createQueuedPromptId, timestampToIso } from './codex-surface-events';
+import {
+  createMessageId,
+  createQueuedPromptId,
+  surfaceTurn,
+  timestampToIso,
+  upsertSurfaceTurn,
+} from './codex-surface-events';
 import {
   ensureAssistantTurnMessage,
   pruneEmptyAssistantPlaceholders,
@@ -207,9 +213,17 @@ export class CodexSurfaceMessagesController {
       this.host.patchRuntime(threadId, {
         busy,
         turnStartPending: false,
+        turns: upsertSurfaceTurn(runtime.turns, surfaceTurn(response.turn)),
         messages: busy ? ensureAssistantTurnMessage(messages, threadId, response.turn.id) : messages,
       });
       this.host.patchConversationStatus(threadId, busy ? 'active' : 'idle', 'action');
+      const startedMessage = messages.find((message) => message.id === messageId);
+      if (startedMessage) {
+        this.host.emitEvent('action', {
+          type: 'message.updated', conversationId: threadId, turnId: response.turn.id,
+          payload: { message: structuredClone(startedMessage) },
+        });
+      }
       if (busy && !wasKnownTurn) {
         this.host.emitEvent('action', {
           type: 'turn.started', conversationId: threadId, turnId: response.turn.id,
@@ -281,6 +295,15 @@ export class CodexSurfaceMessagesController {
       const wasKnownTurn = runtime.turnIds.includes(response.turnId);
       runtime.activeTurnId = response.turnId;
       if (!runtime.turnIds.includes(response.turnId)) runtime.turnIds.push(response.turnId);
+      runtime.turns = upsertSurfaceTurn(runtime.turns, {
+        id: response.turnId,
+        status: 'inProgress',
+        error: null,
+        willRetry: false,
+        startedAt: null,
+        completedAt: null,
+        durationMs: null,
+      });
       this.host.patchConversationTurnCount(threadId, runtime.turnIds.length, 'action');
       const steeredMessages = runtime.messages.map((message) => message.id === messageId
         ? { ...message, turnId: response.turnId, metadata: { ...message.metadata, turnId: response.turnId } }

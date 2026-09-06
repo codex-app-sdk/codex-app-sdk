@@ -24,16 +24,16 @@ import type {
 export type CodexConversationHandleOperations = {
   clearGoal(): Promise<void>;
   compact(): Promise<void>;
-  deleteMessage(index: number): Promise<void>;
+  deleteTurn(turnId: string): Promise<void>;
   deleteQueuedPrompt(promptId: string): Promise<void>;
   updateQueuedPrompt(promptId: string, prompt: string): Promise<void>;
-  editMessage(index: number, content: string): Promise<void>;
+  editTurn(turnId: string, content: string): Promise<void>;
   fork(
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
   ): Promise<CodexConversationForkResult>;
-  forkMessage(
-    index: number,
+  forkTurn(
+    turnId: string,
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
   ): Promise<CodexConversationForkResult>;
@@ -52,8 +52,7 @@ export type CodexConversationHandleOperations = {
     scope?: CodexSurfaceApprovalScope,
   ): Promise<void>;
   respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<void>;
-  retryMessage(index: number): Promise<void>;
-  rollbackToTurn(turnId: string): Promise<void>;
+  retryTurn(turnId: string): Promise<void>;
   select(): Promise<void>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<void>;
   setGoal(objective: string, tokenBudget?: number | null): Promise<void>;
@@ -75,7 +74,7 @@ export function createCodexConversationHandle(
   return {
     id,
     fork: operations.fork,
-    forkMessage: operations.forkMessage,
+    forkTurn: operations.forkTurn,
     load: (options) => snapshotAfter(() => operations.load(options)),
     select: () => snapshotAfter(operations.select),
     readHistory: operations.readHistory,
@@ -91,10 +90,9 @@ export function createCodexConversationHandle(
     startReview: (options) => snapshotAfter(() => operations.startReview(options)),
     steerMessage: (prompt, options) => snapshotAfter(() => operations.steerMessage(prompt, options)),
     interrupt: () => snapshotAfter(operations.interrupt),
-    deleteMessage: (index) => snapshotAfter(() => operations.deleteMessage(index)),
-    editMessage: (index, content) => snapshotAfter(() => operations.editMessage(index, content)),
-    retryMessage: (index) => snapshotAfter(() => operations.retryMessage(index)),
-    rollbackToTurn: (turnId) => snapshotAfter(() => operations.rollbackToTurn(turnId)),
+    deleteTurn: (turnId) => snapshotAfter(() => operations.deleteTurn(turnId)),
+    editTurn: (turnId, content) => snapshotAfter(() => operations.editTurn(turnId, content)),
+    retryTurn: (turnId) => snapshotAfter(() => operations.retryTurn(turnId)),
     deleteQueuedPrompt: (promptId) => snapshotAfter(() => operations.deleteQueuedPrompt(promptId)),
     updateQueuedPrompt: (promptId, prompt) => snapshotAfter(() => operations.updateQueuedPrompt(promptId, prompt)),
     steerQueuedPrompt: (promptId, prompt) => snapshotAfter(() => operations.steerQueuedPrompt(promptId, prompt)),

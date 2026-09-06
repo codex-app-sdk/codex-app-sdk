@@ -12,7 +12,6 @@ import {
   conversationStatus,
   mergeRateLimitSnapshot,
   mergeSurfaceRateLimits,
-  messageAt,
   messageTurnId,
   messageTurnIdOrNull,
   surfaceAttachmentPart,
@@ -136,14 +135,6 @@ describe('Codex surface data codecs', () => {
     } });
     expect(surfaceAttachmentPart({ type: 'image', path: '/tmp/image.png', name: 'Image' }))
       .toMatchObject({ attachment: { kind: 'image', name: 'Image', url: 'file:///tmp/image.png' } });
-  });
-
-  it('selects messages only by valid integer index and reports exact failures', () => {
-    const first = surfaceMessage('first', 'assistant', 'turn-1');
-    const second = surfaceMessage('second', 'user', 'turn-2');
-    expect(messageAt([first, second], 1)).toBe(second);
-    expect(() => messageAt([first], 0.5)).toThrow("Unknown message index '0.5'");
-    expect(() => messageAt([first], 2)).toThrow("Unknown message index '2'");
   });
 
   it('resolves turn identity from the direct field, metadata, or a precise absence', () => {

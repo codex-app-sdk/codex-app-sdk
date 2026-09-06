@@ -41,6 +41,8 @@ import {
 const state: CodexConversationPaneState = {
   identity: {
     get conversationKey() { return activeConversationId.value; },
+    get activeTurnId() { return activeTurnId.value; },
+    get turns() { return turns.value; },
     get messages() { return messages.value; },
     get busy() { return sending.value; },
     get disabled() { return !activeConversationId.value; },
@@ -67,7 +69,7 @@ const state: CodexConversationPaneState = {
   },
   get capabilities() { return capabilities.value; },
   policy: {
-    canForkMessage: true,
+    canForkTurn: true,
   },
 };
 
@@ -80,7 +82,7 @@ const actions: CodexConversationPaneActions = {
   updateSettings: (next) => backend.updateSettings(next),
   loadOlderHistory: () => backend.loadOlderHistory(),
   resolveApproval: (id, decision, scope) => backend.resolveApproval(id, decision, scope),
-  forkMessage: (index) => backend.forkMessage(index),
+  forkTurn: (turnId) => backend.forkTurn(turnId),
   updateQueuedPrompt: (id, prompt) => backend.updateQueuedPrompt(id, prompt),
   steerQueuedPrompt: (id, prompt) => backend.steerQueuedPrompt(id, prompt),
   openImage: (image, context) => imageTabs.open(image, context),
@@ -142,7 +144,7 @@ Controller actions cover:
 - submit, steer, interrupt, and queued-prompt update/steering;
 - composer state, attachments, prompt-history loading, settings, menu selection, and attachment picking;
 - older-history loading;
-- copy notification, quote, edit, retry, fork, and delete message behavior;
+- copy notification and quote behavior, plus edit, retry, fork, and delete turn behavior;
 - image opening, with the SDK fullscreen lightbox as the default fallback;
 - approvals and app-server client responses;
 - goals, follow-ups, and queued-prompt deletion;
@@ -162,17 +164,20 @@ post-action notification: `CodexMessage` performs the clipboard write and
 copied-state feedback itself.
 
 Message forking is deliberately opt-in. In controlled mode, set
-`state.policy.canForkMessage = true` and implement `actions.forkMessage(index)`.
+`state.policy.canForkTurn = true` and implement `actions.forkTurn(turnId)`.
 The Fork control appears immediately before Delete on both user and assistant
 messages. With the granular compatibility API, use
-`:can-fork-message="true"` and `@fork-message="forkMessage"`. A surface-bound
-pane can also opt in with `:can-fork-message="true"`; the active surface action
+`:can-fork-turn="true"` and `@fork-turn="forkTurn"`. A surface-bound
+pane can also opt in with `:can-fork-turn="true"`; the active surface action
 creates and selects the fork.
 
-While a turn is running, completed-message actions remain rendered, but Retry,
-Delete, and Fork are disabled because they change thread history. Copy and Quote
-remain available. The assistant message currently being generated keeps its
-action toolbar hidden until streaming completes.
+The SDK offers turn mutations on every terminal turn when the host supplies the
+corresponding global capability. Delete, Edit, and Retry may target completed,
+failed, or interrupted turns; Fork requires successful completion. The active
+turn never exposes mutation controls, and all historical mutation controls are
+disabled while another turn is running. Acting on an older turn truncates the
+conversation from that turn: Delete stops there, while Edit and Retry resubmit
+the edited or original prompt. Copy and Quote remain available.
 
 ## Reactivity and package boundaries
 

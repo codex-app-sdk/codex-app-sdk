@@ -7,7 +7,7 @@ This runnable Electron + Vue sample demonstrates the intended SDK boundary:
 - the right pane uses and customizes the SDK's `CodexConversationPane`;
 - the SDK transport, state, and eventing handle history, streaming, models,
   reasoning, permissions, goals, skills, plan mode, approvals, app-server user
-  input, message rollback actions, prompt recall, editable queued prompts,
+  input, turn actions, prompt recall, editable queued prompts,
   steering, interruption, and sending;
 - the SDK-native Electron bridge supplies file picking and ingestion, attachment
   previews, image paste/drop, copy, audio capture, and Apple voice transcription;

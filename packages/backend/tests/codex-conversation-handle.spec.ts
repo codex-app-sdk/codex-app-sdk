@@ -13,7 +13,7 @@ describe('createCodexConversationHandle', () => {
 
     expect(conversation.id).toBe('thread-1');
     await expect(conversation.fork()).resolves.toStrictEqual({ conversationId: 'thread-fork' });
-    await expect(conversation.forkMessage(2)).resolves.toStrictEqual({ conversationId: 'thread-fork' });
+    await expect(conversation.forkTurn('turn-2')).resolves.toStrictEqual({ conversationId: 'thread-fork' });
     await expect(conversation.load({ cwd: '/workspace' })).resolves.toBe(snapshot);
     await expect(conversation.select()).resolves.toBe(snapshot);
     await expect(conversation.rename('New title')).resolves.toBe(snapshot);
@@ -25,10 +25,9 @@ describe('createCodexConversationHandle', () => {
       attachments: [{ type: 'file', path: '/tmp/notes.md' }],
     })).resolves.toBe(snapshot);
     await expect(conversation.interrupt()).resolves.toBe(snapshot);
-    await expect(conversation.deleteMessage(2)).resolves.toBe(snapshot);
-    await expect(conversation.editMessage(1, 'Edited')).resolves.toBe(snapshot);
-    await expect(conversation.retryMessage(3)).resolves.toBe(snapshot);
-    await expect(conversation.rollbackToTurn('turn-1')).resolves.toBe(snapshot);
+    await expect(conversation.deleteTurn('turn-2')).resolves.toBe(snapshot);
+    await expect(conversation.editTurn('turn-1', 'Edited')).resolves.toBe(snapshot);
+    await expect(conversation.retryTurn('turn-3')).resolves.toBe(snapshot);
     await expect(conversation.deleteQueuedPrompt('prompt-1')).resolves.toBe(snapshot);
     await expect(conversation.updateQueuedPrompt('prompt-2', 'Edited queue')).resolves.toBe(snapshot);
     await expect(conversation.steerQueuedPrompt('prompt-2', 'Edited steer')).resolves.toBe(snapshot);
@@ -49,10 +48,9 @@ describe('createCodexConversationHandle', () => {
       attachments: [{ type: 'file', path: '/tmp/notes.md' }],
     });
     expect(operations.interrupt).toHaveBeenCalledOnce();
-    expect(operations.deleteMessage).toHaveBeenCalledWith(2);
-    expect(operations.editMessage).toHaveBeenCalledWith(1, 'Edited');
-    expect(operations.retryMessage).toHaveBeenCalledWith(3);
-    expect(operations.rollbackToTurn).toHaveBeenCalledWith('turn-1');
+    expect(operations.deleteTurn).toHaveBeenCalledWith('turn-2');
+    expect(operations.editTurn).toHaveBeenCalledWith('turn-1', 'Edited');
+    expect(operations.retryTurn).toHaveBeenCalledWith('turn-3');
     expect(operations.deleteQueuedPrompt).toHaveBeenCalledWith('prompt-1');
     expect(operations.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     expect(operations.respondToClientRequest).toHaveBeenCalledWith(response);
@@ -60,7 +58,7 @@ describe('createCodexConversationHandle', () => {
     expect(operations.clearGoal).toHaveBeenCalledOnce();
     expect(operations.updateQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited queue');
     expect(operations.steerQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited steer');
-    expect(operations.getSnapshot).toHaveBeenCalledTimes(20);
+    expect(operations.getSnapshot).toHaveBeenCalledTimes(19);
   });
 
   it('passes through history, realtime, snapshots, and subscriptions', async () => {
@@ -104,17 +102,17 @@ describe('createCodexConversationHandle', () => {
 function operationSpies(snapshot: CodexConversationSnapshot): CodexConversationHandleOperations {
   const operation = () => vi.fn(async () => undefined);
   return {
-    clearGoal: operation(), compact: operation(), deleteMessage: operation(), deleteQueuedPrompt: operation(),
-    editMessage: operation(), fork: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
-    forkMessage: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
+    clearGoal: operation(), compact: operation(), deleteTurn: operation(), deleteQueuedPrompt: operation(),
+    editTurn: operation(), fork: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
+    forkTurn: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
     getSnapshot: vi.fn(() => snapshot), interrupt: operation(), load: operation(),
     onEvent: vi.fn(() => 'event-unsubscribe' as never),
     onStateChange: vi.fn(() => 'state-unsubscribe' as never),
     readHistory: vi.fn(async () => ({ turns: [] }) as never),
     readPromptHistory: vi.fn(async () => ({ conversationId: 'thread-1', prompts: ['Hello'] })),
     rename: operation(),
-    resolveApproval: operation(), respondToClientRequest: operation(), retryMessage: operation(),
-    rollbackToTurn: operation(), select: operation(), sendMessage: operation(), setGoal: operation(),
+    resolveApproval: operation(), respondToClientRequest: operation(), retryTurn: operation(),
+    select: operation(), sendMessage: operation(), setGoal: operation(),
     startRealtime: vi.fn(async () => 'session' as never), startReview: operation(), steerMessage: operation(),
     steerQueuedPrompt: operation(), updateQueuedPrompt: operation(), updateSettings: operation(),
   };

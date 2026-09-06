@@ -16,7 +16,7 @@ import {
   type CodexSurfaceController,
   type SurfaceMessage,
 } from '../src';
-import type { CodexSurfaceSnapshot } from '@codex-app-sdk/core/surface';
+import type { CodexSurfaceSnapshot, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
 import type { Message } from '../src/chat/types';
 import ChatComposerShelf from '../src/chat/ChatComposerShelf.vue';
 import CodexComposer from '../src/components/CodexComposer.vue';
@@ -1944,7 +1944,7 @@ describe('CodexConversationPane', () => {
       props: { messages, modelValue: '' },
     });
     const response = { id: 'legacy-request', payload: { decision: 'allow' } };
-    const edit = { content: 'Edited legacy prompt', index: 3 };
+    const edit = { content: 'Edited legacy prompt', turnId: 'turn-3' };
     const composerState = { text: 'Legacy draft', selectionStart: 2, selectionEnd: 6 };
 
     emitPaneActionTable(wrapper, { composerState, edit, response });
@@ -1953,10 +1953,10 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
     expect(wrapper.emitted('clientResponse')).toStrictEqual([[response]]);
     expect(wrapper.emitted('copyMessage')).toStrictEqual([[1]]);
-    expect(wrapper.emitted('deleteMessage')).toStrictEqual([[2]]);
-    expect(wrapper.emitted('editMessage')).toStrictEqual([[edit]]);
-    expect(wrapper.emitted('forkMessage')).toStrictEqual([[4]]);
-    expect(wrapper.emitted('retryMessage')).toStrictEqual([[5]]);
+    expect(wrapper.emitted('deleteTurn')).toStrictEqual([['turn-2']]);
+    expect(wrapper.emitted('editTurn')).toStrictEqual([[edit]]);
+    expect(wrapper.emitted('forkTurn')).toStrictEqual([['turn-4']]);
+    expect(wrapper.emitted('retryTurn')).toStrictEqual([['turn-5']]);
     expect(wrapper.emitted('sendFollowUp')).toStrictEqual([['Continue with tests']]);
     expect(wrapper.emitted('clearGoal')).toStrictEqual([[]]);
     expect(wrapper.emitted('update:modelValue')).toStrictEqual([['Legacy draft']]);
@@ -1967,19 +1967,19 @@ describe('CodexConversationPane', () => {
     const surface = fakeSurfaceController();
     const surfaceActions = {
       clearGoal: vi.fn(async () => surface.state),
-      deleteMessage: vi.fn(async () => surface.state),
-      editMessage: vi.fn(async () => surface.state),
-      forkMessage: vi.fn(async () => surface.state),
+      deleteTurn: vi.fn(async () => surface.state),
+      editTurn: vi.fn(async () => surface.state),
+      forkTurn: vi.fn(async () => surface.state),
       interrupt: vi.fn(async () => surface.state),
       respondToClientRequest: vi.fn(async () => surface.state),
-      retryMessage: vi.fn(async () => surface.state),
+      retryTurn: vi.fn(async () => surface.state),
       sendMessage: vi.fn(async () => surface.state),
     };
     Object.assign(surface, surfaceActions);
     const wrapper = mount(CodexConversationPane, { props: { surface } });
     await vi.waitFor(() => expect(surface.connect).toHaveBeenCalledOnce());
     const response = { id: 'surface-request', payload: { decision: 'deny' } };
-    const edit = { content: 'Edited surface prompt', index: 3 };
+    const edit = { content: 'Edited surface prompt', turnId: 'turn-3' };
     const composerState = { text: 'Surface draft', selectionStart: 1, selectionEnd: 4 };
 
     emitPaneActionTable(wrapper, { composerState, edit, response });
@@ -1987,22 +1987,99 @@ describe('CodexConversationPane', () => {
 
     expect(surfaceActions.interrupt).toHaveBeenCalledOnce();
     expect(surfaceActions.respondToClientRequest).toHaveBeenCalledWith(response);
-    expect(surfaceActions.deleteMessage).toHaveBeenCalledWith(2);
-    expect(surfaceActions.editMessage).toHaveBeenCalledWith(3, 'Edited surface prompt');
-    expect(surfaceActions.forkMessage).toHaveBeenCalledWith(4);
-    expect(surfaceActions.retryMessage).toHaveBeenCalledWith(5);
+    expect(surfaceActions.deleteTurn).toHaveBeenCalledWith('turn-2');
+    expect(surfaceActions.editTurn).toHaveBeenCalledWith('turn-3', 'Edited surface prompt');
+    expect(surfaceActions.forkTurn).toHaveBeenCalledWith('turn-4');
+    expect(surfaceActions.retryTurn).toHaveBeenCalledWith('turn-5');
     expect(surfaceActions.sendMessage).toHaveBeenCalledWith('Continue with tests');
     expect(surfaceActions.clearGoal).toHaveBeenCalledOnce();
     expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
     expect(wrapper.emitted('clientResponse')).toStrictEqual([[response]]);
     expect(wrapper.emitted('copyMessage')).toStrictEqual([[1]]);
-    expect(wrapper.emitted('deleteMessage')).toStrictEqual([[2]]);
-    expect(wrapper.emitted('editMessage')).toStrictEqual([[edit]]);
-    expect(wrapper.emitted('forkMessage')).toStrictEqual([[4]]);
-    expect(wrapper.emitted('retryMessage')).toStrictEqual([[5]]);
+    expect(wrapper.emitted('deleteTurn')).toStrictEqual([['turn-2']]);
+    expect(wrapper.emitted('editTurn')).toStrictEqual([[edit]]);
+    expect(wrapper.emitted('forkTurn')).toStrictEqual([['turn-4']]);
+    expect(wrapper.emitted('retryTurn')).toStrictEqual([['turn-5']]);
     expect(wrapper.emitted('sendFollowUp')).toStrictEqual([['Continue with tests']]);
     expect(wrapper.emitted('clearGoal')).toStrictEqual([[]]);
     expect(wrapper.emitted('update:composerState')).toStrictEqual([[composerState]]);
+  });
+
+  it('keeps a deleting turn visible, shows progress, and disables its actions until deletion settles', async () => {
+    let finishDelete!: () => void;
+    const deleteTurn = vi.fn(() => new Promise<void>((resolve) => {
+      finishDelete = resolve;
+    }));
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: 'pending-delete',
+          activeTurnId: null,
+          turns: [{
+            id: 'turn-delete', status: 'completed', error: null, willRetry: false,
+            startedAt: null, completedAt: null, durationMs: null,
+          }],
+          messages: [{
+            id: 'user-delete', role: 'user', status: 'complete', turnId: 'turn-delete',
+            parts: [{ type: 'text', text: 'Delete this turn' }],
+          }],
+        },
+        policy: { canDeleteTurn: true, canEditTurn: true, canForkTurn: true },
+      },
+      actions: { deleteTurn },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await wrapper.get('button[aria-label="Delete"]').trigger('click');
+    await nextTick();
+
+    expect(deleteTurn).toHaveBeenCalledWith('turn-delete');
+    expect(wrapper.text()).toContain('Delete this turn');
+    expect(wrapper.find('button[aria-label="Delete"]').exists()).toBe(false);
+    expect(wrapper.find('button[aria-label="Deleting"] .chat-message-actions__spinner').exists()).toBe(true);
+    for (const button of wrapper.findAll('.chat-message-actions button')) {
+      expect(button.attributes('disabled')).toBeDefined();
+    }
+
+    finishDelete();
+    await flushPromises();
+
+    expect(wrapper.find('button[aria-label="Deleting"]').exists()).toBe(false);
+    expect(wrapper.get('button[aria-label="Delete"]').attributes('disabled')).toBeUndefined();
+  });
+
+  it('keeps deletion pending for fire-and-forget controller actions until controlled state removes the turn', async () => {
+    const state = reactive<CodexConversationPaneState>({
+      identity: {
+        conversationKey: 'emitted-delete',
+        activeTurnId: null,
+        turns: [{
+          id: 'turn-delete', status: 'completed', error: null, willRetry: false,
+          startedAt: null, completedAt: null, durationMs: null,
+        }],
+        messages: [{
+          id: 'user-delete', role: 'user', status: 'complete', turnId: 'turn-delete',
+          parts: [{ type: 'text', text: 'Delete through a host event' }],
+        }],
+      },
+      policy: { canDeleteTurn: true },
+    });
+    const deleteTurn = vi.fn();
+    const controller = createCodexConversationPaneController({ state, actions: { deleteTurn } });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await wrapper.get('button[aria-label="Delete"]').trigger('click');
+    await nextTick();
+
+    expect(deleteTurn).toHaveBeenCalledWith('turn-delete');
+    expect(wrapper.find('button[aria-label="Deleting"]').exists()).toBe(true);
+
+    state.identity.messages = [];
+    state.identity.turns = [];
+    await nextTick();
+
+    expect(wrapper.find('button[aria-label="Deleting"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Delete through a host event');
   });
 
   it('routes the complete pane action table exclusively through controller actions', async () => {
@@ -2010,10 +2087,10 @@ describe('CodexConversationPane', () => {
       cancel: vi.fn(),
       clientResponse: vi.fn(),
       onMessageCopied: vi.fn(),
-      deleteMessage: vi.fn(),
-      editMessage: vi.fn(),
-      forkMessage: vi.fn(),
-      retryMessage: vi.fn(),
+      deleteTurn: vi.fn(),
+      editTurn: vi.fn(),
+      forkTurn: vi.fn(),
+      retryTurn: vi.fn(),
       sendFollowUp: vi.fn(),
       clearGoal: vi.fn(),
       updateComposerState: vi.fn(),
@@ -2024,7 +2101,7 @@ describe('CodexConversationPane', () => {
     });
     const wrapper = mount(CodexConversationPane, { props: { controller } });
     const response = { id: 'controller-request', payload: { decision: 'allow' } };
-    const edit = { content: 'Edited controlled prompt', index: 3 };
+    const edit = { content: 'Edited controlled prompt', turnId: 'turn-3' };
     const composerState = { text: 'Controlled draft', selectionStart: 3, selectionEnd: 7 };
 
     emitPaneActionTable(wrapper, { composerState, edit, response });
@@ -2033,20 +2110,20 @@ describe('CodexConversationPane', () => {
     expect(actions.cancel).toHaveBeenCalledOnce();
     expect(actions.clientResponse).toHaveBeenCalledWith(response);
     expect(actions.onMessageCopied).toHaveBeenCalledWith(1);
-    expect(actions.deleteMessage).toHaveBeenCalledWith(2);
-    expect(actions.editMessage).toHaveBeenCalledWith(edit);
-    expect(actions.forkMessage).toHaveBeenCalledWith(4);
-    expect(actions.retryMessage).toHaveBeenCalledWith(5);
+    expect(actions.deleteTurn).toHaveBeenCalledWith('turn-2');
+    expect(actions.editTurn).toHaveBeenCalledWith(edit);
+    expect(actions.forkTurn).toHaveBeenCalledWith('turn-4');
+    expect(actions.retryTurn).toHaveBeenCalledWith('turn-5');
     expect(actions.sendFollowUp).toHaveBeenCalledWith('Continue with tests');
     expect(actions.clearGoal).toHaveBeenCalledOnce();
     expect(actions.updateComposerState).toHaveBeenCalledWith(composerState);
     expect(wrapper.emitted('cancel')).toBeUndefined();
     expect(wrapper.emitted('clientResponse')).toBeUndefined();
     expect(wrapper.emitted('copyMessage')).toBeUndefined();
-    expect(wrapper.emitted('deleteMessage')).toBeUndefined();
-    expect(wrapper.emitted('editMessage')).toBeUndefined();
-    expect(wrapper.emitted('forkMessage')).toBeUndefined();
-    expect(wrapper.emitted('retryMessage')).toBeUndefined();
+    expect(wrapper.emitted('deleteTurn')).toBeUndefined();
+    expect(wrapper.emitted('editTurn')).toBeUndefined();
+    expect(wrapper.emitted('forkTurn')).toBeUndefined();
+    expect(wrapper.emitted('retryTurn')).toBeUndefined();
     expect(wrapper.emitted('sendFollowUp')).toBeUndefined();
     expect(wrapper.emitted('clearGoal')).toBeUndefined();
     expect(wrapper.emitted('update:modelValue')).toBeUndefined();
@@ -2063,7 +2140,7 @@ describe('CodexConversationPane', () => {
 
     emitPaneActionTable(wrapper, {
       composerState,
-      edit: { content: 'Must stay controlled', index: 3 },
+      edit: { content: 'Must stay controlled', turnId: 'turn-3' },
       response: { id: 'controller-request-absent', payload: { decision: 'deny' } },
     });
     await flushPromises();
@@ -2072,10 +2149,10 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('cancel')).toBeUndefined();
     expect(wrapper.emitted('clientResponse')).toBeUndefined();
     expect(wrapper.emitted('copyMessage')).toBeUndefined();
-    expect(wrapper.emitted('deleteMessage')).toBeUndefined();
-    expect(wrapper.emitted('editMessage')).toBeUndefined();
-    expect(wrapper.emitted('forkMessage')).toBeUndefined();
-    expect(wrapper.emitted('retryMessage')).toBeUndefined();
+    expect(wrapper.emitted('deleteTurn')).toBeUndefined();
+    expect(wrapper.emitted('editTurn')).toBeUndefined();
+    expect(wrapper.emitted('forkTurn')).toBeUndefined();
+    expect(wrapper.emitted('retryTurn')).toBeUndefined();
     expect(wrapper.emitted('sendFollowUp')).toBeUndefined();
     expect(wrapper.emitted('clearGoal')).toBeUndefined();
     expect(wrapper.emitted('update:modelValue')).toBeUndefined();
@@ -2256,9 +2333,9 @@ describe('CodexConversationPane', () => {
         policy: {
           actionsDisabled: false,
           attachEnabled: false,
-          canDeleteMessage: false,
-          canEditMessage: false,
-          canRetryMessage: false,
+          canDeleteTurn: false,
+          canEditTurn: false,
+          canRetryTurn: false,
           followUpsDisabled: false,
         },
       },
@@ -2309,9 +2386,18 @@ describe('CodexConversationPane', () => {
       removedLines: 1,
       updatedAt: '2026-09-03T00:00:00.000Z',
     };
+    const turns: CodexSurfaceTurn[] = [{
+      id: 'turn-controller',
+      status: 'completed',
+      error: null,
+      willRetry: false,
+      startedAt: '2026-09-03T00:00:00.000Z',
+      completedAt: '2026-09-03T00:00:01.000Z',
+      durationMs: 1_000,
+    }];
     const controller = createCodexConversationPaneController({
       state: {
-        identity: { conversationKey: 'controller-thread', messages },
+        identity: { conversationKey: 'controller-thread', messages, turns },
         thread: { queuedPrompts, turnGitDiff },
         composer: {
           approvalPreset: 'full-access',
@@ -2342,18 +2428,18 @@ describe('CodexConversationPane', () => {
           steerPrompt: true,
           interrupt: true,
           history: true,
-          rollback: true,
-          editMessage: true,
-          retryMessage: true,
+          deleteTurn: true,
+          editTurn: true,
+          retryTurn: true,
           approvals: true,
           approvalPresets: ['full-access'],
         },
         policy: {
           actionsDisabled: true,
-          canDeleteMessage: false,
-          canEditMessage: false,
-          canForkMessage: true,
-          canRetryMessage: false,
+          canDeleteTurn: false,
+          canEditTurn: false,
+          canForkTurn: true,
+          canRetryTurn: false,
           followUpsDisabled: true,
         },
       },
@@ -2392,13 +2478,14 @@ describe('CodexConversationPane', () => {
 
     expect(wrapper.findComponent(CodexMessageList).props()).toMatchObject({
       actionsDisabled: true,
-      canDeleteMessage: false,
-      canEditMessage: false,
-      canForkMessage: true,
-      canRetryMessage: false,
+      canDeleteTurn: false,
+      canEditTurn: false,
+      canForkTurn: true,
+      canRetryTurn: false,
       followUpsDisabled: true,
       plugins,
       skills,
+      turns,
     });
     expect(wrapper.findComponent(ChatComposerShelf).props()).toMatchObject({ queuedPrompts, turnGitDiff });
   });
@@ -2424,10 +2511,10 @@ describe('CodexConversationPane', () => {
     });
     expect(wrapper.findComponent(CodexMessageList).props()).toMatchObject({
       actionsDisabled: false,
-      canDeleteMessage: true,
-      canEditMessage: true,
-      canForkMessage: false,
-      canRetryMessage: true,
+      canDeleteTurn: true,
+      canEditTurn: true,
+      canForkTurn: false,
+      canRetryTurn: true,
       followUpsDisabled: false,
     });
     expect(wrapper.findComponent(ChatComposerShelf).props()).toMatchObject({
@@ -2450,10 +2537,10 @@ describe('CodexConversationPane', () => {
     const wrapper = mount(CodexConversationPane, {
       props: {
         actionsDisabled: true,
-        canDeleteMessage: false,
-        canEditMessage: false,
-        canForkMessage: true,
-        canRetryMessage: false,
+        canDeleteTurn: false,
+        canEditTurn: false,
+        canForkTurn: true,
+        canRetryTurn: false,
         commands,
         files,
         followUpsDisabled: true,
@@ -2484,10 +2571,10 @@ describe('CodexConversationPane', () => {
     });
     expect(wrapper.findComponent(CodexMessageList).props()).toMatchObject({
       actionsDisabled: true,
-      canDeleteMessage: false,
-      canEditMessage: false,
-      canForkMessage: true,
-      canRetryMessage: false,
+      canDeleteTurn: false,
+      canEditTurn: false,
+      canForkTurn: true,
+      canRetryTurn: false,
       followUpsDisabled: true,
     });
     expect(wrapper.findComponent(ChatComposerShelf).props('turnGitDiff')).toStrictEqual(turnGitDiff);
@@ -2517,9 +2604,9 @@ describe('CodexConversationPane', () => {
           steerPrompt: true,
           interrupt: true,
           history: true,
-          rollback: true,
-          editMessage: true,
-          retryMessage: true,
+          deleteTurn: true,
+          editTurn: true,
+          retryTurn: true,
           approvals: true,
           approvalPresets: ['ask-for-approval'],
         },
@@ -3254,7 +3341,7 @@ function emitPaneActionTable(
   wrapper: VueWrapper,
   options: {
     composerState: { text: string; selectionStart: number; selectionEnd: number };
-    edit: { content: string; index: number };
+    edit: { content: string; turnId: string };
     response: { id: string; payload: { decision: string } };
   },
 ): void {
@@ -3262,10 +3349,10 @@ function emitPaneActionTable(
   messageList.vm.$emit('cancel');
   messageList.vm.$emit('client-response', options.response);
   messageList.vm.$emit('copy-message', 1);
-  messageList.vm.$emit('delete-message', 2);
-  messageList.vm.$emit('edit-message', options.edit);
-  messageList.vm.$emit('fork-message', 4);
-  messageList.vm.$emit('retry-message', 5);
+  messageList.vm.$emit('delete-turn', 'turn-2');
+  messageList.vm.$emit('edit-turn', options.edit);
+  messageList.vm.$emit('fork-turn', 'turn-4');
+  messageList.vm.$emit('retry-turn', 'turn-5');
   messageList.vm.$emit('send-follow-up', 'Continue with tests');
   wrapper.findComponent(ChatComposerShelf).vm.$emit('clearGoal');
   (wrapper.findComponent(CodexComposer) as unknown as VueWrapper).vm
@@ -3296,6 +3383,8 @@ function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurface
     },
     conversations: [],
     activeConversationId: null,
+    activeTurnId: null,
+    turns: [],
     messages: [],
     clientRequests: [],
     answeredClientRequestIds: [],
@@ -3350,9 +3439,9 @@ function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurface
     compactConversation: action,
     connect,
     createConversation: action,
-    deleteMessage: action,
+    deleteTurn: action,
     deleteQueuedPrompt: action,
-    editMessage: action,
+    editTurn: action,
     interrupt: action,
     listConversations: vi.fn(async () => []),
     loadOlderConversationHistory: action,
@@ -3366,7 +3455,7 @@ function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurface
     renameConversation: action,
     respondToClientRequest: action,
     resolveApproval: action,
-    retryMessage: action,
+    retryTurn: action,
     selectConversation: action,
     sendMessage,
     setGoal: action,

@@ -39,7 +39,7 @@ It demonstrates:
 - custom create/select/delete conversation UI;
 - several simultaneously live conversations;
 - the full composer, models, reasoning, permissions, plan mode, goals, skills,
-  approvals, queues, message actions, and history;
+  approvals, queues, turn actions, and history;
 - native picking, ingestion, paste/drop, copy, and speech transcription;
 - almost no renderer-side SDK plumbing;
 - a trusted main-process `CodexAppBackend` that owns the shared surface.

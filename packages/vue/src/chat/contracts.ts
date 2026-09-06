@@ -15,9 +15,9 @@ export type CodexCapabilities = {
   steerPrompt: boolean;
   interrupt: boolean;
   history: boolean;
-  rollback: boolean;
-  editMessage: boolean;
-  retryMessage: boolean;
+  deleteTurn: boolean;
+  editTurn: boolean;
+  retryTurn: boolean;
   approvals: boolean;
   approvalPresets?: readonly ApprovalPreset[];
 };

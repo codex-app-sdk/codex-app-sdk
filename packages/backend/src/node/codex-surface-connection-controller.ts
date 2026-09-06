@@ -270,6 +270,7 @@ export class CodexSurfaceConnectionController {
     this.clientRequests.clear();
     this.host.patch({
       status: 'error',
+      activeTurnId: null,
       busy: false,
       approvals: [],
       clientRequests: [],
@@ -301,6 +302,8 @@ export class CodexSurfaceConnectionController {
     this.host.patch({
       conversations: [],
       activeConversationId: null,
+      activeTurnId: null,
+      turns: [],
       messages: [],
       clientRequests: [],
       answeredClientRequestIds: [],

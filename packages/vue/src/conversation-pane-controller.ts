@@ -25,6 +25,7 @@ import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfacePlugin,
+  CodexSurfaceTurn,
   CodexRendererSendMessageOptions,
   SurfaceMessage,
   UpdateCodexConversationSettings,
@@ -32,6 +33,8 @@ import type {
 
 export type CodexConversationPaneIdentityState = {
   conversationKey?: string | number | null;
+  activeTurnId?: string | null;
+  turns?: readonly CodexSurfaceTurn[];
   messages: readonly (Message | SurfaceMessage)[];
   busy?: boolean;
   disabled?: boolean;
@@ -83,10 +86,10 @@ export type CodexConversationPaneCatalogState = {
 export type CodexConversationPanePolicy = {
   actionsDisabled?: boolean;
   attachEnabled?: boolean;
-  canDeleteMessage?: boolean;
-  canEditMessage?: boolean;
-  canForkMessage?: boolean;
-  canRetryMessage?: boolean;
+  canDeleteTurn?: boolean;
+  canEditTurn?: boolean;
+  canForkTurn?: boolean;
+  canRetryTurn?: boolean;
   followUpsDisabled?: boolean;
 };
 
@@ -129,12 +132,12 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   clearGoal?: PaneAction;
   /** Called after the SDK has copied a message to the clipboard. */
   onMessageCopied?: PaneAction<[index: number]>;
-  deleteMessage?: PaneAction<[index: number]>;
+  deleteTurn?: PaneAction<[turnId: string]>;
   deleteQueuedPrompt?: PaneAction<[promptId: string]>;
   updateQueuedPrompt?: PaneAction<[promptId: string, prompt: string]>;
   editGoal?: PaneAction;
-  editMessage?: PaneAction<[payload: { content: string; index: number }]>;
-  forkMessage?: PaneAction<[index: number]>;
+  editTurn?: PaneAction<[payload: { content: string; turnId: string }]>;
+  forkTurn?: PaneAction<[turnId: string]>;
   interrupt?: PaneAction;
   loadOlderHistory?: PaneAction;
   menuSelect?: PaneAction<[item: CodexComposerMenuSelectableItem<Payload>]>;
@@ -150,7 +153,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
     decision: CodexSurfaceApprovalDecision,
     scope: CodexSurfaceApprovalScope,
   ]>;
-  retryMessage?: PaneAction<[index: number]>;
+  retryTurn?: PaneAction<[turnId: string]>;
   selectApprovalPreset?: PaneAction<[preset: ApprovalPreset]>;
   sendFollowUp?: PaneAction<[prompt: string]>;
   steer?: PaneAction<[prompt: string, options?: CodexRendererSendMessageOptions]>;

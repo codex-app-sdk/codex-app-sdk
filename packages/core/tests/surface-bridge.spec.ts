@@ -40,12 +40,12 @@ describe('Codex surface bridge', () => {
     expect(codexSurfaceBridgeArities).toStrictEqual({
       archiveConversation: [1, 1], cancelLogin: [0, 1], clearGoal: [0, 0],
       compactConversation: [0, 0], connect: [0, 0], createConversation: [0, 1],
-      deleteConversation: [1, 1], deleteMessage: [1, 1], deleteQueuedPrompt: [1, 1],
-      editMessage: [2, 2], forkMessage: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
+      deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
+      editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
       listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
       logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
       refreshAccount: [0, 0], refreshConversations: [0, 0], renameConversation: [1, 1],
-      respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryMessage: [1, 1],
+      respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryTurn: [1, 1],
       selectConversation: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
       startChatGptLogin: [0, 0], startReview: [0, 1], steerMessage: [1, 2],
       steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1], updateConversationSettings: [1, 1],
@@ -70,10 +70,10 @@ describe('Codex surface bridge', () => {
       { operation: 'connect', args: [] },
       { operation: 'createConversation', args: [{ model: 'gpt-5', reasoningEffort: 'high', serviceTier: null, approvalPreset: 'full-access' }] },
       { operation: 'deleteConversation', args: ['conversation-1'] },
-      { operation: 'deleteMessage', args: [0] },
+      { operation: 'deleteTurn', args: ['turn-1'] },
       { operation: 'deleteQueuedPrompt', args: ['queued-1'] },
-      { operation: 'editMessage', args: [2, 'Updated'] },
-      { operation: 'forkMessage', args: [1] },
+      { operation: 'editTurn', args: ['turn-2', 'Updated'] },
+      { operation: 'forkTurn', args: ['turn-1'] },
       { operation: 'getSnapshot', args: [] },
       { operation: 'interrupt', args: [] },
       {
@@ -100,7 +100,7 @@ describe('Codex surface bridge', () => {
         }],
       },
       { operation: 'resolveApproval', args: ['approval-1', 'approve', 'session'] },
-      { operation: 'retryMessage', args: [3] },
+      { operation: 'retryTurn', args: ['turn-3'] },
       { operation: 'selectConversation', args: ['conversation-1'] },
       {
         operation: 'sendMessage',
@@ -196,7 +196,7 @@ describe('Codex surface bridge', () => {
 
   it('validates operation arity at both bounds', async () => {
     await expectRejected('connect', ['unexpected'], 'connect received an invalid number of arguments');
-    await expectRejected('editMessage', [0], 'editMessage received an invalid number of arguments');
+    await expectRejected('editTurn', [0], 'editTurn received an invalid number of arguments');
   });
 
   it('accepts omitted optional values', async () => {
@@ -306,7 +306,7 @@ describe('Codex surface bridge', () => {
     ['cancelLogin', [false], 'Login id must be a non-empty string'],
     ['deleteConversation', [' '], 'Conversation id must be a non-empty string'],
     ['deleteQueuedPrompt', [' '], 'Queued prompt id must be a non-empty string'],
-    ['editMessage', [0, ' '], 'Message content must be a non-empty string'],
+    ['editTurn', ['turn-1', ' '], 'Turn content must be a non-empty string'],
     ['loadOlderConversationHistory', [' '], 'Conversation id must be a non-empty string'],
     ['readConversationHistory', [' '], 'Conversation id must be a non-empty string'],
     ['readConversationPromptHistory', [' '], 'Conversation id must be a non-empty string'],
@@ -317,9 +317,9 @@ describe('Codex surface bridge', () => {
     ['setGoal', ['goal', 0], 'Goal token budget must be a positive number or null'],
     ['setGoal', [' ', 1], 'Goal objective must be a non-empty string'],
     ['setGoal', ['goal', Number.POSITIVE_INFINITY], 'Goal token budget must be a positive number or null'],
-    ['deleteMessage', [-1], 'Message index must be a non-negative integer'],
-    ['forkMessage', [1.5], 'Message index must be a non-negative integer'],
-    ['retryMessage', ['1'], 'Message index must be a non-negative integer'],
+    ['deleteTurn', [' '], 'Turn id must be a non-empty string'],
+    ['forkTurn', [1.5], 'Turn id must be a non-empty string'],
+    ['retryTurn', [' '], 'Turn id must be a non-empty string'],
     ['selectConversation', [' '], 'Conversation id must be a non-empty string'],
     ['sendMessage', [' '], 'Message prompt must be a non-empty string'],
     ['steerMessage', [' '], 'Steer prompt must be a non-empty string'],

@@ -47,11 +47,11 @@ export type CodexSurfaceBridgeInvokeOptions = {
 
 export const codexSurfaceBridgeOperations = [
   'archiveConversation', 'cancelLogin', 'clearGoal', 'compactConversation', 'connect',
-  'createConversation', 'deleteConversation', 'deleteMessage', 'deleteQueuedPrompt',
-  'editMessage', 'forkMessage', 'getSnapshot', 'interrupt', 'listConversations',
+  'createConversation', 'deleteConversation', 'deleteTurn', 'deleteQueuedPrompt',
+  'editTurn', 'forkTurn', 'getSnapshot', 'interrupt', 'listConversations',
   'listModels', 'loadOlderConversationHistory', 'logout', 'readConversationHistory',
   'readConversationPromptHistory', 'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
-  'resolveApproval', 'retryMessage', 'selectConversation', 'sendMessage', 'setGoal',
+  'resolveApproval', 'retryTurn', 'selectConversation', 'sendMessage', 'setGoal',
   'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
   'unarchiveConversation', 'updateConversationSettings', 'updateQueuedPrompt',
 ] as const satisfies readonly CodexSurfaceBridgeOperation[];
@@ -62,13 +62,13 @@ export const codexSurfaceBridgeArities: Readonly<
 > = {
   archiveConversation: [1, 1], cancelLogin: [0, 1], clearGoal: [0, 0],
   compactConversation: [0, 0], connect: [0, 0], createConversation: [0, 1],
-  deleteConversation: [1, 1], deleteMessage: [1, 1], deleteQueuedPrompt: [1, 1],
-  editMessage: [2, 2], forkMessage: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
+  deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
+  editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
   listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
   logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
   refreshAccount: [0, 0],
   refreshConversations: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
-  resolveApproval: [2, 3], retryMessage: [1, 1], selectConversation: [1, 1],
+  resolveApproval: [2, 3], retryTurn: [1, 1], selectConversation: [1, 1],
   sendMessage: [1, 2], setGoal: [1, 2], startChatGptLogin: [0, 0], startReview: [0, 1],
   steerMessage: [1, 2], steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1],
   updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 2],
@@ -106,10 +106,10 @@ async function invokeValidated(
     case 'connect': return target.connect();
     case 'createConversation': return target.createConversation(conversationOptions(args[0]));
     case 'deleteConversation': return target.deleteConversation(nonEmptyString(args[0], 'Conversation id'));
-    case 'deleteMessage': return target.deleteMessage(messageIndex(args[0]));
+    case 'deleteTurn': return target.deleteTurn(nonEmptyString(args[0], 'Turn id'));
     case 'deleteQueuedPrompt': return target.deleteQueuedPrompt(nonEmptyString(args[0], 'Queued prompt id'));
-    case 'editMessage': return target.editMessage(messageIndex(args[0]), nonEmptyString(args[1], 'Message content'));
-    case 'forkMessage': return target.forkMessage(messageIndex(args[0]));
+    case 'editTurn': return target.editTurn(nonEmptyString(args[0], 'Turn id'), nonEmptyString(args[1], 'Turn content'));
+    case 'forkTurn': return target.forkTurn(nonEmptyString(args[0], 'Turn id'));
     case 'getSnapshot': return target.getSnapshot();
     case 'interrupt': return target.interrupt();
     case 'listConversations': return target.listConversations(listConversationOptions(args[0]));
@@ -127,7 +127,7 @@ async function invokeValidated(
     case 'resolveApproval': return target.resolveApproval(
       nonEmptyString(args[0], 'Approval id'), approvalDecision(args[1]), approvalScope(args[2]),
     );
-    case 'retryMessage': return target.retryMessage(messageIndex(args[0]));
+    case 'retryTurn': return target.retryTurn(nonEmptyString(args[0], 'Turn id'));
     case 'selectConversation': return target.selectConversation(nonEmptyString(args[0], 'Conversation id'));
     case 'sendMessage': return target.sendMessage(
       nonEmptyString(args[0], 'Message prompt'),
@@ -410,12 +410,6 @@ function tokenBudget(value: unknown): number | null | undefined {
   if (value === undefined || value === null) return value;
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
     throw new TypeError('Goal token budget must be a positive number or null');
-  }
-  return value;
-}
-function messageIndex(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-    throw new TypeError('Message index must be a non-negative integer');
   }
   return value;
 }

@@ -5,6 +5,63 @@ import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { generatedPngBase64, FakeTransport, createSurface, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('publishes the authoritative turn identity for an optimistic user prompt', async () => {
+    const { surface } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+
+    await surface.connect();
+    await surface.sendMessage('Begin');
+
+    const appended = events.find((event): event is Extract<CodexSurfaceEvent, { type: 'message.appended' }> => (
+      event.type === 'message.appended' && event.payload.message.role === 'user'
+    ));
+    const updated = events.find((event): event is Extract<CodexSurfaceEvent, { type: 'message.updated' }> => (
+      event.type === 'message.updated' && event.payload.message.role === 'user'
+    ));
+    expect(appended).toMatchObject({
+      type: 'message.appended', conversationId: 'thread-existing',
+    });
+    expect(appended?.payload.message).not.toHaveProperty('turnId');
+    expect(updated).toMatchObject({
+      type: 'message.updated', conversationId: 'thread-existing', turnId: 'turn-live',
+      payload: { message: { id: appended?.payload.message.id, turnId: 'turn-live' } },
+    });
+  });
+
+  it('reconciles a turnless app-server user item with the pending optimistic prompt', async () => {
+    let resolveStart!: (value: { turn: Record<string, unknown> }) => void;
+    const transport = new FakeTransport({
+      'turn/start': () => new Promise((resolve) => { resolveStart = resolve; }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+
+    const sending = surface.sendMessage('One prompt');
+    await vi.waitFor(() => expect(lastRequest(transport, 'turn/start')).toBeDefined());
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing', turnId: 'turn-live', startedAtMs: 1_700_000_000_000,
+        item: {
+          type: 'userMessage', id: 'server-user', clientId: null,
+          content: [{ type: 'text', text: 'One prompt', text_elements: [] }],
+        },
+      },
+    });
+    resolveStart({ turn: turn('turn-live', 'inProgress', []) });
+    await sending;
+
+    expect(surface.getSnapshot().messages.filter((message) => message.role === 'user'
+      && message.parts.some((part) => part.type === 'text' && part.text === 'One prompt'))).toEqual([
+      expect.objectContaining({ turnId: 'turn-live', parts: [{ type: 'text', text: 'One prompt' }] }),
+    ]);
+    expect(events.filter((event) => event.type === 'message.appended'
+      && event.payload.message.role === 'user')).toHaveLength(1);
+  });
+
   it('reports invalid and failed steering without losing the active conversation', async () => {
     const transport = new FakeTransport({
       'turn/steer': () => { throw new Error('steer rejected'); },
@@ -160,7 +217,8 @@ describe('CodexSurface', () => {
     await surface.close();
     expect(transport.close).toHaveBeenCalledOnce();
     expect(surface.getSnapshot()).toMatchObject({
-      status: 'idle', busy: false, approvals: [], clientRequests: [], historyLoading: false,
+      status: 'idle', activeTurnId: null, busy: false,
+      approvals: [], clientRequests: [], historyLoading: false,
     });
     expect(surface.getConversationSnapshot('thread-existing')).toMatchObject({
       activeTurnId: null, busy: false, approvals: [], clientRequests: [],

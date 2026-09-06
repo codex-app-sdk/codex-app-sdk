@@ -27,6 +27,7 @@ import {
 import { errorMessage } from './codex-surface-prompts';
 import { CodexSurfaceExtensionsController } from './codex-surface-extensions-controller';
 import { activeTurnId, ensureAssistantTurnMessage } from './codex-surface-message-state';
+import { surfaceTurn } from './codex-surface-events';
 import { normalizeMcpServers } from './codex-surface-mcp';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
 import {
@@ -266,6 +267,7 @@ export class CodexSurfaceLifecycleController {
         historyMode: response.thread.historyMode ?? 'legacy',
         historyLoading: false,
         activeTurnId: hydratedRuntime.activeTurnId,
+        turns: hydratedRuntime.turns,
         turnIds: hydratedRuntime.turnIds,
         messages: hydratedRuntime.messages,
         loadingStrategy: hydratedRuntime.loadingStrategy,
@@ -368,6 +370,7 @@ export class CodexSurfaceLifecycleController {
         cwd: cwd ?? null,
         historyLoading: false,
         activeTurnId: runningTurnId,
+        turns: turns.map((turn) => surfaceTurn(turn)),
         turnIds: turns.map((turn) => turn.id),
         messages,
         busy: Boolean(runningTurnId) || threadStatus.type === 'active',

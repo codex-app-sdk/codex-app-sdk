@@ -29,6 +29,7 @@ export {
   IconLogs as LogsIcon,
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,
   IconLayoutSidebarLeftExpand as PanelLeftOpenIcon,
+  IconLoader2 as Loader2Icon,
   IconLogout as QuitIcon,
   IconMaximize as Maximize2,
   IconMicrophone as MicrophoneIcon,

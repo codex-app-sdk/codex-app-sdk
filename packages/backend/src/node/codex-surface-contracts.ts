@@ -137,8 +137,8 @@ export type CodexConversation = {
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
   ): Promise<CodexConversationForkResult>;
-  forkMessage(
-    index: number,
+  forkTurn(
+    turnId: string,
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
   ): Promise<CodexConversationForkResult>;
@@ -156,10 +156,9 @@ export type CodexConversation = {
   startReview(options?: StartCodexReviewOptions): Promise<CodexConversationSnapshot>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   interrupt(): Promise<CodexConversationSnapshot>;
-  deleteMessage(index: number): Promise<CodexConversationSnapshot>;
-  editMessage(index: number, content: string): Promise<CodexConversationSnapshot>;
-  retryMessage(index: number): Promise<CodexConversationSnapshot>;
-  rollbackToTurn(turnId: string): Promise<CodexConversationSnapshot>;
+  deleteTurn(turnId: string): Promise<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string): Promise<CodexConversationSnapshot>;
+  retryTurn(turnId: string): Promise<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Promise<CodexConversationSnapshot>;
   updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexConversationSnapshot>;
   steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexConversationSnapshot>;

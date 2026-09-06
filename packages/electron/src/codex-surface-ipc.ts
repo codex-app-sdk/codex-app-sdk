@@ -43,10 +43,10 @@ const channels = {
   connect: 'codex-surface:connect',
   createConversation: 'codex-surface:create-conversation',
   deleteConversation: 'codex-surface:delete-conversation',
-  deleteMessage: 'codex-surface:delete-message',
+  deleteTurn: 'codex-surface:delete-turn',
   deleteQueuedPrompt: 'codex-surface:delete-queued-prompt',
-  editMessage: 'codex-surface:edit-message',
-  forkMessage: 'codex-surface:fork-message',
+  editTurn: 'codex-surface:edit-turn',
+  forkTurn: 'codex-surface:fork-turn',
   getSnapshot: 'codex-surface:get-snapshot',
   interrupt: 'codex-surface:interrupt',
   listConversations: 'codex-surface:list-conversations',
@@ -60,7 +60,7 @@ const channels = {
   renameConversation: 'codex-surface:rename-conversation',
   respondToClientRequest: 'codex-surface:respond-to-client-request',
   resolveApproval: 'codex-surface:resolve-approval',
-  retryMessage: 'codex-surface:retry-message',
+  retryTurn: 'codex-surface:retry-turn',
   setGoal: 'codex-surface:set-goal',
   selectConversation: 'codex-surface:select-conversation',
   sendMessage: 'codex-surface:send-message',
@@ -83,10 +83,10 @@ type SurfaceRequests = {
   [channels.connect]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.createConversation]: IpcRequest<[options?: CreateCodexRendererConversationOptions], CodexSurfaceSnapshot>;
   [channels.deleteConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
-  [channels.deleteMessage]: IpcRequest<[index: number], CodexSurfaceSnapshot>;
+  [channels.deleteTurn]: IpcRequest<[turnId: string], CodexSurfaceSnapshot>;
   [channels.deleteQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
-  [channels.editMessage]: IpcRequest<[index: number, content: string], CodexSurfaceSnapshot>;
-  [channels.forkMessage]: IpcRequest<[index: number], CodexSurfaceSnapshot>;
+  [channels.editTurn]: IpcRequest<[turnId: string, content: string], CodexSurfaceSnapshot>;
+  [channels.forkTurn]: IpcRequest<[turnId: string], CodexSurfaceSnapshot>;
   [channels.getSnapshot]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.interrupt]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.listConversations]: IpcRequest<[
@@ -108,7 +108,7 @@ type SurfaceRequests = {
     decision: CodexSurfaceApprovalDecision,
     scope?: CodexSurfaceApprovalScope,
   ], CodexSurfaceSnapshot>;
-  [channels.retryMessage]: IpcRequest<[index: number], CodexSurfaceSnapshot>;
+  [channels.retryTurn]: IpcRequest<[turnId: string], CodexSurfaceSnapshot>;
   [channels.setGoal]: IpcRequest<[objective: string, tokenBudget?: number | null], CodexSurfaceSnapshot>;
   [channels.selectConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.sendMessage]: IpcRequest<[prompt: string, options?: CodexRendererSendMessageOptions], CodexSurfaceSnapshot>;
@@ -162,10 +162,10 @@ export function registerCodexSurfaceIpc(
     [channels.connect]: (_event, ...args) => invoke('connect', args),
     [channels.createConversation]: (_event, ...args) => invoke('createConversation', args),
     [channels.deleteConversation]: (_event, ...args) => invoke('deleteConversation', args),
-    [channels.deleteMessage]: (_event, ...args) => invoke('deleteMessage', args),
+    [channels.deleteTurn]: (_event, ...args) => invoke('deleteTurn', args),
     [channels.deleteQueuedPrompt]: (_event, ...args) => invoke('deleteQueuedPrompt', args),
-    [channels.editMessage]: (_event, ...args) => invoke('editMessage', args),
-    [channels.forkMessage]: (_event, ...args) => invoke('forkMessage', args),
+    [channels.editTurn]: (_event, ...args) => invoke('editTurn', args),
+    [channels.forkTurn]: (_event, ...args) => invoke('forkTurn', args),
     [channels.getSnapshot]: (_event, ...args) => invoke('getSnapshot', args),
     [channels.interrupt]: (_event, ...args) => invoke('interrupt', args),
     [channels.listConversations]: (_event, ...args) => invoke('listConversations', args),
@@ -179,7 +179,7 @@ export function registerCodexSurfaceIpc(
     [channels.renameConversation]: (_event, ...args) => invoke('renameConversation', args),
     [channels.respondToClientRequest]: (_event, ...args) => invoke('respondToClientRequest', args),
     [channels.resolveApproval]: (_event, ...args) => invoke('resolveApproval', args),
-    [channels.retryMessage]: (_event, ...args) => invoke('retryMessage', args),
+    [channels.retryTurn]: (_event, ...args) => invoke('retryTurn', args),
     [channels.setGoal]: (_event, ...args) => invoke('setGoal', args),
     [channels.selectConversation]: (_event, ...args) => invoke('selectConversation', args),
     [channels.sendMessage]: (_event, ...args) => invoke('sendMessage', args),
@@ -210,10 +210,10 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     connect: () => renderer.invoke(channels.connect),
     createConversation: (options) => renderer.invoke(channels.createConversation, options),
     deleteConversation: (conversationId) => renderer.invoke(channels.deleteConversation, conversationId),
-    deleteMessage: (index) => renderer.invoke(channels.deleteMessage, index),
+    deleteTurn: (turnId) => renderer.invoke(channels.deleteTurn, turnId),
     deleteQueuedPrompt: (promptId) => renderer.invoke(channels.deleteQueuedPrompt, promptId),
-    editMessage: (index, content) => renderer.invoke(channels.editMessage, index, content),
-    forkMessage: (index) => renderer.invoke(channels.forkMessage, index),
+    editTurn: (turnId, content) => renderer.invoke(channels.editTurn, turnId, content),
+    forkTurn: (turnId) => renderer.invoke(channels.forkTurn, turnId),
     getSnapshot: () => renderer.invoke(channels.getSnapshot),
     interrupt: () => renderer.invoke(channels.interrupt),
     listConversations: (options) => renderer.invoke(channels.listConversations, options),
@@ -231,7 +231,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     renameConversation: (title) => renderer.invoke(channels.renameConversation, title),
     respondToClientRequest: (response) => renderer.invoke(channels.respondToClientRequest, response),
     resolveApproval: (approvalId, decision, scope) => renderer.invoke(channels.resolveApproval, approvalId, decision, scope),
-    retryMessage: (index) => renderer.invoke(channels.retryMessage, index),
+    retryTurn: (turnId) => renderer.invoke(channels.retryTurn, turnId),
     setGoal: (objective, tokenBudget) => renderer.invoke(channels.setGoal, objective, tokenBudget),
     selectConversation: (conversationId) => renderer.invoke(channels.selectConversation, conversationId),
     sendMessage: (prompt, options) => renderer.invoke(channels.sendMessage, prompt, options),

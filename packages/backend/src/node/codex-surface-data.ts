@@ -114,12 +114,6 @@ export function surfaceAttachmentPart(attachment: CodexSurfaceAttachment): Surfa
   };
 }
 
-export function messageAt(messages: readonly SurfaceMessage[], index: number): SurfaceMessage {
-  const message = Number.isInteger(index) ? messages[index] : undefined;
-  if (!message) throw new Error(`Unknown message index '${index}'`);
-  return message;
-}
-
 export function messageTurnIdOrNull(message: SurfaceMessage): string | null {
   const metadataTurnId = message.metadata?.turnId;
   return message.turnId ?? (typeof metadataTurnId === 'string' ? metadataTurnId : null);

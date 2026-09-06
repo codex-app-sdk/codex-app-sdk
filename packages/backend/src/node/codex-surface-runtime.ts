@@ -6,6 +6,7 @@ import type {
   CodexConversationLoadingStrategy,
   CodexSurfaceSkill,
   CodexSurfaceThreadStatus,
+  CodexSurfaceTurn,
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface';
 import type { ThreadHistoryMode } from '../codex/generated/v2/ThreadHistoryMode';
@@ -15,6 +16,7 @@ export type ThreadRuntimeState = {
   cwd: string | null;
   hydrated: boolean;
   activeTurnId: string | null;
+  turns: CodexSurfaceTurn[];
   turnIds: string[];
   messages: SurfaceMessage[];
   answeredClientRequestIds: string[];
@@ -58,6 +60,8 @@ export function initialSurfaceSnapshot(authentication: CodexSurfaceAuthenticatio
     authentication,
     conversations: [],
     activeConversationId: null,
+    activeTurnId: null,
+    turns: [],
     messages: [],
     clientRequests: [],
     answeredClientRequestIds: [],
@@ -103,6 +107,7 @@ export function createThreadRuntime(
     cwd: null,
     hydrated: false,
     activeTurnId: null,
+    turns: [],
     turnIds: [],
     messages: [],
     answeredClientRequestIds: [],
@@ -145,6 +150,7 @@ export function runtimeProjection(
   | 'approvalPresets'
   | 'answeredClientRequestIds'
   | 'approvals'
+  | 'activeTurnId'
   | 'busy'
   | 'clientRequests'
   | 'contextUsage'
@@ -163,8 +169,10 @@ export function runtimeProjection(
   | 'skills'
   | 'threadStatus'
   | 'turnGitDiff'
+  | 'turns'
 > {
   return {
+    activeTurnId: runtime.activeTurnId,
     approvalPreset: runtime.approvalPreset,
     approvalPresets: runtime.approvalPresets,
     answeredClientRequestIds: runtime.answeredClientRequestIds,
@@ -192,5 +200,6 @@ export function runtimeProjection(
     skills: runtime.skills,
     threadStatus: runtime.threadStatus,
     turnGitDiff: runtime.turnGitDiff,
+    turns: runtime.turns,
   };
 }

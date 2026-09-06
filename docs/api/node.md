@@ -231,7 +231,7 @@ events.
 - `generateText(prompt, options?)` — runs one read-only ephemeral Codex turn and returns `{ text }` without persisting or projecting a conversation into surface state.
 - `createConversation(options?, hostOptions?)`
 - `forkConversation(sourceId, options?, hostOptions?)` — forks through the latest completed turn and returns `{ conversationId, conversation, snapshot }` without selecting it.
-- `forkConversationAtMessage(sourceId, index, options?, hostOptions?)` — forks through an assistant message, or through the preceding assistant and resubmits a user message.
+- `forkConversationAtTurn(sourceId, turnId, options?, hostOptions?)` — forks through one completed turn by stable ID.
 - `selectConversation(id)`
 - `forgetConversation(id)` — releases local runtime state without changing the app-server thread; the summary remains available and the conversation can be loaded again later.
 - `archiveConversation(id)`
@@ -275,10 +275,10 @@ unsubscribes the ephemeral thread.
 - `startReview(options?)`
 - `steerMessage(prompt, options?)`
 - `interrupt()`
-- `deleteMessage(index)`
-- `editMessage(index, content)`
-- `retryMessage(index)`
-- `forkMessage(index)` — forks the active conversation at a message and selects the new conversation.
+- `deleteTurn(turnId)`
+- `editTurn(turnId, content)`
+- `retryTurn(turnId)`
+- `forkTurn(turnId)` — forks the active conversation through a completed turn and selects the new conversation.
 - queued-prompt actions: `deleteQueuedPrompt(id)`,
   `updateQueuedPrompt(id, prompt)`, and `steerQueuedPrompt(id, prompt?)`
 - approval and app-server client-request responses
@@ -295,8 +295,8 @@ type CodexConversation = {
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
   ): Promise<CodexConversationForkResult>;
-  forkMessage(
-    index: number,
+  forkTurn(
+    turnId: string,
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
   ): Promise<CodexConversationForkResult>;
@@ -314,7 +314,9 @@ type CodexConversation = {
   startReview(options?: StartCodexReviewOptions): Promise<CodexConversationSnapshot>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   interrupt(): Promise<CodexConversationSnapshot>;
-  rollbackToTurn(turnId: string): Promise<CodexConversationSnapshot>;
+  deleteTurn(turnId: string): Promise<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string): Promise<CodexConversationSnapshot>;
+  retryTurn(turnId: string): Promise<CodexConversationSnapshot>;
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   getSnapshot(): CodexConversationSnapshot;
   onStateChange(listener): () => void;
@@ -336,10 +338,8 @@ type CodexConversationForkResult = {
 ```
 
 Omitted fork overrides inherit from the source app-server thread. A latest-state
-fork requires an idle source; a message fork may target a completed boundary
-before an active turn. Assistant messages fork through their turn. User
-messages fork through the preceding assistant turn and are submitted as the
-new fork's first prompt, including their attachments. The new conversation is
+fork requires an idle source; a turn fork may target a completed boundary
+before an active turn. The new conversation is
 fully usable immediately, but the surface's current selection remains unchanged
 until the host calls `result.conversation.select()`.
 

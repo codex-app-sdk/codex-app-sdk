@@ -5,6 +5,7 @@ import type {
   CodexSurfaceSnapshot,
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface';
+import { upsertSurfaceTurn } from './codex-surface-events';
 import { CodexSurfaceApprovalsController } from './codex-surface-approvals-controller';
 import { CodexSurfaceClientRequestsController } from './codex-surface-client-requests-controller';
 import {
@@ -255,6 +256,15 @@ export class CodexSurfaceRuntimeController {
     runtime.busy = true;
     runtime.turnStartPending = false;
     if (!runtime.turnIds.includes(turnId)) runtime.turnIds.push(turnId);
+    runtime.turns = upsertSurfaceTurn(runtime.turns, {
+      id: turnId,
+      status: 'inProgress',
+      error: null,
+      willRetry: false,
+      startedAt: null,
+      completedAt: null,
+      durationMs: null,
+    });
   }
 
   patchConversationStatus(

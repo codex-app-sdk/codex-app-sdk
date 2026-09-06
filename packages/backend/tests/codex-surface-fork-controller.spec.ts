@@ -282,81 +282,32 @@ describe('CodexSurfaceForkController', () => {
     expect(setup.host.hydrateCompleteHistory).not.toHaveBeenCalled();
   });
 
-  it('forks an assistant message at its turn without resending content', async () => {
+  it('forks a known turn by stable id without resending content', async () => {
     const setup = createController({ messages: [assistantMessage('assistant', 'turn-2', 'Answer')] });
     const fork = vi.spyOn(setup.controller, 'fork').mockResolvedValue('forked');
 
-    await expect(setup.controller.forkMessage('source', 0, { model: 'requested' }, { cwd: '/host' }))
+    await expect(setup.controller.forkTurn('source', 'turn-2', { model: 'requested' }, { cwd: '/host' }))
       .resolves.toBe('forked');
 
     expect(fork).toHaveBeenCalledExactlyOnceWith(
       'source', { model: 'requested' }, { cwd: '/host' }, { lastTurnId: 'turn-2' },
     );
-    expect(setup.host.sendMessageToThread).not.toHaveBeenCalled();
   });
 
-  it('forks a user message after its nearest preceding assistant and resends attachments', async () => {
-    const attachment = attachmentPart();
-    const setup = createController({ messages: [
-      assistantMessage('assistant-1', 'turn-1', 'First'),
-      assistantMessage('assistant-2', 'turn-2', 'Second'),
-      userMessage('user', 'turn-3', ' Continue ', [attachment]),
-    ] });
+  it('forks a user-owned turn through that complete turn', async () => {
+    const setup = createController({ messages: [userMessage('user', 'turn-3', 'Continue')] });
     const fork = vi.spyOn(setup.controller, 'fork').mockResolvedValue('forked');
 
-    await setup.controller.forkMessage('source', 2);
+    await setup.controller.forkTurn('source', 'turn-3');
 
-    expect(fork).toHaveBeenCalledWith('source', {}, {}, { lastTurnId: 'turn-2' });
-    expect(setup.host.sendMessageToThread).toHaveBeenCalledExactlyOnceWith(
-      'forked', 'Continue', { attachments: [{ type: 'file', name: 'notes.txt', path: '/notes.txt' }] },
-    );
+    expect(fork).toHaveBeenCalledWith('source', {}, {}, { lastTurnId: 'turn-3' });
   });
 
-  it('skips non-assistants and unassociated assistants when finding the fork boundary', async () => {
-    const setup = createController({ messages: [
-      assistantMessage('associated', 'turn-1', 'First'),
-      { ...userMessage('system', 'system-turn', 'System'), role: 'system' },
-      unassociatedAssistantMessage('unassociated', 'Draft'),
-      userMessage('user', 'turn-2', 'Continue'),
-    ] });
-    const fork = vi.spyOn(setup.controller, 'fork').mockResolvedValue('forked');
-
-    await setup.controller.forkMessage('source', 3);
-
-    expect(fork).toHaveBeenCalledWith('source', {}, {}, { lastTurnId: 'turn-1' });
-  });
-
-  it('omits the attachments option when resending a text-only user message', async () => {
-    const setup = createController({ messages: [userMessage('user', 'turn-1', 'Continue')] });
-    vi.spyOn(setup.controller, 'fork').mockResolvedValue('forked');
-
-    await setup.controller.forkMessage('source', 0);
-
-    expect(setup.host.sendMessageToThread).toHaveBeenCalledExactlyOnceWith('forked', 'Continue', {});
-  });
-
-  it('forks the first user message before its turn and supplies a prompt for attachment-only input', async () => {
-    const setup = createController({ messages: [
-      userMessage('user', 'turn-1', '', [attachmentPart()]),
-    ] });
-    const fork = vi.spyOn(setup.controller, 'fork').mockResolvedValue('forked');
-
-    await setup.controller.forkMessage('source', 0);
-
-    expect(fork).toHaveBeenCalledWith('source', {}, {}, { beforeTurnId: 'turn-1' });
-    expect(setup.host.sendMessageToThread).toHaveBeenCalledWith(
-      'forked', '(no user instructions)', { attachments: [{ type: 'file', name: 'notes.txt', path: '/notes.txt' }] },
-    );
-  });
-
-  it('rejects empty user and non-message fork targets', async () => {
-    const empty = createController({ messages: [userMessage('user', 'turn-1', '')] });
-    await expect(empty.controller.forkMessage('source', 0)).rejects.toThrow('Cannot fork an empty user message');
-    expect(empty.request).not.toHaveBeenCalled();
-
-    const system = createController({ messages: [{ ...userMessage('system', 'turn-1', 'System'), role: 'system' }] });
-    await expect(system.controller.forkMessage('source', 0))
-      .rejects.toThrow('Only user and assistant messages can be forked');
+  it('rejects unknown turn ids before requesting a fork', async () => {
+    const setup = createController({ messages: [userMessage('user', 'turn-1', 'Prompt')] });
+    await expect(setup.controller.forkTurn('source', 'missing'))
+      .rejects.toThrow("Cannot fork at unknown Codex turn 'missing'");
+    expect(setup.request).not.toHaveBeenCalled();
   });
 });
 
@@ -385,6 +336,7 @@ function createController(options: SetupOptions = {}) {
     busy: options.busy ?? false,
     cwd: options.sourceCwd === undefined ? '/source' : options.sourceCwd,
     messages: options.messages ?? [],
+    turnIds: [...new Set((options.messages ?? []).flatMap((message) => message.turnId ? [message.turnId] : []))],
     selectedModelId: options.selectedModelId ?? null,
   });
   const runtimes = new Map([['source', sourceRuntime]]);
@@ -435,7 +387,6 @@ function createController(options: SetupOptions = {}) {
       if (!runtime) throw new Error(`missing ${threadId}`);
       return runtime;
     }),
-    sendMessageToThread: vi.fn(async () => undefined),
     snapshotForRuntime: vi.fn(() => state),
   };
   const controller = new CodexSurfaceForkController(
@@ -531,20 +482,6 @@ function assistantMessage(id: string, turnId: string, text: string): SurfaceMess
   return {
     id, role: 'assistant', status: 'complete', turnId, parts: [{ type: 'text', text }],
     metadata: { conversationId: 'source', turnId },
-  };
-}
-
-function unassociatedAssistantMessage(id: string, text: string): SurfaceMessage {
-  return {
-    id, role: 'assistant', status: 'complete', parts: [{ type: 'text', text }],
-    metadata: { conversationId: 'source' },
-  };
-}
-
-function attachmentPart() {
-  return {
-    type: 'attachment' as const,
-    attachment: { kind: 'file' as const, name: 'notes.txt', path: '/notes.txt', size: 5 },
   };
 }
 

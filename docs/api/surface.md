@@ -11,6 +11,8 @@ type CodexSurfaceSnapshot = {
   authentication: CodexSurfaceAuthentication;
   conversations: CodexConversationSummary[];
   activeConversationId: string | null;
+  activeTurnId: string | null;
+  turns: CodexSurfaceTurn[];
   messages: SurfaceMessage[];
   clientRequests: CodexSurfaceClientRequest[];
   answeredClientRequestIds: string[];
@@ -41,8 +43,15 @@ type CodexSurfaceSnapshot = {
 };
 ```
 
-`CodexConversationSnapshot` adds a non-null conversation ID, `activeTurnId`, and
-all known turn IDs.
+`turns` is the authoritative lifecycle projection for every materialized turn.
+Each entry carries its stable ID, `inProgress` or terminal status, structured
+error, retry intent, timestamps, and duration. `activeTurnId` identifies the
+single currently running turn without requiring renderers to infer lifecycle
+from message streaming flags.
+
+`CodexConversationSnapshot` narrows the conversation ID to non-null and adds
+`turnIds`, the chronological IDs of all turns known to that conversation
+runtime. The `turns` array follows that same chronological order.
 
 Conversation summaries include optional `sessionId`, `parentConversationId`,
 `agentNickname`, and `agentRole` fields for hosts that present app-server

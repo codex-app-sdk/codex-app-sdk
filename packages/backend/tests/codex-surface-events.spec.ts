@@ -3,10 +3,12 @@ import {
   createMessageId,
   createQueuedPromptId,
   sameValue,
+  surfaceTurn,
   surfaceTurnError,
   threadItemKey,
   timestampToIso,
   timestampToIsoOrNull,
+  upsertSurfaceTurn,
 } from '../src/node/codex-surface-events';
 
 describe('Codex surface event values', () => {
@@ -49,6 +51,35 @@ describe('Codex surface event values', () => {
     })).toStrictEqual({
       message: 'Stopped', additionalDetails: 'Details', codexErrorInfo,
     });
+  });
+
+  it('projects complete turn lifecycle data and replaces updates without reordering turns', () => {
+    const projected = surfaceTurn({
+      id: 'turn-2',
+      status: 'failed',
+      items: [],
+      itemsView: 'full',
+      error: {
+        message: 'Stopped', additionalDetails: null, codexErrorInfo: null, misalignment: null,
+      },
+      startedAt: 1,
+      completedAt: 2,
+      durationMs: 1_000,
+    });
+    expect(projected).toStrictEqual({
+      id: 'turn-2',
+      status: 'failed',
+      error: { message: 'Stopped', additionalDetails: null, codexErrorInfo: null },
+      willRetry: false,
+      startedAt: '1970-01-01T00:00:01.000Z',
+      completedAt: '1970-01-01T00:00:02.000Z',
+      durationMs: 1_000,
+    });
+
+    const first = { ...projected, id: 'turn-1', status: 'completed' as const };
+    expect(upsertSurfaceTurn([first, { ...projected, status: 'inProgress' }], projected))
+      .toStrictEqual([first, projected]);
+    expect(upsertSurfaceTurn([first], projected)).toStrictEqual([first, projected]);
   });
 
   it('compares values using the serialized event contract', () => {

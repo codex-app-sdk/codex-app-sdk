@@ -24,13 +24,15 @@
         v-if="started"
         class="codex-conversation-pane__messages"
         :actions-disabled="effectiveActionsDisabled"
+        :active-turn-id="effectiveActiveTurnId"
         :answered-client-request-ids="effectiveAnsweredClientRequestIds"
         :aria-label="ariaLabel"
         :busy="effectiveBusy"
-        :can-delete-message="effectiveCanDeleteMessage"
-        :can-edit-message="effectiveCanEditMessage"
-        :can-fork-message="effectiveCanForkMessage"
-        :can-retry-message="effectiveCanRetryMessage"
+        :can-delete-turn="effectiveCanDeleteTurn"
+        :can-edit-turn="effectiveCanEditTurn"
+        :can-fork-turn="effectiveCanForkTurn"
+        :can-retry-turn="effectiveCanRetryTurn"
+        :deleting-turn-id="deletingTurnId"
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
         :has-older-messages="effectiveHasOlderHistory"
@@ -48,17 +50,18 @@
         :show-tool-details="showToolDetails"
         :skills="effectiveSkills"
         :transform-message="transformMessage"
+        :turns="effectiveTurns"
         @cancel="cancel"
         @client-response="respondToClientRequest"
         @copy-message="copyMessage"
-        @delete-message="deleteMessage"
-        @edit-message="editMessage"
-        @fork-message="forkMessage"
+        @delete-turn="deleteTurn"
+        @edit-turn="editTurn"
+        @fork-turn="forkTurn"
         @load-older-messages="loadOlderHistory"
         @open-link="handleConversationLink"
         @open-visualization="handleVisualization"
         @quote-message="quoteMessage"
-        @retry-message="retryMessage"
+        @retry-turn="retryTurn"
         @send-follow-up="sendFollowUp"
       >
         <template v-if="$slots.message" #message="scope"><slot name="message" v-bind="scope" /></template>
@@ -224,6 +227,7 @@ import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfacePlugin,
+  CodexSurfaceTurn,
   SurfaceMessage,
   CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/core/surface';
@@ -293,6 +297,7 @@ import CodexWorkbenchLayout from './CodexWorkbenchLayout.vue';
 const props = withDefaults(defineProps<{
   ariaLabel?: string;
   actionsDisabled?: boolean;
+  activeTurnId?: string | null;
   answeredClientRequestIds?: ReadonlySet<string>;
   approvals?: readonly CodexSurfaceApproval[];
   approvalPresets?: readonly ApprovalPreset[];
@@ -303,10 +308,10 @@ const props = withDefaults(defineProps<{
   /** Controlled state/actions adapter. When supplied, it takes precedence over legacy props and surface state. */
   controller?: CodexConversationPaneControllerSource<Payload>;
   busy?: boolean;
-  canDeleteMessage?: boolean;
-  canEditMessage?: boolean;
-  canForkMessage?: boolean;
-  canRetryMessage?: boolean;
+  canDeleteTurn?: boolean;
+  canEditTurn?: boolean;
+  canForkTurn?: boolean;
+  canRetryTurn?: boolean;
   commands?: readonly CodexCommandSummary[];
   composerState?: CodexComposerState;
   contextUsage?: CodexContextUsage | null;
@@ -331,6 +336,7 @@ const props = withDefaults(defineProps<{
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   mentionGroups?: readonly CodexComposerMentionGroup<Payload>[];
   messages?: readonly (Message | SurfaceMessage)[];
+  turns?: readonly CodexSurfaceTurn[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
   modelValue?: string;
@@ -364,10 +370,10 @@ const props = withDefaults(defineProps<{
   escapeInterrupt: true,
   autofocus: false,
   busy: undefined,
-  canDeleteMessage: true,
-  canEditMessage: true,
-  canForkMessage: false,
-  canRetryMessage: true,
+  canDeleteTurn: true,
+  canEditTurn: true,
+  canForkTurn: false,
+  canRetryTurn: true,
   disabled: undefined,
   emptyDescription: '',
   emptyTitle: 'Start a conversation with Codex',
@@ -438,12 +444,12 @@ const emit = defineEmits<{
   clientResponse: [response: ClientRequestResponse];
   copyMessage: [index: number];
   clearGoal: [];
-  deleteMessage: [index: number];
+  deleteTurn: [turnId: string];
   deleteQueuedPrompt: [promptId: string];
   updateQueuedPrompt: [promptId: string, prompt: string];
   editGoal: [];
-  editMessage: [payload: { content: string; index: number }];
-  forkMessage: [index: number];
+  editTurn: [payload: { content: string; turnId: string }];
+  forkTurn: [turnId: string];
   loadOlderHistory: [];
   error: [message: string | null];
   interrupt: [];
@@ -457,7 +463,7 @@ const emit = defineEmits<{
     scope: CodexSurfaceApprovalScope,
   ];
   quoteMessage: [index: number];
-  retryMessage: [index: number];
+  retryTurn: [turnId: string];
   selectApprovalPreset: [preset: ApprovalPreset];
   sendFollowUp: [prompt: string];
   submit: [prompt: string, options?: CodexRendererSendMessageOptions];
@@ -511,6 +517,8 @@ const initialComposerState = normalizeCodexComposerState(effectiveComposerState.
 const localComposerState = ref<CodexComposerState>(initialComposerState);
 const localDraft = ref(initialComposerState.text);
 const editingQueuedPromptId = ref<string | null>(null);
+const deletingTurnId = ref<string | null>(null);
+let deleteOperation = 0;
 const localError = ref<string | null>(null);
 const selectedAttachments = ref<CodexHostAttachment[]>([...effectiveAttachments.value]);
 const promptHistoryByConversation = new Map<string | number, readonly string[]>();
@@ -520,6 +528,14 @@ let promptHistoryRequest = 0;
 const effectiveMessages = computed(() => controlledValue(
   (state) => state.identity.messages,
   () => props.messages ?? surfaceState.value?.messages ?? [],
+));
+const effectiveActiveTurnId = computed(() => controlledValue(
+  (state) => state.identity.activeTurnId,
+  () => (props.activeTurnId !== undefined ? props.activeTurnId : surfaceState.value?.activeTurnId),
+));
+const effectiveTurns = computed(() => controlledValue(
+  (state) => state.identity.turns,
+  () => props.turns ?? surfaceState.value?.turns ?? [],
 ));
 const visiblePromptHistory = computed(() => effectiveMessages.value.flatMap((message) => {
   const chatMessage = chatMessageFromInput(message);
@@ -687,21 +703,21 @@ const effectivePlaceholder = computed(() => controlledValue(
   (state) => state.composer?.placeholder,
   () => props.placeholder,
 ) ?? 'Ask Codex…');
-const effectiveCanDeleteMessage = computed(() => controlledValue(
-  (state) => state.policy?.canDeleteMessage ?? true,
-  () => props.canDeleteMessage,
+const effectiveCanDeleteTurn = computed(() => controlledValue(
+  (state) => state.policy?.canDeleteTurn ?? true,
+  () => props.canDeleteTurn,
 ));
-const effectiveCanEditMessage = computed(() => controlledValue(
-  (state) => state.policy?.canEditMessage ?? true,
-  () => props.canEditMessage,
+const effectiveCanEditTurn = computed(() => controlledValue(
+  (state) => state.policy?.canEditTurn ?? true,
+  () => props.canEditTurn,
 ));
-const effectiveCanForkMessage = computed(() => controlledValue(
-  (state) => state.policy?.canForkMessage ?? false,
-  () => props.canForkMessage,
+const effectiveCanForkTurn = computed(() => controlledValue(
+  (state) => state.policy?.canForkTurn ?? false,
+  () => props.canForkTurn,
 ));
-const effectiveCanRetryMessage = computed(() => controlledValue(
-  (state) => state.policy?.canRetryMessage ?? true,
-  () => props.canRetryMessage,
+const effectiveCanRetryTurn = computed(() => controlledValue(
+  (state) => state.policy?.canRetryTurn ?? true,
+  () => props.canRetryTurn,
 ));
 const effectiveActionsDisabled = computed(() => (
   controlledValue((state) => state.policy?.actionsDisabled ?? false, () => props.actionsDisabled ?? false)
@@ -741,6 +757,8 @@ watch(effectiveAttachEnabled, (enabled) => {
 });
 
 watch(effectiveConversationKey, () => {
+  deleteOperation += 1;
+  deletingTurnId.value = null;
   clearEscapeInterruptArm();
   editingQueuedPromptId.value = null;
   localError.value = null;
@@ -755,6 +773,16 @@ watch(effectiveConversationKey, () => {
   ));
   localComposerState.value = incoming;
   localDraft.value = incoming.text;
+});
+
+watch([effectiveMessages, effectiveTurns], () => {
+  const turnId = deletingTurnId.value;
+  if (!turnId) return;
+  const turnStillPresent = effectiveTurns.value?.some((turn) => turn.id === turnId)
+    || effectiveMessages.value.some((message) => chatMessageFromInput(message).turnId === turnId);
+  if (turnStillPresent) return;
+  deleteOperation += 1;
+  deletingTurnId.value = null;
 });
 
 watch(effectiveQueuedPrompts, (prompts) => {
@@ -1058,32 +1086,59 @@ function copyMessage(index: number): void {
   emit('copyMessage', index);
 }
 
-function deleteMessage(index: number): void {
-  if (dispatchControllerAction('deleteMessage', index)) return;
-  if (effectiveController.value) return;
-  emit('deleteMessage', index);
-  if (props.surface) void runSurfaceAction(() => props.surface!.deleteMessage(index));
+async function deleteTurn(turnId: string): Promise<void> {
+  if (deletingTurnId.value !== null) return;
+  const controlledAction = effectiveControllerActions.value?.deleteTurn;
+  if (effectiveController.value && !controlledAction) return;
+
+  const operation = ++deleteOperation;
+  let waitForControlledState = false;
+  deletingTurnId.value = turnId;
+  try {
+    if (controlledAction) {
+      localError.value = null;
+      let result: void | Promise<void>;
+      try {
+        result = controlledAction(turnId);
+      } catch (error) {
+        setLocalError(error);
+        return;
+      }
+      if (result === undefined) {
+        waitForControlledState = true;
+        return;
+      }
+      await runSurfaceAction(() => result);
+      return;
+    }
+    emit('deleteTurn', turnId);
+    if (props.surface) {
+      await runSurfaceAction(() => props.surface!.deleteTurn(turnId));
+    }
+  } finally {
+    if (!waitForControlledState && deleteOperation === operation) deletingTurnId.value = null;
+  }
 }
 
-function editMessage(payload: { content: string; index: number }): void {
-  if (dispatchControllerAction('editMessage', payload)) return;
+function editTurn(payload: { content: string; turnId: string }): void {
+  if (dispatchControllerAction('editTurn', payload)) return;
   if (effectiveController.value) return;
-  emit('editMessage', payload);
-  if (props.surface) void runSurfaceAction(() => props.surface!.editMessage(payload.index, payload.content));
+  emit('editTurn', payload);
+  if (props.surface) void runSurfaceAction(() => props.surface!.editTurn(payload.turnId, payload.content));
 }
 
-function forkMessage(index: number): void {
-  if (dispatchControllerAction('forkMessage', index)) return;
+function forkTurn(turnId: string): void {
+  if (dispatchControllerAction('forkTurn', turnId)) return;
   if (effectiveController.value) return;
-  emit('forkMessage', index);
-  if (props.surface) void runSurfaceAction(() => props.surface!.forkMessage(index));
+  emit('forkTurn', turnId);
+  if (props.surface) void runSurfaceAction(() => props.surface!.forkTurn(turnId));
 }
 
-function retryMessage(index: number): void {
-  if (dispatchControllerAction('retryMessage', index)) return;
+function retryTurn(turnId: string): void {
+  if (dispatchControllerAction('retryTurn', turnId)) return;
   if (effectiveController.value) return;
-  emit('retryMessage', index);
-  if (props.surface) void runSurfaceAction(() => props.surface!.retryMessage(index));
+  emit('retryTurn', turnId);
+  if (props.surface) void runSurfaceAction(() => props.surface!.retryTurn(turnId));
 }
 
 function sendFollowUp(prompt: string): void {

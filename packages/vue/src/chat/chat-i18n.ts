@@ -10,6 +10,7 @@ const templates: Record<string, string> = {
   'chat.actions.copied': 'Copied',
   'chat.actions.copy': 'Copy',
   'chat.actions.delete': 'Delete',
+  'chat.actions.deleting': 'Deleting',
   'chat.actions.edit': 'Edit',
   'chat.actions.editPrompt': 'Edit prompt',
   'chat.actions.fork': 'Fork',

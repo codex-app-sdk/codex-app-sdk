@@ -165,6 +165,15 @@ describe('CodexSurfaceMessagesController', () => {
       type: 'message.appended', conversationId: 'thread-1', payload: { message: expect.objectContaining({ role: 'user' }) },
     });
     expect(setup.host.emitEvent).toHaveBeenNthCalledWith(2, 'action', {
+      type: 'message.updated', conversationId: 'thread-1', turnId: 'turn-new',
+      payload: {
+        message: expect.objectContaining({
+          role: 'user', turnId: 'turn-new',
+          metadata: expect.objectContaining({ turnId: 'turn-new' }),
+        }),
+      },
+    });
+    expect(setup.host.emitEvent).toHaveBeenNthCalledWith(3, 'action', {
       type: 'turn.started', conversationId: 'thread-1', turnId: 'turn-new',
       payload: { startedAt: '2023-11-14T22:13:20.000Z' },
     });
@@ -186,7 +195,7 @@ describe('CodexSurfaceMessagesController', () => {
     expect(setup.host.emitConversationActivity).toHaveBeenNthCalledWith(2, 'thread-1', 'action');
   });
 
-  it('settles immediately completed and previously known turns without assistant or duplicate event', async () => {
+  it('settles immediately completed and previously known turns without assistant or duplicate turn event', async () => {
     const setup = messagesController();
     setup.runtime.turnIds = ['turn-done'];
     setup.client.request.mockResolvedValueOnce({ turn: codexTurn('turn-done', 'completed') });
@@ -196,14 +205,18 @@ describe('CodexSurfaceMessagesController', () => {
     expect(setup.runtime.messages).toHaveLength(1);
     expect(setup.runtime.messages[0]).toMatchObject({ role: 'user', turnId: 'turn-done' });
     expect(setup.host.patchConversationStatus).toHaveBeenLastCalledWith('thread-1', 'idle', 'action');
-    expect(setup.host.emitEvent).toHaveBeenCalledTimes(1);
+    expect(setup.host.emitEvent).toHaveBeenCalledTimes(2);
+    expect(setup.host.emitEvent).toHaveBeenLastCalledWith('action', {
+      type: 'message.updated', conversationId: 'thread-1', turnId: 'turn-done',
+      payload: { message: expect.objectContaining({ role: 'user', turnId: 'turn-done' }) },
+    });
     expect(setup.host.patchConversationTurnCount).toHaveBeenCalledWith('thread-1', 1, 'action');
 
     const unknown = messagesController();
     unknown.client.request.mockResolvedValueOnce({ turn: codexTurn('turn-done', 'completed') });
     await unknown.controller.sendPromptToThread('thread-1', 'Also quick');
     expect(unknown.runtime.turnIds).toStrictEqual(['turn-done']);
-    expect(unknown.host.emitEvent).toHaveBeenCalledTimes(1);
+    expect(unknown.host.emitEvent).toHaveBeenCalledTimes(2);
     expect(unknown.host.emitEvent).not.toHaveBeenCalledWith('action', expect.objectContaining({
       type: 'turn.started',
     }));

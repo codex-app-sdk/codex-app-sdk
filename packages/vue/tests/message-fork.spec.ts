@@ -12,6 +12,7 @@ import {
 
 const assistantMessage: SurfaceMessage = {
   id: 'assistant-fork',
+  turnId: 'turn-fork',
   role: 'assistant',
   status: 'complete',
   parts: [{ type: 'text', text: 'Fork from here.' }],
@@ -20,7 +21,7 @@ const assistantMessage: SurfaceMessage = {
 describe('message fork action', () => {
   it('stays opt-in and renders immediately before delete', async () => {
     const wrapper = mount(CodexMessage, {
-      props: { canForkMessage: true, index: 3, message: assistantMessage },
+      props: { canForkTurn: true, index: 3, message: assistantMessage },
     });
 
     const actionLabels = wrapper.findAll('.chat-message-actions button')
@@ -32,37 +33,37 @@ describe('message fork action', () => {
     expect(icon.classes()).toContain('chat-message-actions__fork-icon');
 
     await wrapper.get('[aria-label="Fork"]').trigger('click');
-    expect(wrapper.emitted('fork-message')).toStrictEqual([[3]]);
+    expect(wrapper.emitted('fork-turn')).toStrictEqual([['turn-fork']]);
 
-    await wrapper.setProps({ canForkMessage: false });
+    await wrapper.setProps({ canForkTurn: false });
     expect(wrapper.find('[aria-label="Fork"]').exists()).toBe(false);
   });
 
-  it('forwards the granular pane event with the absolute message index', async () => {
+  it('forwards the granular pane event with the stable turn id', async () => {
     const wrapper = mount(CodexConversationPane, {
-      props: { canForkMessage: true, messages: [assistantMessage], modelValue: '' },
+      props: { canForkTurn: true, messages: [assistantMessage], modelValue: '' },
     });
 
     await wrapper.get('[aria-label="Fork"]').trigger('click');
 
-    expect(wrapper.emitted('forkMessage')).toStrictEqual([[0]]);
+    expect(wrapper.emitted('forkTurn')).toStrictEqual([['turn-fork']]);
   });
 
   it('dispatches through an authoritative controlled pane action', async () => {
-    const forkMessage = vi.fn();
+    const forkTurn = vi.fn();
     const state: CodexConversationPaneState = {
       identity: { conversationKey: 'thread-fork', messages: [assistantMessage] },
-      policy: { canForkMessage: true },
+      policy: { canForkTurn: true },
     };
     const controller = createCodexConversationPaneController({
       state,
-      actions: { forkMessage },
+      actions: { forkTurn },
     });
     const wrapper = mount(CodexConversationPane, { props: { controller } });
 
     await wrapper.get('[aria-label="Fork"]').trigger('click');
 
-    expect(forkMessage).toHaveBeenCalledWith(0);
-    expect(wrapper.emitted('forkMessage')).toBeUndefined();
+    expect(forkTurn).toHaveBeenCalledWith('turn-fork');
+    expect(wrapper.emitted('forkTurn')).toBeUndefined();
   });
 });

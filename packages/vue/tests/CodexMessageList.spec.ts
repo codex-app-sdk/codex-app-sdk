@@ -6,7 +6,7 @@ import { defineComponent, h, ref, toRaw } from 'vue';
 import CodexMessageList from '../src/components/CodexMessageList.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
 import type { Message } from '../src/chat/types';
-import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
+import type { CodexSurfaceTurn, SurfaceMessage } from '@codex-app-sdk/core/surface';
 
 const messages: Message[] = [
   {
@@ -42,6 +42,18 @@ function makeMessages(count: number, offset = 0): Message[] {
     content: `Message ${offset + index}`,
     createdAt: `2026-06-05T00:00:${String(index).padStart(2, '0')}.000Z`,
   }));
+}
+
+function turnLifecycle(id: string, status: CodexSurfaceTurn['status']): CodexSurfaceTurn {
+  return {
+    id,
+    status,
+    error: null,
+    willRetry: false,
+    startedAt: null,
+    completedAt: status === 'inProgress' ? null : '2026-06-05T00:00:01.000Z',
+    durationMs: status === 'inProgress' ? null : 1_000,
+  };
 }
 
 afterEach(() => {
@@ -178,6 +190,13 @@ describe('CodexMessageList', () => {
   });
 
   it('renders one work disclosure across assistant segments in the same steered turn', async () => {
+    const initialUserMessage: SurfaceMessage = {
+      id: 'user-turn-1',
+      role: 'user',
+      status: 'complete',
+      turnId: 'turn-1',
+      parts: [{ type: 'text', text: 'Run the full test.' }],
+    };
     const firstToolSegment: SurfaceMessage = {
       id: 'assistant-turn-1',
       role: 'assistant',
@@ -192,6 +211,7 @@ describe('CodexMessageList', () => {
       }],
     };
     const turnMessages: SurfaceMessage[] = [
+      initialUserMessage,
       {
         ...firstToolSegment,
         status: 'complete',
@@ -239,8 +259,12 @@ describe('CodexMessageList', () => {
         }],
       },
     ];
-    const wrapper = mount(CodexMessageList, { props: { busy: true, messages: [firstToolSegment] } });
+    const wrapper = mount(CodexMessageList, {
+      props: { busy: true, messages: [initialUserMessage, firstToolSegment] },
+    });
 
+    expect(wrapper.findAll('.codex-message-turn')).toHaveLength(1);
+    expect(wrapper.text()).toContain('Run the full test.');
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
     expect(wrapper.get('.chat-work-group .chat-fold').classes()).toContain('chat-fold--open');
 
@@ -275,7 +299,7 @@ describe('CodexMessageList', () => {
     expect(wrapper.text()).toContain('The turn is complete.');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
-    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(2);
 
     await wrapper.get('.chat-work-group__header').trigger('click');
 
@@ -285,7 +309,7 @@ describe('CodexMessageList', () => {
     expect(wrapper.text()).toContain('Verifying the shared turn state.');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(3);
-    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(2);
   });
 
   it('keeps the current turn working while busy before its next assistant segment arrives', () => {
@@ -316,6 +340,26 @@ describe('CodexMessageList', () => {
       .toStrictEqual(['Working']);
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(1);
     expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+  });
+
+  it('uses the explicit active turn instead of inferring lifecycle from global busy state', () => {
+    const workMessage: SurfaceMessage = {
+      id: 'explicit-turn-work',
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'turn-explicit',
+      parts: [{ type: 'text', text: 'Checking.', phase: 'commentary' }],
+    };
+    const active = mount(CodexMessageList, {
+      props: { activeTurnId: 'turn-explicit', busy: false, messages: [workMessage] },
+    });
+    const idle = mount(CodexMessageList, {
+      props: { activeTurnId: null, busy: true, messages: [workMessage] },
+    });
+
+    expect(active.get('.chat-work-group__title').text()).toBe('Working');
+    expect(idle.find('.chat-work-group__title').exists()).toBe(false);
+    expect(idle.text()).toContain('Checking.');
   });
 
   it('keeps unphased streaming text and tools on the flat rendering path', () => {
@@ -614,9 +658,9 @@ describe('CodexMessageList', () => {
   it('forwards provider capability flags to message actions', () => {
     const wrapper = mount(CodexMessageList, {
       props: {
-        canDeleteMessage: false,
-        canEditMessage: false,
-        canRetryMessage: false,
+        canDeleteTurn: false,
+        canEditTurn: false,
+        canRetryTurn: false,
         messages,
       },
     });
@@ -626,6 +670,92 @@ describe('CodexMessageList', () => {
     expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(false);
+  });
+
+  it('offers turn mutations on every terminal turn but not the active turn', async () => {
+    const turnMessages: SurfaceMessage[] = [
+      { id: 'old-user', role: 'user', status: 'complete', turnId: 'turn-old', parts: [{ type: 'text', text: 'Old' }] },
+      { id: 'old-answer', role: 'assistant', status: 'complete', turnId: 'turn-old', parts: [{ type: 'text', text: 'Old answer' }] },
+      { id: 'latest-user', role: 'user', status: 'complete', turnId: 'turn-latest', parts: [{ type: 'text', text: 'Latest' }] },
+      { id: 'latest-answer', role: 'assistant', status: 'complete', turnId: 'turn-latest', parts: [{ type: 'text', text: 'Latest answer' }] },
+      { id: 'active-user', role: 'user', status: 'complete', turnId: 'turn-active', parts: [{ type: 'text', text: 'Active' }] },
+      { id: 'active-answer', role: 'assistant', status: 'streaming', turnId: 'turn-active', parts: [] },
+    ];
+    const turns: CodexSurfaceTurn[] = [
+      turnLifecycle('turn-old', 'completed'),
+      turnLifecycle('turn-latest', 'completed'),
+      turnLifecycle('turn-active', 'inProgress'),
+    ];
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: 'turn-active',
+        busy: false,
+        canForkTurn: true,
+        messages: turnMessages,
+        turns,
+      },
+    });
+    const rendered = wrapper.findAllComponents(CodexMessage);
+
+    expect(rendered[0]!.get('[aria-label="Edit"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[0]!.get('[aria-label="Fork"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[0]!.get('[aria-label="Delete"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[1]!.get('[aria-label="Retry"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[1]!.get('[aria-label="Fork"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[1]!.get('[aria-label="Delete"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[2]!.get('[aria-label="Edit"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[2]!.get('[aria-label="Delete"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[3]!.get('[aria-label="Retry"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[3]!.get('[aria-label="Delete"]').attributes('disabled')).toBeUndefined();
+    expect(rendered[4]!.find('[aria-label="Delete"]').exists()).toBe(false);
+    expect(rendered[5]!.find('[aria-label="Retry"]').exists()).toBe(false);
+
+    await rendered[1]!.get('[aria-label="Delete"]').trigger('click');
+    await rendered[1]!.get('[aria-label="Retry"]').trigger('click');
+    await rendered[1]!.get('[aria-label="Fork"]').trigger('click');
+    expect(wrapper.emitted('delete-turn')).toStrictEqual([['turn-old']]);
+    expect(wrapper.emitted('retry-turn')).toStrictEqual([['turn-old']]);
+    expect(wrapper.emitted('fork-turn')).toStrictEqual([['turn-old']]);
+  });
+
+  it('infers historical turns as terminal when a controlled host omits turn lifecycle metadata', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: 'turn-active',
+        canForkTurn: true,
+        messages: [
+          { id: 'old-user', role: 'user', status: 'complete', turnId: 'turn-old', parts: [{ type: 'text', text: 'Old' }] },
+          { id: 'old-answer', role: 'assistant', status: 'complete', turnId: 'turn-old', parts: [{ type: 'text', text: 'Old answer' }] },
+          { id: 'active-user', role: 'user', status: 'complete', turnId: 'turn-active', parts: [{ type: 'text', text: 'Active' }] },
+          { id: 'active-answer', role: 'assistant', status: 'streaming', turnId: 'turn-active', parts: [] },
+        ],
+      },
+    });
+    const rendered = wrapper.findAllComponents(CodexMessage);
+
+    expect(rendered[0]!.find('[aria-label="Edit"]').exists()).toBe(true);
+    expect(rendered[0]!.find('[aria-label="Delete"]').exists()).toBe(true);
+    expect(rendered[1]!.find('[aria-label="Retry"]').exists()).toBe(true);
+    expect(rendered[1]!.find('[aria-label="Fork"]').exists()).toBe(true);
+    expect(rendered[2]!.find('[aria-label="Delete"]').exists()).toBe(false);
+    expect(rendered[3]!.find('[aria-label="Retry"]').exists()).toBe(false);
+  });
+
+  it('does not offer fork for a latest failed turn', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        canForkTurn: true,
+        messages: [
+          { id: 'failed-user', role: 'user', status: 'complete', turnId: 'turn-failed', parts: [{ type: 'text', text: 'Try' }] },
+          { id: 'failed-answer', role: 'assistant', status: 'complete', turnId: 'turn-failed', parts: [{ type: 'text', text: 'Failed' }] },
+        ],
+        turns: [turnLifecycle('turn-failed', 'failed')],
+      },
+    });
+
+    expect(wrapper.find('[aria-label="Delete"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Fork"]').exists()).toBe(false);
   });
 
   it('routes conversation presentation to message actions and tool blocks', () => {
@@ -714,8 +844,15 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
-  it('preserves a turn disclosure while lazy rendering prepends an earlier segment', async () => {
+  it('aligns lazy rendering batches to complete turn boundaries', async () => {
     const turnMessages: SurfaceMessage[] = [
+      {
+        id: 'earlier-turn-answer',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'earlier-turn',
+        parts: [{ type: 'text', text: 'Earlier answer.' }],
+      },
       {
         id: 'lazy-turn-tool',
         role: 'assistant',
@@ -757,6 +894,9 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
 
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(3);
+    expect(wrapper.text()).not.toContain('Earlier answer.');
+
     await wrapper.get('.chat-work-group__header').trigger('click');
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
 
@@ -764,7 +904,7 @@ describe('CodexMessageList', () => {
     await wrapper.get('.message-list').trigger('scroll');
     await flushPromises();
 
-    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(3);
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(4);
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
     expect(wrapper.text()).toContain('Ran read');
     wrapper.unmount();
@@ -1853,25 +1993,25 @@ describe('CodexMessageList', () => {
     });
     const chatMessage = wrapper.getComponent(CodexMessage);
     const clientResponse = { id: 'approval-1', payload: { decision: 'allow' } };
-    const editPayload = { content: 'Updated prompt', index: 0 };
+    const editPayload = { content: 'Updated prompt', turnId: 'turn-1' };
 
     chatMessage.vm.$emit('cancel');
     chatMessage.vm.$emit('client-response', clientResponse);
     chatMessage.vm.$emit('copy-message', 0);
-    chatMessage.vm.$emit('delete-message', 0);
-    chatMessage.vm.$emit('edit-message', editPayload);
+    chatMessage.vm.$emit('delete-turn', 'turn-1');
+    chatMessage.vm.$emit('edit-turn', editPayload);
     chatMessage.vm.$emit('quote-message', 0);
-    chatMessage.vm.$emit('retry-message', 1);
+    chatMessage.vm.$emit('retry-turn', 'turn-1');
     chatMessage.vm.$emit('send-follow-up', 'Open the failing file');
     await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
     expect(wrapper.emitted('client-response')).toStrictEqual([[clientResponse]]);
     expect(wrapper.emitted('copy-message')).toStrictEqual([[0]]);
-    expect(wrapper.emitted('delete-message')).toStrictEqual([[0]]);
-    expect(wrapper.emitted('edit-message')).toStrictEqual([[editPayload]]);
+    expect(wrapper.emitted('delete-turn')).toStrictEqual([['turn-1']]);
+    expect(wrapper.emitted('edit-turn')).toStrictEqual([[editPayload]]);
     expect(wrapper.emitted('quote-message')).toStrictEqual([[0]]);
-    expect(wrapper.emitted('retry-message')).toStrictEqual([[1]]);
+    expect(wrapper.emitted('retry-turn')).toStrictEqual([['turn-1']]);
     expect(wrapper.emitted('send-follow-up')).toStrictEqual([['Open the failing file']]);
   });
 

@@ -456,6 +456,7 @@ describe('CodexMessage', () => {
       message: {
         id: 'user-with-ambient-context',
         role: 'user',
+        turnId: 'turn-context',
         content: [
           '## My request for Codex:',
           'Find a rental car',
@@ -481,8 +482,8 @@ describe('CodexMessage', () => {
 
   it('hides unsupported user mutation actions while keeping copy and quote', () => {
     const wrapper = mountMessage({
-      canDeleteMessage: false,
-      canEditMessage: false,
+      canDeleteTurn: false,
+      canEditTurn: false,
       index: 0,
       message: { id: 'user-1', role: 'user', content: 'Inspect the composer.' },
     });
@@ -495,8 +496,8 @@ describe('CodexMessage', () => {
 
   it('hides unsupported assistant mutation actions while keeping copy', () => {
     const wrapper = mountMessage({
-      canDeleteMessage: false,
-      canRetryMessage: false,
+      canDeleteTurn: false,
+      canRetryTurn: false,
       index: 1,
       message: { id: 'assistant-1', role: 'assistant', content: 'Checking now.' },
     });
@@ -522,8 +523,8 @@ describe('CodexMessage', () => {
 
   it('combines message capabilities with presentation action visibility', () => {
     const wrapper = mountMessage({
-      canDeleteMessage: false,
-      canEditMessage: true,
+      canDeleteTurn: false,
+      canEditTurn: true,
       message: { id: 'user-1', role: 'user', content: 'Inspect the composer.' },
       presentation: {
         messages: {
@@ -592,7 +593,7 @@ describe('CodexMessage', () => {
   it('routes user actions and editor output through its public events', async () => {
     const wrapper = mountMessage({
       index: 2,
-      message: { role: 'user', content: 'Old prompt', createdAt: new Date().toISOString() },
+      message: { role: 'user', content: 'Old prompt', createdAt: new Date().toISOString(), turnId: 'turn-2' },
     });
 
     await wrapper.find('[aria-label="Quote"]').trigger('click');
@@ -602,40 +603,42 @@ describe('CodexMessage', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted('quote-message')).toStrictEqual([[2]]);
-    expect(wrapper.emitted('delete-message')).toStrictEqual([[2]]);
-    expect(wrapper.emitted('edit-message')).toStrictEqual([[{ content: 'New prompt', index: 2 }]]);
+    expect(wrapper.emitted('delete-turn')).toStrictEqual([['turn-2']]);
+    expect(wrapper.emitted('edit-turn')).toStrictEqual([[{ content: 'New prompt', turnId: 'turn-2' }]]);
     expect(wrapper.findComponent(ChatMessageEditor).exists()).toBe(false);
   });
 
   it('closes editing on cancel without emitting a replacement', async () => {
-    const wrapper = mountMessage({ message: { id: 'user-cancel', role: 'user', content: 'Keep me' } });
+    const wrapper = mountMessage({
+      message: { id: 'user-cancel', role: 'user', content: 'Keep me', turnId: 'turn-cancel' },
+    });
 
     await wrapper.get('[aria-label="Edit"]').trigger('click');
     wrapper.getComponent(ChatMessageEditor).vm.$emit('cancel');
     await wrapper.vm.$nextTick();
 
     expect(wrapper.findComponent(ChatMessageEditor).exists()).toBe(false);
-    expect(wrapper.emitted('edit-message')).toBeUndefined();
+    expect(wrapper.emitted('edit-turn')).toBeUndefined();
   });
 
   it('rejects child mutation events that violate role, capability, or thread policy', async () => {
     const unavailable = mountMessage({
-      canDeleteMessage: false,
-      canEditMessage: false,
-      canForkMessage: false,
-      canRetryMessage: false,
+      canDeleteTurn: false,
+      canEditTurn: false,
+      canForkTurn: false,
+      canRetryTurn: false,
       message: { id: 'user-unavailable', role: 'user', content: 'Locked' },
     });
     const unavailableActions = unavailable.getComponent(ChatMessageActions);
     for (const event of ['delete', 'edit', 'fork', 'retry'] as const) unavailableActions.vm.$emit(event);
     await unavailable.vm.$nextTick();
     expect(unavailable.findComponent(ChatMessageEditor).exists()).toBe(false);
-    expect(unavailable.emitted('delete-message')).toBeUndefined();
-    expect(unavailable.emitted('fork-message')).toBeUndefined();
-    expect(unavailable.emitted('retry-message')).toBeUndefined();
+    expect(unavailable.emitted('delete-turn')).toBeUndefined();
+    expect(unavailable.emitted('fork-turn')).toBeUndefined();
+    expect(unavailable.emitted('retry-turn')).toBeUndefined();
 
     const disabled = mountMessage({
-      canForkMessage: true,
+      canForkTurn: true,
       message: { id: 'assistant-disabled', role: 'assistant', content: 'Locked' },
       threadActionsDisabled: true,
     });
@@ -644,9 +647,9 @@ describe('CodexMessage', () => {
     disabledActions.vm.$emit('edit');
     await disabled.vm.$nextTick();
     expect(disabled.findComponent(ChatMessageEditor).exists()).toBe(false);
-    expect(disabled.emitted('delete-message')).toBeUndefined();
-    expect(disabled.emitted('fork-message')).toBeUndefined();
-    expect(disabled.emitted('retry-message')).toBeUndefined();
+    expect(disabled.emitted('delete-turn')).toBeUndefined();
+    expect(disabled.emitted('fork-turn')).toBeUndefined();
+    expect(disabled.emitted('retry-turn')).toBeUndefined();
   });
 
   it('copies messages without tool markers or follow-up chips', async () => {
@@ -700,10 +703,10 @@ describe('CodexMessage', () => {
   it('renders assistant retry actions and reserves them while streaming', async () => {
     const wrapper = mountMessage({
       index: 5,
-      message: { role: 'assistant', content: 'Answer', createdAt: new Date().toISOString() },
+      message: { role: 'assistant', content: 'Answer', createdAt: new Date().toISOString(), turnId: 'turn-5' },
     });
     const streaming = mountMessage({
-      message: { role: 'assistant', content: 'Answer', streaming: true },
+      message: { role: 'assistant', content: 'Answer', streaming: true, turnId: 'turn-streaming' },
     });
 
     expect(wrapper.find('[aria-label="Retry"]').exists()).toBe(true);
@@ -711,8 +714,8 @@ describe('CodexMessage', () => {
     expect(wrapper.find('[aria-label="Edit"]').exists()).toBe(false);
     await wrapper.find('[aria-label="Retry"]').trigger('click');
     await wrapper.find('[aria-label="Delete"]').trigger('click');
-    expect(wrapper.emitted('retry-message')).toStrictEqual([[5]]);
-    expect(wrapper.emitted('delete-message')).toStrictEqual([[5]]);
+    expect(wrapper.emitted('retry-turn')).toStrictEqual([['turn-5']]);
+    expect(wrapper.emitted('delete-turn')).toStrictEqual([['turn-5']]);
     expect(streaming.get('.chat-message__actions').classes()).toContain('chat-message__actions--reserved');
     expect(streaming.get('.chat-message__actions').attributes('aria-hidden')).toBe('true');
   });

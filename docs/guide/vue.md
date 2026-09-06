@@ -82,8 +82,12 @@ the model/reasoning/Fast mode menu.
 - `CodexCompactionMessage`
 - message editor and actions
 
-The latest completed assistant message keeps its actions visible for quick
-follow-up. Older messages reveal actions on hover or focus as usual.
+Every terminal turn exposes Delete, Edit, and Retry; Fork is limited to
+successfully completed turns. The active turn does not expose mutation controls.
+Historical Delete, Edit, and Retry truncate the conversation from their selected
+turn before deleting or resubmitting there. Historical Fork creates a new branch
+through that turn without changing the source conversation. Copy and Quote remain
+message-level actions.
 
 Lazy DOM rendering is enabled by default. It is independent from Node history
 loading and applies `transformMessage` only after the visible slice. See

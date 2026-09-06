@@ -34,13 +34,13 @@ type CodexConversationPaneController<Payload = unknown> = {
 };
 
 const paneState = computed(() => ({
-    identity: { conversationKey, messages, busy, disabled, error },
+    identity: { conversationKey, activeTurnId, turns, messages, busy, disabled, error },
     history: { hasOlder, loading, loadingOlder },
     thread: { approvals, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
     composer: { state, attachments, placeholder, leadingMenuItems, menuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
     catalogs: { files, models, commands, skills, plugins, mentionGroups, modelCatalogStatus, skillCatalogStatus },
     capabilities,
-    policy: { actionsDisabled, attachEnabled, canDeleteMessage, canEditMessage, canForkMessage, canRetryMessage, followUpsDisabled },
+    policy: { actionsDisabled, attachEnabled, canDeleteTurn, canEditTurn, canForkTurn, canRetryTurn, followUpsDisabled },
 }));
 
 const controller = createCodexConversationPaneController({
@@ -49,7 +49,7 @@ const controller = createCodexConversationPaneController({
     submit(prompt, options) { /* host transport */ },
     steer(prompt, options) { /* host transport */ },
     onMessageCopied(index) { /* optional analytics/UI notification */ },
-    forkMessage(index) { /* fork at this user or assistant message */ },
+    forkTurn(turnId) { /* fork through this completed turn */ },
     updateComposerState(next) { /* persist draft */ },
     updateAttachments(next) { /* persist attachments */ },
     updateSettings(settings) { /* apply settings */ },
@@ -73,7 +73,7 @@ Vue runtime's dependency graph.
 Use it with `<CodexConversationPane :controller="controller" />`. The complete
 state groups are `identity`, `history`, `thread`, `composer`, `catalogs`,
 `capabilities`, and `policy`. Actions cover submit/steer, composer updates,
-settings, history, message actions, approvals, goals, queue operations, and
+settings, history, turn actions, approvals, goals, queue operations, and
 client responses. Every action may return `void` or `Promise<void>`; rejected
 promises are surfaced through the pane error UI.
 
@@ -93,9 +93,9 @@ the clipboard write and copied-state feedback first. Omitting this hook does not
 disable copying.
 
 Message forking is disabled by default. Enable it with
-`state.policy.canForkMessage = true` and handle `actions.forkMessage(index)`.
-The compatibility props/events are `canForkMessage` / `forkMessage` in
-TypeScript and `:can-fork-message` / `@fork-message` in Vue templates. In
+`state.policy.canForkTurn = true` and handle `actions.forkTurn(turnId)`.
+The compatibility props/events are `canForkTurn` / `forkTurn` in
+TypeScript and `:can-fork-turn` / `@fork-turn` in Vue templates. In
 surface-bound mode, enabling the prop delegates to the SDK surface action,
 which selects the newly forked conversation.
 
@@ -324,7 +324,7 @@ type CodexMessageTransform = (
 
 The callback runs only after lazy slicing and only for mounted messages. It is
 invoked for every message when `renderStrategy` is `eager`. The `index` is always
-the original absolute message index, and the original message id remains the
+the original absolute rendering index, and the original message id remains the
 rendering key. The default behavior is identity.
 
 `CodexChatMessage` preserves the optional `turnId` from `SurfaceMessage`.
@@ -336,15 +336,28 @@ disclosure. A transform that returns a `CodexChatMessage` should retain
 work before the first phased text arrives; unphased messages containing
 ordinary text retain the flat rendering path.
 
+Pass `activeTurnId` and `turns` when controlling the list, or put them in
+`controller.state.identity`. Surface-bound panes wire both automatically.
+`activeTurnId` is authoritative for `Working`; `busy` remains the broader
+conversation-level pending state used by the composer and Thinking placeholder.
+
 Pass `busy` to `CodexMessageList` (the conversation pane wires this from its
 surface state) to keep a `Thinking` shimmer visible while a turn is accepted
 but the app-server has not yet materialized its first assistant row. When the
 latest visible message has a `turnId`, that pending state remains part of the
 same logical turn so its `Working` disclosure and steers do not fold during the
-gap.
+gap. Lazy batch sizes are approximate: each boundary expands backward to keep
+the complete turn mounted instead of rendering a partial turn.
 
-Message actions remain visible on the latest completed assistant message. Older
-message rows keep the hover/focus visibility behavior.
+Turn mutations are offered on every terminal turn. Delete, Edit, and Retry are
+available for completed, failed, and interrupted turns; Fork requires successful
+completion. The active turn never exposes mutation controls. Historical actions
+use normal Codex rollback semantics: Delete removes the selected turn and every
+later turn, while Edit and Retry truncate that suffix before resubmitting the
+edited or original prompt. Copy and Quote remain message-level actions. While an
+asynchronous Delete action is pending, the stock action bar keeps the turn
+visible, replaces Delete with a progress spinner, and disables its other actions
+until the operation settles.
 
 `CodexMessage` renders `Empty response` in muted italic text when a completed
 assistant message contains no renderable content. Empty streaming messages keep

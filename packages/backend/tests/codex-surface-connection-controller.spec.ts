@@ -304,7 +304,8 @@ describe('CodexSurfaceConnectionController', () => {
     expect(setup.approvals.denyAll).toHaveBeenCalledOnce();
     expect(setup.clientRequests.clear).toHaveBeenCalledOnce();
     expect(setup.state).toMatchObject({
-      status: 'error', busy: false, clientRequests: [], historyLoading: false, error: 'socket lost',
+      status: 'error', activeTurnId: null, busy: false,
+      clientRequests: [], historyLoading: false, error: 'socket lost',
     });
     expect(setup.host.emitSurfaceStatus).toHaveBeenCalledWith('lifecycle');
 
@@ -319,6 +320,8 @@ describe('CodexSurfaceConnectionController', () => {
     Object.assign(setup.state, {
       conversations: [summary('old')],
       activeConversationId: 'old',
+      activeTurnId: 'turn-old',
+      turns: [{ id: 'turn-old' }],
       messages: [{ id: 'message' }],
       approvals: [{ id: 'approval' }],
       clientRequests: [{ id: 'request' }],
@@ -346,7 +349,8 @@ describe('CodexSurfaceConnectionController', () => {
     expect(setup.items.reset).toHaveBeenCalledOnce();
     expect(setup.catalog.reset).toHaveBeenCalledWith(true);
     expect(setup.state).toMatchObject({
-      conversations: [], activeConversationId: null, messages: [], approvals: [], clientRequests: [],
+      conversations: [], activeConversationId: null, activeTurnId: null, turns: [],
+      messages: [], approvals: [], clientRequests: [],
       answeredClientRequestIds: [],
       models: [], modelCatalogStatus: 'notLoaded', skills: [], skillCatalogStatus: 'notLoaded',
       plugins: [], pluginCatalogStatus: 'notLoaded', approvalPresets: [], approvalPreset: null,

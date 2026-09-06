@@ -23,6 +23,7 @@ type TurnEntry = {
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
+  active?: boolean
   entries: readonly TurnEntry[]
   showToolBlocks: boolean
   turnId?: string
@@ -44,9 +45,9 @@ const finalStarted = computed(() => messages.value.some(({ message }) => (
       && part.content.trim().length > 0
   )) ?? false)
 )))
-const active = computed(() => !finalStarted.value && messages.value.some(({ message }) => (
+const active = computed(() => !finalStarted.value && (props.active ?? messages.value.some(({ message }) => (
   message.role === 'assistant' && message.streaming === true
-)))
+))))
 const completedWithoutFinal = computed(() => phased.value && !active.value && !finalStarted.value)
 const latestStreamingAssistantIndex = computed(() => [...messages.value]
   .reverse()

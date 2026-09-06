@@ -43,6 +43,7 @@
       <div class="lab__frame">
         <CodexConversationPane
           v-model="draft"
+          :active-turn-id="selected.activeTurnId"
           :busy="selected.busy"
           :context-usage="selected.contextUsage"
           :conversation-key="selected.id"
@@ -60,6 +61,7 @@
           selected-reasoning-effort="medium"
           :skills="skills"
           :turn-git-diff="selected.turnGitDiff"
+          :turns="selected.turns"
           :transcribe-audio="transcribeAudio"
           @interrupt="activity = 'Interrupt requested'"
           @submit="submitPrompt"
@@ -101,7 +103,7 @@ import {
   type SurfaceMessagePart,
   type TurnGitDiff,
 } from '@codex-app-sdk/vue';
-import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
+import type { CodexSurfacePlugin, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
 
 type Scenario = {
   id: string;
@@ -110,6 +112,8 @@ type Scenario = {
   title: string;
   description: string;
   messages: SurfaceMessage[];
+  activeTurnId?: string | null;
+  turns?: readonly CodexSurfaceTurn[];
   busy?: boolean;
   error?: string;
   queuedPrompts?: CodexQueuedPromptData[];
@@ -209,6 +213,11 @@ const scenarios: [Scenario, ...Scenario[]] = [
     summary: 'Working state, queue, context, and diff shelf',
     title: 'Codex is working',
     description: 'A single active turn split by two steers. Expand the tool group to see completed work before active work.',
+    activeTurnId: 'turn-lab',
+    turns: [{
+      id: 'turn-lab', status: 'inProgress', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:00:00Z', completedAt: null, durationMs: null,
+    }],
     busy: true,
     contextUsage: { totalTokens: 64_000, inputTokens: 48_000, cachedInputTokens: 8_000, outputTokens: 12_000, reasoningOutputTokens: 4_000, lastTotalTokens: 8_000, modelContextWindow: 200_000, usedPercent: 32 },
     queuedPrompts: [{ id: 'queued-1', text: 'Run the visual checks next' }],

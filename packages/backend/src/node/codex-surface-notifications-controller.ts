@@ -31,7 +31,13 @@ import { appendCompactionMarker, ensureAssistantTurnMessage } from './codex-surf
 import { realtimeAudioChunk } from './codex-surface-realtime';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
 import { threadSettingsSelection } from './codex-surface-settings';
-import { sameValue, surfaceTurnError, timestampToIso } from './codex-surface-events';
+import {
+  sameValue,
+  surfaceTurn,
+  surfaceTurnError,
+  timestampToIso,
+  upsertSurfaceTurn,
+} from './codex-surface-events';
 
 type SurfaceEventInput = CodexSurfaceEvent extends infer Event
   ? Event extends CodexSurfaceEvent
@@ -237,6 +243,7 @@ export class CodexSurfaceNotificationsController {
           turnStartPending: false,
           error: null,
           turnGitDiff: null,
+          turns: upsertSurfaceTurn(runtime.turns, surfaceTurn(notification.params.turn)),
           messages: ensureAssistantTurnMessage(
             runtime.messages,
             notification.params.threadId,
@@ -349,6 +356,18 @@ export class CodexSurfaceNotificationsController {
         if (terminalCurrentTurn) runtime.activeTurnId = null;
         this.host.patchRuntime(notification.params.threadId, {
           error: notification.params.error.message,
+          turns: upsertSurfaceTurn(runtime.turns, {
+            ...(runtime.turns.find((turn) => turn.id === notification.params.turnId) ?? {
+              id: notification.params.turnId,
+              status: 'inProgress' as const,
+              startedAt: null,
+              completedAt: null,
+              durationMs: null,
+            }),
+            status: terminalCurrentTurn ? 'failed' : 'inProgress',
+            error: surfaceTurnError(notification.params.error),
+            willRetry: notification.params.willRetry,
+          }),
           ...(terminalCurrentTurn ? { busy: false, turnStartPending: false } : {}),
         });
         if (terminalCurrentTurn) this.host.patchConversationStatus(notification.params.threadId, 'error');

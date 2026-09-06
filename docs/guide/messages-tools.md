@@ -51,10 +51,16 @@ then fold together with the steer bubbles when a final answer starts. Reopening
 `Done · View details` reveals both the work and its steers. If a completed turn
 has no final answer, its work stays visible directly without a disclosure
 header, while its completed steer bubbles remain hidden. Work-only segments do
-not show message actions; actions remain attached to the final answer. Lazy
+not show turn mutation actions; actions remain attached to the final answer. Lazy
 history prepends preserve the disclosure state. Opening or closing turn details
 also preserves the reader's viewport instead of forcing the transcript back to
 the bottom.
+
+Deleting a turn is intentionally non-optimistic. The turn stays visible while
+the host or surface action runs, the Delete icon becomes a progress spinner,
+and the other actions on that turn are disabled. Success removes the turn when
+the backing state updates; failure restores the normal controls and surfaces
+the existing pane error.
 
 This presentation is capability-by-data rather than provider-specific. Messages
 without explicit phases or reasoning summaries keep the existing flat layout,
