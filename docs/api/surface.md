@@ -210,7 +210,9 @@ interface over the Node surface's existing conversation handles:
 import {
   invokeCodexConversationBridgeOperation,
   subscribeCodexConversationBridge,
+  subscribeCodexConversationReplicaBridge,
 } from '@codex-app-sdk/core/surface-bridge';
+import { createCodexConversationReplica } from '@codex-app-sdk/core/conversation-replica';
 
 const snapshot = await invokeCodexConversationBridgeOperation(
   surface,
@@ -233,6 +235,35 @@ const unsubscribe = subscribeCodexConversationBridge(
 notifications only for future changes to that conversation. Read history or
 invoke `getSnapshot` separately when an initial projection is needed. The
 returned function removes both subscriptions.
+
+For a process or network boundary, do not forward those full state-change
+snapshots on every streaming delta. Bootstrap one renderer-local replica and
+then carry only semantic events:
+
+```ts
+let replica: ReturnType<typeof createCodexConversationReplica> | undefined;
+
+const unsubscribe = subscribeCodexConversationReplicaBridge(
+  surface,
+  conversationId,
+  (notification) => {
+    if (notification.type === 'snapshot') {
+      replica = createCodexConversationReplica(notification.snapshot);
+      render(replica.getSnapshot());
+      return;
+    }
+    render(replica!.apply(notification.event));
+  },
+);
+```
+
+`subscribeCodexConversationReplicaBridge()` emits exactly one initial targeted
+snapshot, then only `CodexConversationEvent` deltas. It buffers events raised
+during bootstrap so the snapshot always arrives first. The replica applies
+streaming, message, tool, turn, settings, queue, approval, and client-request
+events with structural sharing. Rare history replacement/prepend events carry
+the canonical message batch plus the small turn and paging state needed for
+edit, retry, delete, resume, and lazy-history correctness.
 
 `codexConversationBridgeOperations` and
 `isCodexConversationBridgeOperation()` expose the supported transport-safe

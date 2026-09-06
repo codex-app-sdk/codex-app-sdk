@@ -127,6 +127,13 @@ const handleSubagentEvent = (event: CodexSubagentEvent) => {
 Extracts only variants with a `conversationId`. Returned by conversation-handle
 subscriptions.
 
+`conversation.queueChanged` carries the current bounded queued-prompt list.
+`conversation.historyReplaced` and `conversation.historyPrepended` include the
+turn and paging metadata needed by `createCodexConversationReplica()` to remain
+authoritative across rollback and lazy history loading. See the
+[conversation-targeted bridge](/api/surface#conversation-targeted-bridge) for
+the one-snapshot-then-events transport pattern.
+
 ## Event origin
 
 ```ts

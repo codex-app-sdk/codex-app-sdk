@@ -29,6 +29,10 @@
     "./surface-bridge": {
       "types": "./dist/surface-bridge.d.ts",
       "import": "./dist/surface-bridge.js"
+    },
+    "./conversation-replica": {
+      "types": "./dist/conversation-replica.d.ts",
+      "import": "./dist/conversation-replica.js"
     }
   },
   "scripts": {

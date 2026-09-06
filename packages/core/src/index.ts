@@ -1,4 +1,8 @@
 export { TypedEventBus, type EventListener } from './typed-event-bus';
+export {
+  createCodexConversationReplica,
+  type CodexConversationReplica,
+} from './conversation-replica';
 export type * from './native';
 export type * from './surface';
 export {
@@ -10,6 +14,7 @@ export {
   isCodexConversationBridgeOperation,
   isCodexSurfaceBridgeOperation,
   subscribeCodexConversationBridge,
+  subscribeCodexConversationReplicaBridge,
   type CodexConversationBridgeHandle,
   type CodexConversationBridgeNotification,
   type CodexConversationBridgeOperation,

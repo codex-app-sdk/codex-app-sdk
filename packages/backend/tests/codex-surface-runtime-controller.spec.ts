@@ -185,13 +185,19 @@ describe('CodexSurfaceRuntimeController', () => {
   it('emits skills, permissions, and full history as detached payloads', () => {
     const setup = setupRuntimeController();
     const runtime = setup.controller.create('thread-1', {
+      activeTurnId: 'turn-2',
       approvalPresets: ['ask-for-approval'],
+      busy: true,
       cwd: '/workspace',
+      historyHasOlder: true,
+      historyLoadingOlder: true,
       messages: [message('assistant', 'assistant')],
       permissionProfiles: [{ id: ':workspace', description: null, allowed: true }],
       skillCatalogStatus: 'loaded',
       skills: [{ name: 'review', path: '/skills/review/SKILL.md', enabled: true }],
       threadStatus: { type: 'idle' },
+      turnIds: ['turn-1', 'turn-2'],
+      turns: [completedTurn('turn-1'), completedTurn('turn-2')],
     });
 
     setup.controller.emitConversationSkills('thread-1', 'action');
@@ -215,7 +221,18 @@ describe('CodexSurfaceRuntimeController', () => {
     expect(setup.host.emitEvent).toHaveBeenNthCalledWith(3, 'action', {
       type: 'conversation.historyReplaced',
       conversationId: 'thread-1',
-      payload: { reason: 'resync', messages: runtime.messages, threadStatus: { type: 'idle' } },
+      payload: {
+        reason: 'resync',
+        messages: runtime.messages,
+        threadStatus: { type: 'idle' },
+        state: expect.objectContaining({
+          activeTurnId: 'turn-2',
+          busy: true,
+          turnIds: ['turn-1', 'turn-2'],
+          turns: runtime.turns,
+          historyState: expect.objectContaining({ hasOlder: true, loadingOlder: true }),
+        }),
+      },
     });
     expect(setup.host.emitEvent.mock.calls[0]![1].payload.skills).not.toBe(runtime.skills);
   });
@@ -233,7 +250,14 @@ describe('CodexSurfaceRuntimeController', () => {
     expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', {
       type: 'conversation.historyPrepended',
       conversationId: 'thread-1',
-      payload: { messages: [current, missing] },
+      payload: {
+        messages: [current, missing],
+        state: expect.objectContaining({
+          turnIds: [],
+          turns: [],
+          historyState: expect.any(Object),
+        }),
+      },
     });
     expect(setup.host.emitEvent.mock.calls[0]![1].payload.messages).not.toBe(setup.controller.get('thread-1')?.messages);
   });
@@ -347,4 +371,16 @@ function message(
   metadata?: Record<string, unknown>,
 ): SurfaceMessage {
   return { id, role, status: 'complete', parts, metadata } as SurfaceMessage;
+}
+
+function completedTurn(id: string) {
+  return {
+    id,
+    status: 'completed' as const,
+    error: null,
+    willRetry: false,
+    startedAt: null,
+    completedAt: null,
+    durationMs: null,
+  };
 }

@@ -108,7 +108,7 @@ describe('CodexSurfaceMessagesController', () => {
     await expect(setup.controller.sendToThread('thread-1', '   ')).rejects.toThrow('empty message');
   });
 
-  it('queues busy prompts with normalized options without emitting optimistic state', async () => {
+  it('queues busy prompts with normalized options and emits compact queue replacements', async () => {
     const setup = messagesController({ busy: true });
     await setup.controller.sendPromptToThread('thread-1', 'Queue me');
     await setup.controller.sendPromptToThread('thread-1', 'Queue with options', { planMode: true });
@@ -118,7 +118,17 @@ describe('CodexSurfaceMessagesController', () => {
       { id: expect.any(String), text: 'Queue with options', options: { planMode: true } },
     ]);
     expect(setup.client.request).not.toHaveBeenCalled();
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
+    expect(setup.host.emitEvent).toHaveBeenNthCalledWith(1, 'action', {
+      type: 'conversation.queueChanged', conversationId: 'thread-1',
+      payload: { queuedPrompts: [expect.objectContaining({ text: 'Queue me' })] },
+    });
+    expect(setup.host.emitEvent).toHaveBeenNthCalledWith(2, 'action', {
+      type: 'conversation.queueChanged', conversationId: 'thread-1',
+      payload: { queuedPrompts: [
+        expect.objectContaining({ text: 'Queue me' }),
+        expect.objectContaining({ text: 'Queue with options' }),
+      ] },
+    });
     expect(setup.host.patchConversationStatus).not.toHaveBeenCalled();
   });
 

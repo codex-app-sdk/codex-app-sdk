@@ -3,6 +3,7 @@ import {
   invokeCodexConversationBridgeOperation,
   isCodexConversationBridgeOperation,
   subscribeCodexConversationBridge,
+  subscribeCodexConversationReplicaBridge,
   type CodexConversationBridgeHandle,
   type CodexConversationBridgeTarget,
 } from '../src/surface-bridge';
@@ -67,6 +68,35 @@ describe('Codex conversation bridge', () => {
     unsubscribeB();
     target.emitState('conversation-a');
     expect(aNotifications).toHaveBeenCalledOnce();
+  });
+
+  it('boots a replica with one snapshot and then emits only incremental events', () => {
+    const target = conversationTarget(['conversation-a']);
+    const notifications = vi.fn();
+
+    const unsubscribe = subscribeCodexConversationReplicaBridge(
+      target,
+      'conversation-a',
+      notifications,
+    );
+
+    expect(notifications).toHaveBeenCalledExactlyOnceWith({
+      type: 'snapshot',
+      conversationId: 'conversation-a',
+      snapshot: expect.objectContaining({ activeConversationId: 'conversation-a' }),
+    });
+    target.emitState('conversation-a');
+    expect(notifications).toHaveBeenCalledTimes(1);
+    target.emitEvent('conversation-a', 'message.updated');
+    expect(notifications).toHaveBeenLastCalledWith({
+      type: 'event',
+      conversationId: 'conversation-a',
+      event: expect.objectContaining({ type: 'message.updated' }),
+    });
+
+    unsubscribe();
+    target.emitEvent('conversation-a', 'message.updated');
+    expect(notifications).toHaveBeenCalledTimes(2);
   });
 
   it('routes every targeted operation through the selected conversation handle', async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createCodexConversationReplica } from '@codex-app-sdk/core';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
@@ -439,6 +440,10 @@ describe('CodexSurface', () => {
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
     await surface.connect();
+    const replica = createCodexConversationReplica(surface.conversation('thread-existing').getSnapshot());
+    surface.onEvent((event) => {
+      if ('conversationId' in event && event.conversationId === 'thread-existing') replica.apply(event);
+    });
     expect(surface.getSnapshot().skills).toMatchObject([{ name: 'reviewer', displayName: 'Reviewer' }]);
     transport.emit({
       method: 'thread/tokenUsage/updated',
@@ -475,6 +480,7 @@ describe('CodexSurface', () => {
       params: { threadId: 'thread-existing', numTurns: 1 },
     });
     expect(surface.getSnapshot().messages).toStrictEqual([]);
+    expect(replica.getSnapshot()).toMatchObject({ messages: [], turnIds: [], turns: [] });
   });
 
   it('uses thread/revert to delete from paginated history without hydrating the full thread', async () => {
@@ -722,6 +728,12 @@ describe('CodexSurface', () => {
   it('backs edit, retry, delete, and queued prompt actions with real surface operations', async () => {
     const edited = createSurface();
     await edited.surface.connect();
+    const editedReplica = createCodexConversationReplica(
+      edited.surface.conversation('thread-existing').getSnapshot(),
+    );
+    edited.surface.onEvent((event) => {
+      if ('conversationId' in event && event.conversationId === 'thread-existing') editedReplica.apply(event);
+    });
     await expect(edited.surface.deleteTurn('missing')).rejects.toThrow("unknown Codex turn 'missing'");
     await expect(edited.surface.editTurn('missing', 'Nope')).rejects.toThrow("user prompt for Codex turn 'missing'");
     await expect(edited.surface.editTurn('turn-history', '   ')).rejects.toThrow('empty content');
@@ -729,6 +741,15 @@ describe('CodexSurface', () => {
     expect(lastRequest(edited.transport, 'thread/rollback')).toMatchObject({ params: { numTurns: 1 } });
     expect(lastRequest(edited.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Edited prompt' }] },
+    });
+    expect(editedReplica.getSnapshot()).toMatchObject({
+      activeTurnId: 'turn-live',
+      busy: true,
+      turnIds: ['turn-live'],
+      messages: [
+        expect.objectContaining({ role: 'user', parts: [expect.objectContaining({ text: 'Edited prompt' })] }),
+        expect.objectContaining({ role: 'assistant', turnId: 'turn-live' }),
+      ],
     });
 
     const retried = createSurface();

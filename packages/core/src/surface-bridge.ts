@@ -195,6 +195,43 @@ export function subscribeCodexConversationBridge(
   };
 }
 
+/**
+ * Emits exactly one targeted snapshot followed by semantic conversation events.
+ * Events raised while the initial snapshot is captured are buffered so consumers
+ * can always initialize a replica before applying deltas.
+ */
+export function subscribeCodexConversationReplicaBridge(
+  target: CodexConversationBridgeTarget,
+  conversationId: string,
+  listener: (notification: CodexConversationBridgeNotification) => void,
+): () => void {
+  const id = nonEmptyString(conversationId, 'Conversation id');
+  const conversation = target.conversation(id);
+  const pending: CodexConversationEvent[] = [];
+  let initialized = false;
+  const unsubscribe = conversation.onEvent((event) => {
+    if (event.conversationId !== id) return;
+    if (!initialized) pending.push(event);
+    else listener({ type: 'event', conversationId: id, event });
+  });
+  try {
+    const snapshot = conversation.getSnapshot();
+    if (snapshot.activeConversationId !== id) {
+      throw new Error(
+        `Snapshot belongs to '${snapshot.activeConversationId}', not bridge conversation '${id}'`,
+      );
+    }
+    listener({ type: 'snapshot', conversationId: id, snapshot });
+    initialized = true;
+    for (const event of pending) listener({ type: 'event', conversationId: id, event });
+    pending.length = 0;
+  } catch (error) {
+    unsubscribe();
+    throw error;
+  }
+  return unsubscribe;
+}
+
 export const codexSurfaceBridgeOperations = [
   'archiveConversation', 'cancelLogin', 'clearGoal', 'compactConversation', 'connect',
   'createConversation', 'deleteConversation', 'deleteTurn', 'deleteQueuedPrompt',

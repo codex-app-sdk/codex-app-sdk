@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
+import { createCodexConversationReplica } from '@codex-app-sdk/core';
 import type { CodexSurfaceEvent, SurfaceMessage } from '@codex-app-sdk/core/surface';
 import { FakeTransport, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
@@ -20,6 +21,10 @@ describe('CodexSurface', () => {
     const { surface, transport } = createSurface();
     await surface.connect();
     const selected = await surface.selectConversation('thread-existing');
+    const replica = createCodexConversationReplica(surface.conversation('thread-existing').getSnapshot());
+    surface.onEvent((event) => {
+      if ('conversationId' in event && event.conversationId === 'thread-existing') replica.apply(event);
+    });
     expect(selected.messages.map((message) => message.parts[0])).toMatchObject([
       { type: 'text', text: 'Hello' },
       { type: 'text', text: 'Hi there' },
@@ -59,6 +64,7 @@ describe('CodexSurface', () => {
     });
 
     const snapshot = surface.getSnapshot();
+    const conversationSnapshot = surface.conversation('thread-existing').getSnapshot();
     expect(snapshot).toMatchObject({ busy: false, error: null });
     expect(snapshot.messages.find((message) => (
       message.role === 'assistant'
@@ -68,6 +74,15 @@ describe('CodexSurface', () => {
       status: 'complete',
       parts: [{ type: 'text', text: 'Working… done', itemId: 'agent-live' }],
     });
+    expect(replica.getSnapshot()).toMatchObject({
+      activeTurnId: conversationSnapshot.activeTurnId,
+      busy: conversationSnapshot.busy,
+      error: conversationSnapshot.error,
+      turnIds: conversationSnapshot.turnIds,
+      turns: conversationSnapshot.turns,
+    });
+    expect(messagesWithoutCreatedAt(replica.getSnapshot().messages))
+      .toStrictEqual(messagesWithoutCreatedAt(conversationSnapshot.messages));
   });
 
   it('renders a bounded full page before hydrating remaining history in the background', async () => {
@@ -232,6 +247,10 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
 
     const initial = await surface.connect();
+    const replica = createCodexConversationReplica(surface.conversation('thread-existing').getSnapshot());
+    surface.onEvent((event) => {
+      if ('conversationId' in event && event.conversationId === 'thread-existing') replica.apply(event);
+    });
     expect(initial.historyState).toMatchObject({ loadingStrategy: 'lazy', hasOlder: true, fullyLoaded: false });
     expect(transport.sent.filter((message) => 'method' in message && message.method === 'thread/turns/list')).toHaveLength(0);
 
@@ -239,6 +258,13 @@ describe('CodexSurface', () => {
     expect(page).toMatchObject({ conversationId: 'thread-existing', hasOlder: false });
     expect(page.messages).toHaveLength(6);
     expect(surface.getSnapshot().historyState).toMatchObject({ hasOlder: false, fullyLoaded: true });
+    expect(replica.getSnapshot()).toMatchObject({
+      turnIds: ['turn-older', 'turn-initial'],
+      historyState: { hasOlder: false, fullyLoaded: true },
+    });
+    expect(messagesWithoutCreatedAt(replica.getSnapshot().messages)).toStrictEqual(
+      messagesWithoutCreatedAt(surface.conversation('thread-existing').getSnapshot().messages),
+    );
 
     const history = await surface.readConversationHistory('thread-existing');
     expect(history.messages).toHaveLength(8);
@@ -571,3 +597,7 @@ describe('CodexSurface', () => {
   });
 
 });
+
+function messagesWithoutCreatedAt(messages: readonly SurfaceMessage[]) {
+  return messages.map(({ createdAt: _createdAt, ...message }) => message);
+}

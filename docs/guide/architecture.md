@@ -39,8 +39,11 @@ product-shaped state machine:
 - semantic events emitted after state mutation;
 - host extensions, dynamic tools, and MCP configuration.
 
-Snapshots are the authoritative state and resynchronization mechanism. Events
-are ordered incremental integration signals.
+Snapshots are the authoritative bootstrap and resynchronization mechanism.
+Events are ordered incremental integration signals. High-volume remote hosts
+can initialize `createCodexConversationReplica()` from one targeted snapshot
+and then reduce only semantic conversation events locally, avoiding a full
+transcript transfer for every token.
 
 `CodexAppBackend` is the in-process composition root for applications that need
 product services around that runtime. It creates or adopts one `CodexSurface`

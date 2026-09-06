@@ -454,6 +454,27 @@ export type CodexConversationSnapshot = CodexSurfaceSnapshot & {
   turnIds: string[];
 };
 
+/** Conversation-local fields replaced together with a canonical history projection. */
+export type CodexConversationHistoryReplacementState = Pick<
+  CodexConversationSnapshot,
+  | 'activeTurnId'
+  | 'answeredClientRequestIds'
+  | 'busy'
+  | 'contextUsage'
+  | 'error'
+  | 'historyLoading'
+  | 'historyState'
+  | 'turnGitDiff'
+  | 'turnIds'
+  | 'turns'
+>;
+
+/** Paging metadata refreshed after older canonical history is prepended. */
+export type CodexConversationHistoryPrependState = Pick<
+  CodexConversationSnapshot,
+  'historyLoading' | 'historyState' | 'turnIds' | 'turns'
+>;
+
 export type CodexConversationHistory = {
   conversationId: string;
   messages: SurfaceMessage[];
@@ -654,9 +675,13 @@ export type CodexSurfaceEvent =
     reason: CodexSurfaceHistoryReason;
     messages: readonly SurfaceMessage[];
     threadStatus: CodexSurfaceThreadStatus | null;
+    /** Present on current runtimes; optional so recorded events from older SDKs remain consumable. */
+    state?: CodexConversationHistoryReplacementState;
   }>
   | CodexConversationEventEnvelope<'conversation.historyPrepended', {
     messages: readonly SurfaceMessage[];
+    /** Present on current runtimes; optional so recorded events from older SDKs remain consumable. */
+    state?: CodexConversationHistoryPrependState;
   }>
   | CodexConversationEventEnvelope<'conversation.activityChanged', {
     threadStatus: CodexSurfaceThreadStatus | null;
@@ -688,6 +713,9 @@ export type CodexSurfaceEvent =
   }>
   | CodexConversationEventEnvelope<'conversation.diffUpdated', {
     diff: CodexSurfaceTurnGitDiff | null;
+  }>
+  | CodexConversationEventEnvelope<'conversation.queueChanged', {
+    queuedPrompts: readonly CodexSurfaceQueuedPrompt[];
   }>
   | CodexConversationEventEnvelope<'realtime.started', {
     realtimeSessionId: string | null;

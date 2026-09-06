@@ -1,6 +1,7 @@
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
+  CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
   SendCodexMessageOptions,
   StartCodexReviewOptions,
@@ -42,7 +43,7 @@ export type CodexSurfaceMessagesHost = {
   compactForThread(threadId: string): Promise<void>;
   createConversation(): Promise<void>;
   emitConversationActivity(threadId: string, origin: 'action'): void;
-  emitEvent(origin: 'action', input: SurfaceEventInput): void;
+  emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void;
   ensureConnected(): Promise<void>;
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
   getSnapshot(): CodexSurfaceSnapshot;
@@ -162,6 +163,7 @@ export class CodexSurfaceMessagesController {
           },
         ],
       });
+      this.emitQueuedPrompts(threadId);
       return;
     }
 
@@ -339,6 +341,7 @@ export class CodexSurfaceMessagesController {
       throw new Error(`Unknown queued prompt '${promptId}'`);
     }
     this.host.patchRuntime(runtime.threadId, { queuedPrompts });
+    this.emitQueuedPrompts(runtime.threadId);
   }
 
   async updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot> {
@@ -359,6 +362,7 @@ export class CodexSurfaceMessagesController {
     });
     if (!found) throw new Error(`Unknown queued prompt '${promptId}'`);
     this.host.patchRuntime(runtime.threadId, { queuedPrompts });
+    this.emitQueuedPrompts(runtime.threadId);
   }
 
   async steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot> {
@@ -374,6 +378,7 @@ export class CodexSurfaceMessagesController {
     this.host.patchRuntime(runtime.threadId, {
       queuedPrompts: runtime.queuedPrompts.filter((candidate) => candidate.id !== promptId),
     });
+    this.emitQueuedPrompts(runtime.threadId);
     const text = replacement ?? prompt.text;
     if (runtime.busy) await this.steerForThread(threadId, text, prompt.options);
     else await this.sendToThread(threadId, text, prompt.options);
@@ -385,13 +390,27 @@ export class CodexSurfaceMessagesController {
     const next = runtime.queuedPrompts[0]!;
     const queuedPrompts = runtime.queuedPrompts.slice(1);
     this.host.patchRuntime(threadId, { queuedPrompts });
+    this.emitQueuedPrompts(threadId, 'notification');
     try {
       await this.sendPromptToThread(threadId, next.text, next.options);
     } catch (error) {
       this.host.patchRuntime(threadId, {
         error: errorMessage(error), queuedPrompts: [next, ...runtime.queuedPrompts],
       });
+      this.emitQueuedPrompts(threadId, 'notification');
     }
+  }
+
+  private emitQueuedPrompts(
+    threadId: string,
+    origin: CodexSurfaceEventOrigin = 'action',
+  ): void {
+    const queuedPrompts = this.host.requireRuntime(threadId).queuedPrompts;
+    this.host.emitEvent(origin, {
+      type: 'conversation.queueChanged',
+      conversationId: threadId,
+      payload: { queuedPrompts: structuredClone(queuedPrompts) },
+    });
   }
 
   private requiredActiveConversation(): string {

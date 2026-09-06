@@ -214,6 +214,7 @@ export class CodexSurfaceRuntimeController {
         reason,
         messages: structuredClone(runtime.messages),
         threadStatus: structuredClone(runtime.threadStatus),
+        state: historyReplacementState(runtime),
       },
     });
   }
@@ -232,6 +233,7 @@ export class CodexSurfaceRuntimeController {
       conversationId: threadId,
       payload: {
         messages: structuredClone(messages.map((message) => currentMessages.get(message.id) ?? message)),
+        state: historyPrependState(this.require(threadId)),
       },
     });
   }
@@ -296,4 +298,37 @@ export class CodexSurfaceRuntimeController {
     const summary = this.host.getState().conversations.find((conversation) => conversation.id === threadId);
     if (summary) this.emitSummaryUpserted(summary, 'updated', origin);
   }
+}
+
+function historyReplacementState(runtime: ThreadRuntimeState) {
+  return structuredClone({
+    activeTurnId: runtime.activeTurnId,
+    answeredClientRequestIds: runtime.answeredClientRequestIds,
+    busy: runtime.busy,
+    contextUsage: runtime.contextUsage,
+    error: runtime.error,
+    historyLoading: runtime.historyLoading,
+    historyState: runtimeHistoryState(runtime),
+    turnGitDiff: runtime.turnGitDiff,
+    turnIds: runtime.turnIds,
+    turns: runtime.turns,
+  });
+}
+
+function historyPrependState(runtime: ThreadRuntimeState) {
+  return structuredClone({
+    historyLoading: runtime.historyLoading,
+    historyState: runtimeHistoryState(runtime),
+    turnIds: runtime.turnIds,
+    turns: runtime.turns,
+  });
+}
+
+function runtimeHistoryState(runtime: ThreadRuntimeState) {
+  return {
+    loadingStrategy: runtime.loadingStrategy,
+    hasOlder: runtime.historyHasOlder,
+    loadingOlder: runtime.historyLoadingOlder,
+    fullyLoaded: runtime.fullHistoryHydrated,
+  };
 }
