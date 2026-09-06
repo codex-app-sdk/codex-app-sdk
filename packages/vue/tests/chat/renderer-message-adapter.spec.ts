@@ -34,6 +34,7 @@ describe('renderer message adapter', () => {
       id: 'assistant-phased',
       role: 'assistant',
       status: 'streaming',
+      turnId: 'turn-phased',
       parts: [
         {
           type: 'reasoning',
@@ -57,6 +58,7 @@ describe('renderer message adapter', () => {
       { type: 'text', content: 'The fix is ready.', itemId: 'answer-1', phase: 'final_answer' },
     ]);
     expect(message.content).toBe('I am checking the UI.\n\nThe fix is ready.');
+    expect(message.turnId).toBe('turn-phased');
   });
 
   it('maps surface parts into rich chat messages without losing tool display data', () => {
@@ -481,6 +483,7 @@ describe('renderer message adapter', () => {
       status: 'running',
       turnId: 'turn-from-metadata',
     }]);
+    expect(message.turnId).toBe('turn-from-metadata');
   });
 
   it.each([undefined, '', false, 42])('rejects non-usable metadata turn ids: %j', (turnId) => {

@@ -35,7 +35,26 @@ The stock Vue renderer groups commentary, reasoning summaries, and tool calls
 under an expanded `Working` section while the turn is active. When the final
 answer starts, the section becomes `Done · View details` and collapses
 automatically; the reader can reopen it at any time. The final answer remains
-visible below it.
+visible below it. If structured tool activity arrives before the first phased
+text or reasoning summary, `CodexMessageList` opens the `Working` section
+immediately.
+
+The accepted-but-not-yet-streaming gap is part of the active turn as well. The
+stock `Thinking` placeholder inherits the latest visible `turnId`, keeping the
+shared `Working` section open until the next assistant segment arrives.
+
+Steering can split one active turn into multiple assistant message segments.
+`CodexMessageList` correlates adjacent segments by `turnId` and renders one
+shared disclosure for the logical turn. Steer bubbles stay in chronological
+order while work is active. Earlier and later work segments expand together,
+then fold together with the steer bubbles when a final answer starts. Reopening
+`Done · View details` reveals both the work and its steers. If a completed turn
+has no final answer, its work stays visible directly without a disclosure
+header, while its completed steer bubbles remain hidden. Work-only segments do
+not show message actions; actions remain attached to the final answer. Lazy
+history prepends preserve the disclosure state. Opening or closing turn details
+also preserves the reader's viewport instead of forcing the transcript back to
+the bottom.
 
 This presentation is capability-by-data rather than provider-specific. Messages
 without explicit phases or reasoning summaries keep the existing flat layout,

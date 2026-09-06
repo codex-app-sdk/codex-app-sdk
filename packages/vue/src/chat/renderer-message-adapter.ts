@@ -17,6 +17,7 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
   const contentParts: string[] = [];
   const parts: MessagePart[] = [];
   const toolCalls: MessageToolCall[] = [];
+  const turnId = message.turnId ?? stringMetadata(message.metadata, 'turnId');
 
   for (const part of message.parts) {
     if (part.type === 'tool') {
@@ -62,6 +63,7 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
     role: message.role === 'user' ? 'user' : 'assistant',
     streaming: message.status === 'streaming',
     toolCalls,
+    ...(turnId ? { turnId } : {}),
     ...(message.kind === 'compaction' ? { compactionStatus: message.status === 'streaming' ? 'running' : 'completed' } : {}),
     type: message.kind === 'compaction' ? 'compaction' : message.kind === 'steer' ? 'steer' : 'text',
   });

@@ -14,7 +14,7 @@
     </div>
   </div> -->
   <div
-    v-else
+    v-else-if="!hideCollapsedTurnDetail"
     class="codex-chat-theme chat-message"
     :class="[`chat-message--${chatMessage.role}`, {
       'chat-message--actions-visible': actionsAlwaysVisible && !reserveActionSlot,
@@ -167,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, provide, ref } from 'vue'
 import { useCodexChatTranslate } from '../chat/chat-i18n'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import { resolveCodexConversationPresentation } from '../chat/contracts'
@@ -187,6 +187,7 @@ import ChatMessageEditor from '../chat/ChatMessageEditor.vue'
 import { computeMessageBlocks, groupAssistantWorkBlocks, stripMessageContext } from '../chat/message-blocks'
 import { copyMessageToClipboard } from '../chat/message-actions'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
+import { assistantWorkMessageIndexKey, assistantWorkTurnKey } from '../chat/message-work-state'
 import { useCodexHostCapabilities } from '../native-capabilities'
 import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom'
 
@@ -259,14 +260,61 @@ const hostCapabilities = useCodexHostCapabilities()
 
 const t = useCodexChatTranslate()
 const chatMessage = computed(() => chatMessageFromInput(props.message))
+const assistantWorkTurn = inject(assistantWorkTurnKey, undefined)
+provide(assistantWorkMessageIndexKey, computed(() => props.index))
+const messageTurnState = computed(() => (
+  chatMessage.value.turnId === assistantWorkTurn?.turnId.value
+    ? assistantWorkTurn
+    : undefined
+))
+const workTurnState = computed(() => (
+  messageTurnState.value?.enabled.value
+    ? messageTurnState.value
+    : undefined
+))
+const workActive = computed(() => {
+  return workTurnState.value?.active.value
+})
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
 const allBlocks = computed(() => computeMessageBlocks(chatMessage.value))
+const visibleBlocks = computed(() => allBlocks.value.filter((block) => (
+  effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
+)))
+const groupWork = computed(() => {
+  const state = workTurnState.value
+  if (!state) return undefined
+  const onlyStructuredWork = allBlocks.value.length > 0 && allBlocks.value.every((block) => (
+    block.type === 'tool' || block.type === 'tool-group'
+  ))
+  return state.phased.value || (state.active.value && onlyStructuredWork)
+})
 const blocks = computed(() => groupAssistantWorkBlocks(
   chatMessage.value,
-  allBlocks.value.filter((block) => (
-    effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
-  )),
+  visibleBlocks.value,
+  workActive.value,
+  groupWork.value,
 ))
+const workOnlyAssistant = computed(() => (
+  chatMessage.value.role === 'assistant'
+  && blocks.value.length > 0
+  && blocks.value.every((block) => block.type === 'work-group')
+))
+const hideCollapsedTurnDetail = computed(() => {
+  if (
+    chatMessage.value.role === 'assistant'
+    && chatMessage.value.streaming !== true
+    && allBlocks.value.length > 0
+    && visibleBlocks.value.length === 0
+  ) return true
+  const state = messageTurnState.value
+  if (!state?.enabled.value || state.active.value) return false
+  if (state.completedWithoutFinal.value) return chatMessage.value.type === 'steer'
+  if (state.expanded.value) return false
+  if (chatMessage.value.type === 'steer') return true
+  return chatMessage.value.role === 'assistant'
+    && state.headerMessageIndex.value !== props.index
+    && blocks.value.every((block) => block.type === 'work-group')
+})
 const indexedBlocks = computed(() => blocks.value.map((block, blockIndex) => ({ block, blockIndex })))
 const indexedAllBlocks = computed(() => allBlocks.value.map((block, blockIndex) => ({ block, blockIndex })))
 const userAttachmentBlocks = computed(() => (
@@ -287,6 +335,7 @@ let copyResetTimeout: ReturnType<typeof setTimeout> | null = null
 const showActions = computed(() => (
   chatMessage.value.type !== 'compaction' &&
   chatMessage.value.type !== 'steer' &&
+  !workOnlyAssistant.value &&
   !isEditing.value
 ))
 const reserveActionSlot = computed(() => (
@@ -299,6 +348,10 @@ const canEdit = computed(() => props.canEditMessage && effectivePresentation.val
 const canFork = computed(() => props.canForkMessage && effectivePresentation.value.messages.actions.fork)
 const canRetry = computed(() => props.canRetryMessage && effectivePresentation.value.messages.actions.retry)
 const hasVisibleAssistantActivity = computed(() => blocks.value.some(isVisibleAssistantBlock))
+const isLatestStreamingAssistantSegment = computed(() => (
+  messageTurnState.value?.latestStreamingAssistantIndex.value === undefined
+    || messageTurnState.value.latestStreamingAssistantIndex.value === props.index
+))
 const showEmptyResponse = computed(() => (
   chatMessage.value.role === 'assistant' &&
   chatMessage.value.streaming !== true &&
@@ -307,11 +360,13 @@ const showEmptyResponse = computed(() => (
 const showThinkingIndicator = computed(() => (
   chatMessage.value.role === 'assistant' &&
   chatMessage.value.streaming === true &&
+  isLatestStreamingAssistantSegment.value &&
   !hasVisibleAssistantActivity.value
 ))
 const showStreamingDot = computed(() => (
   chatMessage.value.role === 'assistant' &&
   chatMessage.value.streaming === true &&
+  isLatestStreamingAssistantSegment.value &&
   hasVisibleAssistantActivity.value
 ))
 function startEdit() {

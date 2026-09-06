@@ -251,6 +251,24 @@ describe('CodexMessage', () => {
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
   });
 
+  it('shows completed phased work directly when there is no final answer', () => {
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-phased-without-answer',
+        role: 'assistant',
+        status: 'complete',
+        parts: [{
+          type: 'text',
+          text: 'The backend does not emit a separate summary.',
+          phase: 'commentary',
+        }],
+      },
+    });
+
+    expect(wrapper.find('.chat-work-group__header').exists()).toBe(false);
+    expect(wrapper.text()).toContain('The backend does not emit a separate summary.');
+  });
+
   it('keeps unphased assistant output on the existing flat rendering path', () => {
     const wrapper = mountMessage({
       message: {

@@ -177,6 +177,385 @@ describe('CodexMessageList', () => {
     expect(wrapper.find('.chat-message--steer').exists()).toBe(true);
   });
 
+  it('renders one work disclosure across assistant segments in the same steered turn', async () => {
+    const firstToolSegment: SurfaceMessage = {
+      id: 'assistant-turn-1',
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'turn-1',
+      parts: [{
+        type: 'tool',
+        id: 'tool-1',
+        title: 'shell',
+        status: 'running',
+        input: { command: 'npm test' },
+      }],
+    };
+    const turnMessages: SurfaceMessage[] = [
+      {
+        ...firstToolSegment,
+        status: 'complete',
+        parts: [{
+          type: 'tool',
+          id: 'tool-1',
+          title: 'shell',
+          status: 'completed',
+          input: { command: 'npm test' },
+        }],
+      },
+      {
+        id: 'steer-turn-1',
+        kind: 'steer',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        parts: [{ type: 'text', text: 'Also check the tests.' }],
+      },
+      {
+        id: 'assistant-turn-1-segment-1',
+        role: 'assistant',
+        status: 'streaming',
+        turnId: 'turn-1',
+        parts: [{ type: 'text', text: 'Checking those now.', phase: 'commentary' }],
+      },
+      {
+        id: 'steer-turn-1-again',
+        kind: 'steer',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-1',
+        parts: [{ type: 'text', text: 'Keep this in the same turn.' }],
+      },
+      {
+        id: 'assistant-turn-1-segment-2',
+        role: 'assistant',
+        status: 'streaming',
+        turnId: 'turn-1',
+        parts: [{
+          type: 'reasoning',
+          itemId: 'reasoning-turn-1-segment-2',
+          summary: 'Verifying the shared turn state.',
+          summaryIndex: 0,
+        }],
+      },
+    ];
+    const wrapper = mount(CodexMessageList, { props: { busy: true, messages: [firstToolSegment] } });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
+    expect(wrapper.get('.chat-work-group .chat-fold').classes()).toContain('chat-fold--open');
+
+    await wrapper.setProps({ messages: turnMessages });
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Working']);
+    expect(wrapper.findAll('.chat-work-group .chat-fold--open')).toHaveLength(1);
+    expect(wrapper.text()).toContain('Also check the tests.');
+    expect(wrapper.text()).toContain('Keep this in the same turn.');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message__stream-dot')).toHaveLength(1);
+
+    await wrapper.setProps({
+      busy: false,
+      messages: turnMessages.map((message) => message.id === 'assistant-turn-1-segment-2'
+        ? {
+            ...message,
+            status: 'complete' as const,
+            parts: [
+              ...message.parts,
+              { type: 'text' as const, text: 'The turn is complete.', phase: 'final_answer' as const },
+            ],
+          }
+        : { ...message, status: 'complete' as const }),
+    });
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Done · View details']);
+    expect(wrapper.findAll('.chat-work-group .chat-fold--open')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-work-group--continuation')).toHaveLength(0);
+    expect(wrapper.text()).toContain('The turn is complete.');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+    expect(wrapper.findAll('.chat-work-group--continuation')).toHaveLength(2);
+    expect(wrapper.text()).toContain('Checking those now.');
+    expect(wrapper.text()).toContain('Verifying the shared turn state.');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(3);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+  });
+
+  it('keeps the current turn working while busy before its next assistant segment arrives', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        busy: true,
+        messages: [
+          {
+            id: 'assistant-before-gap',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-busy-gap',
+            parts: [{ type: 'text', text: 'I am checking this.', phase: 'commentary' }],
+          },
+          {
+            id: 'steer-before-gap',
+            kind: 'steer',
+            role: 'user',
+            status: 'complete',
+            turnId: 'turn-busy-gap',
+            parts: [{ type: 'text', text: 'Also check the pending state.' }],
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Working']);
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+  });
+
+  it('keeps unphased streaming text and tools on the flat rendering path', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        busy: true,
+        messages: [{
+          id: 'assistant-unphased-tool',
+          role: 'assistant',
+          status: 'streaming',
+          turnId: 'turn-unphased',
+          parts: [
+            { type: 'text', text: 'Claude is checking the file.' },
+            { type: 'tool', id: 'tool-read', title: 'read', status: 'running' },
+          ],
+        }],
+      },
+    });
+
+    expect(wrapper.find('.chat-work-group').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Claude is checking the file.');
+    expect(wrapper.text()).toContain('Running read');
+  });
+
+  it('uses visible commentary as the turn disclosure when tool blocks are hidden', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages: [
+          {
+            id: 'assistant-hidden-tool',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-hidden-tool',
+            parts: [{ type: 'tool', id: 'hidden-tool', title: 'npm test', status: 'completed' }],
+          },
+          {
+            id: 'assistant-visible-commentary',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-hidden-tool',
+            parts: [{ type: 'text', text: 'Finished the verification.', phase: 'commentary' }],
+          },
+          {
+            id: 'assistant-visible-answer',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-hidden-tool',
+            parts: [{ type: 'text', text: 'Everything passed.', phase: 'final_answer' }],
+          },
+        ],
+        presentation: { messages: { toolBlocks: false } },
+      },
+    });
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Done · View details']);
+    expect(wrapper.text()).not.toContain('npm test');
+    expect(wrapper.get('.chat-work-group').text()).toContain('Finished the verification.');
+    expect(wrapper.get('.chat-work-group .chat-fold').classes()).not.toContain('chat-fold--open');
+    expect(wrapper.text()).toContain('Everything passed.');
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+  });
+
+  it('does not render an empty row for a hidden tool segment in an active turn', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        busy: true,
+        messages: [
+          {
+            id: 'assistant-hidden-active-tool',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-hidden-active-tool',
+            parts: [{ type: 'tool', id: 'hidden-active-tool', title: 'npm test', status: 'completed' }],
+          },
+          {
+            id: 'assistant-visible-active-commentary',
+            role: 'assistant',
+            status: 'streaming',
+            turnId: 'turn-hidden-active-tool',
+            parts: [{ type: 'text', text: 'Still checking.', phase: 'commentary' }],
+          },
+        ],
+        presentation: { messages: { toolBlocks: false } },
+      },
+    });
+
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(0);
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
+  });
+
+  it('shows completed work directly when a turn has no final answer', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages: [
+          {
+            id: 'assistant-no-summary-work',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-no-summary',
+            parts: [
+              { type: 'tool', id: 'tool-no-summary', title: 'npm test', status: 'completed' },
+              { type: 'text', text: 'Finished the verification.', phase: 'commentary' },
+            ],
+          },
+          {
+            id: 'steer-no-summary',
+            kind: 'steer',
+            role: 'user',
+            status: 'complete',
+            turnId: 'turn-no-summary',
+            parts: [{ type: 'text', text: 'Also check the docs.' }],
+          },
+          {
+            id: 'assistant-no-summary-work-two',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-no-summary',
+            parts: [{ type: 'text', text: 'The docs are current.', phase: 'commentary' }],
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.find('.chat-work-group__header').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Finished the verification.');
+    expect(wrapper.text()).toContain('The docs are current.');
+    expect(wrapper.text()).not.toContain('Also check the docs.');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(0);
+  });
+
+  it('keeps a completed turn disclosure reachable while toggling its details', async () => {
+    let resizeCallback: ResizeObserverCallback = () => undefined;
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', class MockResizeObserver {
+      disconnect(): void {}
+      observe(): void {}
+      unobserve(): void {}
+
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+    });
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages: [{
+          id: 'assistant-toggle-details',
+          role: 'assistant',
+          status: 'complete',
+          turnId: 'turn-toggle-details',
+          parts: [
+            { type: 'tool', id: 'tool-toggle-details', title: 'npm test', status: 'completed' },
+            { type: 'text', text: 'Finished the verification.', phase: 'commentary' },
+            { type: 'text', text: 'Everything passed.', phase: 'final_answer' },
+          ],
+        }],
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let scrollHeight = 1_000;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    scrollEl.scrollTop = 700;
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+    scrollHeight = 2_000;
+    resizeCallback([], {} as ResizeObserver);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+    expect(scrollEl.scrollTop).toBe(700);
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+    scrollHeight = 1_000;
+    resizeCallback([], {} as ResizeObserver);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(scrollEl.scrollTop).toBe(700);
+    wrapper.unmount();
+  });
+
+  it('ignores queued bottom-follow work after the reader opens turn details', async () => {
+    let resizeCallback: ResizeObserverCallback = () => undefined;
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', class MockResizeObserver {
+      disconnect(): void {}
+      observe(): void {}
+      unobserve(): void {}
+
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+    });
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    }));
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messages: [{
+          id: 'assistant-pending-scroll',
+          role: 'assistant',
+          status: 'complete',
+          turnId: 'turn-pending-scroll',
+          parts: [
+            { type: 'text', text: 'Finished the verification.', phase: 'commentary' },
+            { type: 'text', text: 'Everything passed.', phase: 'final_answer' },
+          ],
+        }],
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    let scrollHeight = 1_000;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    await flushPromises();
+    frames.shift()?.(0);
+    scrollEl.scrollTop = 700;
+
+    resizeCallback([], {} as ResizeObserver);
+    expect(frames).toHaveLength(1);
+    await wrapper.get('.chat-work-group__header').trigger('click');
+    scrollHeight = 2_000;
+    frames.shift()?.(0);
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+    expect(scrollEl.scrollTop).toBe(700);
+    wrapper.unmount();
+  });
+
   it('keeps actions visible on the latest completed assistant message only', () => {
     const wrapper = mount(CodexMessageList, {
       props: {
@@ -332,6 +711,62 @@ describe('CodexMessageList', () => {
       'message-1',
       'message-2',
     ]);
+    wrapper.unmount();
+  });
+
+  it('preserves a turn disclosure while lazy rendering prepends an earlier segment', async () => {
+    const turnMessages: SurfaceMessage[] = [
+      {
+        id: 'lazy-turn-tool',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'lazy-turn',
+        parts: [{ type: 'tool', id: 'lazy-tool', title: 'read', status: 'completed' }],
+      },
+      {
+        id: 'lazy-turn-steer',
+        kind: 'steer',
+        role: 'user',
+        status: 'complete',
+        turnId: 'lazy-turn',
+        parts: [{ type: 'text', text: 'Inspect the earlier segment too.' }],
+      },
+      {
+        id: 'lazy-turn-answer',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'lazy-turn',
+        parts: [
+          { type: 'text', text: 'I inspected the visible segment.', phase: 'commentary' },
+          { type: 'text', text: 'Finished.', phase: 'final_answer' },
+        ],
+      },
+    ];
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        initialMessageBatchSize: 2,
+        messageBatchSize: 1,
+        messages: turnMessages,
+      },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 100 });
+    Object.defineProperty(scrollEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapper.findAll('.chat-message').length * 100,
+    });
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+
+    scrollEl.scrollTop = 0;
+    await wrapper.get('.message-list').trigger('scroll');
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(3);
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+    expect(wrapper.text()).toContain('Ran read');
     wrapper.unmount();
   });
 

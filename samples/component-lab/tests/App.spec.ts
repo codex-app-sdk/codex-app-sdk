@@ -108,6 +108,64 @@ describe('component lab', () => {
     expect(titles.slice(3)).toEqual(['Running npm run build']);
   });
 
+  it('shows one work disclosure for a turn with multiple steers and assistant segments', async () => {
+    const wrapper = mount(App);
+    const busyButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Busy and queued'));
+    expect(busyButton).toBeDefined();
+    await busyButton!.trigger('click');
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Working']);
+    expect(wrapper.text()).toContain('Check the message-list boundary too.');
+    expect(wrapper.text()).toContain('Keep both steers in this turn.');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message__stream-dot')).toHaveLength(1);
+  });
+
+  it('removes completed steer and work-only rows until turn details are opened', async () => {
+    const wrapper = mount(App);
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Completed steered turn'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Done · View details']);
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+    expect(wrapper.text()).toContain('The completed turn is compact.');
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(3);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
+  });
+
+  it('shows completed work without a disclosure when there is no summary', async () => {
+    const wrapper = mount(App);
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Completed without summary'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+
+    expect(wrapper.find('.chat-work-group__header').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Finished the verification.');
+    expect(wrapper.text()).toContain('The docs are current.');
+    expect(wrapper.text()).not.toContain('Also check the docs.');
+    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(0);
+  });
+
   it('submits multiline prompts without a backend', async () => {
     const wrapper = mount(App);
     const editor = wrapper.get('[role="textbox"][contenteditable]');

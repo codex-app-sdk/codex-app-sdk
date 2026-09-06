@@ -327,9 +327,21 @@ invoked for every message when `renderStrategy` is `eager`. The `index` is alway
 the original absolute message index, and the original message id remains the
 rendering key. The default behavior is identity.
 
+`CodexChatMessage` preserves the optional `turnId` from `SurfaceMessage`.
+`CodexMessageList` projects adjacent messages with that identity into one
+logical turn. Steering messages remain in chronological order, while all
+assistant commentary, reasoning, and tool segments share one `Working` / `Done`
+disclosure. A transform that returns a `CodexChatMessage` should retain
+`turnId` for that behavior. A tool-only active segment is treated as structured
+work before the first phased text arrives; unphased messages containing
+ordinary text retain the flat rendering path.
+
 Pass `busy` to `CodexMessageList` (the conversation pane wires this from its
 surface state) to keep a `Thinking` shimmer visible while a turn is accepted
-but the app-server has not yet materialized its first assistant row.
+but the app-server has not yet materialized its first assistant row. When the
+latest visible message has a `turnId`, that pending state remains part of the
+same logical turn so its `Working` disclosure and steers do not fold during the
+gap.
 
 Message actions remain visible on the latest completed assistant message. Older
 message rows keep the hover/focus visibility behavior.

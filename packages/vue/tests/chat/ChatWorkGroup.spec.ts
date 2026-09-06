@@ -24,14 +24,16 @@ describe('ChatWorkGroup', () => {
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
   });
 
-  it('auto-expands untouched active work but preserves a reader toggle until the final answer starts', async () => {
+  it('shows summary-less work directly, then preserves reader toggles once it becomes active', async () => {
     const wrapper = mount(ChatWorkGroup, {
       props: { active: false, finalStarted: false },
       slots: { default: 'Inspecting the renderer' },
     });
 
-    expect(wrapper.get('.chat-fold').classes()).not.toContain('chat-fold--open');
+    expect(wrapper.find('.chat-work-group__header').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Inspecting the renderer');
     await wrapper.setProps({ active: true });
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
     expect(wrapper.get('.chat-fold').classes()).toContain('chat-fold--open');
 
     await wrapper.get('.chat-work-group__header').trigger('click');

@@ -74,8 +74,13 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
   return finalizeAssistantBlocks(blocks, prompts)
 }
 
-export function groupAssistantWorkBlocks(message: Message, blocks: MessageBlock[]): RenderedMessageBlock[] {
-  if (message.role !== 'assistant' || !hasExplicitWorkPhases(message)) return blocks
+export function groupAssistantWorkBlocks(
+  message: Message,
+  blocks: MessageBlock[],
+  workActive = message.streaming === true,
+  groupWork = hasExplicitAssistantWorkPhases(message),
+): RenderedMessageBlock[] {
+  if (message.role !== 'assistant' || !groupWork) return blocks
 
   const workBlocks: MessageBlock[] = []
   const answerBlocks: MessageBlock[] = []
@@ -90,7 +95,7 @@ export function groupAssistantWorkBlocks(message: Message, blocks: MessageBlock[
   )) ?? false
   return [{
     type: 'work-group',
-    active: message.streaming === true && !finalStarted,
+    active: workActive && !finalStarted,
     blocks: workBlocks,
     finalStarted,
   }, ...answerBlocks]
@@ -287,13 +292,13 @@ function pushTextBlock(blocks: MessageBlock[], content: string, phase?: MessageP
   }
 }
 
-function hasExplicitWorkPhases(message: Message) {
+export function hasExplicitAssistantWorkPhases(message: Message) {
   return message.parts?.some((part) => (
     part.type === 'reasoning' || (part.type === 'text' && part.phase !== undefined)
   )) ?? false
 }
 
-function isAssistantWorkBlock(block: MessageBlock) {
+export function isAssistantWorkBlock(block: MessageBlock) {
   if (block.type === 'reasoning' || block.type === 'tool' || block.type === 'tool-group') return true
   return 'phase' in block && block.phase === 'commentary'
 }

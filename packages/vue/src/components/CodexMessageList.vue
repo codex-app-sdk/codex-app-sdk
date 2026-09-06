@@ -6,56 +6,66 @@
     <div
       ref="scrollElement"
       class="codex-message-list__viewport message-list"
+      @click.capture="handleViewportClick"
       @scroll="handleScroll"
     >
       <div class="codex-message-list__content">
         <slot v-if="displayEntries.length === 0" name="empty">
           <p class="codex-message-list__empty">{{ emptyLabel }}</p>
         </slot>
-        <template v-for="entry in displayEntries" v-else :key="entry.key">
-          <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(entry.message)" :index="entry.index" />
-          <CodexMessage
-            v-else
-            :actions-disabled="actionsDisabled"
-            :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
-            :answered-client-request-ids="answeredClientRequestIds"
-            :can-delete-message="canDeleteMessage"
-            :can-edit-message="canEditMessage"
-            :can-fork-message="canForkMessage"
-            :can-retry-message="canRetryMessage"
-            :follow-ups-disabled="followUpsDisabled"
-            :index="entry.index"
-            :message="entry.message"
-            :mention-groups="mentionGroups"
-            :open-image="openImage"
-            :plugins="plugins"
-            :presentation="presentation"
-            :show-tool-details="showToolDetails"
-            :skills="skills"
-            :thread-actions-disabled="busy"
-            @cancel="emit('cancel')"
-            @client-response="emit('client-response', $event)"
-            @copy-message="emit('copy-message', $event)"
-            @delete-message="emit('delete-message', $event)"
-            @edit-message="emit('edit-message', $event)"
-            @fork-message="emit('fork-message', $event)"
-            @open-link="emit('open-link', $event)"
-            @open-visualization="emit('open-visualization', $event)"
-            @quote-message="emit('quote-message', $event)"
-            @retry-message="emit('retry-message', $event)"
-            @send-follow-up="emit('send-follow-up', $event)"
-          >
-            <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
-            <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
-            <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
-            <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
-            <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
-            <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
-            <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
-            <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
-            <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
-          </CodexMessage>
-        </template>
+        <CodexMessageTurn
+          v-for="group in displayGroups"
+          v-else
+          :key="group.key"
+          :entries="group.entries"
+          :show-tool-blocks="effectivePresentation.messages.toolBlocks"
+          :turn-id="group.turnId"
+        >
+          <template v-for="entry in group.entries" :key="entry.key">
+            <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(entry.message)" :index="entry.index" />
+            <CodexMessage
+              v-else
+              :actions-disabled="actionsDisabled"
+              :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
+              :answered-client-request-ids="answeredClientRequestIds"
+              :can-delete-message="canDeleteMessage"
+              :can-edit-message="canEditMessage"
+              :can-fork-message="canForkMessage"
+              :can-retry-message="canRetryMessage"
+              :follow-ups-disabled="followUpsDisabled"
+              :index="entry.index"
+              :message="entry.message"
+              :mention-groups="mentionGroups"
+              :open-image="openImage"
+              :plugins="plugins"
+              :presentation="presentation"
+              :show-tool-details="showToolDetails"
+              :skills="skills"
+              :thread-actions-disabled="busy"
+              @cancel="emit('cancel')"
+              @client-response="emit('client-response', $event)"
+              @copy-message="emit('copy-message', $event)"
+              @delete-message="emit('delete-message', $event)"
+              @edit-message="emit('edit-message', $event)"
+              @fork-message="emit('fork-message', $event)"
+              @open-link="emit('open-link', $event)"
+              @open-visualization="emit('open-visualization', $event)"
+              @quote-message="emit('quote-message', $event)"
+              @retry-message="emit('retry-message', $event)"
+              @send-follow-up="emit('send-follow-up', $event)"
+            >
+              <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
+              <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
+              <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
+              <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
+              <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
+              <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
+              <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
+              <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
+              <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
+            </CodexMessage>
+          </template>
+        </CodexMessageTurn>
       </div>
     </div>
     <CodexScrollToBottom
@@ -76,12 +86,14 @@ import type {
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
+import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
 import type { CodexMessageImageOpenHandler } from '../chat/message-image'
 import type { CodexConversationVisualization } from '../chat/visualization'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
+import CodexMessageTurn from './CodexMessageTurn.vue'
 import CodexScrollToBottom from './CodexScrollToBottom.vue'
 import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom'
 
@@ -217,9 +229,38 @@ const displayEntries = computed(() => {
     key: message.id ?? (effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset),
   }))
   if (props.busy && !hasStreamingAssistant.value) {
-    entries.push({ index: props.messages.length, message: thinkingPlaceholder, key: thinkingPlaceholder.id })
+    const turnId = entries.length > 0
+      ? chatMessageFromInput(entries.at(-1)!.message).turnId?.trim() || undefined
+      : undefined
+    entries.push({
+      index: props.messages.length,
+      message: turnId ? { ...thinkingPlaceholder, turnId } : thinkingPlaceholder,
+      key: thinkingPlaceholder.id,
+    })
   }
   return entries
+})
+const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
+const displayGroups = computed(() => {
+  const groups: Array<{
+    entries: typeof displayEntries.value
+    key: string | number
+    turnId?: string
+  }> = []
+  for (const entry of displayEntries.value) {
+    const turnId = chatMessageFromInput(entry.message).turnId?.trim() || undefined
+    const previous = groups.at(-1)
+    if (turnId && previous?.turnId === turnId) {
+      previous.entries.push(entry)
+      continue
+    }
+    groups.push({
+      entries: [entry],
+      key: turnId ? `turn:${turnId}` : entry.key,
+      ...(turnId ? { turnId } : {}),
+    })
+  }
+  return groups
 })
 const latestAssistantIndex = computed(() => [...displayEntries.value]
   .reverse()
@@ -303,6 +344,14 @@ function handleScroll(): void {
   } else if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange()) {
     void loadOlderMessages()
   }
+}
+
+function handleViewportClick(event: MouseEvent): void {
+  const target = event.target
+  if (!(target instanceof Element) || !target.closest('.chat-work-group__header')) return
+  if (!stickToBottom.value) return
+  stickToBottom.value = false
+  emit('stickiness-change', false)
 }
 
 function requestOlderMessages(): void {
@@ -437,7 +486,7 @@ function queueScrollToBottom(): void {
   if (scrollFrame !== null) return
   const callback = () => {
     scrollFrame = null
-    scrollToBottom()
+    if (stickToBottom.value) scrollToBottom()
   }
   scrollFrame = typeof requestAnimationFrame === 'function'
     ? requestAnimationFrame(callback)

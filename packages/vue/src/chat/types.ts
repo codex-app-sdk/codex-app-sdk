@@ -79,6 +79,8 @@ export type Message = {
   streaming?: boolean;
   suggestedPrompts?: MessageSuggestedPrompt[];
   toolCalls?: MessageToolCall[];
+  /** Turn that produced this message, when available. */
+  turnId?: string;
   type?: 'compaction' | 'display' | 'steer' | 'text';
 };
 

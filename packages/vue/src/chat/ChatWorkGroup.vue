@@ -1,6 +1,11 @@
 <template>
-  <section class="codex-chat-theme chat-work-group">
+  <section
+    v-if="showHeader || expanded"
+    class="codex-chat-theme chat-work-group"
+    :class="{ 'chat-work-group--continuation': !showHeader }"
+  >
     <button
+      v-if="showHeader"
       type="button"
       class="chat-work-group__header"
       :aria-expanded="expanded"
@@ -16,19 +21,23 @@
       <component :is="expanded ? ChevronDown : ChevronRightIcon" :size="15" />
     </button>
 
-    <ChatFoldTransition :open="expanded">
+    <ChatFoldTransition v-if="showHeader" :open="expanded">
       <div class="chat-work-group__body">
         <slot />
       </div>
     </ChatFoldTransition>
+    <div v-else class="chat-work-group__body chat-work-group__body--continuation">
+      <slot />
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { ChevronDown, ChevronRightIcon } from '../icons/app-icons'
 import { useCodexChatTranslate } from './chat-i18n'
 import ChatFoldTransition from './ChatFoldTransition.vue'
+import { assistantWorkMessageIndexKey, assistantWorkTurnKey } from './message-work-state'
 
 const props = defineProps<{
   active: boolean
@@ -36,30 +45,52 @@ const props = defineProps<{
 }>()
 
 const t = useCodexChatTranslate()
-const expanded = ref(props.active && !props.finalStarted)
+const assistantWorkTurn = inject(assistantWorkTurnKey, undefined)
+const messageIndex = inject(assistantWorkMessageIndexKey, undefined)
+const usesTurn = computed(() => assistantWorkTurn?.enabled.value === true && messageIndex !== undefined)
+const completedWithoutFinal = computed(() => (
+  usesTurn.value
+    ? assistantWorkTurn!.completedWithoutFinal.value
+    : !props.active && !props.finalStarted
+))
+const localExpanded = ref(props.active && !props.finalStarted)
 const userToggled = ref(false)
+const expanded = computed(() => (
+  completedWithoutFinal.value
+    ? true
+    : usesTurn.value ? assistantWorkTurn!.expanded.value : localExpanded.value
+))
+const active = computed(() => usesTurn.value ? assistantWorkTurn!.active.value : props.active)
+const showHeader = computed(() => (
+  !completedWithoutFinal.value
+  && (!usesTurn.value || assistantWorkTurn!.headerMessageIndex.value === messageIndex!.value)
+))
 const label = computed(() => {
-  if (props.active) return t('chat.work.working')
+  if (active.value) return t('chat.work.working')
   return t(expanded.value ? 'chat.work.doneHideDetails' : 'chat.work.doneViewDetails')
 })
 
 watch(
   () => props.finalStarted,
   (started, previous) => {
-    if (started && !previous) expanded.value = false
+    if (!usesTurn.value && started && !previous) localExpanded.value = false
   },
 )
 
 watch(
   () => props.active,
-  (active) => {
-    if (!userToggled.value) expanded.value = active && !props.finalStarted
+  (isActive) => {
+    if (!usesTurn.value && !userToggled.value) localExpanded.value = isActive && !props.finalStarted
   },
 )
 
 function toggle() {
+  if (usesTurn.value) {
+    assistantWorkTurn!.toggle()
+    return
+  }
   userToggled.value = true
-  expanded.value = !expanded.value
+  localExpanded.value = !localExpanded.value
 }
 </script>
 
@@ -104,5 +135,9 @@ function toggle() {
   flex-direction: column;
   gap: var(--space-4);
   padding-top: var(--space-3);
+}
+
+.chat-work-group__body--continuation {
+  padding-top: 0;
 }
 </style>

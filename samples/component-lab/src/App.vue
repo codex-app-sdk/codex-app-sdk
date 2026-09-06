@@ -208,18 +208,32 @@ const scenarios: [Scenario, ...Scenario[]] = [
     name: 'Busy and queued',
     summary: 'Working state, queue, context, and diff shelf',
     title: 'Codex is working',
-    description: 'Type a follow-up to exercise queue submission and the interrupt button. Expand the tool group to see completed work before active work.',
+    description: 'A single active turn split by two steers. Expand the tool group to see completed work before active work.',
     busy: true,
     contextUsage: { totalTokens: 64_000, inputTokens: 48_000, cachedInputTokens: 8_000, outputTokens: 12_000, reasoningOutputTokens: 4_000, lastTotalTokens: 8_000, modelContextWindow: 200_000, usedPercent: 32 },
     queuedPrompts: [{ id: 'queued-1', text: 'Run the visual checks next' }],
     turnGitDiff: { turnId: 'turn-lab', addedLines: 42, removedLines: 7, updatedAt: '2026-08-01T12:00:00Z' },
-    messages: [{ id: 'busy-assistant', role: 'assistant', status: 'streaming', parts: [
-      { type: 'tool', id: 'busy-completed-test', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
-      { type: 'tool', id: 'busy-completed-read', title: 'README.md', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'read', phase: 'completed', params: { target: 'README.md' } }) },
-      { type: 'tool', id: 'busy-running-search', title: 'Searching source files', kind: 'search', status: 'running', statusText: 'Finding composer code' },
-      { type: 'tool', id: 'busy-running-build', title: 'npm run build', kind: 'command', status: 'running', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'running', params: { target: 'npm run build' } }) },
-      { type: 'text', text: 'Updating the composer and checking every interaction…', phase: 'commentary' },
-    ] }],
+    messages: [
+      { id: 'busy-assistant', role: 'assistant', status: 'streaming', turnId: 'turn-lab', parts: [
+        { type: 'tool', id: 'busy-completed-test', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
+        { type: 'tool', id: 'busy-completed-read', title: 'README.md', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'read', phase: 'completed', params: { target: 'README.md' } }) },
+        { type: 'tool', id: 'busy-running-search', title: 'Searching source files', kind: 'search', status: 'running', statusText: 'Finding composer code' },
+        { type: 'tool', id: 'busy-running-build', title: 'npm run build', kind: 'command', status: 'running', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'running', params: { target: 'npm run build' } }) },
+        { type: 'text', text: 'Updating the composer and checking every interaction…', phase: 'commentary' },
+      ] },
+      { id: 'busy-steer-one', kind: 'steer', role: 'user', status: 'complete', turnId: 'turn-lab', parts: [
+        { type: 'text', text: 'Check the message-list boundary too.' },
+      ] },
+      { id: 'busy-assistant-two', role: 'assistant', status: 'streaming', turnId: 'turn-lab', parts: [
+        { type: 'text', text: 'Keeping the same turn open while I inspect it.', phase: 'commentary' },
+      ] },
+      { id: 'busy-steer-two', kind: 'steer', role: 'user', status: 'complete', turnId: 'turn-lab', parts: [
+        { type: 'text', text: 'Keep both steers in this turn.' },
+      ] },
+      { id: 'busy-assistant-three', role: 'assistant', status: 'streaming', turnId: 'turn-lab', parts: [
+        { type: 'reasoning', itemId: 'busy-reasoning', summaryIndex: 0, summary: 'Verifying that one turn owns one shared disclosure.' },
+      ] },
+    ],
   },
   {
     id: 'tool-icons',
@@ -249,6 +263,51 @@ const scenarios: [Scenario, ...Scenario[]] = [
           { type: 'text', text: 'Known Codex actions use SDK icons, the app-owned browser tool uses a provided icon, and unknown tools use the generic tool icon.' },
         ],
       },
+    ],
+  },
+  {
+    id: 'completed-steered-turn',
+    name: 'Completed steered turn',
+    summary: 'Collapsed work and steer details',
+    title: 'Turn completed',
+    description: 'Only the shared disclosure and final answer remain until the reader opens the turn details.',
+    messages: [
+      { id: 'completed-turn-work', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'tool', id: 'completed-turn-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
+        { type: 'text', text: 'Started the verification.', phase: 'commentary' },
+      ] },
+      { id: 'completed-turn-steer-one', kind: 'steer', role: 'user', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Check the shared disclosure too.' },
+      ] },
+      { id: 'completed-turn-work-two', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Verified the disclosure behavior.', phase: 'commentary' },
+      ] },
+      { id: 'completed-turn-steer-two', kind: 'steer', role: 'user', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Remove empty rows when done.' },
+      ] },
+      { id: 'completed-turn-answer', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Checked the final layout.', phase: 'commentary' },
+        { type: 'text', text: 'The completed turn is compact.', phase: 'final_answer' },
+      ] },
+    ],
+  },
+  {
+    id: 'completed-turn-without-summary',
+    name: 'Completed without summary',
+    summary: 'Completed work shown directly',
+    title: 'Turn completed without a final answer',
+    description: 'Completed commentary and tools remain visible without a Done disclosure.',
+    messages: [
+      { id: 'no-summary-work', role: 'assistant', status: 'complete', turnId: 'no-summary-turn', parts: [
+        { type: 'tool', id: 'no-summary-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
+        { type: 'text', text: 'Finished the verification.', phase: 'commentary' },
+      ] },
+      { id: 'no-summary-steer', kind: 'steer', role: 'user', status: 'complete', turnId: 'no-summary-turn', parts: [
+        { type: 'text', text: 'Also check the docs.' },
+      ] },
+      { id: 'no-summary-work-two', role: 'assistant', status: 'complete', turnId: 'no-summary-turn', parts: [
+        { type: 'text', text: 'The docs are current.', phase: 'commentary' },
+      ] },
     ],
   },
   {
