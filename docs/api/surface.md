@@ -199,6 +199,52 @@ review, goal, approval, client-request, and event operations.
 `CodexSurfaceRendererApi` narrows trusted conversation-creation input and uses
 `CodexRendererSendMessageOptions` for send/steer attachments.
 
+## Conversation-targeted bridge
+
+Multi-agent hosts must not route conversation work through global operations
+such as `sendMessage()`, `interrupt()`, or `deleteTurn()`, because those methods
+follow `activeConversationId`. The core bridge exports a selection-independent
+interface over the Node surface's existing conversation handles:
+
+```ts
+import {
+  invokeCodexConversationBridgeOperation,
+  subscribeCodexConversationBridge,
+} from '@codex-app-sdk/core/surface-bridge';
+
+const snapshot = await invokeCodexConversationBridgeOperation(
+  surface,
+  conversationId,
+  'sendMessage',
+  ['Run the checks'],
+);
+
+const unsubscribe = subscribeCodexConversationBridge(
+  surface,
+  conversationId,
+  (notification) => {
+    if (notification.type === 'snapshot') project(notification.snapshot);
+    else applyEvent(notification.event);
+  },
+);
+```
+
+`subscribeCodexConversationBridge()` emits tagged `snapshot` and `event`
+notifications only for future changes to that conversation. Read history or
+invoke `getSnapshot` separately when an initial projection is needed. The
+returned function removes both subscriptions.
+
+`codexConversationBridgeOperations` and
+`isCodexConversationBridgeOperation()` expose the supported transport-safe
+operation vocabulary. It includes conversation-local history, settings,
+message, turn, queue, goal, approval, and client-request operations. It does
+not include global lifecycle, authentication, catalogs, archive/delete, or
+selection. `forkTurn` returns the new conversation's serializable snapshot and
+does not change global selection.
+
+The existing `invokeCodexSurfaceBridgeOperation()` contract is unchanged for
+single-active-conversation consumers.
+
 Remote-control pairing and device management intentionally remain Node-only
 `CodexSurface` methods because their app-server results contain trusted policy
 and `bigint` timestamps. See [Remote control](/guide/remote-control).

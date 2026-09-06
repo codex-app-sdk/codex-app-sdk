@@ -1,4 +1,9 @@
 import type {
+  CodexConversationEvent,
+  CodexConversationHistory,
+  CodexConversationHistoryPage,
+  CodexConversationPromptHistory,
+  CodexConversationSnapshot,
   CodexSurfaceApi,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
@@ -6,6 +11,7 @@ import type {
   CodexSurfaceClientRequestResponse,
   CodexSurfaceJsonValue,
   CodexRendererAttachment,
+  CodexRendererSendMessageOptions,
   CodexSurfaceAttachment,
   CodexSurfaceRendererApi,
   CreateCodexRendererConversationOptions,
@@ -45,6 +51,150 @@ export type CodexSurfaceBridgeInvokeOptions = {
   resolveAttachment?: CodexSurfaceBridgeAttachmentResolver;
 };
 
+type CodexConversationBridgeOperationFunctions = {
+  clearGoal(): Awaitable<CodexConversationSnapshot>;
+  compactConversation(): Awaitable<CodexConversationSnapshot>;
+  deleteTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
+  deleteQueuedPrompt(promptId: string): Awaitable<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string): Awaitable<CodexConversationSnapshot>;
+  forkTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
+  getSnapshot(): Awaitable<CodexConversationSnapshot>;
+  interrupt(): Awaitable<CodexConversationSnapshot>;
+  loadOlderConversationHistory(): Awaitable<CodexConversationHistoryPage>;
+  readConversationHistory(): Awaitable<CodexConversationHistory>;
+  readConversationPromptHistory(): Awaitable<CodexConversationPromptHistory>;
+  renameConversation(title: string): Awaitable<CodexConversationSnapshot>;
+  respondToClientRequest(response: CodexSurfaceClientRequestResponse): Awaitable<CodexConversationSnapshot>;
+  resolveApproval(
+    approvalId: string,
+    decision: CodexSurfaceApprovalDecision,
+    scope?: CodexSurfaceApprovalScope,
+  ): Awaitable<CodexConversationSnapshot>;
+  retryTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
+  sendMessage(prompt: string, options?: CodexRendererSendMessageOptions): Awaitable<CodexConversationSnapshot>;
+  setGoal(objective: string, tokenBudget?: number | null): Awaitable<CodexConversationSnapshot>;
+  startReview(options?: StartCodexReviewOptions): Awaitable<CodexConversationSnapshot>;
+  steerMessage(prompt: string, options?: CodexRendererSendMessageOptions): Awaitable<CodexConversationSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string): Awaitable<CodexConversationSnapshot>;
+  updateConversationSettings(settings: UpdateCodexConversationSettings): Awaitable<CodexConversationSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string): Awaitable<CodexConversationSnapshot>;
+};
+
+export const codexConversationBridgeOperations = [
+  'clearGoal', 'compactConversation', 'deleteTurn', 'deleteQueuedPrompt', 'editTurn',
+  'forkTurn', 'getSnapshot', 'interrupt', 'loadOlderConversationHistory',
+  'readConversationHistory', 'readConversationPromptHistory', 'renameConversation',
+  'respondToClientRequest', 'resolveApproval', 'retryTurn', 'sendMessage', 'setGoal',
+  'startReview', 'steerMessage', 'steerQueuedPrompt', 'updateConversationSettings',
+  'updateQueuedPrompt',
+] as const satisfies readonly (keyof CodexConversationBridgeOperationFunctions)[];
+
+export type CodexConversationBridgeOperation = typeof codexConversationBridgeOperations[number];
+export type CodexConversationBridgeOperationArguments<Name extends CodexConversationBridgeOperation> =
+  Parameters<CodexConversationBridgeOperationFunctions[Name]>;
+export type CodexConversationBridgeOperationResult<Name extends CodexConversationBridgeOperation> =
+  Awaited<ReturnType<CodexConversationBridgeOperationFunctions[Name]>>;
+
+export type CodexConversationBridgeHandle = {
+  clearGoal(): Awaitable<CodexConversationSnapshot>;
+  compact(): Awaitable<CodexConversationSnapshot>;
+  deleteTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
+  deleteQueuedPrompt(promptId: string): Awaitable<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string): Awaitable<CodexConversationSnapshot>;
+  forkTurn(turnId: string): Awaitable<{ snapshot: CodexConversationSnapshot }>;
+  getSnapshot(): CodexConversationSnapshot;
+  interrupt(): Awaitable<CodexConversationSnapshot>;
+  loadOlderHistory(): Awaitable<CodexConversationHistoryPage>;
+  onEvent(listener: (event: CodexConversationEvent) => void): () => void;
+  onStateChange(listener: (snapshot: CodexConversationSnapshot) => void): () => void;
+  readHistory(): Awaitable<CodexConversationHistory>;
+  readPromptHistory(): Awaitable<CodexConversationPromptHistory>;
+  rename(title: string): Awaitable<CodexConversationSnapshot>;
+  respondToClientRequest(response: CodexSurfaceClientRequestResponse): Awaitable<CodexConversationSnapshot>;
+  resolveApproval(
+    approvalId: string,
+    decision: CodexSurfaceApprovalDecision,
+    scope?: CodexSurfaceApprovalScope,
+  ): Awaitable<CodexConversationSnapshot>;
+  retryTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
+  sendMessage(prompt: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
+  setGoal(objective: string, tokenBudget?: number | null): Awaitable<CodexConversationSnapshot>;
+  startReview(options?: StartCodexReviewOptions): Awaitable<CodexConversationSnapshot>;
+  steerMessage(prompt: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string): Awaitable<CodexConversationSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string): Awaitable<CodexConversationSnapshot>;
+  updateSettings(settings: UpdateCodexConversationSettings): Awaitable<CodexConversationSnapshot>;
+};
+
+export type CodexConversationBridgeTarget = {
+  conversation(conversationId: string): CodexConversationBridgeHandle;
+};
+
+export type CodexConversationBridgeNotification =
+  | {
+    type: 'snapshot';
+    conversationId: string;
+    snapshot: CodexConversationSnapshot;
+  }
+  | {
+    type: 'event';
+    conversationId: string;
+    event: CodexConversationEvent;
+  };
+
+const conversationOperationSet = new Set<string>(codexConversationBridgeOperations);
+
+export function isCodexConversationBridgeOperation(value: unknown): value is CodexConversationBridgeOperation {
+  return typeof value === 'string' && conversationOperationSet.has(value);
+}
+
+export async function invokeCodexConversationBridgeOperation<Name extends CodexConversationBridgeOperation>(
+  target: CodexConversationBridgeTarget,
+  conversationId: string,
+  operation: Name,
+  args: readonly unknown[],
+  options: CodexSurfaceBridgeInvokeOptions = {},
+): Promise<CodexConversationBridgeOperationResult<Name>> {
+  const id = nonEmptyString(conversationId, 'Conversation id');
+  const [minimum, maximum] = conversationArities[operation];
+  if (args.length < minimum || args.length > maximum) {
+    throw new TypeError(`${options.operationLabel ?? operation} received an invalid number of arguments`);
+  }
+  const conversation = target.conversation(id);
+  const bridgeTarget = conversationOperationTarget(conversation);
+  const result = await invokeCodexSurfaceBridgeOperation(bridgeTarget, operation, args, options);
+  return result as CodexConversationBridgeOperationResult<Name>;
+}
+
+export function subscribeCodexConversationBridge(
+  target: CodexConversationBridgeTarget,
+  conversationId: string,
+  listener: (notification: CodexConversationBridgeNotification) => void,
+): () => void {
+  const id = nonEmptyString(conversationId, 'Conversation id');
+  const conversation = target.conversation(id);
+  const emitSnapshot = (snapshot: CodexConversationSnapshot) => {
+    if (snapshot.activeConversationId === id) {
+      listener({ type: 'snapshot', conversationId: id, snapshot });
+    }
+  };
+  const emitEvent = (event: CodexConversationEvent) => {
+    if (event.conversationId === id) listener({ type: 'event', conversationId: id, event });
+  };
+  const unsubscribeState = conversation.onStateChange(emitSnapshot);
+  let unsubscribeEvent: () => void;
+  try {
+    unsubscribeEvent = conversation.onEvent(emitEvent);
+  } catch (error) {
+    unsubscribeState();
+    throw error;
+  }
+  return () => {
+    unsubscribeEvent();
+    unsubscribeState();
+  };
+}
+
 export const codexSurfaceBridgeOperations = [
   'archiveConversation', 'cancelLogin', 'clearGoal', 'compactConversation', 'connect',
   'createConversation', 'deleteConversation', 'deleteTurn', 'deleteQueuedPrompt',
@@ -74,6 +224,18 @@ export const codexSurfaceBridgeArities: Readonly<
   updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 2],
 };
 
+const conversationArities: Readonly<
+  Record<CodexConversationBridgeOperation, readonly [minimum: number, maximum: number]>
+> = {
+  clearGoal: [0, 0], compactConversation: [0, 0], deleteTurn: [1, 1],
+  deleteQueuedPrompt: [1, 1], editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0],
+  interrupt: [0, 0], loadOlderConversationHistory: [0, 0], readConversationHistory: [0, 0],
+  readConversationPromptHistory: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
+  resolveApproval: [2, 3], retryTurn: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
+  startReview: [0, 1], steerMessage: [1, 2], steerQueuedPrompt: [1, 2],
+  updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 2],
+};
+
 export function isCodexSurfaceBridgeOperation(value: unknown): value is CodexSurfaceBridgeOperation {
   return typeof value === 'string' && operationSet.has(value);
 }
@@ -90,6 +252,34 @@ export async function invokeCodexSurfaceBridgeOperation<Name extends CodexSurfac
   }
   const result = await invokeValidated(target, operation, args, options);
   return result as CodexSurfaceBridgeOperationResult<Name>;
+}
+
+function conversationOperationTarget(conversation: CodexConversationBridgeHandle): CodexSurfaceBridgeTarget {
+  const target: Pick<CodexSurfaceBridgeTarget, CodexConversationBridgeOperation> = {
+    clearGoal: () => conversation.clearGoal(),
+    compactConversation: () => conversation.compact(),
+    deleteTurn: (turnId) => conversation.deleteTurn(turnId),
+    deleteQueuedPrompt: (promptId) => conversation.deleteQueuedPrompt(promptId),
+    editTurn: (turnId, content) => conversation.editTurn(turnId, content),
+    forkTurn: async (turnId) => (await conversation.forkTurn(turnId)).snapshot,
+    getSnapshot: () => conversation.getSnapshot(),
+    interrupt: () => conversation.interrupt(),
+    loadOlderConversationHistory: () => conversation.loadOlderHistory(),
+    readConversationHistory: () => conversation.readHistory(),
+    readConversationPromptHistory: () => conversation.readPromptHistory(),
+    renameConversation: (title) => conversation.rename(title),
+    respondToClientRequest: (response) => conversation.respondToClientRequest(response),
+    resolveApproval: (approvalId, decision, scope) => conversation.resolveApproval(approvalId, decision, scope),
+    retryTurn: (turnId) => conversation.retryTurn(turnId),
+    sendMessage: (prompt, options) => conversation.sendMessage(prompt, options),
+    setGoal: (objective, tokenBudget) => conversation.setGoal(objective, tokenBudget),
+    startReview: (options) => conversation.startReview(options),
+    steerMessage: (prompt, options) => conversation.steerMessage(prompt, options),
+    steerQueuedPrompt: (promptId, prompt) => conversation.steerQueuedPrompt(promptId, prompt),
+    updateConversationSettings: (settings) => conversation.updateSettings(settings),
+    updateQueuedPrompt: (promptId, prompt) => conversation.updateQueuedPrompt(promptId, prompt),
+  };
+  return target as unknown as CodexSurfaceBridgeTarget;
 }
 
 async function invokeValidated(

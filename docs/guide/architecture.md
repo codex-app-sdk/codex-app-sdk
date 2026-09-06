@@ -112,6 +112,15 @@ directory. A configured `cwd` scopes new/resumed runtime behavior, while
 Several loaded conversations can stream simultaneously. Selection is a UI
 concern, not a runtime ownership constraint.
 
+Hosts that bridge one `CodexSurface` to several independently active agents
+should use the conversation-targeted helpers from
+`@codex-app-sdk/core/surface-bridge`. Each invocation and subscription is keyed
+by `conversationId` and delegates to `surface.conversation(conversationId)`, so
+messages, turn actions, approvals, and stream updates never depend on the
+surface's UI selection. The original global bridge remains available for
+single-pane Electron and web clients whose operations intentionally follow the
+active conversation.
+
 Conversation state notifications are scoped to the conversation that changed.
 Global catalog and authentication updates still notify every subscribed
 conversation. Consumers should keep message identities stable and prefer

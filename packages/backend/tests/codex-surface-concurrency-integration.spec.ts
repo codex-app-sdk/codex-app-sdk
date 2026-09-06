@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  invokeCodexConversationBridgeOperation,
+  subscribeCodexConversationBridge,
+  type CodexConversationBridgeNotification,
+} from '@codex-app-sdk/core/surface-bridge';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface, createCodexSurface } from '../src/node';
 import {
@@ -562,6 +567,85 @@ describe('CodexSurface', () => {
     await expect(a.resolveApproval('approval-b', 'deny')).rejects.toThrow("belongs to conversation 'thread-b'");
     await surface.resolveApproval('approval-b', 'deny');
     expect(lastResponse(transport, 'approval-b')).toMatchObject({ result: { decision: 'decline' } });
+  });
+
+  it('bridges concurrent conversation mutations and streams without selection cross-talk', async () => {
+    const transport = new FakeTransport({
+      'thread/list': () => ({
+        data: [thread('thread-a', false), thread('thread-b', false)],
+        nextCursor: null,
+      }),
+      'thread/resume': (params) => resumeResponse(thread(
+        String((params as { threadId: string }).threadId),
+        true,
+      )),
+      'turn/start': (params) => ({
+        turn: turn(`turn-${(params as { threadId: string }).threadId}`, 'inProgress', []),
+      }),
+    });
+    const surface = new CodexSurface({
+      autoSelectFirstConversation: false,
+      client: new CodexAppServerClient(transport),
+    });
+    await surface.connect();
+    await Promise.all([
+      surface.conversation('thread-a').load(),
+      surface.conversation('thread-b').load(),
+    ]);
+    const aNotifications: CodexConversationBridgeNotification[] = [];
+    const bNotifications: CodexConversationBridgeNotification[] = [];
+    const unsubscribeA = subscribeCodexConversationBridge(
+      surface,
+      'thread-a',
+      (notification) => aNotifications.push(notification),
+    );
+    const unsubscribeB = subscribeCodexConversationBridge(
+      surface,
+      'thread-b',
+      (notification) => bNotifications.push(notification),
+    );
+
+    const [a, b] = await Promise.all([
+      invokeCodexConversationBridgeOperation(surface, 'thread-a', 'sendMessage', ['Run A']),
+      invokeCodexConversationBridgeOperation(surface, 'thread-b', 'sendMessage', ['Run B']),
+    ]);
+
+    expect(a).toMatchObject({ activeConversationId: 'thread-a', activeTurnId: 'turn-thread-a', busy: true });
+    expect(b).toMatchObject({ activeConversationId: 'thread-b', activeTurnId: 'turn-thread-b', busy: true });
+    expect(surface.getSnapshot().activeConversationId).toBeNull();
+    expect(requestsFor(transport, 'turn/start')).toMatchObject([
+      { params: { threadId: 'thread-a' } },
+      { params: { threadId: 'thread-b' } },
+    ]);
+
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: 'Stream A',
+      },
+    });
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-b', turnId: 'turn-thread-b', itemId: 'agent-b', delta: 'Stream B',
+      },
+    });
+    await vi.waitFor(() => expect(aNotifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'event', conversationId: 'thread-a', event: expect.objectContaining({ type: 'message.delta' }),
+      }),
+    ])));
+    await vi.waitFor(() => expect(bNotifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'event', conversationId: 'thread-b', event: expect.objectContaining({ type: 'message.delta' }),
+      }),
+    ])));
+    expect(aNotifications.every((notification) => notification.conversationId === 'thread-a')).toBe(true);
+    expect(bNotifications.every((notification) => notification.conversationId === 'thread-b')).toBe(true);
+    expect(surface.getSnapshot().activeConversationId).toBeNull();
+
+    unsubscribeA();
+    unsubscribeB();
   });
 
   it('applies product-neutral host extensions on start and resume and executes dynamic tools', async () => {
