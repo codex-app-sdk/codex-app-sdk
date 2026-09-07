@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
@@ -166,6 +166,32 @@ describe('CodexSurface', () => {
       selectedServiceTier: 'priority',
       approvalPreset: 'full-access',
       planMode: true,
+    });
+  });
+
+  it('uses a model selected during generation for the next queued turn', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    await surface.sendMessage('First turn');
+
+    await surface.updateConversationSettings({ modelId: 'gpt-mini' });
+    await surface.sendMessage('Next turn');
+
+    transport.emit({
+      method: 'turn/completed',
+      params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
+    });
+
+    await vi.waitFor(() => {
+      const starts = transport.sent.filter((message) => 'method' in message && message.method === 'turn/start');
+      expect(starts).toHaveLength(2);
+    });
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({
+      params: {
+        input: [{ type: 'text', text: 'Next turn' }],
+        model: 'gpt-mini-runtime',
+        threadId: 'thread-existing',
+      },
     });
   });
 

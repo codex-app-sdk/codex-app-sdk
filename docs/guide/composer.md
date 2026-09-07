@@ -234,7 +234,9 @@ The controller exposes `buttonDisabled`, `buttonLabel`, `buttonTitle`, `error`,
 
 `CodexModelReasoningSelector` uses one hierarchical menu so the active model,
 reasoning effort, and service tier are visible together. Models and supported
-efforts come from the app-server catalog; the component does not invent IDs.
+efforts come from the app-server catalog; the component does not invent IDs. The
+selector stays available while a turn is running. Changes update the conversation
+settings used by subsequent prompts without interrupting the active turn.
 
 When the model advertises a `priority` or `fast` service tier, the menu exposes
 a Fast mode toggle. Enabling it emits that tier ID. Disabling it emits `null`,

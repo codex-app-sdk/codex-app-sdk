@@ -1024,6 +1024,32 @@ describe('ChatComposer', () => {
     expect(wrapper.text()).toContain('GPT-5.1 Codex Max');
   });
 
+  it('allows changing the model while Codex is responding', async () => {
+    const wrapper = mountComposer({
+      isSending: true,
+      models: [
+        ...models,
+        {
+          ...models[0]!,
+          id: 'codex-fast',
+          model: 'gpt-5.1-codex-fast',
+          displayName: 'GPT-5.1 Codex Fast',
+          isDefault: false,
+        },
+      ],
+      selectedModelId: 'codex-max',
+    });
+
+    const trigger = wrapper.get<HTMLButtonElement>('.chat-model-selector__button');
+    expect(trigger.element.disabled).toBe(false);
+
+    await trigger.trigger('click');
+    await wrapper.get('[data-submenu-id="model"] > button').trigger('click');
+    await wrapper.findAll('[data-submenu-id="model"] [role="menuitemradio"]')[1]!.trigger('click');
+
+    expect(wrapper.emitted('update:modelId')).toStrictEqual([['codex-fast']]);
+  });
+
   it('keeps the editor above a split control row', () => {
     const wrapper = mountComposer({
       contextUsage: {

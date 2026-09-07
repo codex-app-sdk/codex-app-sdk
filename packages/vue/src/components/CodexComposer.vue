@@ -105,7 +105,7 @@
         />
         <ChatModelReasoningSelector
           v-if="effectiveCodexCapabilities.models"
-          :disabled="disabled || isSending"
+          :disabled="disabled"
           :models="models"
           :model-catalog-status="modelCatalogStatus"
           :model-id="selectedModelId"
