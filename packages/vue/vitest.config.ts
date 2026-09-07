@@ -7,9 +7,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.spec.ts'],
-    pool: 'vmThreads',
+    pool: 'forks',
     setupFiles: ['tests/setup.ts'],
-    vmMemoryLimit: '512MB',
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'src/**/*.vue'],
