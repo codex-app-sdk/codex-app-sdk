@@ -483,6 +483,34 @@ describe('CodexSurface', () => {
     expect(replica.getSnapshot()).toMatchObject({ messages: [], turnIds: [], turns: [] });
   });
 
+  it('waits beyond the ordinary request timeout for rollback before replacing conversation history', async () => {
+    vi.useFakeTimers();
+    let resolveRollback!: (value: { thread: Record<string, unknown> }) => void;
+    const rollbackResponse = new Promise<{ thread: Record<string, unknown> }>((resolve) => {
+      resolveRollback = resolve;
+    });
+    const transport = new FakeTransport({
+      'thread/rollback': () => rollbackResponse,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+
+    try {
+      await surface.connect();
+      const deletion = surface.conversation('thread-existing').deleteTurn('turn-history');
+      const completion = expect(deletion).resolves.toMatchObject({ messages: [] });
+
+      await vi.advanceTimersByTimeAsync(15_001);
+      expect(surface.getSnapshot().messages).not.toStrictEqual([]);
+
+      resolveRollback({ thread: thread('thread-existing', false) });
+      await completion;
+      expect(surface.getSnapshot().messages).toStrictEqual([]);
+    } finally {
+      vi.useRealTimers();
+      await surface.close();
+    }
+  });
+
   it('uses thread/revert to delete from paginated history without hydrating the full thread', async () => {
     const firstTurn = turn('turn-first', 'completed', [
       { type: 'userMessage', id: 'user-first', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
@@ -520,6 +548,62 @@ describe('CodexSurface', () => {
       historyState: { hasOlder: true, fullyLoaded: false },
     });
     expect(surface.getSnapshot().messages.every((message) => message.turnId === 'turn-first')).toBe(true);
+  });
+
+  it('waits beyond the ordinary request timeout for a paginated revert before reconciling its retained tail', async () => {
+    vi.useFakeTimers();
+    const firstTurn = turn('turn-first', 'completed', [
+      { type: 'userMessage', id: 'user-first', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
+    ]);
+    const secondTurn = turn('turn-second', 'completed', [
+      { type: 'userMessage', id: 'user-second', clientId: null, content: [{ type: 'text', text: 'Second', text_elements: [] }] },
+    ]);
+    const paginatedThread = {
+      ...thread('thread-existing', false),
+      historyMode: 'paginated',
+      turns: [firstTurn, secondTurn],
+    };
+    let resolveRevert!: (value: {
+      thread: Record<string, unknown>;
+      turnsBackwardsCursor: string;
+      itemsBackwardsCursor: string;
+    }) => void;
+    const revertResponse = new Promise<{
+      thread: Record<string, unknown>;
+      turnsBackwardsCursor: string;
+      itemsBackwardsCursor: string;
+    }>((resolve) => {
+      resolveRevert = resolve;
+    });
+    const transport = new FakeTransport({
+      'thread/resume': () => resumeResponse(paginatedThread),
+      'thread/revert': () => revertResponse,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+
+    try {
+      await surface.connect();
+      const conversation = surface.conversation('thread-existing');
+      const deletion = conversation.deleteTurn('turn-second');
+      const completion = expect(deletion).resolves.toMatchObject({ turnIds: ['turn-first'] });
+
+      await vi.advanceTimersByTimeAsync(15_001);
+      expect(conversation.getSnapshot().turnIds).toStrictEqual(['turn-first', 'turn-second']);
+
+      resolveRevert({
+        thread: { ...paginatedThread, turns: [] },
+        turnsBackwardsCursor: 'retained-tail',
+        itemsBackwardsCursor: 'retained-item-tail',
+      });
+      await completion;
+      expect(conversation.getSnapshot()).toMatchObject({
+        turnIds: ['turn-first'],
+        historyState: { hasOlder: true, fullyLoaded: false },
+      });
+    } finally {
+      vi.useRealTimers();
+      await surface.close();
+    }
   });
 
   it('uses app-server cwd defaults and reports unavailable conversation operations precisely', async () => {

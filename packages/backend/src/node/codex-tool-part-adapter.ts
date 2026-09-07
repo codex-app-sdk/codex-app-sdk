@@ -8,6 +8,7 @@ import type {
 import { toolOutputText } from './tool-output';
 
 const structuredToolResultNotice = 'Result returned in structuredContent.';
+const MAX_TOOL_PAYLOAD_BYTES = 32 * 1024;
 
 export type CodexToolPartAdapterOptions = {
   includeCommandOutput?: boolean;
@@ -88,16 +89,18 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
   if (item.type === 'mcpToolCall') {
     const server = typeof item.server === 'string' ? item.server : 'mcp';
     const tool = typeof item.tool === 'string' ? item.tool : 'tool';
-    const errorMessage = mcpErrorMessage(item.error);
+    const errorMessage = boundedToolText(mcpErrorMessage(item.error));
+    const input = boundedToolPayload(item.arguments);
+    const output = boundedToolPayload(item.result);
     return {
       type: 'tool',
       id: item.id,
       kind: 'mcp',
       title: `${server}.${tool}`,
       status: rendererToolStatus(item.status),
-      body: errorMessage ?? mcpResultText(item.result),
-      input: item.arguments,
-      output: item.result,
+      body: errorMessage ?? boundedToolText(mcpResultText(output)),
+      ...(input !== undefined ? { input } : {}),
+      ...(output !== undefined ? { output } : {}),
       metadata: {
         server,
         tool,
@@ -111,15 +114,17 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
   if (item.type === 'dynamicToolCall') {
     const tool = typeof item.tool === 'string' ? item.tool : 'tool';
     const namespace = typeof item.namespace === 'string' ? item.namespace : null;
+    const input = boundedToolPayload(item.arguments);
+    const output = boundedToolPayload(item.contentItems);
     return {
       type: 'tool',
       id: item.id,
       kind: 'dynamic',
       title: namespace ? `${namespace}.${tool}` : tool,
       status: rendererToolStatus(item.status),
-      body: dynamicToolContentText(item.contentItems),
-      input: item.arguments,
-      output: item.contentItems,
+      body: boundedToolText(dynamicToolContentText(output)),
+      ...(input !== undefined ? { input } : {}),
+      ...(output !== undefined ? { output } : {}),
       metadata: {
         namespace,
         tool,
@@ -247,20 +252,22 @@ export function mcpProgressToToolPartUpdate(itemId: string, message: string): Re
 }
 
 export function rawOutputToToolPartUpdate(itemId: string, output: unknown, title?: string, status: unknown = 'completed'): RendererToolPartUpdate {
+  const boundedOutput = boundedToolPayload(output);
+  const body = boundedToolText(toolOutputText(boundedOutput));
   return {
     itemId,
     title: title && title.trim() ? title : undefined,
     status: rendererToolStatus(status),
-    body: toolOutputText(output),
-    output,
+    body,
+    ...(boundedOutput !== undefined ? { output: boundedOutput } : {}),
     fallbackToolPart: {
       type: 'tool',
       id: itemId,
       kind: 'generic',
       title: title && title.trim() ? title : 'Tool output',
       status: rendererToolStatus(status),
-      body: toolOutputText(output),
-      output,
+      body,
+      ...(boundedOutput !== undefined ? { output: boundedOutput } : {}),
     },
   };
 }
@@ -641,4 +648,43 @@ function fileChangesText(changes: unknown[]): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function boundedToolText(value: string | undefined): string | undefined {
+  return value !== undefined && Buffer.byteLength(value) <= MAX_TOOL_PAYLOAD_BYTES ? value : undefined;
+}
+
+function boundedToolPayload(value: unknown): unknown {
+  if (value === undefined || !jsonValueFitsByteBudget(value, MAX_TOOL_PAYLOAD_BYTES)) {
+    return undefined;
+  }
+  return value;
+}
+
+function jsonValueFitsByteBudget(value: unknown, maxBytes: number): boolean {
+  if (jsonValueContainsOversizedStringOrCycle(value, maxBytes, new Set<object>())) {
+    return false;
+  }
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized !== undefined && Buffer.byteLength(serialized) <= maxBytes;
+  } catch {
+    return false;
+  }
+}
+
+function jsonValueContainsOversizedStringOrCycle(
+  value: unknown,
+  maxBytes: number,
+  ancestors: Set<object>,
+): boolean {
+  if (typeof value === 'string') return Buffer.byteLength(value) > maxBytes;
+  if (value === null || typeof value !== 'object') return false;
+  if (ancestors.has(value)) return true;
+
+  ancestors.add(value);
+  const entries = Array.isArray(value) ? value : Object.values(value);
+  const oversized = entries.some((entry) => jsonValueContainsOversizedStringOrCycle(entry, maxBytes, ancestors));
+  ancestors.delete(value);
+  return oversized;
 }

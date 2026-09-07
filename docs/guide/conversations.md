@@ -188,6 +188,11 @@ and cursor for the host. Deleting a turn removes that turn and every later turn;
 the standard pane exposes the destructive control on the latest eligible turn,
 where it behaves as a single-turn delete.
 
+Rollback and revert are treated as long-running mutations. The default client
+keeps them correlated for up to 120 seconds (instead of the ordinary 15-second
+request deadline), then applies the returned thread before publishing the
+updated surface snapshot.
+
 Handles also expose edit, retry, delete-turn, steering, reviews, goals,
 queued-prompt actions, approval resolution, and app-server question responses.
 

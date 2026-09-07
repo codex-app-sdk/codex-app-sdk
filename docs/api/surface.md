@@ -105,6 +105,13 @@ This is the stable renderer model for both restored and live conversations.
 When a message is terminal (`complete` or `error`), SDK adapters settle any
 stale `running` tool parts rather than exposing a nested streaming state.
 
+Tool `input`, `output`, and derived body projections are best-effort display
+data. Each projection is limited to 32 KiB before it enters a surface snapshot
+or event; oversized or cyclic provider payloads are omitted while tool identity,
+title, and status remain available. This limit does not remove attachment or
+media parts, so generated images continue to render through their dedicated
+media representation.
+
 ```ts
 type SurfaceMessageTextPart = {
   type: 'text';

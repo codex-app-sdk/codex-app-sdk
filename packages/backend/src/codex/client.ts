@@ -41,6 +41,13 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const LONG_MUTATION_REQUEST_TIMEOUT_MS = 120_000;
+const requestTimeoutByMethod: Partial<Record<MethodName, number>> = {
+  'thread/revert': LONG_MUTATION_REQUEST_TIMEOUT_MS,
+  'thread/rollback': LONG_MUTATION_REQUEST_TIMEOUT_MS,
+};
+
 export type CodexServerRequestResponder<Method extends ServerRequestMethod> = {
   readonly responded: boolean;
   resolve(result: ServerRequestResult<Method>): void;
@@ -134,7 +141,7 @@ export class CodexAppServerClient {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Codex app-server request timed out: ${method}`));
-      }, this.options.requestTimeoutMs ?? 15_000);
+      }, this.options.requestTimeoutMs ?? requestTimeoutByMethod[method] ?? DEFAULT_REQUEST_TIMEOUT_MS);
 
       this.pending.set(id, {
         method,

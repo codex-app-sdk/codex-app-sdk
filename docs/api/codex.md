@@ -66,6 +66,12 @@ type CodexAppServerClientOptions = {
 The client owns request correlation, timeouts, notification routing, disconnect
 propagation, server-request response state, and transport cleanup.
 
+Without an explicit `requestTimeoutMs`, ordinary requests use a 15-second
+deadline. The mutating `thread/rollback` and `thread/revert` operations use a
+120-second deadline so their authoritative response remains correlated and the
+surface can reconcile conversation history after a slow rollback. An explicit
+`requestTimeoutMs` overrides both defaults.
+
 ## Generated exports
 
 - all app-server request/response/notification types;

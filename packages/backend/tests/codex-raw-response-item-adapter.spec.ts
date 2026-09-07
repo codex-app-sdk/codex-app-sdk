@@ -58,6 +58,22 @@ describe('rawResponseItemToEvent', () => {
     });
   });
 
+  it('bounds large raw tool output events before they enter surface state', () => {
+    const event = adapt({
+      type: 'custom_tool_call_output', call_id: 'large-output', name: 'render',
+      output: {
+        content: [{ type: 'image', data: 'A'.repeat(2 * 1024 * 1024), mimeType: 'image/png' }],
+      },
+    });
+
+    expect(Buffer.byteLength(JSON.stringify(event))).toBeLessThan(64 * 1024);
+    expect(event).toMatchObject({
+      type: 'item.updated',
+      payload: { itemId: 'large-output', title: 'render', status: 'completed', body: undefined },
+    });
+    expect(event?.payload).not.toHaveProperty('output');
+  });
+
   it('maps tool search calls and outputs', () => {
     expect(adapt({
       type: 'tool_search_call', call_id: 'search-call', status: 'inProgress', execution: 'server',

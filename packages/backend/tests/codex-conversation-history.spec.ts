@@ -349,6 +349,40 @@ describe('codexThreadToSurfaceMessages', () => {
       media: { url: `data:image/png;base64,${pngBase64}` },
     });
   });
+
+  it('bounds historical tool payloads without dropping visible generated images', () => {
+    const largeImagePayload = 'A'.repeat(2 * 1024 * 1024);
+    const messages = codexThreadToSurfaceMessages({
+      id: 'thread-large-tool-output',
+      turns: [{
+        id: 'turn-large-tool-output', status: 'completed', startedAt: 1, completedAt: 2,
+        items: [
+          {
+            type: 'mcpToolCall', id: 'large-tool', server: 'images', tool: 'inspect', status: 'completed',
+            arguments: { path: '/tmp/input.png' }, error: null, appContext: null, pluginId: null,
+            readOnlyHint: true, durationMs: 1, result: {
+              content: [{ type: 'image', data: largeImagePayload, mimeType: 'image/png' }],
+              structuredContent: { image: largeImagePayload },
+            },
+          },
+          {
+            type: 'imageGeneration', id: 'generated-image', status: 'completed', revisedPrompt: 'Visible image',
+            result: pngBase64, savedPath: null,
+          },
+        ],
+      }],
+    } as unknown as v2.Thread);
+
+    expect(Buffer.byteLength(JSON.stringify(messages))).toBeLessThan(64 * 1024);
+    const largeTool = messages[0]?.parts.find((part) => part.type === 'tool' && part.id === 'large-tool');
+    expect(largeTool).toMatchObject({ type: 'tool', id: 'large-tool', body: undefined });
+    expect(largeTool).not.toHaveProperty('output');
+    expect(messages[0]?.parts).toContainEqual(expect.objectContaining({
+      type: 'media', itemId: 'generated-image',
+      media: expect.objectContaining({ url: `data:image/png;base64,${pngBase64}` }),
+    }));
+  });
+
   it('translates resumed Codex turns into renderer messages in item order', () => {
     const thread = {
       id: 'thread-resumed',
