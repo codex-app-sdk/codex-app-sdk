@@ -181,6 +181,11 @@ await build.compact();
 await build.deleteTurn(turnId);
 ```
 
+Compaction progress is driven by app-server's `contextCompaction` item
+notifications. The compact action only requests the operation, so a host
+replica receives one provider-authored lifecycle marker even when the item
+arrives after the request resolves.
+
 Delete, edit, retry, and fork all use one stable turn-ID contract. The SDK
 selects app-server's paginated `thread/revert` operation or the legacy
 `thread/rollback` operation internally and reconciles the retained history page

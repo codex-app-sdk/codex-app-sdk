@@ -29,22 +29,12 @@ describe('CodexSurfaceTurnActionsController', () => {
     expect(interrupt).toHaveBeenCalledExactlyOnceWith('thread-1');
   });
 
-  it('compacts an idle thread and identifies its active or latest turn in the event', async () => {
-    const active = createController({ activeTurnId: 'turn-active', turnIds: ['turn-old', 'turn-active'] });
-    await active.controller.compactForThread('thread-1');
-    expect(active.request).toHaveBeenCalledExactlyOnceWith('thread/compact/start', { threadId: 'thread-1' });
-    expect(active.host.emitEvent).toHaveBeenCalledExactlyOnceWith('action', {
-      type: 'context.compactionStarted', conversationId: 'thread-1', turnId: 'turn-active',
-      payload: { itemId: null },
-    });
+  it('requests compaction and leaves its lifecycle to provider notifications', async () => {
+    const setup = createController({ turnIds: ['turn-latest'] });
+    await setup.controller.compactForThread('thread-1');
 
-    const latest = createController({ turnIds: ['turn-first', 'turn-middle', 'turn-latest'] });
-    await latest.controller.compactForThread('thread-1');
-    expect(latest.host.emitEvent).toHaveBeenCalledWith('action', expect.objectContaining({ turnId: 'turn-latest' }));
-
-    const empty = createController();
-    await empty.controller.compactForThread('thread-1');
-    expect(empty.host.emitEvent).not.toHaveBeenCalled();
+    expect(setup.request).toHaveBeenCalledExactlyOnceWith('thread/compact/start', { threadId: 'thread-1' });
+    expect(setup.host.emitEvent).not.toHaveBeenCalled();
   });
 
   it('rejects compact while the thread is busy', async () => {

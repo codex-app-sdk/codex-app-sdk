@@ -426,6 +426,29 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot()).toMatchObject({ busy: true, queuedPrompts: [] });
   });
 
+  it('shows one compaction marker when the provider item arrives after the compact action resolves', async () => {
+    const transport = new FakeTransport();
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    await surface.connect();
+    const replica = createCodexConversationReplica(surface.conversation('thread-existing').getSnapshot());
+    surface.onEvent((event) => {
+      if ('conversationId' in event && event.conversationId === 'thread-existing') replica.apply(event);
+    });
+
+    await surface.sendMessage('/compact');
+    transport.emit({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-existing',
+        turnId: 'turn-compaction',
+        startedAtMs: 1,
+        item: { type: 'contextCompaction', id: 'compact-1' },
+      },
+    });
+
+    expect(replica.getSnapshot().messages.filter((message) => message.kind === 'compaction')).toHaveLength(1);
+  });
+
   it('exposes skills, goals, context usage, diffs, and rollback-backed turn deletion', async () => {
     const transport = new FakeTransport({
       'skills/list': () => ({

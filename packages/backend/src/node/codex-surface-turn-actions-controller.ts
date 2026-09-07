@@ -56,12 +56,6 @@ export class CodexSurfaceTurnActionsController {
     const runtime = await this.host.ensureThreadReady(threadId);
     if (runtime.busy) throw new Error('Cannot compact while Codex is responding');
     await this.client.request('thread/compact/start', { threadId });
-    const turnId = runtime.activeTurnId ?? runtime.turnIds.at(-1);
-    if (turnId) {
-      this.host.emitEvent('action', {
-        type: 'context.compactionStarted', conversationId: threadId, turnId, payload: { itemId: null },
-      });
-    }
   }
 
   async startReview(options: StartCodexReviewOptions = {}): Promise<CodexSurfaceSnapshot> {
