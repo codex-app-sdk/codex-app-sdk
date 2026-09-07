@@ -169,7 +169,9 @@ normal transport action. The pane owns the temporary user row while
 becomes the provider thread ID, and reconciles it when the matching authoritative
 user message arrives. The submit promise may resolve before that message; do not
 add a host-owned optimistic transcript row or delay promise settlement just for
-rendering. A rejected action removes the temporary row and surfaces the error.
+rendering. While the temporary row is pending, the pane keeps Thinking visible
+even if provider busy state briefly clears during thread creation. A rejected
+action removes both temporary states and surfaces the error.
 
 Message forking is deliberately opt-in. In controlled mode, set
 `state.policy.canForkTurn = true` and implement `actions.forkTurn(turnId)`.

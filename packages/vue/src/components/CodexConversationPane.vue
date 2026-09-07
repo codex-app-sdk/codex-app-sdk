@@ -2,9 +2,9 @@
   <section
     ref="paneElement"
     class="codex-chat-theme codex-conversation-pane"
-    :aria-busy="effectiveBusy || effectiveHistoryLoading"
+    :aria-busy="effectiveTranscriptBusy || effectiveHistoryLoading"
     :aria-label="ariaLabel"
-    :data-codex-generating="effectiveBusy ? 'true' : undefined"
+    :data-codex-generating="effectiveTranscriptBusy ? 'true' : undefined"
     @click="handleConversationClick"
     @dragover="handleDragOver"
     @drop="handleDrop"
@@ -27,7 +27,7 @@
         :active-turn-id="effectiveActiveTurnId"
         :answered-client-request-ids="effectiveAnsweredClientRequestIds"
         :aria-label="ariaLabel"
-        :busy="effectiveBusy"
+        :busy="effectiveTranscriptBusy"
         :can-delete-turn="effectiveCanDeleteTurn"
         :can-edit-turn="effectiveCanEditTurn"
         :can-fork-turn="effectiveCanForkTurn"
@@ -577,6 +577,9 @@ const effectiveApprovals = computed(() => controlledValue(
 const effectiveBusy = computed(() => controlledValue(
   (state) => state.identity.busy ?? false,
   () => props.busy ?? surfaceState.value?.busy ?? false,
+));
+const effectiveTranscriptBusy = computed(() => (
+  effectiveBusy.value || pendingControlledSubmission.value !== null
 ));
 const {
   armed: escapeInterruptArmed,

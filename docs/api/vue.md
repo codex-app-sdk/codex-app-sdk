@@ -82,7 +82,9 @@ renders an optimistic user row immediately. The row survives settlement of the
 `submit` promise and one `identity.conversationKey` change while the host creates
 the provider conversation. Publish the authoritative user message through
 `identity.messages`; matching prompt content replaces the optimistic row without
-duplication. The host must not insert a second renderer-only optimistic row.
+duplication. The pane also keeps its Thinking state active if provider `busy`
+briefly clears during that handoff. The host must not insert a second
+renderer-only optimistic row or preserve a synthetic busy flag.
 
 `composer.leadingMenuItems` renders host actions after the built-in Approval
 item and before Plan mode. `composer.menuItems` remains the trailing extension

@@ -678,12 +678,18 @@ describe('CodexConversationPane', () => {
     expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
     expect(wrapper.text()).toContain('Create the first turn');
 
+    state.identity.busy = true;
+    await nextTick();
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+
     state.identity.conversationKey = 'thread-created';
     state.identity.messages = [];
+    state.identity.busy = false;
     await nextTick();
 
     expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(false);
     expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
 
     state.identity.messages = [{
       id: 'authoritative-user',
@@ -692,9 +698,11 @@ describe('CodexConversationPane', () => {
       turnId: 'turn-created',
       parts: [{ type: 'text', text: 'Create the first turn' }],
     }];
+    state.identity.busy = true;
     await nextTick();
 
     expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
     expect(wrapper.text().match(/Create the first turn/g)).toHaveLength(1);
   });
 
@@ -713,11 +721,13 @@ describe('CodexConversationPane', () => {
     await wrapper.get('form').trigger('submit');
     await nextTick();
     expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
 
     rejectSubmit(new Error('Submission rejected'));
     await flushPromises();
 
     expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(0);
     expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(true);
     expect(wrapper.get('[role="alert"]').text()).toBe('Submission rejected');
   });
