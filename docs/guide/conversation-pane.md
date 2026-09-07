@@ -163,6 +163,14 @@ until an asynchronous host action settles. `onMessageCopied` is only a
 post-action notification: `CodexMessage` performs the clipboard write and
 copied-state feedback itself.
 
+For the first controlled submission, keep `actions.submit(prompt, options)` as a
+normal transport action. The pane owns the temporary user row while
+`identity.messages` is empty, preserves it if the provisional conversation key
+becomes the provider thread ID, and reconciles it when the matching authoritative
+user message arrives. The submit promise may resolve before that message; do not
+add a host-owned optimistic transcript row or delay promise settlement just for
+rendering. A rejected action removes the temporary row and surfaces the error.
+
 Message forking is deliberately opt-in. In controlled mode, set
 `state.policy.canForkTurn = true` and implement `actions.forkTurn(turnId)`.
 The Fork control appears immediately before Delete on both user and assistant

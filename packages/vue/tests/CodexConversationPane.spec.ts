@@ -662,6 +662,66 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('interrupt')).toHaveLength(1);
   });
 
+  it('keeps a controlled initial submission visible while the provider conversation is created', async () => {
+    const submit = vi.fn(async () => undefined);
+    const state = reactive<CodexConversationPaneState>({
+      identity: { conversationKey: 'agent-provisional', messages: [] },
+    });
+    const controller = createCodexConversationPaneController({ state, actions: { submit } });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await setComposerText(wrapper, 'Create the first turn');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.text()).toContain('Create the first turn');
+
+    state.identity.conversationKey = 'thread-created';
+    state.identity.messages = [];
+    await nextTick();
+
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+
+    state.identity.messages = [{
+      id: 'authoritative-user',
+      role: 'user',
+      status: 'complete',
+      turnId: 'turn-created',
+      parts: [{ type: 'text', text: 'Create the first turn' }],
+    }];
+    await nextTick();
+
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.text().match(/Create the first turn/g)).toHaveLength(1);
+  });
+
+  it('removes a controlled initial submission when the host rejects it', async () => {
+    let rejectSubmit!: (error: Error) => void;
+    const submit = vi.fn(() => new Promise<void>((_resolve, reject) => {
+      rejectSubmit = reject;
+    }));
+    const controller = createCodexConversationPaneController({
+      state: { identity: { conversationKey: 'agent-provisional', messages: [] } },
+      actions: { submit },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    await setComposerText(wrapper, 'Reject this turn');
+    await wrapper.get('form').trigger('submit');
+    await nextTick();
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+
+    rejectSubmit(new Error('Submission rejected'));
+    await flushPromises();
+
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(true);
+    expect(wrapper.get('[role="alert"]').text()).toBe('Submission rejected');
+  });
+
   it('clears an armed Escape interrupt when the composer requests interruption', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: {

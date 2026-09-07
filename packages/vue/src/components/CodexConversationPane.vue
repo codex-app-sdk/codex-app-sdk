@@ -518,6 +518,15 @@ const localComposerState = ref<CodexComposerState>(initialComposerState);
 const localDraft = ref(initialComposerState.text);
 const editingQueuedPromptId = ref<string | null>(null);
 const deletingTurnId = ref<string | null>(null);
+type PendingControlledSubmission = {
+  adoptedConversationKey: string | number | null;
+  hasAdoptedConversationKey: boolean;
+  message: SurfaceMessage;
+  originConversationKey: string | number | null;
+  prompt: string;
+};
+const pendingControlledSubmission = ref<PendingControlledSubmission | null>(null);
+let optimisticSubmissionSequence = 0;
 let deleteOperation = 0;
 const localError = ref<string | null>(null);
 const selectedAttachments = ref<CodexHostAttachment[]>([...effectiveAttachments.value]);
@@ -525,10 +534,16 @@ const promptHistoryByConversation = new Map<string | number, readonly string[]>(
 const loadedPromptHistory = ref<readonly string[]>([]);
 const promptHistoryLoading = ref(false);
 let promptHistoryRequest = 0;
-const effectiveMessages = computed(() => controlledValue(
+const authoritativeMessages = computed(() => controlledValue(
   (state) => state.identity.messages,
   () => props.messages ?? surfaceState.value?.messages ?? [],
 ));
+const effectiveMessages = computed<readonly (Message | SurfaceMessage)[]>(() => {
+  const messages = authoritativeMessages.value;
+  const pending = pendingControlledSubmission.value;
+  if (!pending || messages.some((message) => matchesPendingSubmission(message, pending))) return messages;
+  return [...messages, pending.message];
+});
 const effectiveActiveTurnId = computed(() => controlledValue(
   (state) => state.identity.activeTurnId,
   () => (props.activeTurnId !== undefined ? props.activeTurnId : surfaceState.value?.activeTurnId),
@@ -756,7 +771,25 @@ watch(effectiveAttachEnabled, (enabled) => {
   if (!enabled && selectedAttachments.value.length > 0) replaceAttachments([]);
 });
 
-watch(effectiveConversationKey, () => {
+watch(effectiveConversationKey, (conversationKey, previousConversationKey) => {
+  const pending = pendingControlledSubmission.value;
+  if (pending) {
+    if (
+      !pending.hasAdoptedConversationKey
+      && (previousConversationKey ?? null) === pending.originConversationKey
+    ) {
+      pendingControlledSubmission.value = {
+        ...pending,
+        adoptedConversationKey: conversationKey ?? null,
+        hasAdoptedConversationKey: true,
+      };
+    } else if (
+      (conversationKey ?? null) !== pending.originConversationKey
+      && (conversationKey ?? null) !== pending.adoptedConversationKey
+    ) {
+      pendingControlledSubmission.value = null;
+    }
+  }
   deleteOperation += 1;
   deletingTurnId.value = null;
   clearEscapeInterruptArm();
@@ -773,6 +806,18 @@ watch(effectiveConversationKey, () => {
   ));
   localComposerState.value = incoming;
   localDraft.value = incoming.text;
+});
+
+watch(authoritativeMessages, (messages) => {
+  const pending = pendingControlledSubmission.value;
+  if (!pending) return;
+  if (messages.some((message) => matchesPendingSubmission(message, pending))) {
+    pendingControlledSubmission.value = null;
+    return;
+  }
+  if (pending.hasAdoptedConversationKey && messages.length > 0) {
+    pendingControlledSubmission.value = null;
+  }
 });
 
 watch([effectiveMessages, effectiveTurns], () => {
@@ -867,8 +912,15 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
     return;
   }
   const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
-  const dispatched = dispatchControllerAction('submit', prompt, options);
-  if (dispatched || effectiveController.value) {
+  if (effectiveController.value) {
+    const controlledSubmit = effectiveControllerActions.value?.submit;
+    if (controlledSubmit) {
+      const optimisticMessageId = beginControlledSubmission(prompt, selectedAttachments.value);
+      void runSurfaceAction(
+        () => Promise.resolve(controlledSubmit(prompt, options)),
+        () => clearPendingControlledSubmission(optimisticMessageId),
+      );
+    }
     replaceAttachments([]);
     return;
   }
@@ -878,6 +930,53 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
     void runSurfaceAction(() => props.surface!.sendMessage(prompt, options));
   }
   replaceAttachments([]);
+}
+
+function beginControlledSubmission(
+  prompt: string,
+  attachments: readonly CodexHostAttachment[],
+): string | null {
+  if (effectiveBusy.value || authoritativeMessages.value.length > 0) return null;
+  const id = `codex-optimistic-user-${++optimisticSubmissionSequence}`;
+  pendingControlledSubmission.value = {
+    adoptedConversationKey: null,
+    hasAdoptedConversationKey: false,
+    originConversationKey: effectiveConversationKey.value ?? null,
+    prompt,
+    message: {
+      id,
+      role: 'user',
+      status: 'complete',
+      createdAt: new Date().toISOString(),
+      parts: [
+        { type: 'text', text: prompt },
+        ...attachments.map((attachment) => ({
+          type: 'attachment' as const,
+          attachment: {
+            kind: attachment.type,
+            name: attachment.name,
+            mimeType: attachment.mimeType,
+            ...(attachment.previewUrl ? { url: attachment.previewUrl } : {}),
+          },
+        })),
+      ],
+    },
+  };
+  return id;
+}
+
+function matchesPendingSubmission(
+  message: Message | SurfaceMessage,
+  pending: PendingControlledSubmission,
+): boolean {
+  const candidate = chatMessageFromInput(message);
+  return candidate.role === 'user' && stripMessageContext(candidate.content) === pending.prompt;
+}
+
+function clearPendingControlledSubmission(messageId: string | null): void {
+  if (messageId && pendingControlledSubmission.value?.message.id === messageId) {
+    pendingControlledSubmission.value = null;
+  }
 }
 
 function loadOlderHistory(): void {
@@ -1301,11 +1400,12 @@ function dispatchControllerAction(
   return true;
 }
 
-async function runSurfaceAction(action: () => Promise<unknown>): Promise<void> {
+async function runSurfaceAction(action: () => Promise<unknown>, onError?: () => void): Promise<void> {
   localError.value = null;
   try {
     await action();
   } catch (error) {
+    onError?.();
     setLocalError(error);
   }
 }

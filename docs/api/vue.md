@@ -77,6 +77,13 @@ settings, history, turn actions, approvals, goals, queue operations, and
 client responses. Every action may return `void` or `Promise<void>`; rejected
 promises are surfaced through the pane error UI.
 
+When a controlled pane with no messages submits its first prompt, the pane
+renders an optimistic user row immediately. The row survives settlement of the
+`submit` promise and one `identity.conversationKey` change while the host creates
+the provider conversation. Publish the authoritative user message through
+`identity.messages`; matching prompt content replaces the optimistic row without
+duplication. The host must not insert a second renderer-only optimistic row.
+
 `composer.leadingMenuItems` renders host actions after the built-in Approval
 item and before Plan mode. `composer.menuItems` remains the trailing extension
 point after Plan mode. The equivalent granular pane prop is
