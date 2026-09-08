@@ -70,7 +70,26 @@ function renderItem(
       key: item.id,
       class: 'codex-composer-menu-list__heading',
       role: 'presentation',
-    }, item.label);
+    }, [
+      h('span', { class: 'codex-composer-menu-list__heading-label' }, item.label),
+      item.actions?.length
+        ? h('span', { class: 'codex-composer-menu-list__heading-actions' }, item.actions.map((action) => (
+          h('button', {
+            key: action.id,
+            class: 'codex-composer-menu-list__heading-action',
+            type: 'button',
+            role: 'menuitem',
+            title: action.label,
+            'aria-label': action.label,
+            disabled: action.disabled,
+            tabindex: -1,
+            onClick: () => select(action),
+          }, action.icon
+            ? [h(action.icon as Component, { 'aria-hidden': 'true' })]
+            : action.label)
+        )))
+        : null,
+    ]);
   }
 
   if (item.type === 'submenu') {
@@ -206,10 +225,14 @@ function menuItems(menu: HTMLElement | null): HTMLButtonElement[] {
   if (!menu) return [];
   const items: HTMLButtonElement[] = [];
   for (const child of menu.children) {
-    const candidate = child.matches('button[role^="menuitem"]')
-      ? child
-      : child.querySelector(':scope > button[role^="menuitem"]');
-    if (candidate instanceof HTMLButtonElement && !candidate.disabled) items.push(candidate);
+    const candidates = child.matches('button[role^="menuitem"]')
+      ? [child]
+      : child.querySelectorAll(
+        ':scope > button[role^="menuitem"], :scope > .codex-composer-menu-list__heading-actions > button[role^="menuitem"]',
+      );
+    for (const candidate of candidates) {
+      if (candidate instanceof HTMLButtonElement && !candidate.disabled) items.push(candidate);
+    }
   }
   return items;
 }
@@ -248,8 +271,24 @@ function renderContent(item: CodexComposerMenuItemBase<unknown>, slots: Slots): 
         ? h('span', { class: 'codex-composer-menu-list__description' }, ` • ${item.description}`)
         : null,
     ]),
-    item.value
-      ? h('span', { class: 'codex-composer-menu-list__value' }, item.value)
+    item.value || item.valueIcon
+      ? h('span', { class: 'codex-composer-menu-list__value' }, [
+        item.value
+          ? h('span', {
+            class: item.valueAppearance === 'badge'
+              ? 'codex-composer-menu-list__value-badge'
+              : undefined,
+          }, item.value)
+          : null,
+        item.valueIcon
+          ? h(item.valueIcon as Component, {
+            class: 'codex-composer-menu-list__value-icon',
+            title: item.valueIconLabel,
+            'aria-label': item.valueIconLabel,
+            'aria-hidden': item.valueIconLabel ? undefined : 'true',
+          })
+          : null,
+      ])
       : null,
   ];
 }

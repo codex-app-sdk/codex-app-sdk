@@ -109,11 +109,13 @@
           :models="models"
           :model-catalog-status="modelCatalogStatus"
           :model-id="selectedModelId"
+          :menu-items="modelMenuItems"
           :reasoning-effort="selectedReasoningEffort"
           :service-tier="selectedServiceTier"
           :show-service-tier="effectiveCodexCapabilities.serviceTier"
           :show-reasoning="effectiveCodexCapabilities.reasoningEffort"
           @update:model-id="$emit('update:modelId', $event)"
+          @menu-select="$emit('menuSelect', $event)"
           @update:reasoning-effort="$emit('update:reasoningEffort', $event)"
           @update:service-tier="$emit('update:serviceTier', $event)"
         />
@@ -190,6 +192,7 @@ const props = defineProps<{
   mentionGroups?: readonly CodexComposerMentionGroup<Payload>[];
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
+  modelMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   placeholder: string;
   queuedPromptId?: string | null;
   approvalPreset?: ApprovalPreset | null;

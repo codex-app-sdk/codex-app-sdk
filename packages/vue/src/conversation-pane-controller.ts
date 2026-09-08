@@ -65,6 +65,8 @@ export type CodexConversationPaneComposerState = {
   /** Host actions rendered after Approval and before Plan mode. */
   leadingMenuItems?: readonly CodexComposerMenuItem[];
   menuItems?: readonly CodexComposerMenuItem[];
+  /** Host-owned actions rendered before the SDK's model, reasoning, and speed controls. */
+  modelMenuItems?: readonly CodexComposerMenuItem[];
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
   selectedModelId?: string | null;

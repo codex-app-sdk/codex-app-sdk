@@ -2449,6 +2449,7 @@ describe('CodexConversationPane', () => {
     const files = [{ name: 'controller.ts', path: '/repo/controller.ts' }];
     const leadingMenuItems = [{ id: 'leading-controller', label: 'Leading', type: 'action' as const }];
     const menuItems = [{ id: 'menu-controller', label: 'Menu', type: 'custom' as const }];
+    const modelMenuItems = [{ id: 'model-menu-controller', label: 'Favorite', type: 'action' as const }];
     const queuedPrompts = [{ id: 'queued-controller', text: 'Controller queue' }];
     const turnGitDiff = {
       turnId: 'turn-controller',
@@ -2473,6 +2474,7 @@ describe('CodexConversationPane', () => {
           approvalPreset: 'full-access',
           leadingMenuItems,
           menuItems,
+          modelMenuItems,
           placeholder: 'Controller placeholder',
           planMode: true,
           selectedModelId: 'model-controller',
@@ -2532,6 +2534,7 @@ describe('CodexConversationPane', () => {
       files,
       leadingMenuItems,
       menuItems,
+      modelMenuItems,
       modelCatalogStatus: 'loaded',
       models,
       placeholder: 'Controller placeholder',
@@ -2573,6 +2576,7 @@ describe('CodexConversationPane', () => {
       files: [],
       leadingMenuItems: [],
       menuItems: [],
+      modelMenuItems: [],
       placeholder: 'Ask Codex…',
       selectedModelId: undefined,
       selectedReasoningEffort: undefined,
@@ -2598,6 +2602,7 @@ describe('CodexConversationPane', () => {
     const files = [{ name: 'legacy.ts', path: '/repo/legacy.ts' }];
     const leadingMenuItems = [{ id: 'legacy-leading', label: 'Leading', type: 'action' as const }];
     const menuItems = [{ id: 'legacy-menu', label: 'Menu', type: 'custom' as const }];
+    const modelMenuItems = [{ id: 'legacy-model-menu', label: 'Favorite', type: 'action' as const }];
     const turnGitDiff = {
       turnId: 'turn-legacy',
       addedLines: 5,
@@ -2616,6 +2621,7 @@ describe('CodexConversationPane', () => {
         followUpsDisabled: true,
         leadingMenuItems,
         menuItems,
+        modelMenuItems,
         messages,
         modelValue: '',
         placeholder: 'Legacy placeholder',
@@ -2633,6 +2639,7 @@ describe('CodexConversationPane', () => {
       files,
       leadingMenuItems,
       menuItems,
+      modelMenuItems,
       placeholder: 'Legacy placeholder',
       selectedModelId: 'legacy-model',
       selectedReasoningEffort: 'medium',

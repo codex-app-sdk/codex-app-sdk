@@ -6,14 +6,27 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexComposerMenuList, type CodexComposerMenuItem } from '../src';
 
 describe('CodexComposerMenuList', () => {
+  const HeadingIcon = (props: Record<string, unknown>) => h('svg', { ...props, 'data-icon': 'heading' });
+  const ValueIcon = (props: Record<string, unknown>) => h('svg', { ...props, 'data-icon': 'value' });
+  const headingAction = {
+    id: 'manage-actions',
+    type: 'action' as const,
+    label: 'Manage actions',
+    icon: HeadingIcon,
+    payload: { source: 'host' },
+  };
   const items: CodexComposerMenuItem<{ source: string }>[] = [
-    { id: 'heading', type: 'heading', label: 'Actions' },
+    { id: 'heading', type: 'heading', label: 'Actions', actions: [headingAction] },
     { id: 'separator', type: 'separator' },
     {
       id: 'custom-tool',
       type: 'custom',
       label: 'Run custom tool',
       description: 'Provided by the host application',
+      value: 'H',
+      valueAppearance: 'badge',
+      valueIcon: ValueIcon,
+      valueIconLabel: 'Fast',
       payload: { source: 'plugin' },
     },
     {
@@ -46,8 +59,15 @@ describe('CodexComposerMenuList', () => {
 
     expect(wrapper.get('[role="menu"]').attributes('aria-label')).toBe('Prompt actions');
     expect(wrapper.get('.codex-composer-menu-list__heading').text()).toBe('Actions');
+    const headingButton = wrapper.get('button[aria-label="Manage actions"]');
+    expect(headingButton.attributes('title')).toBe('Manage actions');
+    expect(headingButton.get('[data-icon="heading"]').attributes('aria-hidden')).toBe('true');
     expect(wrapper.find('[role="separator"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Provided by the host application');
+    const valueIcon = wrapper.get('[data-icon="value"]');
+    expect(wrapper.get('.codex-composer-menu-list__value-badge').text()).toBe('H');
+    expect(valueIcon.attributes('aria-label')).toBe('Fast');
+    expect(valueIcon.attributes('title')).toBe('Fast');
     expect(wrapper.text()).toContain('Ask first');
     expect(wrapper.get('.codex-composer-menu-list__submenu-list').classes())
       .toContain('codex-composer-menu-list__submenu-list--bottom-aligned');
@@ -58,6 +78,9 @@ describe('CodexComposerMenuList', () => {
     await customAction.trigger('click');
 
     expect(wrapper.emitted('select')?.[0]).toStrictEqual([items[2]]);
+
+    await headingButton.trigger('click');
+    expect(wrapper.emitted('select')?.[1]).toStrictEqual([headingAction]);
   });
 
   it('supports host item and icon slots while suppressing disabled selection', async () => {

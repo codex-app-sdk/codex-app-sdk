@@ -42,23 +42,23 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="Payload = unknown">
 import { computed } from 'vue';
 import type { CodexModelOption, ReasoningEffort } from './contracts';
 import { BoltIcon, ChevronDown } from '../icons/app-icons';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposerMenu from '../components/CodexComposerMenu.vue';
 
-type SelectorCommand = {
-  kind: 'model' | 'reasoning' | 'serviceTier';
-  value: string;
-};
+type SelectorCommand<Payload> =
+  | { source: 'selector'; kind: 'model' | 'reasoning' | 'serviceTier'; value: string }
+  | { source: 'host'; item: CodexComposerMenuSelectableItem<Payload> };
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   disabled?: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   modelId?: string | null;
+  menuItems?: readonly CodexComposerMenuItem<Payload>[];
   models?: readonly CodexModelOption[];
   reasoningEffort?: ReasoningEffort | null;
   serviceTier?: string | null;
@@ -69,6 +69,7 @@ const props = withDefaults(defineProps<{
   modelCatalogStatus: 'notLoaded',
   modelId: null,
   models: () => [],
+  menuItems: () => [],
   reasoningEffort: null,
   serviceTier: null,
   showServiceTier: true,
@@ -77,6 +78,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:modelId': [modelId: string];
+  menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
   'update:reasoningEffort': [reasoningEffort: ReasoningEffort];
   'update:serviceTier': [serviceTier: string | null];
 }>();
@@ -108,8 +110,13 @@ const fastServiceTier = computed(() => serviceTiers.value.find((tier) => (
 
 const controlDisabled = computed(() => props.disabled);
 
-const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
-  const items: CodexComposerMenuItem<SelectorCommand>[] = [{
+const selectorItems = computed<CodexComposerMenuItem<SelectorCommand<Payload>>[]>(() => {
+  const items: CodexComposerMenuItem<SelectorCommand<Payload>>[] = [];
+  if (props.menuItems.length > 0) {
+    items.push(...wrapHostMenuItems(props.menuItems));
+    items.push({ id: 'host-model-menu-separator', type: 'separator' });
+  }
+  items.push({
     id: 'model',
     label: 'Model',
     type: 'submenu',
@@ -118,13 +125,13 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
     submenuWidth: 'wide',
     items: props.models.map((model) => ({
       checked: model.id === selectedModel.value?.id,
-      closeOnSelect: true,
+      closeOnSelect: false,
       id: `model:${model.id}`,
       label: model.displayName,
-      payload: { kind: 'model' as const, value: model.id },
+      payload: { source: 'selector' as const, kind: 'model' as const, value: model.id },
       type: 'radio' as const,
     })),
-  }];
+  });
 
   if (showReasoning.value) {
     items.push({
@@ -139,7 +146,7 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
         closeOnSelect: true,
         id: `reasoning:${effort.reasoningEffort}`,
         label: effortLabel(effort.reasoningEffort),
-        payload: { kind: 'reasoning' as const, value: effort.reasoningEffort },
+        payload: { source: 'selector' as const, kind: 'reasoning' as const, value: effort.reasoningEffort },
         type: 'radio' as const,
       })),
     });
@@ -155,7 +162,7 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand>[]>(() => {
       description: fastServiceTier.value.description,
       id: `service-tier:${fastServiceTier.value.id}`,
       label: 'Fast mode',
-      payload: { kind: 'serviceTier' as const, value: fastServiceTier.value.id },
+      payload: { source: 'selector' as const, kind: 'serviceTier' as const, value: fastServiceTier.value.id },
       type: 'checkbox' as const,
     });
   }
@@ -216,19 +223,52 @@ function compactModelLabel(modelLabel: string): string {
   return modelLabel.replace(/^gpt[-\s]*/i, '').trim() || modelLabel;
 }
 
-function onSelect(item: CodexComposerMenuSelectableItem<SelectorCommand>): void {
+function onSelect(item: CodexComposerMenuSelectableItem<SelectorCommand<Payload>>): void {
   const command = item.payload;
   if (!command) {
     return;
   }
 
-  if (command.kind === 'model') {
+  if (command.source === 'host') {
+    emit('menuSelect', command.item);
+  } else if (command.kind === 'model') {
     emit('update:modelId', command.value);
   } else if (command.kind === 'reasoning' && showReasoning.value) {
     emit('update:reasoningEffort', command.value);
   } else if (command.kind === 'serviceTier' && fastServiceTier.value) {
     emit('update:serviceTier', props.serviceTier === fastServiceTier.value.id ? null : command.value);
   }
+}
+
+function wrapHostMenuItems(
+  items: readonly CodexComposerMenuItem<Payload>[],
+  parentPath: readonly number[] = [],
+): CodexComposerMenuItem<SelectorCommand<Payload>>[] {
+  return items.map((item, index) => {
+    const path = [...parentPath, index];
+    const id = `host:${path.join('.')}:${item.id}`;
+    if (item.type === 'separator') return { ...item, id };
+    if (item.type === 'heading') {
+      return {
+        ...item,
+        id,
+        actions: item.actions?.map((action, actionIndex) => ({
+          ...action,
+          id: `${id}:action:${actionIndex}:${action.id}`,
+          payload: { source: 'host', item: action },
+        })),
+      };
+    }
+    if (item.type === 'submenu') {
+      const { items: childItems, payload: _payload, ...submenu } = item;
+      return { ...submenu, id, items: wrapHostMenuItems(childItems, path) };
+    }
+    return {
+      ...item,
+      id,
+      payload: { source: 'host', item },
+    };
+  });
 }
 </script>
 

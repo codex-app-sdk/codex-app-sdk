@@ -132,6 +132,15 @@ Use `composer.leadingMenuItems` for host actions that belong beside the built-in
 Codex controls. They render after Approval and before Plan mode. Existing
 `composer.menuItems` remain after Plan mode; both collections use
 `CodexComposerMenuItem` and dispatch through `actions.menuSelect`.
+Use `composer.modelMenuItems` for host-owned presets or actions that belong
+inside the model selector. They render before the SDK-owned Model, Reasoning,
+and Speed groups and dispatch the host's original payload through the same
+`actions.menuSelect` callback. The SDK keeps its own selector commands distinct
+from host payloads, so hosts do not need to mirror or namespace built-in menu
+behavior. A `heading` item may include compact trailing `actions`; those icon
+actions use the same typed payload and menu-selection flow. Items may pair a
+short trailing `value` with `valueIcon` and `valueIconLabel` for accessible
+compact metadata. Set `valueAppearance` to `badge` for short categorical values.
 Host-defined `catalogs.mentionGroups` render grouped `@` results before or
 after Plugins and Files and dispatch through `actions.mentionSelect`. Keep Vue
 rendering in the pane's `suggestion-item` and `mention` slots rather than in

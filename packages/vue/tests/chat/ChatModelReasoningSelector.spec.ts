@@ -5,11 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 import ChatModelReasoningSelector from '../../src/chat/ChatModelReasoningSelector.vue';
 import CodexComposerMenu from '../../src/components/CodexComposerMenu.vue';
 import type { CodexModelOption, ReasoningEffort } from '../../src/chat/contracts';
+import type { CodexComposerMenuItem } from '../../src/composer-menu';
 
 type SelectorProps = {
   disabled?: boolean;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   modelId?: string | null;
+  menuItems?: CodexComposerMenuItem<{ action: 'select' | 'remove'; id: string }>[];
   models?: CodexModelOption[];
   reasoningEffort?: ReasoningEffort | null;
   serviceTier?: string | null;
@@ -134,14 +136,67 @@ describe('ChatModelReasoningSelector', () => {
 
     expect(modelChoices).toHaveLength(2);
     await modelChoices[0]!.trigger('click');
-    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
-    await wrapper.get('.chat-model-selector__button').trigger('click');
+    expect(wrapper.find('.chat-model-selector__menu').exists()).toBe(true);
     await wrapper.get('[data-submenu-id="reasoning"] > button').trigger('click');
     await wrapper.findAll('[data-submenu-id="reasoning"] [role="menuitemradio"]')[0]!.trigger('click');
 
     expect(wrapper.emitted('update:modelId')).toStrictEqual([['codex-fast']]);
     expect(wrapper.emitted('update:reasoningEffort')).toStrictEqual([['medium']]);
     expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+  });
+
+  it('renders host model-menu items first and returns their original selection', async () => {
+    const addFavorite = {
+      id: 'add-favorite',
+      label: 'Add current to favorites',
+      payload: { action: 'select' as const, id: 'current' },
+      type: 'action' as const,
+    };
+    const selectFavorite = {
+      closeOnSelect: true,
+      id: 'favorite:terra',
+      label: 'Terra · Medium · Fast',
+      payload: { action: 'select' as const, id: 'terra' },
+      type: 'action' as const,
+    };
+    const removeFavorite = {
+      id: 'remove-favorite:terra',
+      label: 'Terra · Medium · Fast',
+      payload: { action: 'remove' as const, id: 'terra' },
+      type: 'action' as const,
+    };
+    const menuItems: NonNullable<SelectorProps['menuItems']> = [
+      { id: 'favorites', label: 'Favorites', type: 'heading', actions: [addFavorite] },
+      selectFavorite,
+      {
+        id: 'remove-favorite',
+        label: 'Remove favorite',
+        type: 'submenu',
+        items: [removeFavorite],
+      },
+    ];
+    const wrapper = mountSelector({ menuItems });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+
+    const rootMenu = wrapper.get('.chat-model-selector__menu');
+    expect(rootMenu.get('.codex-composer-menu-list__heading-label').text()).toBe('Favorites');
+    expect(rootMenu.findAll(':scope > .codex-composer-menu-list__separator')).toHaveLength(2);
+    await rootMenu.get('button[aria-label="Add current to favorites"]').trigger('click');
+    expect(wrapper.emitted('menuSelect')).toStrictEqual([[addFavorite]]);
+
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+    const reopenedMenu = wrapper.get('.chat-model-selector__menu');
+    await reopenedMenu.findAll(':scope > button')[0]!.trigger('click');
+    expect(wrapper.emitted('menuSelect')).toStrictEqual([[addFavorite], [selectFavorite]]);
+    expect(wrapper.find('.chat-model-selector__menu').exists()).toBe(false);
+
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+    const removeMenu = wrapper.findAll('.codex-composer-menu-list__submenu')
+      .find((submenu) => submenu.get(':scope > button').text().includes('Remove favorite'));
+    expect(removeMenu).toBeDefined();
+    await removeMenu!.get(':scope > button').trigger('click');
+    await removeMenu!.get(':scope > .codex-composer-menu-list__submenu-list > [role="menuitem"]').trigger('click');
+    expect(wrapper.emitted('menuSelect')).toStrictEqual([[addFavorite], [selectFavorite], [removeFavorite]]);
   });
 
   it('renders and toggles Fast mode when the model exposes a priority service tier', async () => {

@@ -237,6 +237,21 @@ reasoning effort, and service tier are visible together. Models and supported
 efforts come from the app-server catalog; the component does not invent IDs. The
 selector stays available while a turn is running. Changes update the conversation
 settings used by subsequent prompts without interrupting the active turn.
+Choosing a built-in model keeps the menu open so users can immediately choose
+its reasoning effort and optional speed tier. Reasoning selection keeps its
+existing close behavior.
+
+Hosts can prepend their own actions and nested presets with
+`composer.modelMenuItems` on a controlled pane, or `model-menu-items` on the
+granular pane/composer components. The SDK renders those entries before its
+built-in groups and returns the original host payload through `menuSelect`; the
+host owns only the custom action and its persistence, not a duplicate selector.
+Use `heading.actions` for compact icon actions beside a host section title.
+Use `valueIcon` with `valueIconLabel` when a trailing status is clearer as an
+icon than as text; it may be combined with a short `value`.
+Set `valueAppearance` to `badge` when that short value is categorical metadata.
+Host items keep their own `closeOnSelect` behavior, so a preset can still apply
+all of its settings and close the menu in one step.
 
 When the model advertises a `priority` or `fast` service tier, the menu exposes
 a Fast mode toggle. Enabling it emits that tier ID. Disabling it emits `null`,

@@ -37,7 +37,7 @@ const paneState = computed(() => ({
     identity: { conversationKey, activeTurnId, turns, messages, busy, disabled, error },
     history: { hasOlder, loading, loadingOlder },
     thread: { approvals, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
-    composer: { state, attachments, placeholder, leadingMenuItems, menuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
+    composer: { state, attachments, placeholder, leadingMenuItems, menuItems, modelMenuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
     catalogs: { files, models, commands, skills, plugins, mentionGroups, modelCatalogStatus, skillCatalogStatus },
     capabilities,
     policy: { actionsDisabled, attachEnabled, canDeleteTurn, canEditTurn, canForkTurn, canRetryTurn, followUpsDisabled },
@@ -90,6 +90,15 @@ renderer-only optimistic row or preserve a synthetic busy flag.
 item and before Plan mode. `composer.menuItems` remains the trailing extension
 point after Plan mode. The equivalent granular pane prop is
 `leading-menu-items`.
+
+`composer.modelMenuItems` renders host actions before the built-in Model,
+Reasoning, and Speed groups. Selections preserve the original host payload and
+dispatch through `actions.menuSelect`; the equivalent granular prop is
+`model-menu-items`. `CodexComposerMenuHeadingItem.actions` accepts action items
+rendered as accessible trailing icon controls in the heading row.
+`CodexComposerMenuItemBase.valueIcon` adds a trailing icon beside `value`; set
+`valueIconLabel` when the icon carries meaning. `valueAppearance: 'badge'`
+renders short values as compact metadata badges.
 
 `catalogs.mentionGroups` adds app-owned grouped `@` suggestions alongside the
 built-in plugin and file results. `actions.mentionSelect(item, group)` observes

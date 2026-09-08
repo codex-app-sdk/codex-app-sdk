@@ -135,6 +135,7 @@
             :is-sending="effectiveBusy"
             :leading-menu-items="effectiveLeadingMenuItems"
             :menu-items="effectiveMenuItems"
+            :model-menu-items="effectiveModelMenuItems"
             :mention-groups="effectiveMentionGroups"
             :model-catalog-status="effectiveModelCatalogStatus"
             :models="effectiveModels"
@@ -334,6 +335,7 @@ const props = withDefaults(defineProps<{
   messageBatchSize?: number;
   leadingMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
+  modelMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   mentionGroups?: readonly CodexComposerMentionGroup<Payload>[];
   messages?: readonly (Message | SurfaceMessage)[];
   turns?: readonly CodexSurfaceTurn[];
@@ -383,6 +385,7 @@ const props = withDefaults(defineProps<{
   leadingMenuItems: () => [],
   messageBatchSize: 25,
   menuItems: () => [],
+  modelMenuItems: () => [],
   modelValue: '',
   placeholder: 'Ask Codex…',
   planMode: undefined,
@@ -716,6 +719,10 @@ const effectiveLeadingMenuItems = computed(() => controlledValue(
 const effectiveMenuItems = computed(() => controlledValue(
   (state) => state.composer?.menuItems ?? [],
   () => props.menuItems,
+));
+const effectiveModelMenuItems = computed(() => controlledValue(
+  (state) => state.composer?.modelMenuItems ?? [],
+  () => props.modelMenuItems,
 ));
 const effectivePlaceholder = computed(() => controlledValue(
   (state) => state.composer?.placeholder,

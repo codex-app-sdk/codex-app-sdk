@@ -8,6 +8,9 @@ export type CodexComposerMenuItemBase<Payload = unknown> = {
   icon?: Component;
   payload?: Payload;
   value?: string;
+  valueAppearance?: 'plain' | 'badge';
+  valueIcon?: Component;
+  valueIconLabel?: string;
 };
 
 export type CodexComposerMenuActionItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
@@ -35,10 +38,11 @@ export type CodexComposerMenuSeparatorItem = {
   type: 'separator';
 };
 
-export type CodexComposerMenuHeadingItem = {
+export type CodexComposerMenuHeadingItem<Payload = unknown> = {
   id: string;
   type: 'heading';
   label: string;
+  actions?: readonly CodexComposerMenuActionItem<Payload>[];
 };
 
 export type CodexComposerMenuSubmenuItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
@@ -51,12 +55,12 @@ export type CodexComposerMenuSubmenuItem<Payload = unknown> = CodexComposerMenuI
 export type CodexComposerMenuItem<Payload = unknown> =
   | CodexComposerMenuActionItem<Payload>
   | CodexComposerMenuCheckboxItem<Payload>
-  | CodexComposerMenuHeadingItem
+  | CodexComposerMenuHeadingItem<Payload>
   | CodexComposerMenuRadioItem<Payload>
   | CodexComposerMenuSeparatorItem
   | CodexComposerMenuSubmenuItem<Payload>;
 
 export type CodexComposerMenuSelectableItem<Payload = unknown> = Exclude<
   CodexComposerMenuItem<Payload>,
-  CodexComposerMenuHeadingItem | CodexComposerMenuSeparatorItem | CodexComposerMenuSubmenuItem<Payload>
+  CodexComposerMenuHeadingItem<Payload> | CodexComposerMenuSeparatorItem | CodexComposerMenuSubmenuItem<Payload>
 >;

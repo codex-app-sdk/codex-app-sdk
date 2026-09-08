@@ -112,10 +112,32 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 }
 
 .codex-composer-menu-list__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   max-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.codex-composer-menu-list__value-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.codex-composer-menu-list__value-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--codex-hover-color, var(--color-surface-low, #f4f4f4));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .codex-composer-menu-list__separator {
@@ -125,10 +147,55 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 }
 
 .codex-composer-menu-list__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--codex-space-2, 4px);
   padding: 6px 8px 4px;
   color: var(--codex-muted-text-color, var(--color-text-muted, #666));
   font-size: var(--codex-composer-menu-heading-font-size, 13px);
   line-height: 18px;
+}
+
+.codex-composer-menu-list__heading-label {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.codex-composer-menu-list__heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.codex-composer-menu-list__heading-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.codex-composer-menu-list__heading-action:hover:not(:disabled),
+.codex-composer-menu-list__heading-action:focus-visible {
+  color: var(--codex-text-color, var(--color-text, #0d0d0d));
+  background: var(--codex-hover-color, var(--color-surface-low, #f4f4f4));
+  outline: none;
+}
+
+.codex-composer-menu-list__heading-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.codex-composer-menu-list__heading-action > svg {
+  width: 16px;
+  height: 16px;
 }
 
 .codex-composer-menu-list__submenu {
