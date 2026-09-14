@@ -33,13 +33,13 @@ describe('CodexSurfaceNotificationsController', () => {
     );
   });
 
-  it('keeps a thread busy while an idle status still has local active work', () => {
+  it('clears stale local active work on authoritative idle', () => {
     const setup = createController({ activeTurnId: 'turn-active' });
 
     handle(setup, 'thread/status/changed', { threadId: 'thread-1', status: { type: 'idle' } });
 
     expect(setup.runtime).toMatchObject({
-      activeTurnId: 'turn-active', busy: true, threadStatus: { type: 'idle' },
+      activeTurnId: null, busy: false, threadStatus: { type: 'idle' },
     });
     expect(setup.state.conversations[0]).toMatchObject({ id: 'thread-1', status: 'idle' });
     expect(setup.host.emitSummaryUpserted).toHaveBeenCalledWith(

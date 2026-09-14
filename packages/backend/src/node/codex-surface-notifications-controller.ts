@@ -110,7 +110,15 @@ export class CodexSurfaceNotificationsController {
         const { threadId, status } = notification.params;
         const runtime = this.host.requireRuntime(threadId);
         const systemError = status.type === 'systemError';
-        if (systemError) runtime.activeTurnId = null;
+        if (status.type === 'idle' && !runtime.turnStartPending && runtime.activeTurnId) {
+          // Idle is authoritative even if the terminal turn notification was
+          // missed. Settle conservatively, without inventing successful work.
+          this.items.applyTurnCompleted({ threadId, turn: {
+            id: runtime.activeTurnId, status: 'interrupted', items: [], itemsView: 'full',
+            error: null, startedAt: null, completedAt: null, durationMs: null,
+          } });
+        }
+        if (systemError || (status.type === 'idle' && !runtime.turnStartPending)) runtime.activeTurnId = null;
         this.host.patchRuntime(threadId, {
           threadStatus: surfaceThreadStatus(status),
           busy: systemError

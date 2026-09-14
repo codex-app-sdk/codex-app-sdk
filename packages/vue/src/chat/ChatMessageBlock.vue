@@ -38,6 +38,7 @@
   </slot>
   <ChatAsyncUserInputRequest
     v-else-if="block.type === 'question'"
+    :historical="block.historical"
     :answered-client-request-ids="answeredClientRequestIds"
     :request="block.request"
     @client-response="emit('client-response', $event)"

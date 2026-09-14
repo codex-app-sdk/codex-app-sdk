@@ -42,7 +42,7 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
         summaryIndex: part.summaryIndex,
       });
     } else if (part.type === 'question') {
-      parts.push({ type: 'question', request: part.request });
+      parts.push({ ...part });
     } else if (part.type === 'text') {
       contentParts.push(part.text);
       parts.push({

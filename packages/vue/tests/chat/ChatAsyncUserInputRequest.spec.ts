@@ -3,6 +3,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import ChatAsyncUserInputRequest from '../../src/chat/ChatAsyncUserInputRequest.vue'
+import { questionResponsesKey } from '../../src/chat/message-work-state'
 
 describe('ChatAsyncUserInputRequest', () => {
   it('renders a surface request and forwards its answer', async () => {
@@ -28,6 +29,23 @@ describe('ChatAsyncUserInputRequest', () => {
         },
       },
     }
+    const history = mount(ChatAsyncUserInputRequest, { props: { request, historical: true } })
+    expect(history.text()).toContain('Previous user question')
+    expect(history.text()).toContain('Which framework?')
+    expect(history.find('textarea, button').exists()).toBe(false)
+    history.unmount()
+
+    const answeredHistory = mount(ChatAsyncUserInputRequest, {
+      props: { request, historical: true },
+      global: { provide: { [questionResponsesKey as symbol]: new Map([
+        [request.id, { answers: { 'question-1': { answers: ['Vue'] } } }],
+      ]) } },
+    })
+    expect(answeredHistory.text()).toContain('Answered user question')
+    expect(answeredHistory.text()).toContain('Vue')
+    expect(answeredHistory.find('textarea, button').exists()).toBe(false)
+    answeredHistory.unmount()
+
     const wrapper = mount(ChatAsyncUserInputRequest, { props: { request } })
 
     await wrapper.get('[aria-label="Vue"]').trigger('click')

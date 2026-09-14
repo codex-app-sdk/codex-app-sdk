@@ -171,7 +171,7 @@ export class CodexSurfaceClientRequestsController {
     let request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> | null = null;
     for (const message of runtime?.messages ?? []) {
       for (const part of message.parts) {
-        if (part.type === 'question' && part.request.id === response.id) request = part.request;
+        if (part.type === 'question' && !part.historical && part.request.id === response.id) request = part.request;
       }
     }
     const match = runtime && request ? { request, runtime } : null;

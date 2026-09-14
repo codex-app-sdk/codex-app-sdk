@@ -130,6 +130,7 @@ type SurfaceMessageReasoningPart = {
 
 type SurfaceMessageQuestionPart = {
   type: 'question';
+  historical?: boolean;
   request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>;
 };
 ```
@@ -156,8 +157,17 @@ the provider envelope themselves.
 
 `clientRequest.requested` and `clientRequest.resolved` cover both deliveries,
 so an incremental conversation replica never needs a full snapshot to discover
-or settle a question. Restored history also reconstructs unanswered async
-questions and recognizes durable answers.
+or settle a question. Restored question parts have `historical: true`: they
+are read-only transcript content, not pending requests. Durable answers remain
+visible when present in loaded history. A prior session's unanswered or skipped
+question does not reopen on restart; only a newly issued provider request is
+actionable. Historical questions fold with the turn's work details.
+
+An optional question does not keep execution busy after a turn ends. Consumers
+mapping client requests to a blocking status must respect `request.blocking`.
+On resume, an idle provider status takes precedence over an old `inProgress`
+history entry, and notifications received during hydration take precedence over
+the older resume response.
 
 ## History state
 

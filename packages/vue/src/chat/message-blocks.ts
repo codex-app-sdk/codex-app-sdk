@@ -146,7 +146,7 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
     }
 
     if (part.type === 'question') {
-      blocks.push({ type: 'question', request: part.request })
+      blocks.push({ ...part })
       continue
     }
 
@@ -325,7 +325,7 @@ export function hasExplicitAssistantWorkPhases(message: Message) {
 }
 
 export function isAssistantWorkBlock(block: MessageBlock, answeredClientRequestIds?: ReadonlySet<string>) {
-  if (block.type === 'question') return answeredClientRequestIds?.has(block.request.id) === true
+  if (block.type === 'question') return block.historical === true || answeredClientRequestIds?.has(block.request.id) === true
   if (block.type === 'reasoning' || block.type === 'tool' || block.type === 'tool-group') return true
   if (block.type === 'media') return block.phase !== 'final_answer'
   return 'phase' in block && block.phase === 'commentary'

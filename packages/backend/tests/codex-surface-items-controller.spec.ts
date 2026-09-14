@@ -494,7 +494,7 @@ describe('CodexSurfaceItemsController', () => {
     });
 
     expect(setup.runtime).toMatchObject({
-      activeTurnId: 'turn-other', turnIds: ['turn-1'], busy: false, error: null,
+      activeTurnId: 'turn-other', turnIds: ['turn-1'], busy: true, error: null,
     });
     expect(setup.runtime.messages[0]).toMatchObject({
       status: 'complete', parts: [expect.objectContaining({ id: 'tool-1', status: 'completed' })],

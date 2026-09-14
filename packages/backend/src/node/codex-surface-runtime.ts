@@ -186,6 +186,7 @@ export function runtimeProjection(
     for (const part of message.parts) {
       if (
         part.type !== 'question'
+        || part.historical === true
         || knownClientRequestIds.has(part.request.id)
         || answeredClientRequestIds.has(part.request.id)
       ) continue;

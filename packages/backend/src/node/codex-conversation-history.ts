@@ -135,7 +135,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
           ...(item.phase ? { phase: item.phase } : {}),
         });
       }
-      const questionPart = codexItemToQuestionPart(threadId, turn.id, item);
+      const questionPart = codexItemToQuestionPart(threadId, turn.id, item, true);
       if (questionPart) {
         sawAssistantActivity = true;
         assistantParts.push(questionPart);
@@ -217,7 +217,7 @@ export function codexItemToSurfaceMessage(
   if (item.type === 'agentMessage' || item.type === 'exitedReviewMode') {
     const text = item.type === 'agentMessage' ? item.text : item.review;
     const questionPart = item.type === 'agentMessage'
-      ? codexItemToQuestionPart(threadId, turn.id, item)
+      ? codexItemToQuestionPart(threadId, turn.id, item, true)
       : null;
     const parts: SurfaceMessagePart[] = [
       ...(text ? [{
@@ -282,6 +282,7 @@ export function codexItemToQuestionPart(
   threadId: string,
   turnId: string,
   item: Extract<ThreadItem, { type: 'agentMessage' }>,
+  historical = false,
 ): SurfaceMessageQuestionPart | null {
   if (item.delivery !== 'async') return null;
   const structuredQuestions = item.questions ?? [];
@@ -320,7 +321,7 @@ export function codexItemToQuestionPart(
       },
     },
   };
-  return { type: 'question', request };
+  return { type: 'question', request, ...(historical ? { historical: true } : {}) };
 }
 
 export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart | null {

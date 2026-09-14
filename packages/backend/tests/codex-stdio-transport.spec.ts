@@ -9,7 +9,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 type FakeChild = EventEmitter & {
-  stdin: EventEmitter & { write: ReturnType<typeof vi.fn> };
+  stdin: EventEmitter & { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
   stdout: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
   stderr: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
   kill: ReturnType<typeof vi.fn>;
@@ -21,6 +21,7 @@ function createFakeChild(): FakeChild {
   const child = new EventEmitter() as FakeChild;
   child.stdin = new EventEmitter() as FakeChild['stdin'];
   child.stdin.write = vi.fn();
+  child.stdin.end = vi.fn();
   child.stdout = new EventEmitter() as FakeChild['stdout'];
   child.stdout.setEncoding = vi.fn();
   child.stderr = new EventEmitter() as FakeChild['stderr'];
@@ -32,6 +33,20 @@ function createFakeChild(): FakeChild {
 }
 
 describe('CodexAppServerStdioTransport', () => {
+  it('closes stdin and allows durable shutdown before sending any signal', async () => {
+    vi.useFakeTimers();
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport();
+    await transport.start();
+    const closing = transport.close();
+    expect(child.stdin.end).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(child.kill).not.toHaveBeenCalled();
+    child.emit('exit', 0, null);
+    await expect(closing).resolves.toBeUndefined();
+  });
+
   beforeEach(() => {
     spawnMock.mockReset();
   });
@@ -248,7 +263,8 @@ describe('CodexAppServerStdioTransport', () => {
       ['-c', 'features.default_mode_request_user_input=true', 'app-server', '--listen', 'stdio://'],
       expect.any(Object),
     );
-    expect(replacement.kill).toHaveBeenCalledOnce();
+    expect(replacement.stdin.end).toHaveBeenCalledOnce();
+    expect(replacement.kill).not.toHaveBeenCalled();
     expect(errors).toHaveLength(1);
     expect(() => transport.send({ method: 'initialized' })).toThrow('Codex app-server transport is not started');
   });
@@ -280,6 +296,7 @@ describe('CodexAppServerStdioTransport', () => {
     const rejection = expect(closing).rejects.toThrow('Codex app-server did not exit after SIGKILL');
     await vi.advanceTimersByTimeAsync(10);
     expect(child.kill).toHaveBeenNthCalledWith(1);
+    await vi.advanceTimersByTimeAsync(10);
     expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
     await vi.advanceTimersByTimeAsync(10);
     await rejection;
@@ -293,7 +310,7 @@ describe('CodexAppServerStdioTransport', () => {
     await transport.start();
 
     const closing = transport.close();
-    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(20);
     expect(child.listenerCount('exit')).toBe(2);
     child.emit('exit', null, 'SIGKILL');
 
@@ -434,7 +451,8 @@ describe('CodexAppServerStdioTransport', () => {
 
     expect(errors.map((error) => error.message)).toStrictEqual(['first failed']);
     expect(first.kill).not.toHaveBeenCalled();
-    expect(second.kill).toHaveBeenCalledOnce();
+    expect(second.stdin.end).toHaveBeenCalledOnce();
+    expect(second.kill).not.toHaveBeenCalled();
   });
 
   it('ignores a late stdin error from an unexpectedly exited child after restart', async () => {
@@ -614,7 +632,7 @@ describe('CodexAppServerStdioTransport', () => {
 
     await expect(transport.close()).resolves.toBeUndefined();
 
-    expect(child.kill).toHaveBeenCalledOnce();
+    expect(child.kill).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
 });

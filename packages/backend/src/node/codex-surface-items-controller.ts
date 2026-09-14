@@ -544,7 +544,8 @@ export class CodexSurfaceItemsController {
         && message.kind === undefined && message.parts.length === 0
       ));
     this.host.patchRuntime(params.threadId, {
-      busy: false,
+      busy: runtime.activeTurnId !== null,
+      ...(runtime.activeTurnId === null ? { threadStatus: { type: 'idle' as const } } : {}),
       turnStartPending: false,
       error: params.turn.error?.message ?? null,
       messages,

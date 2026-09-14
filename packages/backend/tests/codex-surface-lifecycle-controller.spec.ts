@@ -406,7 +406,9 @@ describe('CodexSurfaceLifecycleController', () => {
     const running = turn('turn-live', 'inProgress', [
       { type: 'agentMessage', id: 'agent-live', text: 'Working', phase: null, memoryCitation: null },
     ]);
-    const response = resumeResponse(thread('target', false));
+    const resumedThread = thread('target', false);
+    resumedThread.status = { type: 'active', activeFlags: [] };
+    const response = resumeResponse(resumedThread);
     delete response.initialTurnsPage;
     response.cwd = null;
     setup.client.request.mockImplementation(async (method: string, params?: unknown) => {
@@ -440,7 +442,7 @@ describe('CodexSurfaceLifecycleController', () => {
       hydrated: true, historyMode: 'legacy', loadingStrategy: 'eager', historyCursor: 'older', historyHasOlder: true,
       historyLoadingOlder: false, fullHistoryHydrated: false, cwd: '/tmp/project', historyLoading: false,
       activeTurnId: 'turn-live', turnIds: ['turn-old', 'turn-live'], busy: true,
-      goal: goal('target'), threadStatus: { type: 'idle' },
+      goal: goal('target'), threadStatus: { type: 'active', activeFlags: [] },
     });
     expect(runtime?.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ role: 'user' }),

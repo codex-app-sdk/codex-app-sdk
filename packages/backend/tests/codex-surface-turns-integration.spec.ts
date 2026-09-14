@@ -134,6 +134,7 @@ describe('CodexSurface', () => {
     const transport = new FakeTransport({
       'thread/resume': (params) => {
         const value = thread(String((params as { threadId: string }).threadId), false);
+        value.status = { type: 'active', activeFlags: [] };
         value.turns = [turn('turn-running', 'inProgress', [])];
         return resumeResponse(value);
       },

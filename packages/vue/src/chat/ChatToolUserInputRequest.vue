@@ -29,6 +29,13 @@
       </div>
     </div>
 
+    <div v-else-if="historical" class="chat-tool-user-input__summary">
+      <ChatToolCallTitle title="Previous user question" :icon="SquareDashed" />
+      <div v-for="question in questions" :key="question.id" class="chat-tool-user-input__answer">
+        <span class="chat-tool-user-input__answer-label">{{ question.question }}</span>
+      </div>
+    </div>
+
     <template v-else-if="currentQuestion">
       <header class="chat-tool-user-input__header">
         <div class="chat-tool-user-input__heading">
@@ -157,6 +164,7 @@ import type { MessageToolCall } from './types'
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
+  historical?: boolean
   toolCall: MessageToolCall
 }>()
 

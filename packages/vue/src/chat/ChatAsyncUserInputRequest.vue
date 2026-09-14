@@ -1,6 +1,7 @@
 <template>
   <ChatToolUserInputRequest
     :answered-client-request-ids="answeredClientRequestIds"
+    :historical="historical"
     :tool-call="toolCall"
     @client-response="respond"
   />
@@ -17,6 +18,7 @@ import type { MessageToolCall } from './types'
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
+  historical?: boolean
   request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>
 }>()
 

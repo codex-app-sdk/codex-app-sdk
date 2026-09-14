@@ -31,6 +31,8 @@ export type CodexSurfaceAskUserQuestion = {
 
 export type SurfaceMessageQuestionPart = {
   type: 'question';
+  /** Replayed transcript content, not a live request to answer. */
+  historical?: boolean;
   request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>;
 };
 

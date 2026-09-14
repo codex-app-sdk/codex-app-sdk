@@ -34,7 +34,7 @@ const DEFAULT_OUTPUT_LINE_CHARS = Math.min(
   256 * 1024 * 1024,
   Math.floor(bufferConstants.MAX_STRING_LENGTH / 2),
 );
-const DEFAULT_SHUTDOWN_TIMEOUT_MS = 1_000;
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 12_000;
 
 export class CodexAppServerStdioTransport implements RpcTransport {
   private child: ChildProcessWithoutNullStreams | null = null;
@@ -163,10 +163,17 @@ export class CodexAppServerStdioTransport implements RpcTransport {
     this.expectedExits.add(child);
     const shutdownTimeoutMs = this.options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
     const gracefulExit = waitForExit(child, shutdownTimeoutMs);
-    child.kill();
+    // Stdio app-server shuts its threads down on EOF. SIGTERM bypasses that
+    // path and can lose the tail of a rollout that has not been flushed yet.
+    child.stdin.end();
     if (await gracefulExit) return;
 
-    const forcedExit = waitForExit(child, shutdownTimeoutMs);
+    const signalTimeoutMs = Math.min(shutdownTimeoutMs, 1_000);
+    const terminatedExit = waitForExit(child, signalTimeoutMs);
+    child.kill();
+    if (await terminatedExit) return;
+
+    const forcedExit = waitForExit(child, signalTimeoutMs);
     child.kill('SIGKILL');
     if (!await forcedExit) {
       throw new Error('Codex app-server did not exit after SIGKILL');

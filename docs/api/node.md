@@ -14,6 +14,13 @@ import {
 
 Creates a high-level surface and its default app-server client/stdio transport.
 
+Closing the default stdio transport ends stdin first so app-server can stop its
+threads and flush history. It allows 12 seconds by default (`shutdownTimeoutMs`
+overrides this), then escalates to SIGTERM and SIGKILL with at most one second
+for each signal. Hosts should await close and allow at least 15 seconds in
+their outer shutdown lifecycle. Forced termination cannot guarantee a history
+flush.
+
 ### `CodexSurfaceOptions`
 
 ```ts

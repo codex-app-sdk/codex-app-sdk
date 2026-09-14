@@ -315,6 +315,9 @@ export class CodexSurfaceLifecycleController {
       extensionContext: hostOptions.extensionContext,
     }, {}, hostOptions.mcpServers);
     const loadingRuntime = this.host.createRuntime(conversationId, { historyLoading: true, error: null });
+    const initialTurns = new Map(loadingRuntime.turns.map((turn) => [turn.id, turn]));
+    const initialMessages = new Map(loadingRuntime.messages.map((message) => [message.id, message]));
+    const initialStatus = loadingRuntime.threadStatus;
     if (activate) this.host.activateRuntime(loadingRuntime);
     try {
       const [response, goal] = await Promise.all([
@@ -350,15 +353,31 @@ export class CodexSurfaceLifecycleController {
       const turns = [...initialPage.data].reverse();
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
       const catalogs = await this.catalog.loadConversationCatalogs(cwd);
-      const runningTurnId = activeTurnId(turns);
-      const threadStatus = surfaceThreadStatus(response.thread.status);
+      const changedTurns = loadingRuntime.turns.filter((turn) => initialTurns.get(turn.id) !== turn);
+      const threadStatus = loadingRuntime.threadStatus !== initialStatus && loadingRuntime.threadStatus
+        ? loadingRuntime.threadStatus
+        : surfaceThreadStatus(response.thread.status);
+      const restoredTurns = turns.map((turn) => threadStatus.type === 'idle' && turn.status === 'inProgress'
+        ? { ...turn, status: 'interrupted' as const }
+        : turn);
+      const projectedTurns = new Map(restoredTurns.map((turn) => [turn.id, surfaceTurn(turn)]));
+      for (const turn of changedTurns) projectedTurns.set(turn.id, turn);
+      const runningTurnId = changedTurns.length > 0
+        ? loadingRuntime.activeTurnId
+        : threadStatus.type === 'active' ? activeTurnId(turns) : null;
       const historyMessages = preserveHistoricalAttachmentPreviews(
         loadingRuntime.messages,
-        codexThreadToSurfaceMessages({ ...response.thread, turns }),
+        codexThreadToSurfaceMessages({ ...response.thread, turns: restoredTurns }),
       );
+      // Notifications received while hydration awaited RPC/catalog data are newer
+      // than that response. Never replace them with the stale transcript page.
+      const mergedMessages = new Map(historyMessages.map((message) => [message.id, message]));
+      for (const message of loadingRuntime.messages) {
+        if (initialMessages.get(message.id) !== message) mergedMessages.set(message.id, message);
+      }
       const messages = runningTurnId
-        ? ensureAssistantTurnMessage(historyMessages, response.thread.id, runningTurnId)
-        : historyMessages;
+        ? ensureAssistantTurnMessage([...mergedMessages.values()], response.thread.id, runningTurnId)
+        : [...mergedMessages.values()];
       const runtime = this.host.createRuntime(response.thread.id, {
         hydrated: true,
         historyMode: response.thread.historyMode ?? 'legacy',
@@ -370,10 +389,10 @@ export class CodexSurfaceLifecycleController {
         cwd: cwd ?? null,
         historyLoading: false,
         activeTurnId: runningTurnId,
-        turns: turns.map((turn) => surfaceTurn(turn)),
-        turnIds: turns.map((turn) => turn.id),
+        turns: [...projectedTurns.values()],
+        turnIds: [...projectedTurns.keys()],
         messages,
-        busy: Boolean(runningTurnId) || threadStatus.type === 'active',
+        busy: changedTurns.length > 0 ? loadingRuntime.busy : Boolean(runningTurnId) || threadStatus.type === 'active',
         goal: goal ? { ...goal } : null,
         threadStatus,
         ...catalogs,

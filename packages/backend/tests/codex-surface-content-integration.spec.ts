@@ -1,10 +1,75 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
+import { createCodexConversationReplica } from '@codex-app-sdk/core';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import { FakeTransport, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('preserves completion and messages received while resume is pending', async () => {
+    const restored = thread('thread-existing', false);
+    restored.status = { type: 'active', activeFlags: [] };
+    restored.turns = [turn('race-turn', 'inProgress', [])];
+    const response = deferred<ReturnType<typeof resumeResponse>>();
+    const transport = new FakeTransport({ 'thread/resume': () => response.promise });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const connecting = surface.connect();
+    await vi.waitFor(() => expect(lastRequest(transport, 'thread/resume')).toBeDefined());
+    transport.emit({ method: 'item/agentMessage/delta', params: {
+      threadId: 'thread-existing', turnId: 'race-turn', itemId: 'race-answer', delta: 'Finished during resume',
+    } });
+    transport.emit({ method: 'turn/completed', params: {
+      threadId: 'thread-existing', turn: turn('race-turn', 'completed', []),
+    } });
+    response.resolve(resumeResponse(restored));
+    await connecting;
+    expect(surface.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null,
+      turns: [expect.objectContaining({ id: 'race-turn', status: 'completed' })],
+      messages: [expect.objectContaining({ parts: [expect.objectContaining({ text: 'Finished during resume' })] })],
+    });
+  });
+
+  it('does not resurrect historical questions or execution when resuming an idle thread', async () => {
+    const restored = thread('thread-existing', false);
+    restored.status = { type: 'idle' };
+    restored.turns = [turn('old-turn', 'inProgress', [{
+      type: 'agentMessage', id: 'old-question', text: 'Pick one', phase: null,
+      memoryCitation: null, delivery: 'async', questions: [{ title: 'Pick one', options: null }],
+    }])];
+    const transport = new FakeTransport({ 'thread/resume': () => resumeResponse(restored) });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    expect(surface.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null, clientRequests: [] });
+    expect(surface.getSnapshot().turns).toMatchObject([{ id: 'old-turn', status: 'interrupted' }]);
+    expect(surface.getSnapshot().messages).not.toHaveLength(0);
+    await surface.sendMessage('New work');
+    expect(lastRequest(transport, 'turn/start')).toBeDefined();
+    expect(surface.getSnapshot().queuedPrompts).toEqual([]);
+  });
+
+  it('clears stale execution on authoritative idle even when turn/completed was missed', async () => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+    surface.onConversationEvent('thread-existing', (event) => replica.apply(event));
+    transport.emit({ method: 'turn/started', params: {
+      threadId: 'thread-existing', turn: turn('lost-completion', 'inProgress', []),
+    } });
+    expect(surface.getSnapshot().busy).toBe(true);
+    transport.emit({ method: 'thread/status/changed', params: {
+      threadId: 'thread-existing', status: { type: 'idle' },
+    } });
+    expect(surface.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null });
+    expect(surface.getSnapshot().turns).toContainEqual(expect.objectContaining({
+      id: 'lost-completion', status: 'interrupted',
+    }));
+    expect(replica.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null,
+      turns: expect.arrayContaining([expect.objectContaining({ id: 'lost-completion', status: 'interrupted' })]),
+    });
+    await surface.sendMessage('New work');
+    expect(lastRequest(transport, 'turn/start')).toBeDefined();
+  });
+
   it('projects asynchronous agent questions as answerable surface requests', async () => {
     const { surface, transport } = createSurface();
     const events: CodexSurfaceEvent[] = [];
