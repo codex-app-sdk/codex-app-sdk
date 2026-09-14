@@ -183,6 +183,53 @@ describe('CodexSurfaceLifecycleController', () => {
     expect(setup.client.request.mock.calls.filter(([method]) => method === 'thread/resume')).toHaveLength(2);
   });
 
+  it('keeps a live compaction marker in persisted history order during hydration', async () => {
+    const setup = setupLifecycle();
+    const resume = deferred<unknown>();
+    setup.client.request.mockImplementation(async (method: string, params?: unknown) => {
+      if (method === 'thread/resume') return resume.promise;
+      return responseFor(method, params);
+    });
+
+    const hydration = setup.controller.ensureReady('compacted');
+    await vi.waitFor(() => expect(setup.runtimes.has('compacted')).toBe(true));
+    const loadingRuntime = setup.runtimes.get('compacted');
+    if (!loadingRuntime) throw new Error('Missing loading runtime');
+    loadingRuntime.messages = [{
+      id: 'compaction-turn-compaction',
+      kind: 'compaction',
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'turn-compaction',
+      parts: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      metadata: { conversationId: 'compacted', turnId: 'turn-compaction' },
+    }];
+
+    const resumedThread = {
+      ...thread('compacted', false),
+      status: { type: 'active', activeFlags: [] },
+      turns: [turn('turn-compaction', 'inProgress', [
+        {
+          type: 'userMessage', id: 'user-compaction', clientId: null,
+          content: [{ type: 'text', text: 'Continue after compaction.', text_elements: [] }],
+        },
+        { type: 'agentMessage', id: 'before', text: 'Before.', phase: null, memoryCitation: null },
+        { type: 'contextCompaction', id: 'compaction' },
+        { type: 'agentMessage', id: 'after', text: 'After.', phase: null, memoryCitation: null },
+      ])],
+    };
+    resume.resolve(resumeResponse(resumedThread));
+    await hydration;
+
+    expect(setup.runtimes.get('compacted')?.messages.map(({ id }) => id)).toStrictEqual([
+      'user-compacted-turn-compaction-user-compaction',
+      'assistant-turn-compaction',
+      'compaction-turn-compaction',
+      'assistant-turn-compaction-segment-1',
+    ]);
+  });
+
   it.each(['forget', 'clear', 'resetHydrations'] as const)(
     '%s invalidates an in-flight hydration so a replacement load can start',
     async (method) => {

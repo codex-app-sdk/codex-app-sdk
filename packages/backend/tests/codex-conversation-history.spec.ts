@@ -85,6 +85,54 @@ describe('codexThreadToSurfaceMessages', () => {
     })]);
   });
 
+  it('preserves context compaction between assistant history segments', () => {
+    const messages = codexTurnToSurfaceMessages('thread-compaction', {
+      id: 'turn-compaction',
+      status: 'inProgress',
+      startedAt: 1,
+      completedAt: null,
+      items: [
+        {
+          type: 'userMessage', id: 'user-before-compaction', clientId: null,
+          content: [{ type: 'text', text: 'Finish the release.' }],
+        },
+        {
+          type: 'agentMessage', id: 'agent-before-compaction',
+          text: 'I am checking the package.',
+        },
+        { type: 'contextCompaction', id: 'context-compaction' },
+        {
+          type: 'agentMessage', id: 'agent-after-compaction',
+          text: 'The compacted turn is continuing.',
+        },
+      ],
+    } as unknown as v2.Turn);
+
+    expect(messages).toMatchObject([
+      {
+        id: 'user-thread-compaction-turn-compaction-user-before-compaction',
+        role: 'user',
+      },
+      {
+        id: 'assistant-turn-compaction',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'I am checking the package.' }],
+      },
+      {
+        id: 'compaction-turn-compaction',
+        kind: 'compaction',
+        role: 'assistant',
+        status: 'complete',
+        parts: [],
+      },
+      {
+        id: 'assistant-turn-compaction-segment-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'The compacted turn is continuing.' }],
+      },
+    ]);
+  });
+
   it('displays and deduplicates structured skills when no prompt text is available', () => {
     const [message] = codexTurnToSurfaceMessages('thread-skill-only', {
       id: 'turn-skill-only', status: 'completed', startedAt: 1, completedAt: 2,

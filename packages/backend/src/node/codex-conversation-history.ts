@@ -124,6 +124,25 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       continue;
     }
 
+    if (item.type === 'contextCompaction') {
+      sawAssistantActivity = true;
+      flushAssistantMessage();
+      const markerId = `compaction-${turn.id}`;
+      if (!messages.some((message) => message.id === markerId)) {
+        messages.push({
+          id: markerId,
+          kind: 'compaction',
+          role: 'assistant',
+          status: 'complete',
+          turnId: turn.id,
+          parts: [],
+          createdAt,
+          metadata: { conversationId: threadId, turnId: turn.id },
+        });
+      }
+      continue;
+    }
+
     if (item.type === 'agentMessage') {
       const text = typeof item.text === 'string' ? item.text : '';
       if (text) {
