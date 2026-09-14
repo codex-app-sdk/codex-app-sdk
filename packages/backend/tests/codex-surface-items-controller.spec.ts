@@ -84,6 +84,37 @@ describe('CodexSurfaceItemsController', () => {
     expect(setup.host.emitEvent).toHaveBeenCalledTimes(1);
   });
 
+  it('reconciles a selected skill item with its optimistic user message without duplicating the skill', () => {
+    const setup = itemController();
+    setup.runtime.turnStartPending = true;
+    setup.runtime.messages = [{
+      id: 'optimistic-user', role: 'user', status: 'complete',
+      createdAt: '2026-09-14T00:00:00.000Z',
+      parts: [{ type: 'text', text: '$cp first' }],
+      metadata: { conversationId: 'thread-1' },
+    }];
+
+    setup.controller.applyItem(item('userMessage', {
+      id: 'provider-user', clientId: null,
+      content: [
+        { type: 'text', text: '$cp first', text_elements: [] },
+        {
+          type: 'skill',
+          name: 'Commit-Push (cp)',
+          path: '/skills/commit-push/SKILL.md',
+        },
+      ],
+    }), true);
+
+    expect(setup.runtime.messages).toStrictEqual([expect.objectContaining({
+      id: 'optimistic-user', turnId: 'turn-1', parts: [{ type: 'text', text: '$cp first' }],
+    })]);
+    expect(setup.host.emitEvent).toHaveBeenCalledOnce();
+    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', expect.objectContaining({
+      type: 'message.updated', conversationId: 'thread-1', turnId: 'turn-1',
+    }));
+  });
+
   it('emits both phases of context compaction', () => {
     const setup = itemController();
     setup.controller.applyItem(item('contextCompaction', { id: 'compact-1' }), false);

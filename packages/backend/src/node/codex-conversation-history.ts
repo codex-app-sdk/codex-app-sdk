@@ -357,14 +357,27 @@ export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart 
 
 function userMessageParts(item: Extract<ThreadItem, { type: 'userMessage' }>): SurfaceMessagePart[] {
   const content = Array.isArray(item.content) ? item.content : [];
+  const hasTextInput = content.some((input) => (
+    isRecord(input) && input.type === 'text' && typeof input.text === 'string' && input.text.length > 0
+  ));
   const parts: SurfaceMessagePart[] = [];
   let text: string[] = [];
+  const renderedSkills = new Set<string>();
   const flushText = () => {
     if (text.length > 0) parts.push({ type: 'text', text: text.join('\n') });
     text = [];
   };
 
   for (const input of content) {
+    if (isRecord(input) && input.type === 'skill' && typeof input.name === 'string') {
+      // app-server persists selected skills alongside the original prompt text.
+      // The text is the canonical user-authored display value; rendering the
+      // structured execution metadata too repeats the skill mention.
+      if (hasTextInput) continue;
+      const normalizedName = input.name.toLowerCase();
+      if (renderedSkills.has(normalizedName)) continue;
+      renderedSkills.add(normalizedName);
+    }
     const inputText = userInputText(input);
     if (inputText) {
       text.push(inputText);

@@ -13,6 +13,25 @@ import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
 const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 describe('codexThreadToSurfaceMessages', () => {
+  it('does not repeat a structured skill already present in prompt text', () => {
+    const [message] = codexTurnToSurfaceMessages('thread-skill', {
+      id: 'turn-skill', status: 'completed', startedAt: 1, completedAt: 2,
+      items: [{
+        type: 'userMessage', id: 'user-skill', clientId: null,
+        content: [
+          { type: 'text', text: '$cp first', text_elements: [] },
+          {
+            type: 'skill',
+            name: 'Commit-Push (cp)',
+            path: '/skills/commit-push/SKILL.md',
+          },
+        ],
+      }],
+    } as unknown as v2.Turn);
+
+    expect(message?.parts).toStrictEqual([{ type: 'text', text: '$cp first' }]);
+  });
+
   it('normalizes incomplete history and every persisted user input type', () => {
     expect(codexThreadToSurfaceMessages({ id: 'empty', turns: null } as unknown as v2.Thread)).toStrictEqual([]);
     const messages = codexTurnToSurfaceMessages('thread-inputs', {
@@ -43,7 +62,7 @@ describe('codexThreadToSurfaceMessages', () => {
       id: 'client-inputs',
       status: 'complete',
       parts: [
-        { type: 'text', text: 'Hello\n$review' },
+        { type: 'text', text: 'Hello' },
         {
           type: 'attachment',
           attachment: {
@@ -64,6 +83,21 @@ describe('codexThreadToSurfaceMessages', () => {
         },
       ],
     })]);
+  });
+
+  it('displays and deduplicates structured skills when no prompt text is available', () => {
+    const [message] = codexTurnToSurfaceMessages('thread-skill-only', {
+      id: 'turn-skill-only', status: 'completed', startedAt: 1, completedAt: 2,
+      items: [{
+        type: 'userMessage', id: 'user-skill-only', clientId: null,
+        content: [
+          { type: 'skill', name: 'review', path: '/skills/review/SKILL.md' },
+          { type: 'skill', name: 'REVIEW', path: '/skills/review/SKILL.md' },
+        ],
+      }],
+    } as unknown as v2.Turn);
+
+    expect(message?.parts).toStrictEqual([{ type: 'text', text: '$review' }]);
   });
 
   it('maps individual history items and all turn statuses', () => {
@@ -1136,7 +1170,7 @@ describe('codexThreadToSurfaceMessages', () => {
       ],
     } as unknown as v2.ThreadItem);
     expect(message?.parts).toStrictEqual([
-      { type: 'text', text: 'First\n$review' },
+      { type: 'text', text: 'First' },
       { type: 'attachment', attachment: {
         kind: 'file', name: 'Named file', path: '/tmp/file.pdf', mimeType: 'application/pdf',
       } },
