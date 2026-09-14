@@ -380,7 +380,7 @@ export class CodexSurfaceItemsController {
 
     if (params.item.type === 'contextCompaction') {
       this.host.patchRuntime(params.threadId, {
-        messages: appendCompactionMarker(runtime.messages, params.threadId, params.turnId),
+        messages: appendCompactionMarker(runtime.messages, params.threadId, params.turnId, completed ? 'complete' : 'streaming'),
       });
       if (completed) {
         const message = this.host.requireRuntime(params.threadId).messages.find((candidate) => (

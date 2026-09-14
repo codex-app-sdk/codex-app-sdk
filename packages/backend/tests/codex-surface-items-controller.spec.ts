@@ -472,7 +472,7 @@ describe('CodexSurfaceItemsController', () => {
     setup.controller.applyItem(item('contextCompaction', { id: 'compact-1' }), true);
     expect(setup.host.emitEvent).toHaveBeenNthCalledWith(2, 'notification', {
       type: 'context.compactionCompleted', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { itemId: 'compact-1', message: compaction },
+      payload: { itemId: 'compact-1', message: { ...compaction, status: 'complete' } },
     });
   });
 

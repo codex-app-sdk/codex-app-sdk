@@ -1,7 +1,43 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createCodexConversationReplica } from '@codex-app-sdk/core';
 import { createSurface, lastResponse, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it.each([
+    ['item/completed', true], ['thread/compacted', true],
+    ['item/completed', false], ['thread/compacted', false],
+  ] as const)(
+    'settles compaction through %s before the turn finishes (start received: %s)', async (method, started) => {
+      const { surface, transport } = createSurface();
+      await surface.connect();
+      const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+      surface.onConversationEvent('thread-existing', (event) => replica.apply(event));
+      const params = { threadId: 'thread-existing', turnId: 'turn-stream',
+        item: { type: 'contextCompaction', id: 'compact' },
+      };
+      transport.emit({ method: 'turn/started', params: {
+        threadId: params.threadId, turn: turn(params.turnId, 'inProgress', []),
+      } });
+      if (started) {
+        transport.emit({ method: 'item/started', params });
+        expect(replica.getSnapshot().messages.find((message) => message.kind === 'compaction')?.status).toBe('streaming');
+      }
+      transport.emit({ method, params });
+      // Duplicate completion and a late start must not reopen the same marker.
+      transport.emit({ method, params });
+      transport.emit({ method: 'item/started', params });
+      transport.emit({ method: 'item/agentMessage/delta', params: {
+        threadId: params.threadId, turnId: params.turnId, itemId: 'answer', delta: 'Continuing work',
+      } });
+      for (const snapshot of [surface.getConversationSnapshot(params.threadId), replica.getSnapshot()]) {
+        expect(snapshot.busy).toBe(true);
+        expect(snapshot.messages.filter((message) => message.kind === 'compaction')).toMatchObject([
+          { status: 'complete' },
+        ]);
+      }
+    },
+  );
+
   it('reduces every streamed tool update and resolves cancellation and confirmation variants', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();

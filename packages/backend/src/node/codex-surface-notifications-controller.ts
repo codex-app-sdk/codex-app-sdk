@@ -341,6 +341,7 @@ export class CodexSurfaceNotificationsController {
             runtime.messages,
             notification.params.threadId,
             notification.params.turnId,
+            'complete',
           ),
         });
         const message = this.host.requireRuntime(notification.params.threadId).messages.find((candidate) => (

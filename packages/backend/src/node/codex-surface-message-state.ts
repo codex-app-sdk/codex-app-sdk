@@ -366,9 +366,14 @@ export function appendCompactionMarker(
   messages: readonly SurfaceMessage[],
   threadId: string,
   turnId: string,
+  status: 'streaming' | 'complete' = 'streaming',
 ): SurfaceMessage[] {
   if (messages.some((message) => message.kind === 'compaction' && message.metadata?.turnId === turnId)) {
-    return [...messages];
+    return messages.map((message) => (
+      status === 'complete' && message.kind === 'compaction' && message.metadata?.turnId === turnId
+        ? { ...message, status }
+        : message
+    ));
   }
   const next = [...messages];
   const activeAssistantIndex = findLastIndex(next, (message) => (
@@ -386,7 +391,7 @@ export function appendCompactionMarker(
     id: `compaction-${turnId}`,
     kind: 'compaction',
     role: 'assistant',
-    status: 'streaming',
+    status,
     turnId,
     parts: [],
     createdAt: new Date().toISOString(),
