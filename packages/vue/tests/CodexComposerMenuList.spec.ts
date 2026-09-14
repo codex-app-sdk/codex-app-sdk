@@ -188,7 +188,7 @@ describe('CodexComposerMenuList', () => {
     expect(button('Switch off').find('.codex-composer-menu-list__switch-thumb').exists()).toBe(true);
     expect(button('Empty color').find('.codex-composer-menu-list__selection').exists()).toBe(false);
     expect(button('Wide').get('.codex-composer-menu-list__chevron').attributes('aria-hidden')).toBe('true');
-    expect(button('Wide').get('.codex-composer-menu-list__chevron').text()).toBe('›');
+    expect(button('Wide').get('.codex-composer-menu-list__chevron').element.tagName).toBe('svg');
     expect(button('Wide').classes()).toContain('codex-composer-menu-list__item');
     expect(button('Wide').attributes('tabindex')).toBe('-1');
     expect(button('Wide').attributes('type')).toBe('button');

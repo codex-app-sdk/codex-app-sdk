@@ -4,6 +4,7 @@ import type {
   CodexComposerMenuItemBase,
   CodexComposerMenuSelectableItem,
 } from '../composer-menu';
+import { ChevronRightIcon } from '../icons/app-icons';
 
 const CodexComposerMenuItems = defineComponent({
   name: 'CodexComposerMenuItems',
@@ -142,7 +143,10 @@ function renderItem(
         },
       }, [
         ...renderContent(item, slots),
-        h('span', { class: 'codex-composer-menu-list__chevron', 'aria-hidden': 'true' }, '›'),
+        h(ChevronRightIcon, {
+          class: 'codex-composer-menu-list__chevron',
+          'aria-hidden': 'true',
+        }),
       ]),
       enabled
         ? renderMenu(
