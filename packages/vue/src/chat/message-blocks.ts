@@ -313,6 +313,7 @@ export function hasExplicitAssistantWorkPhases(message: Message) {
 
 export function isAssistantWorkBlock(block: MessageBlock) {
   if (block.type === 'reasoning' || block.type === 'tool' || block.type === 'tool-group') return true
+  if (block.type === 'media') return block.phase !== 'final_answer'
   return 'phase' in block && block.phase === 'commentary'
 }
 

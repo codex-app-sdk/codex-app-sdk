@@ -348,8 +348,9 @@ rendering key. The default behavior is identity.
 `CodexChatMessage` preserves the optional `turnId` from `SurfaceMessage`.
 `CodexMessageList` projects adjacent messages with that identity into one
 logical turn. Steering messages remain in chronological order, while all
-assistant commentary, reasoning, and tool segments share one `Working` / `Done`
-disclosure. A transform that returns a `CodexChatMessage` should retain
+assistant commentary, reasoning, tool segments, and generated media share one
+`Working` / `Done` disclosure. Generated media retains its chronological
+position among those work blocks. A transform that returns a `CodexChatMessage` should retain
 `turnId` for that behavior. A tool-only active segment is treated as structured
 work before the first phased text arrives; unphased messages containing
 ordinary text retain the flat rendering path.
@@ -358,6 +359,7 @@ Pass `activeTurnId` and `turns` when controlling the list, or put them in
 `controller.state.identity`. Surface-bound panes wire both automatically.
 `activeTurnId` is authoritative for `Working`; `busy` remains the broader
 conversation-level pending state used by the composer and Thinking placeholder.
+An active `Working` disclosure is always expanded and cannot be collapsed.
 
 Pass `busy` to `CodexMessageList` (the conversation pane wires this from its
 surface state) to keep a `Thinking` shimmer visible while a turn is accepted

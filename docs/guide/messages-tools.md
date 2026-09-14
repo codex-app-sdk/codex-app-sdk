@@ -31,13 +31,15 @@ Codex assistant items can distinguish intermediate `commentary` from the
 reasoning summaries as separate `reasoning` parts. It never exposes raw
 reasoning content.
 
-The stock Vue renderer groups commentary, reasoning summaries, and tool calls
-under an expanded `Working` section while the turn is active. When the final
-answer starts, the section becomes `Done · View details` and collapses
-automatically; the reader can reopen it at any time. The final answer remains
-visible below it. If structured tool activity arrives before the first phased
-text or reasoning summary, `CodexMessageList` opens the `Working` section
-immediately.
+The stock Vue renderer groups commentary, reasoning summaries, tool calls, and
+generated media under an expanded `Working` section while the turn is active.
+Work blocks retain their chronological order, and the active section cannot be
+collapsed. When the final answer starts, the section becomes
+`Done · View details` and collapses automatically; the reader can reopen it at
+any time to inspect the tools and generated media. The final answer, including
+images embedded in `final_answer` text, remains visible below it. If structured
+tool activity arrives before the first phased text or reasoning summary,
+`CodexMessageList` opens the `Working` section immediately.
 
 The accepted-but-not-yet-streaming gap is part of the active turn as well. The
 stock `Thinking` placeholder inherits the latest visible `turnId`, keeping the

@@ -144,6 +144,8 @@ describe('component lab', () => {
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
     expect(wrapper.text()).toContain('The completed turn is compact.');
+    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
+      .not.toContain('chat-fold--open');
 
     await wrapper.get('.chat-work-group__header').trigger('click');
 
@@ -151,6 +153,8 @@ describe('component lab', () => {
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(3);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
+      .toContain('chat-fold--open');
 
     await wrapper.get('.chat-work-group__header').trigger('click');
 

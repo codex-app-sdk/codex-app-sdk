@@ -286,6 +286,7 @@ const scenarios: [Scenario, ...Scenario[]] = [
       { id: 'completed-turn-work', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
         { type: 'tool', id: 'completed-turn-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
         { type: 'text', text: 'Started the verification.', phase: 'commentary' },
+        { type: 'media', itemId: 'completed-turn-preview', media: { url: '/attachment-preview.svg', title: 'Generated turn preview', mimeType: 'image/svg+xml' } },
       ] },
       { id: 'completed-turn-steer-one', kind: 'steer', role: 'user', status: 'complete', turnId: 'completed-turn', parts: [
         { type: 'text', text: 'Check the shared disclosure too.' },

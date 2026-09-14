@@ -424,28 +424,29 @@ describe('CodexMessageList', () => {
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
   });
 
-  it('keeps generated media before commentary that streams after the image', () => {
+  it('keeps generated media in order while active and folds it with completed work', async () => {
+    const activeMessage: SurfaceMessage = {
+      id: 'assistant-image-turn',
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'turn-image',
+      parts: [
+        { type: 'text', text: 'Generating the image.', phase: 'commentary' },
+        {
+          type: 'tool', id: 'image-1', title: 'image_generation', status: 'completed',
+        },
+        {
+          type: 'media', itemId: 'image-1',
+          media: { url: 'data:image/png;base64,cG5n', title: 'Generated image' },
+        },
+        { type: 'text', text: 'Checking the generated result.', phase: 'commentary' },
+      ],
+    };
     const wrapper = mount(CodexMessageList, {
       props: {
         activeTurnId: 'turn-image',
         busy: true,
-        messages: [{
-          id: 'assistant-image-turn',
-          role: 'assistant',
-          status: 'streaming',
-          turnId: 'turn-image',
-          parts: [
-            { type: 'text', text: 'Generating the image.', phase: 'commentary' },
-            {
-              type: 'tool', id: 'image-1', title: 'image_generation', status: 'completed',
-            },
-            {
-              type: 'media', itemId: 'image-1',
-              media: { url: 'data:image/png;base64,cG5n', title: 'Generated image' },
-            },
-            { type: 'text', text: 'Checking the generated result.', phase: 'commentary' },
-          ],
-        }],
+        messages: [activeMessage],
       },
     });
 
@@ -457,6 +458,30 @@ describe('CodexMessageList', () => {
     expect(media.compareDocumentPosition(laterCommentary!) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(wrapper.findAll('.chat-work-group__header')).toHaveLength(1);
+
+    await wrapper.setProps({
+      activeTurnId: null,
+      busy: false,
+      messages: [{
+        ...activeMessage,
+        status: 'complete',
+        parts: [
+          ...activeMessage.parts,
+          { type: 'text', text: 'The image is ready.', phase: 'final_answer' },
+        ],
+      }],
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
+      .not.toContain('chat-fold--open');
+    expect(wrapper.text()).toContain('The image is ready.');
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
+    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
+      .toContain('chat-fold--open');
   });
 
   it('does not render an empty row for a hidden tool segment in an active turn', () => {
