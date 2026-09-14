@@ -100,7 +100,9 @@ Lazy rendering:
 - keeps bottom-follow and the scroll-to-bottom control working;
 - keeps the current tail/active streaming row mounted;
 - does not let stale historical streaming markers expand the window;
-- resets to the newest batch when `conversationKey` changes.
+- opens an unseen `conversationKey` at the newest batch and restores the
+  mounted window and scroll position when returning to a previously viewed
+  conversation.
 
 Set `render-strategy="eager"` to mount every supplied message. The deprecated
 `lazyMessages` prop remains a compatibility alias; new code should use

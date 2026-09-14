@@ -327,8 +327,9 @@ Lazy mode initially mounts the newest batch, prepends one batch when the user
 scrolls within one viewport of the top, preserves the visible scroll anchor,
 and keeps bottom-follow behavior for new messages. The current tail, including
 an active streaming assistant row, is always included; stale historical
-streaming markers do not expand the window. Changing `conversationKey` resets
-the window to the newest batch.
+streaming markers do not expand the window. An unseen `conversationKey` opens
+at the newest batch; returning to a previously viewed key restores its mounted
+window and scroll position.
 The host still supplies the complete message array; no pagination or backend
 contract is required.
 

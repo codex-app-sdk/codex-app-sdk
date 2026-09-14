@@ -243,6 +243,12 @@ const renderStartIndex = ref(initialRenderStart(
   effectiveInitialMessageBatchSize.value,
 ))
 type MessageIdentity = string | object | null
+type ConversationScrollState = {
+  renderedAnchor: MessageIdentity
+  scrollTop: number
+  stickToBottom: boolean
+}
+const conversationScrollStates = new Map<string | number, ConversationScrollState>()
 let renderedAnchor = messageIdentityAt(props.messages, renderStartIndex.value)
 let observedMessagesLength = props.messages.length
 let observedFirstMessage = messageIdentityAt(props.messages, 0)
@@ -378,13 +384,36 @@ watch(() => props.messages.length, async (nextLength) => {
   }
 })
 
-watch(() => props.resetKey, async () => {
-  setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value))
+watch(() => props.resetKey, async (nextKey, previousKey) => {
+  const target = scrollElement.value
+  if (target && previousKey !== null && previousKey !== undefined) {
+    conversationScrollStates.set(previousKey, {
+      renderedAnchor,
+      scrollTop: target.scrollTop,
+      stickToBottom: isAtBottom(),
+    })
+  }
+  const restoredState = nextKey === null || nextKey === undefined
+    ? undefined
+    : conversationScrollStates.get(nextKey)
+  const restoredAnchorIndex = restoredState
+    ? findMessageIndex(props.messages, restoredState.renderedAnchor)
+    : -1
+  setRenderStartIndex(restoredAnchorIndex >= 0
+    ? restoredAnchorIndex
+    : initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value))
   loadingOlderMessages.value = false
   olderMessagesRequestPending = false
+  stickToBottom.value = restoredState?.stickToBottom ?? true
   observeMessageBounds()
   await nextTick()
-  scrollToBottom()
+  if (restoredState && target) {
+    target.scrollTop = restoredState.stickToBottom
+      ? target.scrollHeight
+      : restoredState.scrollTop
+  } else {
+    scrollToBottom()
+  }
 })
 
 watch(() => [props.loadingOlderMessages, props.hasOlderMessages] as const, () => {

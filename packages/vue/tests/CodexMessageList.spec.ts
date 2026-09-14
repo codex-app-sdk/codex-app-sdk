@@ -2038,6 +2038,7 @@ describe('CodexMessageList', () => {
     }
     expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(15);
     expect(wrapper.emitted('load-older-messages')).toStrictEqual([[]]);
+    const threadAScrollTop = scrollEl.scrollTop;
 
     await wrapper.setProps({ resetKey: 'thread-b' });
     await flushPromises();
@@ -2055,6 +2056,12 @@ describe('CodexMessageList', () => {
       await flushPromises();
     }
     expect(wrapper.emitted('load-older-messages')).toStrictEqual([[], []]);
+
+    await wrapper.setProps({ resetKey: 'thread-a' });
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(15);
+    expect(scrollEl.scrollTop).toBe(threadAScrollTop);
     wrapper.unmount();
   });
 
@@ -2494,7 +2501,7 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
-  it('resets scroll position when the conversation key changes', async () => {
+  it('restores each conversation scroll position when switching away and back', async () => {
     vi.stubGlobal('requestAnimationFrame', undefined);
     const wrapper = mount(CodexMessageList, {
       props: { messages, resetKey: 'thread-a' },
@@ -2512,6 +2519,50 @@ describe('CodexMessageList', () => {
     await flushPromises();
 
     expect(scrollEl.scrollTop).toBe(900);
+
+    scrollEl.scrollTop = 240;
+    await wrapper.get('.message-list').trigger('scroll');
+    await wrapper.setProps({ resetKey: 'thread-a' });
+    await flushPromises();
+
+    expect(scrollEl.scrollTop).toBe(100);
+
+    await wrapper.setProps({ resetKey: 'thread-b' });
+    await flushPromises();
+
+    expect(scrollEl.scrollTop).toBe(240);
+    wrapper.unmount();
+  });
+
+  it('returns a conversation to the bottom after switching away from its bottom', async () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    const wrapper = mount(CodexMessageList, {
+      props: { messages: makeMessages(15), resetKey: 'thread-a' },
+      attachTo: document.body,
+    });
+    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
+    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    scrollEl.scrollTop = 100;
+    await wrapper.get('.message-list').trigger('scroll');
+    scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight;
+    expect(scrollEl.scrollTop).toBe(600);
+
+    await wrapper.setProps({ messages: makeMessages(8, 100), resetKey: 'thread-b' });
+    await flushPromises();
+    scrollEl.scrollTop = 200;
+    await wrapper.get('.message-list').trigger('scroll');
+
+    await wrapper.setProps({ messages: makeMessages(15), resetKey: 'thread-a' });
+    await flushPromises();
+
+    expect(scrollEl.scrollTop).toBe(900);
+    expect(wrapper.find('.codex-message-list__scroll-to-bottom').exists()).toBe(false);
     wrapper.unmount();
   });
 });
