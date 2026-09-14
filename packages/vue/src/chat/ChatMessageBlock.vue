@@ -67,6 +67,7 @@
   <ChatWorkGroup
     v-else-if="block.type === 'work-group'"
     :active="block.active"
+    :continuation="block.continuation"
     :final-started="block.finalStarted"
   >
     <template v-for="(child, index) in block.blocks" :key="child.type === 'tool' ? child.toolCall.id : `${child.type}-${index}`">

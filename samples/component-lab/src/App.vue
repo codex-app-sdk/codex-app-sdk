@@ -212,7 +212,7 @@ const scenarios: [Scenario, ...Scenario[]] = [
     name: 'Busy and queued',
     summary: 'Working state, queue, context, and diff shelf',
     title: 'Codex is working',
-    description: 'A single active turn split by two steers. Expand the tool group to see completed work before active work.',
+    description: 'A single active turn with generated media and two steers. Work stays expanded while the turn is active.',
     activeTurnId: 'turn-lab',
     turns: [{
       id: 'turn-lab', status: 'inProgress', error: null, willRetry: false,
@@ -229,6 +229,8 @@ const scenarios: [Scenario, ...Scenario[]] = [
         { type: 'tool', id: 'busy-running-search', title: 'Searching source files', kind: 'search', status: 'running', statusText: 'Finding composer code' },
         { type: 'tool', id: 'busy-running-build', title: 'npm run build', kind: 'command', status: 'running', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'running', params: { target: 'npm run build' } }) },
         { type: 'text', text: 'Updating the composer and checking every interaction…', phase: 'commentary' },
+        { type: 'media', itemId: 'busy-generated-preview', media: { url: '/attachment-preview.svg', title: 'Generated preview', mimeType: 'image/svg+xml' } },
+        { type: 'text', text: 'Checking the generated preview before continuing…', phase: 'commentary' },
       ] },
       { id: 'busy-steer-one', kind: 'steer', role: 'user', status: 'complete', turnId: 'turn-lab', parts: [
         { type: 'text', text: 'Check the message-list boundary too.' },

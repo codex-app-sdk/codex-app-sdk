@@ -424,6 +424,41 @@ describe('CodexMessageList', () => {
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
   });
 
+  it('keeps generated media before commentary that streams after the image', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: 'turn-image',
+        busy: true,
+        messages: [{
+          id: 'assistant-image-turn',
+          role: 'assistant',
+          status: 'streaming',
+          turnId: 'turn-image',
+          parts: [
+            { type: 'text', text: 'Generating the image.', phase: 'commentary' },
+            {
+              type: 'tool', id: 'image-1', title: 'image_generation', status: 'completed',
+            },
+            {
+              type: 'media', itemId: 'image-1',
+              media: { url: 'data:image/png;base64,cG5n', title: 'Generated image' },
+            },
+            { type: 'text', text: 'Checking the generated result.', phase: 'commentary' },
+          ],
+        }],
+      },
+    });
+
+    const media = wrapper.get('.chat-media-block').element;
+    const laterCommentary = wrapper.findAll('.chat-message-block--text')
+      .find((block) => block.text().includes('Checking the generated result.'))?.element;
+
+    expect(laterCommentary).toBeDefined();
+    expect(media.compareDocumentPosition(laterCommentary!) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(wrapper.findAll('.chat-work-group__header')).toHaveLength(1);
+  });
+
   it('does not render an empty row for a hidden tool segment in an active turn', () => {
     const wrapper = mount(CodexMessageList, {
       props: {

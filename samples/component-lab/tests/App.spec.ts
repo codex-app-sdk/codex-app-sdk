@@ -117,10 +117,18 @@ describe('component lab', () => {
 
     expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
       .toStrictEqual(['Working']);
+    expect(wrapper.get('.chat-work-group__header').attributes('disabled')).toBeDefined();
+    expect(wrapper.find('.chat-work-group__header svg').exists()).toBe(false);
     expect(wrapper.text()).toContain('Check the message-list boundary too.');
     expect(wrapper.text()).toContain('Keep both steers in this turn.');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message__stream-dot')).toHaveLength(1);
+    const generatedPreview = wrapper.get('.chat-media-block').element;
+    const laterCommentary = wrapper.findAll('.chat-message-block--text')
+      .find((block) => block.text().includes('Checking the generated preview'))?.element;
+    expect(laterCommentary).toBeDefined();
+    expect(generatedPreview.compareDocumentPosition(laterCommentary!) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('removes completed steer and work-only rows until turn details are opened', async () => {

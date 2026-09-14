@@ -9,6 +9,7 @@
       type="button"
       class="chat-work-group__header"
       :aria-expanded="expanded"
+      :disabled="active"
       @click="toggle"
     >
       <span
@@ -18,7 +19,7 @@
       >
         {{ label }}
       </span>
-      <component :is="expanded ? ChevronDown : ChevronRightIcon" :size="15" />
+      <component v-if="!active" :is="expanded ? ChevronDown : ChevronRightIcon" :size="15" />
     </button>
 
     <ChatFoldTransition v-if="showHeader" :open="expanded">
@@ -41,6 +42,7 @@ import { assistantWorkMessageIndexKey, assistantWorkTurnKey } from './message-wo
 
 const props = defineProps<{
   active: boolean
+  continuation?: boolean
   finalStarted: boolean
 }>()
 
@@ -55,14 +57,19 @@ const completedWithoutFinal = computed(() => (
 ))
 const localExpanded = ref(props.active && !props.finalStarted)
 const userToggled = ref(false)
+const active = computed(() => (
+  (usesTurn.value ? assistantWorkTurn!.active.value : props.active) && !props.finalStarted
+))
 const expanded = computed(() => (
-  completedWithoutFinal.value
+  active.value
+    ? true
+    : completedWithoutFinal.value
     ? true
     : usesTurn.value ? assistantWorkTurn!.expanded.value : localExpanded.value
 ))
-const active = computed(() => usesTurn.value ? assistantWorkTurn!.active.value : props.active)
 const showHeader = computed(() => (
-  !completedWithoutFinal.value
+  !props.continuation
+  && !completedWithoutFinal.value
   && (!usesTurn.value || assistantWorkTurn!.headerMessageIndex.value === messageIndex!.value)
 ))
 const label = computed(() => {
@@ -85,6 +92,7 @@ watch(
 )
 
 function toggle() {
+  if (active.value) return
   if (usesTurn.value) {
     assistantWorkTurn!.toggle()
     return
@@ -118,6 +126,10 @@ function toggle() {
 
 .chat-work-group__header:focus-visible {
   outline: none;
+}
+
+.chat-work-group__header:disabled {
+  cursor: default;
 }
 
 .chat-work-group__title {

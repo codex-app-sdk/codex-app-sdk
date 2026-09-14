@@ -20,6 +20,7 @@ export type RenderedMessageBlock = MessageBlock | {
   type: 'work-group'
   active: boolean
   blocks: MessageBlock[]
+  continuation?: boolean
   finalStarted: boolean
 }
 
@@ -82,23 +83,35 @@ export function groupAssistantWorkBlocks(
 ): RenderedMessageBlock[] {
   if (message.role !== 'assistant' || !groupWork) return blocks
 
-  const workBlocks: MessageBlock[] = []
-  const answerBlocks: MessageBlock[] = []
-  for (const block of blocks) {
-    if (isAssistantWorkBlock(block)) workBlocks.push(block)
-    else answerBlocks.push(block)
-  }
-  if (workBlocks.length === 0) return blocks
-
   const finalStarted = message.parts?.some((part) => (
     part.type === 'text' && part.phase === 'final_answer' && part.content.trim().length > 0
   )) ?? false
-  return [{
-    type: 'work-group',
-    active: workActive && !finalStarted,
-    blocks: workBlocks,
-    finalStarted,
-  }, ...answerBlocks]
+  const rendered: RenderedMessageBlock[] = []
+  let workBlocks: MessageBlock[] = []
+  let workGroupCount = 0
+  const flushWork = () => {
+    if (workBlocks.length === 0) return
+    rendered.push({
+      type: 'work-group',
+      active: workActive && !finalStarted,
+      blocks: workBlocks,
+      ...(workGroupCount > 0 ? { continuation: true } : {}),
+      finalStarted,
+    })
+    workBlocks = []
+    workGroupCount += 1
+  }
+
+  for (const block of blocks) {
+    if (isAssistantWorkBlock(block)) {
+      workBlocks.push(block)
+      continue
+    }
+    flushWork()
+    rendered.push(block)
+  }
+  flushWork()
+  return workGroupCount > 0 ? rendered : blocks
 }
 
 function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageToolCall[]): MessageBlock[] {
