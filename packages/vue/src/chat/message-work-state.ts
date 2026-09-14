@@ -1,4 +1,7 @@
 import type { ComputedRef, InjectionKey, Ref } from 'vue'
+import type { ClientRequestResponse } from './contracts'
+
+export const questionResponsesKey: InjectionKey<Map<string, ClientRequestResponse['payload']>> = Symbol('codex-app-sdk-question-responses')
 
 export type AssistantWorkTurnContext = {
   active: ComputedRef<boolean>

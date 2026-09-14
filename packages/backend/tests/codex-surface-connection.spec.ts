@@ -176,22 +176,36 @@ describe('CodexSurface', () => {
     expect(transport.start).toHaveBeenCalledOnce();
   });
 
-  it('enables image-aware compaction when the app-server advertises it as disabled', async () => {
+  it('enables supported SDK runtime features when the app-server advertises them as disabled', async () => {
     const transport = new FakeTransport({
       'experimentalFeature/list': () => ({
-        data: [{
-          name: 'compaction_image_budget',
-          stage: 'underDevelopment',
-          displayName: null,
-          description: null,
-          announcement: null,
-          enabled: false,
-          defaultEnabled: false,
-        }],
+        data: [
+          {
+            name: 'compaction_image_budget',
+            stage: 'underDevelopment',
+            displayName: null,
+            description: null,
+            announcement: null,
+            enabled: false,
+            defaultEnabled: false,
+          },
+          {
+            name: 'default_mode_request_user_input',
+            stage: 'underDevelopment',
+            displayName: null,
+            description: null,
+            announcement: null,
+            enabled: false,
+            defaultEnabled: false,
+          },
+        ],
         nextCursor: null,
       }),
       'experimentalFeature/enablement/set': () => ({
-        enablement: { compaction_image_budget: true },
+        enablement: {
+          compaction_image_budget: true,
+          default_mode_request_user_input: true,
+        },
       }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -199,7 +213,12 @@ describe('CodexSurface', () => {
     await surface.connect();
 
     expect(lastRequest(transport, 'experimentalFeature/enablement/set')).toMatchObject({
-      params: { enablement: { compaction_image_budget: true } },
+      params: {
+        enablement: {
+          compaction_image_budget: true,
+          default_mode_request_user_input: true,
+        },
+      },
     });
   });
 

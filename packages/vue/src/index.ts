@@ -72,6 +72,7 @@ export { default as CodexToolConfirmation } from './chat/ChatToolConfirmation.vu
 export { default as CodexToolGroup } from './chat/ChatToolGroup.vue';
 export { default as CodexToolIcon } from './chat/ChatToolIcon.vue';
 export { default as CodexToolUserInputRequest } from './chat/ChatToolUserInputRequest.vue';
+export { default as CodexAsyncUserInputRequest } from './chat/ChatAsyncUserInputRequest.vue';
 export { default as CodexTurnGitInfo } from './chat/ChatTurnGitInfo.vue';
 export { default as CodexUserText } from './chat/ChatUserText.vue';
 export { default as CodexVisualizationBlock } from './chat/ChatVisualizationBlock.vue';

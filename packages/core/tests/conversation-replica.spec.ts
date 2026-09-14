@@ -215,7 +215,9 @@ describe('Codex conversation replica', () => {
     const request = {
       id: 'request-1', kind: 'ask_user' as const, conversationId: 'conversation-1',
       turnId: 'turn-1', itemId: 'question-1',
-      payload: { request: { itemId: 'question-1', questions: [] } },
+      payload: {
+        request: { itemId: 'question-1', delivery: 'tool' as const, blocking: true, questions: [] },
+      },
     };
     apply(replica, event('clientRequest.requested', 'turn-1', { request }));
     apply(replica, event('clientRequest.resolved', 'turn-1', {
@@ -466,7 +468,9 @@ describe('Codex conversation replica', () => {
     const askRequest = {
       id: 'ask-1', kind: 'ask_user' as const, conversationId: 'conversation-1',
       turnId: 'turn-1', itemId: 'question-1',
-      payload: { request: { itemId: 'question-1', questions: [] } },
+      payload: {
+        request: { itemId: 'question-1', delivery: 'tool' as const, blocking: true, questions: [] },
+      },
     };
     apply(replica, event('clientRequest.resolved', undefined, {
       request: askRequest, response: null, reason: 'server',

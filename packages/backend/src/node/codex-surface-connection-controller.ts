@@ -41,6 +41,11 @@ export interface CodexSurfaceConnectionHost {
   patch(patch: Partial<CodexSurfaceSnapshot>): void;
 }
 
+const SDK_RUNTIME_FEATURES = new Set([
+  'compaction_image_budget',
+  'default_mode_request_user_input',
+]);
+
 export class CodexSurfaceConnectionController {
   private connectPromise: Promise<CodexSurfaceSnapshot> | null = null;
   private surfaceBootstrapPromise: Promise<void> | null = null;
@@ -86,7 +91,7 @@ export class CodexSurfaceConnectionController {
           },
           capabilities: { experimentalApi: true, requestAttestation: false },
         });
-        await this.enableCompactionImageBudget();
+        await this.enableSupportedRuntimeFeatures();
         const authenticationChanged = await this.authentication.load('lifecycle');
         if (authenticationChanged || this.authentication.blocksBootstrap()) {
           await this.clearAuthenticatedSurfaceData();
@@ -107,29 +112,29 @@ export class CodexSurfaceConnectionController {
     return this.connectPromise;
   }
 
-  private async enableCompactionImageBudget(): Promise<void> {
+  private async enableSupportedRuntimeFeatures(): Promise<void> {
     try {
       let cursor: string | null = null;
+      const enablement: Record<string, boolean> = {};
       do {
         const response: ExperimentalFeatureListResponse = await this.client.request('experimentalFeature/list', {
           cursor,
           limit: 100,
           threadId: null,
         });
-        const feature = response.data.find(({ name }) => name === 'compaction_image_budget');
-        if (feature) {
-          if (!feature.enabled) {
-            await this.client.request('experimentalFeature/enablement/set', {
-              enablement: { compaction_image_budget: true },
-            });
+        for (const feature of response.data) {
+          if (SDK_RUNTIME_FEATURES.has(feature.name) && !feature.enabled) {
+            enablement[feature.name] = true;
           }
-          return;
         }
         cursor = response.nextCursor;
       } while (cursor);
+      if (Object.keys(enablement).length > 0) {
+        await this.client.request('experimentalFeature/enablement/set', { enablement });
+      }
     } catch (error) {
       // Older app-server releases do not expose feature discovery. They remain
-      // usable, but cannot opt into image-aware compaction.
+      // usable, but cannot opt into SDK-supported runtime features.
       if (error instanceof RpcRemoteError && error.code === -32601) return;
       throw error;
     }

@@ -5,6 +5,7 @@ export type {
   SurfaceMessageMedia,
   SurfaceMessageMediaPart,
   SurfaceMessagePart,
+  SurfaceMessageQuestionPart,
   SurfaceMessageStatusPart,
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,

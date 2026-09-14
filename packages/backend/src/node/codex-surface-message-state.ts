@@ -2,6 +2,7 @@ import type { v2 } from '../codex/index';
 import type {
   SurfaceMessage,
   SurfaceMessageMediaPart,
+  SurfaceMessageQuestionPart,
   SurfaceMessageReasoningPart,
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,
@@ -266,6 +267,40 @@ export function upsertAssistantMediaPart(
   if (partIndex >= 0) parts.splice(partIndex, 1, mediaPart);
   else parts.push(mediaPart);
   next.splice(messageIndex, 1, { ...message, status: 'streaming', parts });
+  return pruneEmptyAssistantPlaceholders(next, threadId);
+}
+
+export function upsertAssistantQuestionPart(
+  messages: readonly SurfaceMessage[],
+  threadId: string,
+  turnId: string,
+  questionPart: SurfaceMessageQuestionPart,
+): SurfaceMessage[] {
+  let next = [...messages];
+  let messageIndex = next.findIndex((message) => (
+    message.role === 'assistant'
+    && message.metadata?.turnId === turnId
+    && message.parts.some((part) => (
+      part.type === 'question' && part.request.id === questionPart.request.id
+    ))
+  ));
+  if (messageIndex < 0) {
+    next = ensureAssistantTurnMessage(next, threadId, turnId);
+    messageIndex = findLastIndex(next, (message) => (
+      message.role === 'assistant'
+      && message.kind === undefined
+      && message.metadata?.turnId === turnId
+    ));
+  }
+  const message = messageIndex >= 0 ? next[messageIndex] : undefined;
+  if (!message) return next;
+  const parts = [...message.parts];
+  const partIndex = parts.findIndex((part) => (
+    part.type === 'question' && part.request.id === questionPart.request.id
+  ));
+  if (partIndex >= 0) parts.splice(partIndex, 1, questionPart);
+  else parts.push(questionPart);
+  next.splice(messageIndex, 1, { ...message, parts });
   return pruneEmptyAssistantPlaceholders(next, threadId);
 }
 

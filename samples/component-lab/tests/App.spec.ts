@@ -6,6 +6,43 @@ import App from '../src/App.vue';
 
 describe('component lab', () => {
   afterEach(() => vi.useRealTimers());
+  it('exercises an asynchronous agent question through the controlled pane', async () => {
+    const wrapper = mount(App);
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Async question'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+
+    expect(wrapper.text()).toContain('Which framework should I use?');
+    expect(wrapper.find('.chat-work-group').exists()).toBe(false);
+    const vueOption = wrapper.findAll('button').find((button) => button.text().includes('Vue'));
+    expect(vueOption).toBeDefined();
+    await vueOption!.trigger('click');
+    const send = wrapper.findAll('button').find((button) => button.text() === 'Send');
+    expect(send).toBeDefined();
+    await send!.trigger('click');
+
+    expect(wrapper.text()).toContain('Answered: Vue');
+    expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Vue');
+  });
+  it('shows text-only asynchronous questions as an immediately focused field', async () => {
+    const wrapper = mount(App, { attachTo: document.body });
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Async free text'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+
+    const input = wrapper.get<HTMLTextAreaElement>('.chat-tool-user-input__other-input--direct');
+    expect(wrapper.text().split('What should I know before continuing?')).toHaveLength(2);
+    expect(wrapper.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(wrapper.find('.chat-tool-user-input__option--other').exists()).toBe(false);
+    await vi.waitFor(() => expect(document.activeElement).toBe(input.element));
+    await input.setValue('Preserve the existing API.');
+    await wrapper.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
+
+    expect(wrapper.text()).toContain('Answered: Preserve the existing API.');
+    wrapper.unmount();
+  });
   it('renders a dense multi-turn fixture with mentions, attachments, tools, and steering', async () => {
     const wrapper = mount(App);
     expect(wrapper.text()).toContain('Component lab');

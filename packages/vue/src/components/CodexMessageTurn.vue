@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, provide, ref, watch } from 'vue'
+import { computed, inject, provide, ref, shallowReactive, watch } from 'vue'
 import type { SurfaceMessage } from '@codex-app-sdk/core/surface'
 import {
   computeMessageBlocks,
@@ -14,7 +14,9 @@ import {
 } from '../chat/message-blocks'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import type { Message } from '../chat/types'
-import { assistantWorkTurnKey } from '../chat/message-work-state'
+import { assistantWorkTurnKey, questionResponsesKey } from '../chat/message-work-state'
+
+provide(questionResponsesKey, inject(questionResponsesKey, undefined) ?? shallowReactive(new Map()))
 
 type TurnEntry = {
   index: number
@@ -24,6 +26,7 @@ type TurnEntry = {
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   active?: boolean
+  answeredClientRequestIds?: ReadonlySet<string>
   entries: readonly TurnEntry[]
   showToolBlocks: boolean
   turnId?: string
@@ -89,7 +92,7 @@ function shouldGroupMessageWork(message: Message): boolean {
     props.showToolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
   ))
   if (blocks.length === 0) return false
-  if (phased.value) return blocks.some(isAssistantWorkBlock)
+  if (phased.value) return blocks.some((block) => isAssistantWorkBlock(block, props.answeredClientRequestIds))
   return active.value && blocks.every((block) => block.type === 'tool' || block.type === 'tool-group')
 }
 </script>

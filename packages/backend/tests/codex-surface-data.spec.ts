@@ -228,6 +228,7 @@ describe('Codex surface data codecs', () => {
     });
     expect(surfaceRateLimits({
       rateLimits: rateSnapshot(), rateLimitsByLimitId: null, rateLimitResetCredits: null,
+      accountId: null, rateLimitUpsell: null,
     }).rateLimitResetCredits).toBeNull();
 
     const individual = { limit: '10', used: '2', remainingPercent: 80, resetsAt: 10 };
@@ -235,6 +236,8 @@ describe('Codex surface data codecs', () => {
       rateLimits: rateSnapshot({ individualLimit: individual }),
       rateLimitsByLimitId: null,
       rateLimitResetCredits: null,
+      accountId: null,
+      rateLimitUpsell: null,
     });
     expect(mapped.rateLimits.individualLimit).toStrictEqual(individual);
     expect(mapped.rateLimits.individualLimit).not.toBe(individual);
@@ -249,6 +252,8 @@ describe('Codex surface data codecs', () => {
       }),
       rateLimitsByLimitId: null,
       rateLimitResetCredits: null,
+      accountId: null,
+      rateLimitUpsell: null,
     });
     const merged = mergeSurfaceRateLimits(current, rateSnapshot({
       limitId: 'codex',

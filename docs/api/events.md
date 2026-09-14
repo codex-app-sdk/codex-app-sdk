@@ -67,6 +67,12 @@ A locally submitted prompt is first published optimistically through
 that same message ID with its authoritative `turnId`; event-replicating hosts
 should replace the optimistic message so turn actions remain available.
 
+`clientRequest.requested` covers blocking tool questions and non-blocking
+questions carried by asynchronous agent messages. Both use the same
+`respondToClientRequest()` action. Async questions additionally arrive as a
+`question` part on `message.appended` or `message.updated`, keeping the prompt
+and its interaction colocated in replicated message state.
+
 `remoteControl.statusChanged` projects app-server remote-control connection
 notifications into the surface event stream. Its payload contains the current
 typed status so hosts can update native behavior such as sleep prevention

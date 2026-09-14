@@ -127,6 +127,8 @@ import type { PluginListParams } from "./generated/v2/PluginListParams";
 import type { PluginListResponse } from "./generated/v2/PluginListResponse";
 import type { PluginReadParams } from "./generated/v2/PluginReadParams";
 import type { PluginReadResponse } from "./generated/v2/PluginReadResponse";
+import type { PluginReconcileParams } from "./generated/v2/PluginReconcileParams";
+import type { PluginReconcileResponse } from "./generated/v2/PluginReconcileResponse";
 import type { PluginSearchParams } from "./generated/v2/PluginSearchParams";
 import type { PluginSearchResponse } from "./generated/v2/PluginSearchResponse";
 import type { PluginShareCheckoutParams } from "./generated/v2/PluginShareCheckoutParams";
@@ -365,6 +367,7 @@ export interface CodexAppServerMethodMap {
   "plugin/list": { params: PluginListParams; result: PluginListResponse };
   "plugin/search": { params: PluginSearchParams; result: PluginSearchResponse };
   "plugin/installed": { params: PluginInstalledParams; result: PluginInstalledResponse };
+  "plugin/reconcile": { params: PluginReconcileParams; result: PluginReconcileResponse };
   "plugin/read": { params: PluginReadParams; result: PluginReadResponse };
   "plugin/skill/read": { params: PluginSkillReadParams; result: PluginSkillReadResponse };
   "plugin/share/save": { params: PluginShareSaveParams; result: PluginShareSaveResponse };

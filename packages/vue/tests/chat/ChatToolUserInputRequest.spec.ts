@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import ChatToolUserInputRequest from '../../src/chat/ChatToolUserInputRequest.vue';
 import type { AskUserQuestion } from '../../src/chat/contracts';
 import type { MessageToolCall } from '../../src/chat/types';
@@ -78,6 +78,38 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
     expect(wrapper.find('.chat-tool-user-input').exists()).toBe(false);
   });
 
+  it('shows and focuses a direct answer field when a question has no options', async () => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      attachTo: document.body,
+      props: {
+        toolCall: requestTool([{
+          id: 'free-text',
+          header: 'Details',
+          question: 'What should I know?',
+          isOther: true,
+          isSecret: false,
+          options: null,
+        }]),
+      },
+    });
+
+    const input = wrapper.get<HTMLTextAreaElement>('.chat-tool-user-input__other-input--direct');
+    expect(wrapper.find('.chat-tool-user-input__option--other').exists()).toBe(false);
+    await vi.waitFor(() => expect(document.activeElement).toBe(input.element));
+    expect(wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary').element.disabled).toBe(true);
+
+    await input.setValue('  A direct answer  ');
+    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([[
+      {
+        id: 'request-1',
+        payload: { answers: { 'free-text': { answers: ['A direct answer'] } } },
+      },
+    ]]);
+    wrapper.unmount();
+  });
+
   it('filters malformed questions and supplies exact defaults for valid minimal entries', async () => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: {
@@ -105,12 +137,11 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
     });
 
     expect(wrapper.findAll('.chat-tool-user-input__progress-dot')).toHaveLength(2);
-    expect(wrapper.get('.chat-tool-user-input__tag').text()).toBe('Minimal question');
+    expect(wrapper.find('.chat-tool-user-input__tag').exists()).toBe(false);
     expect(wrapper.get('.chat-tool-user-input__question').text()).toBe('Minimal question');
-    expect(wrapper.findAll('.chat-tool-user-input__option')).toHaveLength(1);
-    expect(wrapper.get('.chat-tool-user-input__option--other').text()).toContain('Other');
+    expect(wrapper.findAll('.chat-tool-user-input__option')).toHaveLength(0);
+    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Type your answer...');
 
-    await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
     await wrapper.get('textarea').setValue('minimal answer');
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
 

@@ -151,6 +151,8 @@ describe('CodexSurfaceClientRequestsController', () => {
       payload: {
         request: {
           itemId: 'ask-item',
+          delivery: 'tool',
+          blocking: true,
           questions: [{
             id: 'q', header: 'Question', question: 'Continue?', isOther: false,
             isSecret: false, options: null,
@@ -484,6 +486,8 @@ function clientRequests(options: { hideToolMessages?: boolean } = {}) {
     return target;
   };
   const host: CodexSurfaceClientRequestsHost = {
+    activeConversationId: () => 'thread-1',
+    answerAsyncQuestion: vi.fn(async () => undefined),
     emitConversationActivity: vi.fn(),
     emitEvent: vi.fn(),
     hasPendingApproval: vi.fn(() => false),
@@ -516,7 +520,8 @@ function askRequest(questions: unknown[], overrides: Record<string, unknown> = {
   return {
     id, method: 'item/tool/requestUserInput',
     params: {
-      threadId: 'thread-1', turnId: 'turn-1', itemId: 'ask-item', autoResolutionMs: 60_000, questions,
+      threadId: 'thread-1', turnId: 'turn-1', itemId: 'ask-item', autoResolutionMs: 60_000,
+      isBlocking: true, questions,
       ...params,
     },
   } as never;

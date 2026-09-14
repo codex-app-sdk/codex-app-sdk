@@ -67,13 +67,16 @@ describe('CodexSurfaceConnectionController', () => {
     }));
   });
 
-  it('paginates feature discovery and enables a disabled compaction image budget', async () => {
+  it('paginates feature discovery and enables supported SDK runtime features', async () => {
     const setup = setupConnection();
     setup.client.request.mockImplementation(async (method: string, value?: unknown) => {
       const params = value as { cursor?: string | null } | undefined;
       if (method === 'experimentalFeature/list') {
         return params?.cursor === null
-          ? { data: [{ name: 'other', enabled: false }], nextCursor: 'page-2' }
+          ? {
+            data: [{ name: 'default_mode_request_user_input', enabled: false }],
+            nextCursor: 'page-2',
+          }
           : { data: [{ name: 'compaction_image_budget', enabled: false }], nextCursor: null };
       }
       if (method === 'experimentalFeature/enablement/set') return {};
@@ -85,14 +88,20 @@ describe('CodexSurfaceConnectionController', () => {
       cursor: 'page-2', limit: 100, threadId: null,
     });
     expect(setup.client.request).toHaveBeenCalledWith('experimentalFeature/enablement/set', {
-      enablement: { compaction_image_budget: true },
+      enablement: {
+        compaction_image_budget: true,
+        default_mode_request_user_input: true,
+      },
     });
   });
 
   it('does not rewrite an enabled feature and tolerates only method-not-found discovery errors', async () => {
     const enabled = setupConnection();
     enabled.client.request.mockResolvedValue({
-      data: [{ name: 'compaction_image_budget', enabled: true }],
+      data: [
+        { name: 'compaction_image_budget', enabled: true },
+        { name: 'default_mode_request_user_input', enabled: true },
+      ],
       nextCursor: null,
     });
     await enabled.controller.connect();
@@ -290,7 +299,7 @@ describe('CodexSurfaceConnectionController', () => {
     setup.runtimeState.values.mockReturnValue([first, second][Symbol.iterator]());
     setup.state.clientRequests = [{
       id: 'request-1', kind: 'ask_user', conversationId: 'first', turnId: 'turn-1', itemId: 'item-1',
-      payload: { request: { itemId: 'item-1', questions: [] } },
+      payload: { request: { itemId: 'item-1', delivery: 'tool', blocking: true, questions: [] } },
     }];
     setup.state.historyLoading = true;
     setup.controller.handleDisconnect(new Error('socket lost'));

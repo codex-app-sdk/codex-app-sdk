@@ -4,10 +4,12 @@ import type { Turn } from '../codex/generated/v2/Turn';
 import { basename, extname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
+  CodexSurfaceClientRequest,
   SurfaceMessage,
   SurfaceMessageAttachment,
   SurfaceMessageMediaPart,
   SurfaceMessagePart,
+  SurfaceMessageQuestionPart,
 } from '@codex-app-sdk/core/surface';
 import { codexThreadItemToToolPart } from './codex-tool-part-adapter';
 import { finalizeTurnToolParts } from './codex-surface-message-state';
@@ -94,6 +96,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
   for (const item of Array.isArray(turn.items) ? turn.items : []) {
     if (item.type === 'userMessage') {
       const parts = userMessageParts(item);
+      const asyncQuestionRequestIds = asyncQuestionRequestIdsForUserMessage(item);
       if (parts.length > 0) {
         const isSteerMessage = sawAssistantActivity;
         const initialMessageKey = isSteerMessage ? null : JSON.stringify(parts);
@@ -108,7 +111,14 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
           turnId: turn.id,
           parts,
           createdAt,
-          metadata: { conversationId: threadId, turnId: turn.id },
+          metadata: {
+            conversationId: threadId,
+            turnId: turn.id,
+            ...(asyncQuestionRequestIds.length > 0 ? {
+              asyncQuestionRequestIds,
+              asyncQuestionAnswers: asyncQuestionAnswersForUserMessage(item),
+            } : {}),
+          },
         });
       }
       continue;
@@ -124,6 +134,11 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
           itemId: item.id,
           ...(item.phase ? { phase: item.phase } : {}),
         });
+      }
+      const questionPart = codexItemToQuestionPart(threadId, turn.id, item);
+      if (questionPart) {
+        sawAssistantActivity = true;
+        assistantParts.push(questionPart);
       }
       continue;
     }
@@ -179,6 +194,7 @@ export function codexItemToSurfaceMessage(
   const createdAt = timestampToIso(turn.startedAt);
   if (item.type === 'userMessage') {
     const parts = userMessageParts(item);
+    const asyncQuestionRequestIds = asyncQuestionRequestIdsForUserMessage(item);
     return parts.length > 0 ? {
       id: item.clientId ?? `user-${threadId}-${turn.id}-${item.id}`,
       role: 'user',
@@ -186,23 +202,38 @@ export function codexItemToSurfaceMessage(
       turnId: turn.id,
       parts,
       createdAt,
-      metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
+      metadata: {
+        conversationId: threadId,
+        turnId: turn.id,
+        itemId: item.id,
+        ...(asyncQuestionRequestIds.length > 0 ? {
+          asyncQuestionRequestIds,
+          asyncQuestionAnswers: asyncQuestionAnswersForUserMessage(item),
+        } : {}),
+      },
     } : null;
   }
 
   if (item.type === 'agentMessage' || item.type === 'exitedReviewMode') {
     const text = item.type === 'agentMessage' ? item.text : item.review;
-    return text ? {
+    const questionPart = item.type === 'agentMessage'
+      ? codexItemToQuestionPart(threadId, turn.id, item)
+      : null;
+    const parts: SurfaceMessagePart[] = [
+      ...(text ? [{
+        type: 'text' as const,
+        text,
+        itemId: item.id,
+        ...(item.type === 'agentMessage' && item.phase ? { phase: item.phase } : {}),
+      }] : []),
+      ...(questionPart ? [questionPart] : []),
+    ];
+    return parts.length > 0 ? {
       id: `assistant-${item.id}`,
       role: 'assistant',
       status: surfaceMessageStatus(turn.status),
       turnId: turn.id,
-      parts: [{
-        type: 'text',
-        text,
-        itemId: item.id,
-        ...(item.type === 'agentMessage' && item.phase ? { phase: item.phase } : {}),
-      }],
+      parts,
       createdAt,
       metadata: { conversationId: threadId, turnId: turn.id, itemId: item.id },
     } : null;
@@ -245,6 +276,51 @@ export function codexItemToSurfaceMessage(
   } : null;
   if (!message || turn.status === 'inProgress') return message;
   return finalizeTurnToolParts([message], turn.id, turn.status)[0] ?? null;
+}
+
+export function codexItemToQuestionPart(
+  threadId: string,
+  turnId: string,
+  item: Extract<ThreadItem, { type: 'agentMessage' }>,
+): SurfaceMessageQuestionPart | null {
+  if (item.delivery !== 'async') return null;
+  const structuredQuestions = item.questions ?? [];
+  const questions = structuredQuestions.length > 0
+    ? structuredQuestions.map((question, index) => ({
+        id: JSON.stringify(['request_user_input_async', item.id, index]),
+        header: question.title,
+        question: question.title,
+        isOther: true,
+        isSecret: false,
+        options: question.options?.map((label) => ({ label, description: '' })) ?? null,
+      }))
+    : item.text.trim()
+      ? [{
+          id: item.id,
+          header: 'Question',
+          question: item.text,
+          isOther: true,
+          isSecret: false,
+          options: null,
+        }]
+      : [];
+  if (questions.length === 0) return null;
+  const request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> = {
+    id: `async-question:${item.id}`,
+    kind: 'ask_user',
+    conversationId: threadId,
+    turnId,
+    itemId: item.id,
+    payload: {
+      request: {
+        itemId: item.id,
+        delivery: 'async',
+        blocking: false,
+        questions,
+      },
+    },
+  };
+  return { type: 'question', request };
 }
 
 export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart | null {
@@ -306,9 +382,75 @@ function userInputText(input: unknown): string {
   if (!isRecord(input) || typeof input.type !== 'string') {
     return '';
   }
-  if (input.type === 'text' && typeof input.text === 'string') return input.text;
+  if (input.type === 'text' && typeof input.text === 'string') {
+    return asyncQuestionReply(input.text)?.displayText ?? input.text;
+  }
   if (input.type === 'skill' && typeof input.name === 'string') return `$${input.name}`;
   return '';
+}
+
+function asyncQuestionRequestIdsForUserMessage(
+  item: Extract<ThreadItem, { type: 'userMessage' }>,
+): string[] {
+  const ids = new Set<string>();
+  for (const input of Array.isArray(item.content) ? item.content : []) {
+    if (!isRecord(input) || input.type !== 'text' || typeof input.text !== 'string') continue;
+    for (const requestId of asyncQuestionReply(input.text)?.requestIds ?? []) ids.add(requestId);
+  }
+  return [...ids];
+}
+
+function asyncQuestionAnswersForUserMessage(item: Extract<ThreadItem, { type: 'userMessage' }>): Record<string, { answers: string[] }> {
+  const answers: Record<string, { answers: string[] }> = {};
+  for (const input of Array.isArray(item.content) ? item.content : []) {
+    if (!isRecord(input) || input.type !== 'text' || typeof input.text !== 'string') continue;
+    Object.assign(answers, asyncQuestionReply(input.text)?.answers);
+  }
+  return answers;
+}
+
+function asyncQuestionReply(text: string): { displayText: string; requestIds: string[]; answers: Record<string, { answers: string[] }> } | null {
+  const match = text.match(
+    /^<send_user_message_question_reply>\s*([\s\S]*?)\s*<\/send_user_message_question_reply>$/,
+  );
+  if (!match?.[1]) return null;
+  try {
+    const value: unknown = JSON.parse(match[1]);
+    if (!Array.isArray(value)) return null;
+    const replies = value.filter((entry): entry is {
+      questionItemId: string;
+      question: string;
+      answer: string;
+    } => (
+      isRecord(entry)
+      && typeof entry.questionItemId === 'string'
+      && typeof entry.question === 'string'
+      && typeof entry.answer === 'string'
+    ));
+    if (replies.length === 0) return null;
+    const requestIds = replies.flatMap((reply) => {
+      try {
+        const questionId: unknown = JSON.parse(reply.questionItemId);
+        if (
+          Array.isArray(questionId)
+          && questionId[0] === 'request_user_input_async'
+          && typeof questionId[1] === 'string'
+        ) return [`async-question:${questionId[1]}`];
+      } catch {
+        // Open-ended asynchronous questions use their item id directly.
+      }
+      return [`async-question:${reply.questionItemId}`];
+    });
+    return {
+      displayText: replies.length === 1
+        ? replies[0]!.answer
+        : replies.map((reply) => `${reply.question}: ${reply.answer}`).join('\n'),
+      requestIds,
+      answers: Object.fromEntries(replies.map((reply) => [reply.questionItemId, { answers: [reply.answer] }])),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function userInputAttachment(input: unknown): SurfaceMessageAttachment | null {

@@ -137,7 +137,9 @@ describe('Codex surface runtime state', () => {
     const clientRequests = [{
       id: 'request-1', kind: 'ask_user' as const, conversationId: 'thread-1',
       turnId: 'turn-1', itemId: 'item-1',
-      payload: { request: { itemId: 'item-1', questions: [] } },
+      payload: {
+        request: { itemId: 'item-1', delivery: 'tool' as const, blocking: true, questions: [] },
+      },
     }];
 
     expect(runtimeProjection(runtime, approvals, clientRequests)).toStrictEqual({
@@ -171,5 +173,39 @@ describe('Codex surface runtime state', () => {
       turnGitDiff: null,
       turns: [],
     });
+  });
+
+  it('derives pending and answered asynchronous questions from durable message history', () => {
+    const request = {
+      id: 'async-question:agent-question',
+      kind: 'ask_user' as const,
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'agent-question',
+      payload: {
+        request: {
+          itemId: 'agent-question',
+          delivery: 'async' as const,
+          blocking: false,
+          questions: [],
+        },
+      },
+    };
+    const pendingRuntime = createThreadRuntime('thread-1', initialSurfaceSnapshot(authentication), {
+      messages: [{
+        id: 'assistant-question', role: 'assistant', status: 'complete',
+        parts: [{ type: 'question', request }],
+      }],
+    });
+
+    expect(runtimeProjection(pendingRuntime, [], []).clientRequests).toStrictEqual([request]);
+
+    pendingRuntime.messages.push({
+      id: 'user-answer', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Vue' }],
+      metadata: { asyncQuestionRequestIds: [request.id] },
+    });
+    const answered = runtimeProjection(pendingRuntime, [], []);
+    expect(answered.clientRequests).toStrictEqual([]);
+    expect(answered.answeredClientRequestIds).toStrictEqual([request.id]);
   });
 });

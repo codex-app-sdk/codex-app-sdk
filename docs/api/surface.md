@@ -98,6 +98,7 @@ type SurfaceMessage = {
 - completed reasoning summaries;
 - attachments;
 - generated and attached media;
+- asynchronous agent questions;
 - streaming/status information;
 - tool calls and tool groups.
 
@@ -126,10 +127,37 @@ type SurfaceMessageReasoningPart = {
   itemId: string;
   summaryIndex: number;
 };
+
+type SurfaceMessageQuestionPart = {
+  type: 'question';
+  request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>;
+};
 ```
 
 Reasoning parts contain only completed app-server summaries. Raw reasoning
 content and reasoning deltas are not exposed through the surface contract.
+
+## Questions and client requests
+
+The surface exposes one `ask_user` contract for both app-server question paths:
+
+- `payload.request.delivery === 'tool'` is the blocking
+  `item/tool/requestUserInput` server request. `blocking` mirrors the
+  app-server's `isBlocking` flag.
+- `payload.request.delivery === 'async'` is a non-blocking question attached to
+  an asynchronous agent message. It is also present as a `question` message
+  part so renderers keep it beside the text that asked it.
+
+Answer either form with the existing `respondToClientRequest()` operation. For
+an asynchronous question, the SDK starts a new turn or steers the active turn,
+encodes the provider reply envelope internally, and exposes only the human
+answer in message history. Consumers must not call raw app-server RPC or build
+the provider envelope themselves.
+
+`clientRequest.requested` and `clientRequest.resolved` cover both deliveries,
+so an incremental conversation replica never needs a full snapshot to discover
+or settle a question. Restored history also reconstructs unanswered async
+questions and recognizes durable answers.
 
 ## History state
 

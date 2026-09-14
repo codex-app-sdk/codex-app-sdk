@@ -33,6 +33,90 @@ function mountMessage(props: Record<string, unknown>) {
 }
 
 describe('CodexMessage', () => {
+  it('renders an async question once when provider text and header repeat its title', () => {
+    const question = 'Does the field receive focus?';
+    const wrapper = mountMessage({
+      index: 0,
+      message: {
+        id: 'question-duplicates', role: 'assistant', status: 'complete',
+        parts: [
+          { type: 'text', text: question },
+          { type: 'question', request: {
+            id: 'async-question:duplicate', kind: 'ask_user',
+            conversationId: 'thread-1', turnId: 'turn-1', itemId: 'duplicate',
+            payload: { request: {
+              itemId: 'duplicate', delivery: 'async', blocking: false,
+              questions: [{ id: 'q', header: question, question, isOther: true, isSecret: false, options: null }],
+            } },
+          } },
+        ],
+      },
+    });
+
+    expect(wrapper.text().split(question)).toHaveLength(2);
+    expect(wrapper.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(wrapper.find('textarea').exists()).toBe(true);
+  });
+
+  it('renders and answers an asynchronous agent question outside the work disclosure', async () => {
+    const request = {
+      id: 'async-question:agent-question',
+      kind: 'ask_user' as const,
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'agent-question',
+      payload: {
+        request: {
+          itemId: 'agent-question',
+          delivery: 'async' as const,
+          blocking: false,
+          questions: [{
+            id: '["request_user_input_async","agent-question",0]',
+            header: 'Framework',
+            question: 'Which framework should I use?',
+            isOther: true,
+            isSecret: false,
+            options: [
+              { label: 'Vue', description: 'Use the SDK component package' },
+              { label: 'React', description: 'Use a custom renderer' },
+            ],
+          }],
+        },
+      },
+    };
+    const wrapper = mountMessage({
+      answeredClientRequestIds: new Set<string>(),
+      index: 0,
+      message: {
+        id: 'assistant-question',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'turn-1',
+        parts: [
+          { type: 'text', text: 'I need one decision.' },
+          { type: 'question', request },
+        ],
+      },
+    });
+
+    expect(wrapper.text()).toContain('I need one decision.');
+    expect(wrapper.text()).toContain('Which framework should I use?');
+    expect(wrapper.find('.chat-work-group').exists()).toBe(false);
+    const vueOption = wrapper.findAll('button').find((button) => button.text().includes('Vue'))!;
+    await vueOption.trigger('click');
+    const send = wrapper.findAll('button').find((button) => button.text() === 'Send')!;
+    await send.trigger('click');
+
+    expect(wrapper.emitted('client-response')).toStrictEqual([{
+      id: request.id,
+      payload: {
+        answers: {
+          '["request_user_input_async","agent-question",0]': { answers: ['Vue'] },
+        },
+      },
+    }].map((response) => [response]));
+  });
+
   it('renders an additive header once above default content while preserving actions', async () => {
     const wrapper = mount(CodexMessage, {
       props: { index: 2, message: { id: 'user-header', role: 'user', content: 'Keep SDK rendering' } },

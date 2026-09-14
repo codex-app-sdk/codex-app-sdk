@@ -17,6 +17,23 @@ export type SurfaceMessageStatusPart = {
   text: string;
 };
 
+export type CodexSurfaceAskUserQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  isOther: boolean;
+  isSecret: boolean;
+  options: readonly {
+    label: string;
+    description: string;
+  }[] | null;
+};
+
+export type SurfaceMessageQuestionPart = {
+  type: 'question';
+  request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>;
+};
+
 export type SurfaceMessageAttachment = {
   kind: 'file' | 'image';
   name: string;
@@ -74,6 +91,7 @@ export type SurfaceMessageToolPartUpdate = {
 export type SurfaceMessagePart =
   | SurfaceMessageAttachmentPart
   | SurfaceMessageMediaPart
+  | SurfaceMessageQuestionPart
   | SurfaceMessageReasoningPart
   | SurfaceMessageTextPart
   | SurfaceMessageStatusPart
@@ -153,18 +171,6 @@ export type CodexSurfaceClientRequestResponse = {
   };
 };
 
-export type CodexSurfaceAskUserQuestion = {
-  id: string;
-  header: string;
-  question: string;
-  isOther: boolean;
-  isSecret: boolean;
-  options: readonly {
-    label: string;
-    description: string;
-  }[] | null;
-};
-
 export type CodexSurfaceClientRequest =
   | {
     id: string;
@@ -193,6 +199,8 @@ export type CodexSurfaceClientRequest =
     payload: {
       request: {
         itemId: string;
+        delivery: 'tool' | 'async';
+        blocking: boolean;
         questions: readonly CodexSurfaceAskUserQuestion[];
         autoResolutionMs?: number;
       };

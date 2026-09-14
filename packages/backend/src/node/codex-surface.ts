@@ -211,6 +211,10 @@ export class CodexSurface {
       patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
     });
     this.clientRequests = new CodexSurfaceClientRequestsController({
+      activeConversationId: () => this.state.activeConversationId,
+      answerAsyncQuestion: (threadId, prompt, displayText) => (
+        this.messagesController.answerAsyncQuestion(threadId, prompt, displayText)
+      ),
       emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
       emitEvent: (origin, input) => this.emitEvent(origin, input),
       hasPendingApproval: (threadId) => this.approvals.hasForThread(threadId),

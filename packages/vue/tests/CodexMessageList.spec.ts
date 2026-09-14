@@ -35,6 +35,48 @@ const messages: Message[] = [
   },
 ];
 
+it('folds resolved async questions with turn details while leaving pending questions accessible', async () => {
+  const request = {
+    id: 'async-question:q', kind: 'ask_user' as const,
+    conversationId: 'thread', turnId: 'turn', itemId: 'q',
+    payload: { request: { itemId: 'q', delivery: 'async' as const, blocking: false,
+      questions: [{ id: 'q', header: 'Context', question: 'What context?', isOther: true, isSecret: false, options: null }],
+    } },
+  };
+  const wrapper = mount(CodexMessageList, { props: {
+    messages: [
+      { id: 'work', role: 'assistant', status: 'complete', turnId: 'turn', parts: [{ type: 'text', text: 'Checking', phase: 'commentary' }] },
+      { id: 'question', role: 'assistant', status: 'complete', turnId: 'turn', parts: [{ type: 'question', request }] },
+      { id: 'final', role: 'assistant', status: 'complete', turnId: 'turn', parts: [{ type: 'text', text: 'Finished', phase: 'final_answer' }] },
+    ] as SurfaceMessage[],
+    answeredClientRequestIds: new Set<string>(),
+  } });
+  expect(wrapper.find('textarea').exists()).toBe(true);
+  expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
+  await wrapper.get('textarea').setValue('Keep the original answer.');
+  await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
+  await wrapper.setProps({ answeredClientRequestIds: new Set([request.id]) });
+  expect(wrapper.find('.chat-tool-user-input').exists()).toBe(false);
+  await wrapper.get('.chat-work-group__header').trigger('click');
+  expect(wrapper.get('.chat-tool-user-input__summary--answered').text()).toContain('Answered user question');
+  expect(wrapper.get('.chat-tool-user-input__answer-value').text()).toBe('Keep the original answer.');
+  await wrapper.get('.chat-work-group__header').trigger('click');
+  expect(wrapper.find('.chat-tool-user-input').exists()).toBe(false);
+  expect(wrapper.text()).toContain('Finished');
+  const restoredMessages = [...wrapper.props('messages'), {
+    id: 'reply', role: 'user', status: 'complete', turnId: 'next-turn',
+    parts: [{ type: 'text', text: 'Keep the original answer.' }],
+    metadata: { asyncQuestionAnswers: { q: { answers: ['Keep the original answer.'] } } },
+  }] as SurfaceMessage[];
+  wrapper.unmount();
+  const restored = mount(CodexMessageList, { props: {
+    messages: restoredMessages, answeredClientRequestIds: new Set([request.id]),
+  } });
+  await restored.get('.chat-work-group__header').trigger('click');
+  expect(restored.get('.chat-tool-user-input__answer-value').text()).toBe('Keep the original answer.');
+  restored.unmount();
+});
+
 function makeMessages(count: number, offset = 0): Message[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `message-${offset + index}`,

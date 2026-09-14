@@ -44,6 +44,7 @@
         <CodexConversationPane
           v-model="draft"
           :active-turn-id="selected.activeTurnId"
+          :answered-client-request-ids="answeredClientRequestIds"
           :busy="selected.busy"
           :context-usage="selected.contextUsage"
           :conversation-key="selected.id"
@@ -64,6 +65,7 @@
           :turns="selected.turns"
           :transcribe-audio="transcribeAudio"
           @interrupt="activity = 'Interrupt requested'"
+          @client-response="respondToClientRequest"
           @submit="submitPrompt"
         >
           <template #message-header="{ message }">
@@ -93,6 +95,7 @@ import {
   type CodexChatMessage,
   type CodexChatTranscription,
   type CodexContextUsage,
+  type ClientRequestResponse,
   type CodexModelOption,
   type CodexNativeAttachment,
   type CodexNativeAttachmentInput,
@@ -206,6 +209,90 @@ const scenarios: [Scenario, ...Scenario[]] = [
       },
       { id: 'conversation-steer', kind: 'steer', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Focus on the attachment renderer first.' }] },
     ],
+  },
+  {
+    id: 'async-question',
+    name: 'Async question',
+    summary: 'A non-blocking question from an agent message',
+    title: 'Codex needs a decision',
+    description: 'The question remains actionable after the turn that asked it has completed.',
+    messages: [{
+      id: 'async-question-message',
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'async-question-turn',
+      parts: [
+        { type: 'text', text: 'I can continue once you choose a framework.', phase: 'final_answer' },
+        {
+          type: 'question',
+          request: {
+            id: 'async-question:lab-agent-question',
+            kind: 'ask_user',
+            conversationId: 'async-question',
+            turnId: 'async-question-turn',
+            itemId: 'lab-agent-question',
+            payload: {
+              request: {
+                itemId: 'lab-agent-question',
+                delivery: 'async',
+                blocking: false,
+                questions: [{
+                  id: '["request_user_input_async","lab-agent-question",0]',
+                  header: 'Framework',
+                  question: 'Which framework should I use?',
+                  isOther: true,
+                  isSecret: false,
+                  options: [
+                    { label: 'Vue', description: 'Use the SDK component package' },
+                    { label: 'React', description: 'Use a custom renderer' },
+                  ],
+                }],
+              },
+            },
+          },
+        },
+      ],
+    }],
+  },
+  {
+    id: 'async-free-text',
+    name: 'Async free text',
+    summary: 'A non-blocking question with no suggested answers',
+    title: 'Codex needs some context',
+    description: 'Text-only questions open directly into a focused answer field.',
+    messages: [{
+      id: 'async-free-text-message',
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'async-free-text-turn',
+      parts: [
+        { type: 'text', text: 'Checking the context before continuing.', phase: 'commentary' },
+        { type: 'text', text: 'What should I know before continuing?' }, {
+        type: 'question',
+        request: {
+          id: 'async-question:lab-free-text-question',
+          kind: 'ask_user',
+          conversationId: 'async-free-text',
+          turnId: 'async-free-text-turn',
+          itemId: 'lab-free-text-question',
+          payload: {
+            request: {
+              itemId: 'lab-free-text-question',
+              delivery: 'async',
+              blocking: false,
+              questions: [{
+                id: '["request_user_input_async","lab-free-text-question",0]',
+                header: 'What should I know before continuing?',
+                question: 'What should I know before continuing?',
+                isOther: true,
+                isSecret: false,
+                options: null,
+              }],
+            },
+          },
+        },
+      }, { type: 'text', text: 'Ready for your answer.', phase: 'final_answer' }],
+    }],
   },
   {
     id: 'busy',
@@ -338,6 +425,7 @@ const theme = ref<'light' | 'dark' | 'system'>('light');
 const draft = ref('');
 const activity = ref('Ready');
 const messages = ref<SurfaceMessage[]>([]);
+const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
 const selected = computed<Scenario>(() => scenarios.find((scenario) => scenario.id === selectedId.value) ?? scenarios[0]);
 const streamTimers = new Set<number>();
 const mockAttachments = new Map<string, CodexNativeAttachment>();
@@ -348,8 +436,28 @@ function resetScenario(): void {
   clearMockStream();
   draft.value = '';
   messages.value = selected.value.messages.map((message) => ({ ...message, parts: [...message.parts] }));
+  answeredClientRequestIds.value = new Set();
   activity.value = 'Scenario reset';
   if (selected.value.id === 'busy') startBusyToolCompletion();
+}
+
+function respondToClientRequest(response: ClientRequestResponse): void {
+  answeredClientRequestIds.value = new Set([...answeredClientRequestIds.value, response.id]);
+  const answers = response.payload?.answers ?? {};
+  const answerText = Object.values(answers)
+    .flatMap((answer) => answer.answers)
+    .filter(Boolean)
+    .join(', ');
+  if (answerText) {
+    messages.value.push({
+      id: `mock-answer-${messages.value.length}`,
+      role: 'user',
+      status: 'complete',
+      createdAt: new Date().toISOString(),
+      parts: [{ type: 'text', text: answerText }],
+    });
+  }
+  activity.value = answerText ? `Answered: ${answerText}` : 'Question dismissed';
 }
 
 function startBusyToolCompletion(): void {

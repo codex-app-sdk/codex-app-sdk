@@ -41,6 +41,8 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
         itemId: part.itemId,
         summaryIndex: part.summaryIndex,
       });
+    } else if (part.type === 'question') {
+      parts.push({ type: 'question', request: part.request });
     } else if (part.type === 'text') {
       contentParts.push(part.text);
       parts.push({

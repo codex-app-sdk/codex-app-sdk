@@ -144,9 +144,11 @@ export class CodexSurfaceMessagesController {
     threadId: string,
     text: string,
     options: SendCodexMessageOptions = {},
+    displayText?: string,
   ): Promise<void> {
     const runtime = this.host.requireRuntime(threadId);
     const normalizedOptions = validatedSendOptions(this.host.snapshotForRuntime(runtime), options);
+    const visibleText = displayText?.trim() || text;
     const skillInputs = mergeSkillInputs(
       promptSkillInputsFromText(text, runtime.skills),
       validateSkillInputs(normalizedOptions.skills ?? [], runtime.skills),
@@ -158,7 +160,7 @@ export class CodexSurfaceMessagesController {
           ...runtime.queuedPrompts,
           {
             id: createQueuedPromptId(),
-            text,
+            text: visibleText,
             ...(Object.keys(normalizedOptions).length > 0 ? { options: normalizedOptions } : {}),
           },
         ],
@@ -172,7 +174,7 @@ export class CodexSurfaceMessagesController {
       id: messageId,
       role: 'user',
       status: 'complete',
-      parts: [{ type: 'text', text }, ...attachments.map(surfaceAttachmentPart)],
+      parts: [{ type: 'text', text: visibleText }, ...attachments.map(surfaceAttachmentPart)],
       createdAt: new Date().toISOString(),
       metadata: {
         conversationId: threadId,
@@ -256,16 +258,18 @@ export class CodexSurfaceMessagesController {
     threadId: string,
     prompt: string,
     options: SendCodexMessageOptions = {},
+    displayText?: string,
   ): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     const text = prompt.trim();
+    const visibleText = displayText?.trim() || text;
     if (!text) throw new Error('Cannot steer with an empty message');
     if (!runtime.activeTurnId) throw new Error('There is no active turn to steer');
     const attachments = validateAttachments(options.attachments ?? []);
     const messageId = createMessageId();
     const optimisticSteer: SurfaceMessage = {
       id: messageId, kind: 'steer', role: 'user', status: 'complete',
-      parts: [{ type: 'text', text }, ...attachments.map(surfaceAttachmentPart)],
+      parts: [{ type: 'text', text: visibleText }, ...attachments.map(surfaceAttachmentPart)],
       createdAt: new Date().toISOString(),
       turnId: runtime.activeTurnId,
       metadata: {
@@ -326,6 +330,15 @@ export class CodexSurfaceMessagesController {
       this.host.patchRuntime(threadId, { error: errorMessage(error) });
       throw error;
     }
+  }
+
+  async answerAsyncQuestion(threadId: string, prompt: string, displayText: string): Promise<void> {
+    const runtime = await this.host.ensureThreadReady(threadId);
+    if (runtime.activeTurnId) {
+      await this.steerForThread(threadId, prompt, {}, displayText);
+      return;
+    }
+    await this.sendPromptToThread(threadId, prompt, {}, displayText);
   }
 
   async deleteQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot> {

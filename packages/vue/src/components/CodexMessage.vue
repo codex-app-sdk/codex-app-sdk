@@ -168,7 +168,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, provide, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, provide, ref, shallowReactive } from 'vue'
+import { questionResponsesKey } from '../chat/message-work-state'
 import { useCodexChatTranslate } from '../chat/chat-i18n'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import { resolveCodexConversationPresentation } from '../chat/contracts'
@@ -278,6 +279,7 @@ const workActive = computed(() => {
   return workTurnState.value?.active.value
 })
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
+provide(questionResponsesKey, inject(questionResponsesKey, undefined) ?? shallowReactive(new Map()))
 const allBlocks = computed(() => computeMessageBlocks(chatMessage.value))
 const visibleBlocks = computed(() => allBlocks.value.filter((block) => (
   effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
@@ -295,6 +297,7 @@ const blocks = computed(() => groupAssistantWorkBlocks(
   visibleBlocks.value,
   workActive.value,
   groupWork.value,
+  props.answeredClientRequestIds,
 ))
 const workOnlyAssistant = computed(() => (
   chatMessage.value.role === 'assistant'

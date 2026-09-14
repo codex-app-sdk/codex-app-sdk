@@ -5,6 +5,135 @@ import { CodexSurface } from '../src/node';
 import { FakeTransport, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('projects asynchronous agent questions as answerable surface requests', async () => {
+    const { surface, transport } = createSurface();
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    transport.emit({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-existing',
+        turnId: 'turn-question',
+        itemId: 'agent-question',
+        delta: 'I need one decision before continuing.',
+      },
+    });
+    events.length = 0;
+
+    transport.emit({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-existing',
+        turnId: 'turn-question',
+        completedAtMs: 1_700_000_002_000,
+        item: {
+          type: 'agentMessage',
+          id: 'agent-question',
+          text: 'I need one decision before continuing.',
+          phase: null,
+          memoryCitation: null,
+          delivery: 'async',
+          questions: [{ title: 'Which framework should I use?', options: ['Vue', 'React'] }],
+        },
+      },
+    });
+
+    const request = {
+      id: 'async-question:agent-question',
+      kind: 'ask_user',
+      conversationId: 'thread-existing',
+      turnId: 'turn-question',
+      itemId: 'agent-question',
+      payload: {
+        request: {
+          itemId: 'agent-question',
+          delivery: 'async',
+          blocking: false,
+          questions: [{
+            id: '["request_user_input_async","agent-question",0]',
+            header: 'Which framework should I use?',
+            question: 'Which framework should I use?',
+            isOther: true,
+            isSecret: false,
+            options: [
+              { label: 'Vue', description: '' },
+              { label: 'React', description: '' },
+            ],
+          }],
+        },
+      },
+    } as const;
+    expect(surface.getConversationSnapshot('thread-existing')).toMatchObject({
+      clientRequests: [request],
+      messages: [
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          id: 'assistant-turn-question',
+          parts: [
+            expect.objectContaining({
+              type: 'text',
+              text: 'I need one decision before continuing.',
+            }),
+            { type: 'question', request },
+          ],
+        }),
+      ],
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'message.updated',
+      conversationId: 'thread-existing',
+      turnId: 'turn-question',
+      payload: {
+        message: expect.objectContaining({
+          parts: expect.arrayContaining([{ type: 'question', request }]),
+        }),
+      },
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'clientRequest.requested',
+      conversationId: 'thread-existing',
+      turnId: 'turn-question',
+      payload: { request },
+    }));
+    transport.emit({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-existing',
+        turn: turn('turn-question', 'completed', []),
+      },
+    });
+
+    await surface.conversation('thread-existing').respondToClientRequest({
+      id: request.id,
+      payload: { answers: { [request.payload.request.questions[0].id]: { answers: ['Vue'] } } },
+    });
+
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({
+      params: {
+        threadId: 'thread-existing',
+        input: [{
+          type: 'text',
+          text: '<send_user_message_question_reply>\n'
+            + '[{"questionItemId":"[\\"request_user_input_async\\",\\"agent-question\\",0]","question":"Which framework should I use?","answer":"Vue"}]\n'
+            + '</send_user_message_question_reply>',
+        }],
+      },
+    });
+    expect(surface.getConversationSnapshot('thread-existing')).toMatchObject({
+      clientRequests: [],
+      messages: expect.arrayContaining([
+        expect.objectContaining({
+          role: 'user',
+          parts: [{ type: 'text', text: 'Vue' }],
+        }),
+      ]),
+    });
+
+    await surface.close();
+  });
+
   it('connects, returns state, publishes summaries, and refreshes plugins from conversation refresh', async () => {
     let pluginLoads = 0;
     const transport = new FakeTransport({

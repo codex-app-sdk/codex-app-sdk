@@ -10,6 +10,7 @@ import type {
 } from '@codex-app-sdk/core/surface';
 import {
   codexItemToMediaPart,
+  codexItemToQuestionPart,
   codexItemToSurfaceMessage,
   codexItemToToolPart,
 } from './codex-conversation-history';
@@ -32,6 +33,7 @@ import {
   surfaceMediaPartsEqual,
   updateAssistantToolPart,
   upsertAssistantMediaPart,
+  upsertAssistantQuestionPart,
   upsertAssistantReasoningSummaries,
   upsertAssistantText,
   upsertAssistantToolPart,
@@ -296,20 +298,37 @@ export class CodexSurfaceItemsController {
         this.reviewOutputByTurn.set(reviewTurnKey, text);
       }
       const previousMessageIds = new Set(runtime.messages.map((message) => message.id));
+      const previousMessage = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+      const previousParts = previousMessage ? JSON.stringify(previousMessage.parts) : null;
+      const previousQuestionRequestIds = new Set(previousMessage?.parts.flatMap((part) => (
+        part.type === 'question' ? [part.request.id] : []
+      )) ?? []);
       const previousText = runtime.messages.flatMap((message) => message.parts)
         .find((part): part is Extract<SurfaceMessage['parts'][number], { type: 'text' }> => (
           part.type === 'text' && part.itemId === params.item.id
         ))?.text ?? '';
-      this.host.patchRuntime(params.threadId, {
-        messages: upsertAssistantText(
-          runtime.messages, params.threadId, params.turnId, params.item.id, text, phase,
-        ),
-      });
-      if (!text) return;
+      let messages = upsertAssistantText(
+        runtime.messages, params.threadId, params.turnId, params.item.id, text, phase,
+      );
+      const questionPart = params.item.type === 'agentMessage'
+        ? codexItemToQuestionPart(params.threadId, params.turnId, params.item)
+        : null;
+      if (questionPart) {
+        messages = upsertAssistantQuestionPart(
+          messages, params.threadId, params.turnId, questionPart,
+        );
+      }
+      this.host.patchRuntime(params.threadId, { messages });
+      if (!text && !questionPart) return;
       const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
       if (message && !previousMessageIds.has(message.id)) {
         this.host.emitEvent('notification', {
           type: 'message.appended', conversationId: params.threadId, turnId: params.turnId,
+          payload: { message: structuredClone(message) },
+        });
+      } else if (message && questionPart && JSON.stringify(message.parts) !== previousParts) {
+        this.host.emitEvent('notification', {
+          type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
           payload: { message: structuredClone(message) },
         });
       } else if (message && text !== previousText) {
@@ -330,6 +349,14 @@ export class CodexSurfaceItemsController {
             payload: { message: structuredClone(message) },
           });
         }
+      }
+      if (questionPart && !previousQuestionRequestIds.has(questionPart.request.id)) {
+        this.host.emitEvent('notification', {
+          type: 'clientRequest.requested',
+          conversationId: params.threadId,
+          turnId: params.turnId,
+          payload: { request: structuredClone(questionPart.request) },
+        });
       }
       return;
     }

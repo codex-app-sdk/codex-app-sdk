@@ -47,6 +47,8 @@ type PendingClientRequest =
   };
 
 export type CodexSurfaceClientRequestsHost = {
+  activeConversationId(): string | null;
+  answerAsyncQuestion(threadId: string, prompt: string, displayText: string): Promise<void>;
   emitConversationActivity(threadId: string, origin: 'action' | 'notification'): void;
   emitEvent(origin: 'action' | 'notification', input: SurfaceEventInput): void;
   hasPendingApproval(threadId: string): boolean;
@@ -108,7 +110,10 @@ export class CodexSurfaceClientRequestsController {
     response: CodexSurfaceClientRequestResponse,
   ): Promise<void> {
     const pending = this.pending.get(response.id);
-    if (!pending) throw new Error(`Unknown client request '${response.id}'`);
+    if (!pending) {
+      await this.respondToAsyncQuestion(threadId, response);
+      return;
+    }
     if (threadId !== undefined && pending.threadId !== threadId) {
       throw new Error(`Client request '${response.id}' belongs to conversation '${pending.threadId}', not '${threadId}'`);
     }
@@ -155,6 +160,58 @@ export class CodexSurfaceClientRequestsController {
       },
     });
     this.host.emitConversationActivity(pending.threadId, 'action');
+  }
+
+  private async respondToAsyncQuestion(
+    threadId: string | undefined,
+    response: CodexSurfaceClientRequestResponse,
+  ): Promise<void> {
+    const resolvedThreadId = threadId ?? this.host.activeConversationId();
+    const runtime = resolvedThreadId === null ? null : this.host.requireRuntime(resolvedThreadId);
+    let request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> | null = null;
+    for (const message of runtime?.messages ?? []) {
+      for (const part of message.parts) {
+        if (part.type === 'question' && part.request.id === response.id) request = part.request;
+      }
+    }
+    const match = runtime && request ? { request, runtime } : null;
+    if (!match) throw new Error(`Unknown client request '${response.id}'`);
+    if (match.request.payload.request.delivery !== 'async') {
+      throw new Error(`Unknown client request '${response.id}'`);
+    }
+    const answers = response.payload?.answers ?? {};
+    const entries = match.request.payload.request.questions.flatMap((question) => {
+      const answer = answers[question.id]?.answers.join(', ').trim() ?? '';
+      return answer ? [{
+        questionItemId: question.id,
+        question: question.question,
+        answer,
+      }] : [];
+    });
+    if (response.payload?.cancelled !== true) {
+      if (entries.length === 0) throw new Error('At least one answer is required');
+      const prompt = '<send_user_message_question_reply>\n'
+        + `${JSON.stringify(entries)}\n`
+        + '</send_user_message_question_reply>';
+      const displayText = entries.length === 1
+        ? entries[0]!.answer
+        : entries.map((entry) => `${entry.question}: ${entry.answer}`).join('\n');
+      await this.host.answerAsyncQuestion(match.runtime.threadId, prompt, displayText);
+    }
+    this.host.patchRuntime(match.runtime.threadId, {
+      answeredClientRequestIds: addUnique(match.runtime.answeredClientRequestIds, response.id),
+    });
+    this.host.emitEvent('action', {
+      type: 'clientRequest.resolved',
+      conversationId: match.runtime.threadId,
+      ...(match.request.turnId ? { turnId: match.request.turnId } : {}),
+      payload: {
+        request: structuredClone(match.request),
+        response: structuredClone(response),
+        reason: 'host',
+      },
+    });
+    this.host.emitConversationActivity(match.runtime.threadId, 'action');
   }
 
   handleServerResolved(requestId: string, threadId: string): void {
@@ -206,6 +263,8 @@ export class CodexSurfaceClientRequestsController {
       payload: {
         request: {
           itemId,
+          delivery: 'tool',
+          blocking: request.params.isBlocking ?? true,
           questions: normalizedQuestions,
           ...(request.params.autoResolutionMs === null
             ? {}

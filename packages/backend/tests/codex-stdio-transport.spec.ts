@@ -62,7 +62,15 @@ describe('CodexAppServerStdioTransport', () => {
     expect(spawnMock).toHaveBeenCalledOnce();
     expect(spawnMock).toHaveBeenCalledWith(
       'custom-codex',
-      ['-c', 'features.apps=true', 'app-server', '--listen', 'stdio://'],
+      [
+        '-c',
+        'features.default_mode_request_user_input=true',
+        '-c',
+        'features.apps=true',
+        'app-server',
+        '--listen',
+        'stdio://',
+      ],
       expect.objectContaining({
         cwd: '/tmp/project',
         env: expect.objectContaining({ CODEX_HOME: '/tmp/codex-home', SURFACE_TEST: 'yes' }),
@@ -235,7 +243,11 @@ describe('CodexAppServerStdioTransport', () => {
     await closing;
     await transport.close();
 
-    expect(spawnMock).toHaveBeenLastCalledWith('codex', ['app-server', '--listen', 'stdio://'], expect.any(Object));
+    expect(spawnMock).toHaveBeenLastCalledWith(
+      'codex',
+      ['-c', 'features.default_mode_request_user_input=true', 'app-server', '--listen', 'stdio://'],
+      expect.any(Object),
+    );
     expect(replacement.kill).toHaveBeenCalledOnce();
     expect(errors).toHaveLength(1);
     expect(() => transport.send({ method: 'initialized' })).toThrow('Codex app-server transport is not started');

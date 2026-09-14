@@ -6,6 +6,7 @@ type PhasedMessageBlock = {
 
 export type MessageBlock =
   | { type: 'attachment'; attachment: MessageAttachment }
+  | Extract<MessagePart, { type: 'question' }>
   | ({ type: 'text'; content: string } & PhasedMessageBlock)
   | { type: 'user-text'; content: string }
   | ({ type: 'reasoning'; content: string } & PhasedMessageBlock)
@@ -80,6 +81,7 @@ export function groupAssistantWorkBlocks(
   blocks: MessageBlock[],
   workActive = message.streaming === true,
   groupWork = hasExplicitAssistantWorkPhases(message),
+  answeredClientRequestIds?: ReadonlySet<string>,
 ): RenderedMessageBlock[] {
   if (message.role !== 'assistant' || !groupWork) return blocks
 
@@ -103,7 +105,7 @@ export function groupAssistantWorkBlocks(
   }
 
   for (const block of blocks) {
-    if (isAssistantWorkBlock(block)) {
+    if (isAssistantWorkBlock(block, answeredClientRequestIds)) {
       workBlocks.push(block)
       continue
     }
@@ -119,7 +121,7 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
   const prompts: string[] = []
   const anchoredToolCallIds = new Set<string>()
 
-  for (const part of parts) {
+  for (const [index, part] of parts.entries()) {
     if (part.type === 'tool') {
       anchoredToolCallIds.add(part.toolCall.id)
       blocks.push({ type: 'tool', toolCall: part.toolCall })
@@ -140,6 +142,17 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
       if (part.summary.trim()) {
         blocks.push({ type: 'reasoning', content: part.summary, phase: 'commentary' })
       }
+      continue
+    }
+
+    if (part.type === 'question') {
+      blocks.push({ type: 'question', request: part.request })
+      continue
+    }
+
+    const nextPart = parts[index + 1]
+    if (nextPart?.type === 'question'
+      && nextPart.request.payload.request.questions.some((question) => question.question.trim() === part.content.trim())) {
       continue
     }
 
@@ -311,7 +324,8 @@ export function hasExplicitAssistantWorkPhases(message: Message) {
   )) ?? false
 }
 
-export function isAssistantWorkBlock(block: MessageBlock) {
+export function isAssistantWorkBlock(block: MessageBlock, answeredClientRequestIds?: ReadonlySet<string>) {
+  if (block.type === 'question') return answeredClientRequestIds?.has(block.request.id) === true
   if (block.type === 'reasoning' || block.type === 'tool' || block.type === 'tool-group') return true
   if (block.type === 'media') return block.phase !== 'final_answer'
   return 'phase' in block && block.phase === 'commentary'

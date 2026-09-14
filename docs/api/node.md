@@ -184,10 +184,17 @@ schedulers are unref'd when supported and are always cleared during close.
 - `close()`
 
 During `connect()`, the surface discovers app-server experimental features and
-enables `compaction_image_budget` when the running version advertises it as
-disabled. App-server versions without feature discovery remain supported. This
-keeps manual and automatic compaction image-aware without requiring host
-configuration.
+enables supported runtime capabilities when the running version advertises
+them as disabled. These currently include `compaction_image_budget` for
+image-aware manual and automatic compaction and
+`default_mode_request_user_input` so agents can ask non-blocking questions
+outside plan mode. App-server versions without feature discovery remain
+supported.
+
+`CodexAppServerStdioTransport` enables `default_mode_request_user_input` at
+process launch because app-server establishes that tool gate before the SDK can
+negotiate features over JSON-RPC. An externally managed Unix-socket app-server
+must be launched with the feature enabled by its owner.
 
 ### Authentication
 

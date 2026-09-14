@@ -32,7 +32,10 @@
     <template v-else-if="currentQuestion">
       <header class="chat-tool-user-input__header">
         <div class="chat-tool-user-input__heading">
-          <span class="chat-tool-user-input__tag">{{ currentQuestion.header }}</span>
+          <span
+            v-if="currentQuestion.header.trim() !== currentQuestion.question.trim()"
+            class="chat-tool-user-input__tag"
+          >{{ currentQuestion.header }}</span>
           <span class="chat-tool-user-input__question">{{ currentQuestion.question }}</span>
         </div>
         <div
@@ -53,54 +56,69 @@
       </header>
 
       <div class="chat-tool-user-input__options">
-        <button
-          v-for="option in currentQuestion.options ?? []"
-          :key="option.label"
-          class="chat-tool-user-input__option"
-          :class="{ 'chat-tool-user-input__option--selected': isSelected(currentQuestion.id, option.label) }"
-          type="button"
-          @click="toggleOption(currentQuestion, option.label)"
-        >
-          <span class="chat-tool-user-input__check">
-            <Check v-if="isSelected(currentQuestion.id, option.label)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
-            <Circle v-else class="chat-tool-user-input__icon" :size="16" />
-          </span>
-          <span class="chat-tool-user-input__option-copy">
-            <span class="chat-tool-user-input__option-label">{{ option.label }}</span>
-            <span v-if="option.description" class="chat-tool-user-input__option-description">{{ option.description }}</span>
-          </span>
-        </button>
+        <textarea
+          v-if="isFreeTextOnly(currentQuestion)"
+          v-focus
+          v-model="otherTexts[currentQuestion.id]"
+          autofocus
+          class="chat-tool-user-input__other-input chat-tool-user-input__other-input--direct"
+          :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
+          rows="2"
+          :type="currentQuestion.isSecret ? 'password' : 'text'"
+          @keydown.stop
+        />
 
-        <div
-          v-if="currentQuestion.isOther || !currentQuestion.options?.length"
-          class="chat-tool-user-input__option chat-tool-user-input__option--other"
-          :class="{ 'chat-tool-user-input__option--selected': isOtherSelected(currentQuestion.id) }"
-          role="button"
-          tabindex="0"
-          @click="toggleOther(currentQuestion)"
-          @keydown.enter.prevent="toggleOther(currentQuestion)"
-          @keydown.space.prevent="toggleOther(currentQuestion)"
-        >
-          <span class="chat-tool-user-input__check">
-            <Check v-if="isOtherSelected(currentQuestion.id)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
-            <Circle v-else class="chat-tool-user-input__icon" :size="16" />
-          </span>
-          <span class="chat-tool-user-input__option-copy">
-            <span class="chat-tool-user-input__option-label">Other</span>
-          </span>
-          <textarea
-            v-if="isOtherSelected(currentQuestion.id)"
-            v-model="otherTexts[currentQuestion.id]"
-            class="chat-tool-user-input__other-input"
-            :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
-            rows="2"
-            :type="currentQuestion.isSecret ? 'password' : 'text'"
-            @click.stop
-            @focus="selectOther(currentQuestion)"
-            @input="selectOther(currentQuestion)"
-            @keydown.stop
-          />
-        </div>
+        <template v-else>
+          <button
+            v-for="option in currentQuestion.options ?? []"
+            :key="option.label"
+            :aria-label="option.label"
+            class="chat-tool-user-input__option"
+            :class="{ 'chat-tool-user-input__option--selected': isSelected(currentQuestion.id, option.label) }"
+            type="button"
+            @click="toggleOption(currentQuestion, option.label)"
+          >
+            <span class="chat-tool-user-input__check">
+              <Check v-if="isSelected(currentQuestion.id, option.label)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
+              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
+            </span>
+            <span class="chat-tool-user-input__option-copy">
+              <span class="chat-tool-user-input__option-label">{{ option.label }}</span>
+              <span v-if="option.description" class="chat-tool-user-input__option-description">{{ option.description }}</span>
+            </span>
+          </button>
+
+          <div
+            v-if="currentQuestion.isOther"
+            class="chat-tool-user-input__option chat-tool-user-input__option--other"
+            :class="{ 'chat-tool-user-input__option--selected': isOtherSelected(currentQuestion.id) }"
+            role="button"
+            tabindex="0"
+            @click="toggleOther(currentQuestion)"
+            @keydown.enter.prevent="toggleOther(currentQuestion)"
+            @keydown.space.prevent="toggleOther(currentQuestion)"
+          >
+            <span class="chat-tool-user-input__check">
+              <Check v-if="isOtherSelected(currentQuestion.id)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
+              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
+            </span>
+            <span class="chat-tool-user-input__option-copy">
+              <span class="chat-tool-user-input__option-label">Other</span>
+            </span>
+            <textarea
+              v-if="isOtherSelected(currentQuestion.id)"
+              v-model="otherTexts[currentQuestion.id]"
+              class="chat-tool-user-input__other-input"
+              :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
+              rows="2"
+              :type="currentQuestion.isSecret ? 'password' : 'text'"
+              @click.stop
+              @focus="selectOther(currentQuestion)"
+              @input="selectOther(currentQuestion)"
+              @keydown.stop
+            />
+          </div>
+        </template>
       </div>
 
       <footer class="chat-tool-user-input__actions">
@@ -192,6 +210,16 @@ const canProceed = computed(() => {
   return !isLastQuestion.value || questions.value.every((entry) => hasAnswerFor(entry))
 })
 
+const vFocus = {
+  mounted(element: HTMLTextAreaElement) {
+    window.setTimeout(() => element.focus(), 0)
+  },
+}
+
+function isFreeTextOnly(question: AskUserQuestion) {
+  return question.options === null
+}
+
 function isSelected(questionId: string, label: string) {
   return selections[questionId]?.includes(label) ?? false
 }
@@ -250,7 +278,9 @@ function selectOther(question: AskUserQuestion) {
 }
 
 function hasAnswerFor(question: AskUserQuestion) {
-  return (selections[question.id]?.length ?? 0) > 0 || (otherSelected[question.id] && !!otherTexts[question.id]?.trim())
+  return (selections[question.id]?.length ?? 0) > 0 || (
+    (isFreeTextOnly(question) || otherSelected[question.id]) && !!otherTexts[question.id]?.trim()
+  )
 }
 
 function next() {
@@ -300,7 +330,7 @@ function cancel() {
 function buildAnswer(question: AskUserQuestion): { answers: string[] } {
   const answers = [...(selections[question.id] ?? [])]
   const otherText = otherTexts[question.id]?.trim()
-  if (otherSelected[question.id] && otherText) {
+  if ((isFreeTextOnly(question) || otherSelected[question.id]) && otherText) {
     answers.push(otherText)
   }
   return { answers }
@@ -396,16 +426,10 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 
 .chat-tool-user-input__summary--answered {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.chat-tool-user-input__summary--answered :deep(.chat-tool-call__title) {
-  grid-column: 1 / -1;
-}
-
-.chat-tool-user-input__tag,
-.chat-tool-user-input__answer-label {
+.chat-tool-user-input__tag {
   width: fit-content;
   flex: 0 0 auto;
   border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
@@ -470,13 +494,13 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 
 .chat-tool-user-input__answer {
   display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
   margin-top: var(--space-2);
-  margin-left: var(--space-10);
   border: 0;
-  padding: 0;
+  padding: 0 0 0 var(--space-10);
+  box-sizing: border-box;
   background: transparent;
 }
 
@@ -538,12 +562,16 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   font-size: var(--font-size-14);
 }
 
-.chat-tool-user-input--resolved .chat-tool-user-input__answer-label {
-  justify-self: end;
-  border: none;
-  border-radius: 0;
-  font-size: var(--font-size-13);
-  text-align: right;
+.chat-tool-user-input__answer-label {
+  color: var(--color-text);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-medium);
+}
+
+.chat-tool-user-input__answer-label,
+.chat-tool-user-input__answer-value {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .chat-tool-user-input__option--other {
@@ -570,6 +598,11 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 
 .chat-tool-user-input__other-input:focus {
   outline: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+}
+
+.chat-tool-user-input__other-input--direct {
+  grid-column: auto;
+  margin-top: 0;
 }
 
 .chat-tool-user-input__actions {

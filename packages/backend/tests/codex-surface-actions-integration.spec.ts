@@ -310,6 +310,7 @@ describe('CodexSurface', () => {
       method: 'item/tool/requestUserInput',
       params: {
         threadId: 'thread-existing', turnId: 'turn-input', itemId: 'ask-user-item', autoResolutionMs: null,
+        isBlocking: false,
         questions: [{
           id: 'target', header: 'Target', question: 'Which file?', isOther: true, isSecret: false,
           options: [{ label: 'README.md', description: 'Read the README.' }],
@@ -332,6 +333,8 @@ describe('CodexSurface', () => {
       payload: {
         request: {
           itemId: 'ask-user-item',
+          delivery: 'tool',
+          blocking: false,
           questions: [{
             id: 'target', header: 'Target', question: 'Which file?', isOther: true, isSecret: false,
             options: [{ label: 'README.md', description: 'Read the README.' }],

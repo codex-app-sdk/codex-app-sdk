@@ -69,7 +69,8 @@ describe('codexThreadToSurfaceMessages', () => {
   it('maps individual history items and all turn statuses', () => {
     const baseTurn = { id: 'turn', startedAt: Number.NaN } as Pick<v2.Turn, 'id' | 'status' | 'startedAt'>;
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'inProgress' }, {
-      type: 'agentMessage', id: 'agent', text: 'Streaming', phase: 'commentary', memoryCitation: null, delivery: null,
+      type: 'agentMessage', id: 'agent', text: 'Streaming', phase: 'commentary', memoryCitation: null,
+      delivery: null, questions: null,
     })).toMatchObject({
       status: 'streaming',
       createdAt: '1970-01-01T00:00:00.000Z',
@@ -90,7 +91,8 @@ describe('codexThreadToSurfaceMessages', () => {
       }],
     });
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'interrupted' }, {
-      type: 'agentMessage', id: 'interrupted', text: 'Partial response', phase: null, memoryCitation: null, delivery: null,
+      type: 'agentMessage', id: 'interrupted', text: 'Partial response', phase: null,
+      memoryCitation: null, delivery: null, questions: null,
     })).toMatchObject({ status: 'complete', parts: [{ text: 'Partial response' }] });
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'userMessage', id: 'user', clientId: null, content: [],
@@ -117,6 +119,61 @@ describe('codexThreadToSurfaceMessages', () => {
     expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'enteredReviewMode', id: 'entered', review: 'changes',
     })).toBeNull();
+  });
+
+  it('projects durable asynchronous questions and hides their response envelope', () => {
+    const turn = {
+      id: 'turn-question', status: 'completed', startedAt: 2,
+    } as Pick<v2.Turn, 'id' | 'status' | 'startedAt'>;
+    const question = codexItemToSurfaceMessage('thread-question', turn, {
+      type: 'agentMessage',
+      id: 'agent-question',
+      text: 'Which framework should I use?',
+      phase: 'final_answer',
+      memoryCitation: null,
+      delivery: 'async',
+      questions: null,
+    });
+    expect(question).toMatchObject({
+      parts: [
+        { type: 'text', text: 'Which framework should I use?' },
+        {
+          type: 'question',
+          request: {
+            id: 'async-question:agent-question',
+            payload: {
+              request: {
+                delivery: 'async',
+                blocking: false,
+                questions: [{ id: 'agent-question', question: 'Which framework should I use?' }],
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    const answer = codexItemToSurfaceMessage('thread-question', turn, {
+      type: 'userMessage',
+      id: 'question-answer',
+      clientId: null,
+      content: [{
+        type: 'text',
+        text: '<send_user_message_question_reply>\n'
+          + '[{"questionItemId":"[\\"request_user_input_async\\",\\"agent-question\\",0]","question":"Framework?","answer":"Vue"}]\n'
+          + '</send_user_message_question_reply>',
+        text_elements: [],
+      }],
+    });
+    expect(answer).toMatchObject({
+      role: 'user',
+      parts: [{ type: 'text', text: 'Vue' }],
+      metadata: {
+        asyncQuestionRequestIds: ['async-question:agent-question'],
+        asyncQuestionAnswers: { '["request_user_input_async","agent-question",0]': { answers: ['Vue'] } },
+      },
+    });
+    expect(JSON.stringify(answer)).not.toContain('send_user_message_question_reply');
   });
 
   it('projects every non-empty reasoning summary with stable source indices', () => {

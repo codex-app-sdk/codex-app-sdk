@@ -171,14 +171,36 @@ export function runtimeProjection(
   | 'turnGitDiff'
   | 'turns'
 > {
+  const projectedClientRequests = [...clientRequests];
+  const knownClientRequestIds = new Set(projectedClientRequests.map((request) => request.id));
+  const answeredClientRequestIds = new Set(runtime.answeredClientRequestIds);
+  for (const message of runtime.messages) {
+    const answeredByMessage = message.metadata?.asyncQuestionRequestIds;
+    if (Array.isArray(answeredByMessage)) {
+      for (const requestId of answeredByMessage) {
+        if (typeof requestId === 'string') answeredClientRequestIds.add(requestId);
+      }
+    }
+  }
+  for (const message of runtime.messages) {
+    for (const part of message.parts) {
+      if (
+        part.type !== 'question'
+        || knownClientRequestIds.has(part.request.id)
+        || answeredClientRequestIds.has(part.request.id)
+      ) continue;
+      knownClientRequestIds.add(part.request.id);
+      projectedClientRequests.push(part.request);
+    }
+  }
   return {
     activeTurnId: runtime.activeTurnId,
     approvalPreset: runtime.approvalPreset,
     approvalPresets: runtime.approvalPresets,
-    answeredClientRequestIds: runtime.answeredClientRequestIds,
+    answeredClientRequestIds: [...answeredClientRequestIds],
     approvals,
     busy: runtime.busy,
-    clientRequests,
+    clientRequests: projectedClientRequests,
     contextUsage: runtime.contextUsage,
     error: runtime.error,
     goal: runtime.goal,

@@ -36,6 +36,12 @@
   <slot v-else-if="block.type === 'media'" name="media" :block="block" :media="block.media">
     <ChatMediaBlock :media="block.media" :open-image="openImage" />
   </slot>
+  <ChatAsyncUserInputRequest
+    v-else-if="block.type === 'question'"
+    :answered-client-request-ids="answeredClientRequestIds"
+    :request="block.request"
+    @client-response="emit('client-response', $event)"
+  />
   <slot
     v-else-if="block.type === 'attachment'"
     name="attachment"
@@ -105,6 +111,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount } from 'vue'
 import ChatAttachmentBlock from './ChatAttachmentBlock.vue'
+import ChatAsyncUserInputRequest from './ChatAsyncUserInputRequest.vue'
 import ChatFollowUps from './ChatFollowUps.vue'
 import ChatMediaBlock from './ChatMediaBlock.vue'
 import ChatMermaidBlock from './ChatMermaidBlock.vue'

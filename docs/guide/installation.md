@@ -9,14 +9,21 @@
 - A compatible Codex executable available to discovery, or an explicit
   transport command
 
-The checked-in app-server bindings currently target `codex-cli 0.151.0`.
+The checked-in app-server bindings currently target `codex-cli 0.153.4`.
 
-During connection, `CodexSurface` negotiates image-aware compaction with the
-running app-server. When `compaction_image_budget` is advertised but disabled,
-the SDK enables it for that app-server process before loading conversations.
-Older app-server releases that do not expose feature discovery remain usable,
-but cannot receive this compatibility improvement; hosts should ship a current
-stable Codex executable for reliable compaction of image-heavy threads.
+During connection, `CodexSurface` negotiates the runtime features used by its
+high-level behavior. It enables `compaction_image_budget` for image-aware
+manual and automatic compaction, and `default_mode_request_user_input` for
+non-blocking questions outside plan mode, when the running app-server
+advertises either feature as disabled. Older app-server releases that do not
+expose feature discovery remain usable, but cannot receive these compatibility
+improvements; hosts should ship a current stable Codex executable.
+
+The default spawned stdio transport also enables
+`default_mode_request_user_input` on the Codex command line because the tool
+gate is established when app-server starts. Hosts that connect to an externally
+managed Unix-socket app-server must enable that feature when launching the
+shared process.
 
 For a new application, the fastest path is the [project
 scaffolder](/guide/scaffolding): Electron is the default and `--target web`

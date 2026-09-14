@@ -18,6 +18,7 @@
           v-else
           :key="group.key"
           :entries="group.entries"
+          :answered-client-request-ids="answeredClientRequestIds"
           :active="activeTurnId === undefined
             ? undefined
             : group.turnId !== undefined && group.turnId === activeTurnId"
@@ -82,7 +83,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowReactive, watch } from 'vue'
+import { questionResponsesKey } from '../chat/message-work-state'
 import type {
   CodexConversationRenderStrategy,
   CodexSurfacePlugin,
@@ -198,6 +200,37 @@ const thinkingPlaceholder: SurfaceMessage = {
   status: 'streaming',
   parts: [],
 }
+const questionResponses = shallowReactive(new Map<string, ClientRequestResponse['payload']>())
+provide(questionResponsesKey, questionResponses)
+watch(() => props.messages, (messages) => {
+  const answers: Record<string, { answers: string[] }> = {}
+  const requestIds = new Set<string>()
+  for (const message of messages) {
+    if (!('metadata' in message)) continue
+    const stored = message.metadata?.asyncQuestionAnswers
+    if (!stored || typeof stored !== 'object') continue
+    for (const [id, value] of Object.entries(stored)) {
+      if (value && typeof value === 'object' && 'answers' in value
+        && Array.isArray(value.answers) && value.answers.every((answer: unknown) => typeof answer === 'string')) {
+        answers[id] = { answers: value.answers }
+      }
+    }
+  }
+  for (const message of messages) {
+    for (const part of message.parts ?? []) {
+      if (part.type !== 'question') continue
+      requestIds.add(part.request.id)
+      const restored = Object.fromEntries(part.request.payload.request.questions
+        .filter((question) => answers[question.id])
+        .map((question) => [question.id, answers[question.id]!]))
+      if (Object.keys(restored).length > 0) questionResponses.set(part.request.id, { answers: restored })
+    }
+  }
+  for (const id of questionResponses.keys()) {
+    if (!requestIds.has(id)) questionResponses.delete(id)
+  }
+}, { immediate: true })
+
 const effectiveRenderStrategy = computed<CodexConversationRenderStrategy>(() => (
   props.renderStrategy ?? (props.lazyMessages === false ? 'eager' : 'lazy')
 ))
