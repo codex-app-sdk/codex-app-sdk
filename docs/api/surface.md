@@ -241,6 +241,11 @@ Framework-neutral async interface exposed through Electron IPC or the web
 client. It includes lifecycle, authentication, catalog, conversation, message,
 review, goal, approval, client-request, and event operations.
 
+Browser-capable hosts use `startChatGptLogin()`. Headless hosts use
+`startChatGptDeviceCodeLogin()`, which returns a serializable
+`{ loginId, verificationUrl, userCode }` result while app-server and the SDK
+retain ownership of credentials and authentication lifecycle.
+
 `CodexSurfaceRendererApi` narrows trusted conversation-creation input and uses
 `CodexRendererSendMessageOptions` for send/steer attachments.
 

@@ -11,6 +11,7 @@ import type {
   CodexConversationSnapshot,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
+  CodexSurfaceChatGptDeviceCodeLogin,
   CodexSurfaceChatGptLogin,
   CodexSurfaceClientRequestResponse,
   CodexSurfaceEvent,
@@ -489,6 +490,10 @@ export class CodexSurface {
 
   async startChatGptLogin(): Promise<CodexSurfaceChatGptLogin> {
     return this.connection.startChatGptLogin();
+  }
+
+  async startChatGptDeviceCodeLogin(): Promise<CodexSurfaceChatGptDeviceCodeLogin> {
+    return this.connection.startChatGptDeviceCodeLogin();
   }
 
   /** Reads the app-server's current remote-control connection state. */

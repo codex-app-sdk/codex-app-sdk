@@ -111,6 +111,13 @@ describe('Codex web transport', () => {
     await expect(client.createConversation(undefined)).resolves.toStrictEqual(snapshot);
     expect(surface.createConversation).toHaveBeenCalledWith(undefined);
 
+    await expect(client.startChatGptDeviceCodeLogin()).resolves.toStrictEqual({
+      loginId: 'device-login-1',
+      verificationUrl: 'https://auth.example.test/device',
+      userCode: 'ABCD-EFGH',
+    });
+    expect(surface.startChatGptDeviceCodeLogin).toHaveBeenCalledWith();
+
     surface.emitState({ ...snapshot, busy: true });
     surface.emitEvent(event);
     await nextTask();
@@ -270,6 +277,11 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
   const archiveConversation = vi.fn(async () => initialSnapshot);
   const refreshAccount = vi.fn(async () => initialSnapshot);
   const createConversation = vi.fn(async () => initialSnapshot);
+  const startChatGptDeviceCodeLogin = vi.fn(async () => ({
+    loginId: 'device-login-1',
+    verificationUrl: 'https://auth.example.test/device',
+    userCode: 'ABCD-EFGH',
+  }));
   const partial = {
     connect,
     createConversation,
@@ -277,6 +289,7 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
     sendMessage,
     archiveConversation,
     refreshAccount,
+    startChatGptDeviceCodeLogin,
     onStateChange: vi.fn((listener: (value: CodexSurfaceSnapshot) => void) => {
       stateListener = listener;
       return () => { stateListener = undefined; };
@@ -293,6 +306,7 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
     archiveConversation,
     createConversation,
     refreshAccount,
+    startChatGptDeviceCodeLogin,
     emitState: (value: CodexSurfaceSnapshot) => stateListener?.(value),
     emitEvent: (value: CodexSurfaceEvent) => eventListener?.(value),
   };

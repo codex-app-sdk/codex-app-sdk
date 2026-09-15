@@ -114,6 +114,11 @@ describe('Codex surface Electron bridge', () => {
       selectConversation: vi.fn(async () => snapshot),
       sendMessage: vi.fn(async () => snapshot),
       startReview: vi.fn(async () => snapshot),
+      startChatGptDeviceCodeLogin: vi.fn(async () => ({
+        loginId: 'device-login-1',
+        verificationUrl: 'https://auth.example.test/device',
+        userCode: 'ABCD-EFGH',
+      })),
       startChatGptLogin: vi.fn(async () => ({
         loginId: 'login-1', authUrl: 'https://auth.example.test/login',
       })),
@@ -162,6 +167,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:select-conversation',
       'codex-surface:send-message',
       'codex-surface:set-goal',
+      'codex-surface:start-chatgpt-device-code-login',
       'codex-surface:start-chatgpt-login',
       'codex-surface:start-review',
       'codex-surface:steer-message',
@@ -179,6 +185,11 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:load-older-conversation-history', 'thread-1')).resolves.toBe(history);
     await expect(main.call('codex-surface:logout')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:refresh-account')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:start-chatgpt-device-code-login')).resolves.toStrictEqual({
+      loginId: 'device-login-1',
+      verificationUrl: 'https://auth.example.test/device',
+      userCode: 'ABCD-EFGH',
+    });
     await expect(main.call('codex-surface:start-chatgpt-login')).resolves.toStrictEqual({
       loginId: 'login-1', authUrl: 'https://auth.example.test/login',
     });
@@ -499,6 +510,7 @@ describe('Codex surface Electron bridge', () => {
     });
     expect(surface.logout).toHaveBeenCalledOnce();
     expect(surface.refreshAccount).toHaveBeenCalledOnce();
+    expect(surface.startChatGptDeviceCodeLogin).toHaveBeenCalledOnce();
     expect(surface.startChatGptLogin).toHaveBeenCalledOnce();
     expect(surface.readConversationHistory).toHaveBeenNthCalledWith(1, 'thread-1');
     expect(surface.readConversationHistory).toHaveBeenNthCalledWith(2, undefined);
@@ -588,6 +600,7 @@ describe('Codex surface Electron bridge', () => {
     await api.retryTurn('turn-3');
     await api.selectConversation('thread-2');
     await api.sendMessage('Build it', { model: 'gpt-5' });
+    await api.startChatGptDeviceCodeLogin();
     await api.startChatGptLogin();
     await api.startReview({ target: { type: 'uncommittedChanges' } });
     await api.steerMessage('Keep going', {
@@ -632,6 +645,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:retry-turn', 'turn-3'],
       ['codex-surface:select-conversation', 'thread-2'],
       ['codex-surface:send-message', 'Build it', { model: 'gpt-5' }],
+      ['codex-surface:start-chatgpt-device-code-login'],
       ['codex-surface:start-chatgpt-login'],
       ['codex-surface:start-review', { target: { type: 'uncommittedChanges' } }],
       ['codex-surface:steer-message', 'Keep going', {

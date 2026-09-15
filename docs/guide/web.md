@@ -101,6 +101,10 @@ user store or distributed scheduler.
 Stock ChatGPT login can still use the surface. The browser calls
 `startChatGptLogin()`, the host opens the returned URL, and app-server persists
 successful credentials into the isolated `codexHome` selected by the host.
+For a headless app-server, the authorized host can instead call
+`startChatGptDeviceCodeLogin()` and display its `verificationUrl` and `userCode`;
+tokens remain entirely inside app-server's managed login and the same
+`codexHome`.
 
 ## Browser boundary
 

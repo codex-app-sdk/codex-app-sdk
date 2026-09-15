@@ -3,6 +3,7 @@ import type { CodexAppServerClient, v2 } from '../codex/index';
 import type { ExperimentalFeatureListResponse } from '../codex/generated/v2/ExperimentalFeatureListResponse';
 import type {
   CodexSurfaceAuthentication,
+  CodexSurfaceChatGptDeviceCodeLogin,
   CodexSurfaceChatGptLogin,
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
@@ -191,6 +192,11 @@ export class CodexSurfaceConnectionController {
   async startChatGptLogin(): Promise<CodexSurfaceChatGptLogin> {
     await this.ensureConnected();
     return this.authentication.startChatGptLogin();
+  }
+
+  async startChatGptDeviceCodeLogin(): Promise<CodexSurfaceChatGptDeviceCodeLogin> {
+    await this.ensureConnected();
+    return this.authentication.startChatGptDeviceCodeLogin();
   }
 
   async cancelLogin(loginId: string): Promise<CodexSurfaceSnapshot> {

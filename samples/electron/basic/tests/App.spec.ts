@@ -294,6 +294,11 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
     selectConversation: vi.fn(async () => ({ ...snapshot, activeConversationId: 'thread-1' })),
     sendMessage: vi.fn(async () => snapshot),
     startReview: vi.fn(async () => snapshot),
+    startChatGptDeviceCodeLogin: vi.fn(async () => ({
+      loginId: 'device-login-1',
+      verificationUrl: 'https://auth.example.test/device',
+      userCode: 'ABCD-EFGH',
+    })),
     startChatGptLogin: vi.fn(async () => ({
       loginId: 'login-1', authUrl: 'https://auth.example.test/login',
     })),

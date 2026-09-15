@@ -204,6 +204,129 @@ describe('CodexSurface', () => {
     expect(requestsFor(transport, 'account/login/start')).toHaveLength(1);
   });
 
+  it('starts a managed ChatGPT device-code login on a headless surface', async () => {
+    let account: Record<string, unknown> | null = null;
+    const transport = new FakeTransport({
+      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+      'account/login/start': () => ({
+        type: 'chatgptDeviceCode',
+        loginId: ' device-login ',
+        verificationUrl: 'https://auth.example.test/device',
+        userCode: 'ABCD-EFGH',
+      }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    const unsubscribe = surface.onEvent((event) => events.push(event));
+    await surface.connect();
+
+    await expect(surface.startChatGptDeviceCodeLogin()).resolves.toStrictEqual({
+      loginId: 'device-login',
+      verificationUrl: 'https://auth.example.test/device',
+      userCode: 'ABCD-EFGH',
+    });
+    expect(lastRequest(transport, 'account/login/start')).toMatchObject({
+      params: { type: 'chatgptDeviceCode' },
+    });
+    expect(surface.getSnapshot().authentication.login).toStrictEqual({
+      status: 'pending',
+      loginId: 'device-login',
+      authUrl: 'https://auth.example.test/device',
+      error: null,
+    });
+    account = { type: 'chatgpt', email: 'headless@example.test', planType: 'pro' };
+    transport.emit({
+      method: 'account/login/completed',
+      params: { loginId: 'device-login', success: true, error: null },
+    });
+    await vi.waitFor(() => expect(surface.getSnapshot().authentication).toMatchObject({
+      account: { type: 'chatgpt', email: 'headless@example.test', planType: 'pro' },
+      login: { status: 'completed', loginId: 'device-login', error: null },
+    }));
+    expect(events.filter((event) => event.type === 'authentication.changed').map((event) => (
+      event.payload.authentication.login.status
+    ))).toEqual(expect.arrayContaining(['starting', 'pending', 'completed']));
+    unsubscribe();
+    await surface.close();
+  });
+
+  it('reuses a pending device code until that login is cancelled', async () => {
+    let attempt = 0;
+    const firstAttempt = deferred<unknown>();
+    const transport = new FakeTransport({
+      'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
+      'account/login/start': () => {
+        attempt += 1;
+        if (attempt === 1) return firstAttempt.promise;
+        return {
+          type: 'chatgptDeviceCode',
+          loginId: `device-login-${attempt}`,
+          verificationUrl: `https://auth.example.test/device/${attempt}`,
+          userCode: `CODE-${attempt}`,
+        };
+      },
+      'account/login/cancel': () => ({ status: 'canceled' }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    const firstPromise = surface.startChatGptDeviceCodeLogin();
+    const concurrentPromise = surface.startChatGptDeviceCodeLogin();
+    await vi.waitFor(() => expect(requestsFor(transport, 'account/login/start')).toHaveLength(1));
+    firstAttempt.resolve({
+      type: 'chatgptDeviceCode',
+      loginId: 'device-login-1',
+      verificationUrl: 'https://auth.example.test/device/1',
+      userCode: 'CODE-1',
+    });
+    const [first, concurrent] = await Promise.all([firstPromise, concurrentPromise]);
+    expect(concurrent).toStrictEqual(first);
+    await expect(surface.startChatGptDeviceCodeLogin()).resolves.toStrictEqual(first);
+    expect(requestsFor(transport, 'account/login/start')).toHaveLength(1);
+
+    await surface.cancelLogin(first.loginId);
+    await expect(surface.startChatGptDeviceCodeLogin()).resolves.toMatchObject({
+      loginId: 'device-login-2',
+      userCode: 'CODE-2',
+    });
+    expect(requestsFor(transport, 'account/login/start')).toHaveLength(2);
+    await surface.close();
+  });
+
+  it.each([
+    [
+      { type: 'chatgpt', loginId: 'browser-login', authUrl: 'https://auth.example.test/login' },
+      "unexpected login type 'chatgpt'",
+    ],
+    [
+      {
+        type: 'chatgptDeviceCode', loginId: 'device-login',
+        verificationUrl: 'file:///tmp/device', userCode: 'CODE-1',
+      },
+      "unsupported authentication URL scheme 'file:'",
+    ],
+    [
+      {
+        type: 'chatgptDeviceCode', loginId: 'device-login',
+        verificationUrl: 'https://auth.example.test/device', userCode: '   ',
+      },
+      'empty device user code',
+    ],
+  ])('rejects an invalid device-code login response: %s', async (response, message) => {
+    const transport = new FakeTransport({
+      'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
+      'account/login/start': () => response,
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+
+    await expect(surface.startChatGptDeviceCodeLogin()).rejects.toThrow(message);
+    expect(surface.getSnapshot().authentication.login).toMatchObject({
+      status: 'error', loginId: null, authUrl: null,
+    });
+    await surface.close();
+  });
+
   it('runs a trailing authoritative account refresh when login completes during an older refresh', async () => {
     const staleRefresh = deferred<unknown>();
     let accountReadCount = 0;

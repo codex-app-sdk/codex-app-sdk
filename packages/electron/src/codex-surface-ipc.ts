@@ -9,6 +9,7 @@ import type {
   CodexConversationSummary,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
+  CodexSurfaceChatGptDeviceCodeLogin,
   CodexSurfaceChatGptLogin,
   CodexSurfaceClientRequestResponse,
   CodexSurfaceEvent,
@@ -65,6 +66,7 @@ const channels = {
   selectConversation: 'codex-surface:select-conversation',
   sendMessage: 'codex-surface:send-message',
   startReview: 'codex-surface:start-review',
+  startChatGptDeviceCodeLogin: 'codex-surface:start-chatgpt-device-code-login',
   startChatGptLogin: 'codex-surface:start-chatgpt-login',
   steerMessage: 'codex-surface:steer-message',
   steerQueuedPrompt: 'codex-surface:steer-queued-prompt',
@@ -113,6 +115,7 @@ type SurfaceRequests = {
   [channels.selectConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.sendMessage]: IpcRequest<[prompt: string, options?: CodexRendererSendMessageOptions], CodexSurfaceSnapshot>;
   [channels.startReview]: IpcRequest<[options?: StartCodexReviewOptions], CodexSurfaceSnapshot>;
+  [channels.startChatGptDeviceCodeLogin]: IpcRequest<[], CodexSurfaceChatGptDeviceCodeLogin>;
   [channels.startChatGptLogin]: IpcRequest<[], CodexSurfaceChatGptLogin>;
   [channels.steerMessage]: IpcRequest<[
     prompt: string,
@@ -184,6 +187,7 @@ export function registerCodexSurfaceIpc(
     [channels.selectConversation]: (_event, ...args) => invoke('selectConversation', args),
     [channels.sendMessage]: (_event, ...args) => invoke('sendMessage', args),
     [channels.startReview]: (_event, ...args) => invoke('startReview', args),
+    [channels.startChatGptDeviceCodeLogin]: (_event, ...args) => invoke('startChatGptDeviceCodeLogin', args),
     [channels.startChatGptLogin]: (_event, ...args) => invoke('startChatGptLogin', args),
     [channels.steerMessage]: (_event, ...args) => invoke('steerMessage', args),
     [channels.steerQueuedPrompt]: (_event, ...args) => invoke('steerQueuedPrompt', args),
@@ -236,6 +240,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     selectConversation: (conversationId) => renderer.invoke(channels.selectConversation, conversationId),
     sendMessage: (prompt, options) => renderer.invoke(channels.sendMessage, prompt, options),
     startReview: (options) => renderer.invoke(channels.startReview, options),
+    startChatGptDeviceCodeLogin: () => renderer.invoke(channels.startChatGptDeviceCodeLogin),
     startChatGptLogin: () => renderer.invoke(channels.startChatGptLogin),
     steerMessage: (prompt, options) => renderer.invoke(channels.steerMessage, prompt, options),
     steerQueuedPrompt: (promptId, prompt) => renderer.invoke(channels.steerQueuedPrompt, promptId, prompt),

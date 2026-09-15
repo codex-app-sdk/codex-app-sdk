@@ -47,7 +47,8 @@ describe('Codex surface bridge', () => {
       refreshAccount: [0, 0], refreshConversations: [0, 0], renameConversation: [1, 1],
       respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryTurn: [1, 1],
       selectConversation: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
-      startChatGptLogin: [0, 0], startReview: [0, 1], steerMessage: [1, 2],
+      startChatGptDeviceCodeLogin: [0, 0], startChatGptLogin: [0, 0],
+      startReview: [0, 1], steerMessage: [1, 2],
       steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1], updateConversationSettings: [1, 1],
       updateQueuedPrompt: [2, 2],
     });
@@ -130,6 +131,7 @@ describe('Codex surface bridge', () => {
         }],
       },
       { operation: 'setGoal', args: ['Ship it', 500] },
+      { operation: 'startChatGptDeviceCodeLogin', args: [] },
       { operation: 'startChatGptLogin', args: [] },
       { operation: 'startReview', args: [{ target: { type: 'custom', instructions: 'Focus on errors' } }] },
       { operation: 'steerMessage', args: ['Use the other approach'], expected: ['Use the other approach', undefined] },

@@ -18,7 +18,7 @@ Important fields:
 | `status` | Account catalog state: `notLoaded`, `loading`, `loaded`, or `error` |
 | `account` | Serializable app-server account information, or `null` |
 | `requiresOpenaiAuth` | Whether a null account blocks normal Codex bootstrap |
-| `login` | Current login state, login ID, browser URL, and error |
+| `login` | Current login state, login ID, actionable login URL, and error |
 
 `account: null` and `requiresOpenaiAuth: true` is a normal signed-out state, not
 a transport failure. It lets an application render a dedicated landing page.
@@ -54,6 +54,35 @@ user; never select that identity from a browser-supplied user ID.
 The SDK tracks `account/login/completed`, refreshes account-dependent catalogs
 and conversations, and keeps the same mounted surface usable. The application
 does not need to restart after a successful login.
+
+## Start device-code login
+
+Headless hosts can keep authentication inside the SDK-managed app-server and
+show the user a code and URL through their own UI:
+
+```ts
+const { loginId, verificationUrl, userCode } =
+  await surface.startChatGptDeviceCodeLogin();
+
+showDeviceLogin({ verificationUrl, userCode });
+```
+
+The method sends app-server's `chatgptDeviceCode` login request and returns:
+
+```ts
+type CodexSurfaceChatGptDeviceCodeLogin = {
+  loginId: string;
+  verificationUrl: string;
+  userCode: string;
+};
+```
+
+The host displays those values but never receives or persists ChatGPT tokens.
+The pending URL is also reflected in `authentication.login.authUrl`. Completion,
+errors, cancellation through `cancelLogin(loginId)`, credential persistence in
+the surface's existing `codexHome`, and account-dependent refreshes use the same
+managed lifecycle as browser login. Repeating the operation while its device
+code is pending returns that same login rather than starting another attempt.
 
 ## Cancel or sign out
 

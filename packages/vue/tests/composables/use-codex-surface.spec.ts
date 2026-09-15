@@ -68,6 +68,11 @@ describe('useCodexSurface', () => {
     await surface.interrupt();
     await surface.logout();
     await surface.refreshAccount();
+    await expect(surface.startChatGptDeviceCodeLogin()).resolves.toStrictEqual({
+      loginId: 'device-login-1',
+      verificationUrl: 'https://auth.example.test/device',
+      userCode: 'ABCD-EFGH',
+    });
     await expect(surface.startChatGptLogin()).resolves.toStrictEqual({
       loginId: 'login-1', authUrl: 'https://auth.example.test/login',
     });
@@ -104,6 +109,7 @@ describe('useCodexSurface', () => {
     expect(api.interrupt).toHaveBeenCalledWith();
     expect(api.logout).toHaveBeenCalledWith();
     expect(api.refreshAccount).toHaveBeenCalledWith();
+    expect(api.startChatGptDeviceCodeLogin).toHaveBeenCalledWith();
     expect(api.startChatGptLogin).toHaveBeenCalledWith();
     expect(api.refreshConversations).toHaveBeenCalledWith();
     expect(api.respondToClientRequest).toHaveBeenCalledWith({ id: 'question-1', payload: { answers: {} } });
@@ -406,6 +412,11 @@ function fakeApi(
     selectConversation: vi.fn(async () => readySnapshot),
     sendMessage: vi.fn(async () => readySnapshot),
     startReview: vi.fn(async () => readySnapshot),
+    startChatGptDeviceCodeLogin: vi.fn(async () => ({
+      loginId: 'device-login-1',
+      verificationUrl: 'https://auth.example.test/device',
+      userCode: 'ABCD-EFGH',
+    })),
     startChatGptLogin: vi.fn(async () => ({
       loginId: 'login-1', authUrl: 'https://auth.example.test/login',
     })),

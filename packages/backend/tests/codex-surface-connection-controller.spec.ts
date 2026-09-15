@@ -246,6 +246,7 @@ describe('CodexSurfaceConnectionController', () => {
     const setup = setupConnection();
     setup.state.status = 'ready';
     setup.authentication.refresh.mockResolvedValue('refresh-result');
+    setup.authentication.startChatGptDeviceCodeLogin.mockResolvedValue('device-login-result');
     setup.authentication.startChatGptLogin.mockResolvedValue('login-result');
     setup.authentication.cancelLogin.mockResolvedValue('cancel-result');
     setup.authentication.logout.mockResolvedValue('logout-result');
@@ -254,6 +255,7 @@ describe('CodexSurfaceConnectionController', () => {
     ));
 
     await expect(setup.controller.refreshAccount()).resolves.toBe('refresh-result');
+    await expect(setup.controller.startChatGptDeviceCodeLogin()).resolves.toBe('device-login-result');
     await expect(setup.controller.startChatGptLogin()).resolves.toBe('login-result');
     await expect(setup.controller.cancelLogin('login-1')).resolves.toBe('cancel-result');
     await expect(setup.controller.logout()).resolves.toBe('logout-result');
@@ -411,6 +413,7 @@ function setupConnection(options: Record<string, unknown> = {}) {
     logout: vi.fn(),
     pendingRefresh: vi.fn<() => Promise<void> | null>(() => null),
     refresh: vi.fn(),
+    startChatGptDeviceCodeLogin: vi.fn(),
     startChatGptLogin: vi.fn(),
   };
   const approvals = { denyAll: vi.fn() };

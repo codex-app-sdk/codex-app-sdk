@@ -116,6 +116,11 @@ export function fakeSurfaceApi(snapshot = surfaceSnapshot()) {
     selectConversation: vi.fn(async () => snapshot),
     sendMessage: vi.fn(async (_prompt: string, _options?: CodexRendererSendMessageOptions) => snapshot),
     startReview: vi.fn(async () => snapshot),
+    startChatGptDeviceCodeLogin: vi.fn(async () => ({
+      loginId: 'device-login-relay',
+      verificationUrl: 'https://auth.example.test/device',
+      userCode: 'ABCD-EFGH',
+    })),
     startChatGptLogin: vi.fn(async () => ({
       loginId: 'login-relay',
       authUrl: 'https://auth.example.test/relay',

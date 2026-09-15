@@ -422,6 +422,12 @@ export type CodexSurfaceChatGptLogin = {
   authUrl: string;
 };
 
+export type CodexSurfaceChatGptDeviceCodeLogin = {
+  loginId: string;
+  verificationUrl: string;
+  userCode: string;
+};
+
 export type CodexSurfaceSnapshot = {
   status: CodexSurfaceStatus;
   authentication: CodexSurfaceAuthentication;
@@ -960,6 +966,7 @@ export type CodexSurfaceApi = {
   connect(): Promise<CodexSurfaceSnapshot>;
   refreshAccount(): Promise<CodexSurfaceSnapshot>;
   startChatGptLogin(): Promise<CodexSurfaceChatGptLogin>;
+  startChatGptDeviceCodeLogin(): Promise<CodexSurfaceChatGptDeviceCodeLogin>;
   cancelLogin(loginId?: string): Promise<CodexSurfaceSnapshot>;
   logout(): Promise<CodexSurfaceSnapshot>;
   clearGoal(): Promise<CodexSurfaceSnapshot>;

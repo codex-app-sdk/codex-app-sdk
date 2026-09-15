@@ -239,7 +239,7 @@ export const codexSurfaceBridgeOperations = [
   'listModels', 'loadOlderConversationHistory', 'logout', 'readConversationHistory',
   'readConversationPromptHistory', 'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
   'resolveApproval', 'retryTurn', 'selectConversation', 'sendMessage', 'setGoal',
-  'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
+  'startChatGptDeviceCodeLogin', 'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
   'unarchiveConversation', 'updateConversationSettings', 'updateQueuedPrompt',
 ] as const satisfies readonly CodexSurfaceBridgeOperation[];
 
@@ -256,7 +256,8 @@ export const codexSurfaceBridgeArities: Readonly<
   refreshAccount: [0, 0],
   refreshConversations: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
   resolveApproval: [2, 3], retryTurn: [1, 1], selectConversation: [1, 1],
-  sendMessage: [1, 2], setGoal: [1, 2], startChatGptLogin: [0, 0], startReview: [0, 1],
+  sendMessage: [1, 2], setGoal: [1, 2], startChatGptDeviceCodeLogin: [0, 0],
+  startChatGptLogin: [0, 0], startReview: [0, 1],
   steerMessage: [1, 2], steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1],
   updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 2],
 };
@@ -361,6 +362,7 @@ async function invokeValidated(
       await sendOptions(args[1], options.resolveAttachment),
     );
     case 'setGoal': return target.setGoal(nonEmptyString(args[0], 'Goal objective'), tokenBudget(args[1]));
+    case 'startChatGptDeviceCodeLogin': return target.startChatGptDeviceCodeLogin();
     case 'startChatGptLogin': return target.startChatGptLogin();
     case 'startReview': return target.startReview(reviewOptions(args[0]));
     case 'steerMessage': return target.steerMessage(

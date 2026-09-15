@@ -1,6 +1,7 @@
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexSurfaceAuthentication,
+  CodexSurfaceChatGptDeviceCodeLogin,
   CodexSurfaceChatGptLogin,
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
@@ -27,6 +28,8 @@ export class CodexSurfaceAuthenticationController {
   private accountRefreshForceBootstrap = false;
   private accountRefreshOrigin: CodexSurfaceEventOrigin = 'action';
   private chatGptLoginPromise: Promise<CodexSurfaceChatGptLogin> | null = null;
+  private chatGptDeviceCodeLoginPromise: Promise<CodexSurfaceChatGptDeviceCodeLogin> | null = null;
+  private activeChatGptDeviceCodeLogin: CodexSurfaceChatGptDeviceCodeLogin | null = null;
   private lastLoadedAuthenticationIdentityKey: string | null = null;
 
   constructor(
@@ -73,6 +76,50 @@ export class CodexSurfaceAuthenticationController {
     return start;
   }
 
+  async startChatGptDeviceCodeLogin(): Promise<CodexSurfaceChatGptDeviceCodeLogin> {
+    const current = this.host.getSnapshot().authentication.login;
+    if (
+      current.status === 'pending'
+      && current.loginId === this.activeChatGptDeviceCodeLogin?.loginId
+      && current.authUrl === this.activeChatGptDeviceCodeLogin.verificationUrl
+    ) {
+      return this.activeChatGptDeviceCodeLogin;
+    }
+    if (this.chatGptDeviceCodeLoginPromise) return this.chatGptDeviceCodeLoginPromise;
+    const start = (async () => {
+      this.activeChatGptDeviceCodeLogin = null;
+      this.host.patchAuthentication({
+        login: { status: 'starting', loginId: null, authUrl: null, error: null },
+      }, 'action');
+      try {
+        const response = await this.client.request('account/login/start', { type: 'chatgptDeviceCode' });
+        if (response.type !== 'chatgptDeviceCode') {
+          throw new Error(`Codex account/login/start returned unexpected login type '${response.type}'`);
+        }
+        const loginId = normalizedLoginId(response.loginId);
+        const verificationUrl = safeLoginUrl(response.verificationUrl);
+        const userCode = response.userCode.trim();
+        if (!userCode) throw new Error('Codex account/login/start returned an empty device user code');
+        this.host.patchAuthentication({
+          login: { status: 'pending', loginId, authUrl: verificationUrl, error: null },
+        }, 'action');
+        const login = { loginId, verificationUrl, userCode };
+        this.activeChatGptDeviceCodeLogin = login;
+        return login;
+      } catch (error) {
+        this.host.patchAuthentication({
+          login: { status: 'error', loginId: null, authUrl: null, error: errorMessage(error) },
+        }, 'action');
+        throw error;
+      }
+    })();
+    this.chatGptDeviceCodeLoginPromise = start;
+    void start.finally(() => {
+      this.chatGptDeviceCodeLoginPromise = null;
+    }).catch(() => undefined);
+    return start;
+  }
+
   async cancelLogin(loginId: string): Promise<CodexSurfaceSnapshot> {
     const normalized = normalizedLoginId(loginId);
     const response = await this.client.request('account/login/cancel', { loginId: normalized });
@@ -84,6 +131,7 @@ export class CodexSurfaceAuthenticationController {
         error: null,
       },
     }, 'action');
+    this.activeChatGptDeviceCodeLogin = null;
     return this.host.getSnapshot();
   }
 
@@ -92,6 +140,7 @@ export class CodexSurfaceAuthenticationController {
     this.host.patchAuthentication({
       login: { status: 'idle', loginId: null, authUrl: null, error: null },
     }, 'action');
+    this.activeChatGptDeviceCodeLogin = null;
     const authenticationChanged = await this.load('action');
     if (authenticationChanged || this.blocksBootstrap()) {
       await this.host.clearAuthenticatedSurfaceData();
@@ -171,6 +220,7 @@ export class CodexSurfaceAuthenticationController {
     const current = this.host.getSnapshot().authentication.login;
     const loginId = params.loginId ?? current.loginId;
     if (!params.success) {
+      this.activeChatGptDeviceCodeLogin = null;
       this.host.patchAuthentication({
         login: {
           status: 'error', loginId, authUrl: current.authUrl,
@@ -179,6 +229,7 @@ export class CodexSurfaceAuthenticationController {
       }, 'notification');
       return;
     }
+    this.activeChatGptDeviceCodeLogin = null;
     this.host.patchAuthentication({
       login: { status: 'completed', loginId, authUrl: current.authUrl, error: null },
     }, 'notification');

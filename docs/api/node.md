@@ -207,6 +207,7 @@ must be launched with the feature enabled by its owner.
 
 - `refreshAccount()`
 - `startChatGptLogin()`
+- `startChatGptDeviceCodeLogin()`
 - `cancelLogin(loginId?)`
 - `logout()`
 

@@ -147,6 +147,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     selectConversation: (conversationId: string) => run(() => api.selectConversation(conversationId)),
     sendMessage: (prompt: string, options?: CodexRendererSendMessageOptions) => run(() => api.sendMessage(prompt, options)),
     startReview: (options?: StartCodexReviewOptions) => run(() => api.startReview(options)),
+    startChatGptDeviceCodeLogin: () => api.startChatGptDeviceCodeLogin(),
     startChatGptLogin: () => api.startChatGptLogin(),
     steerMessage: (prompt: string, options?: CodexRendererSendMessageOptions) => run(() => api.steerMessage(prompt, options)),
     steerQueuedPrompt: (promptId: string, prompt?: string) => run(() => api.steerQueuedPrompt(promptId, prompt)),
