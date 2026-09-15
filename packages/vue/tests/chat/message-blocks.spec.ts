@@ -105,7 +105,6 @@ describe('message block computation', () => {
         active: false,
         finalStarted: true,
         blocks: [
-          { type: 'reasoning', content: 'Inspecting the source', phase: 'commentary' },
           { type: 'text', content: 'Checking.', phase: 'commentary' },
           { type: 'tool-group', toolCalls: [completedTool] },
         ],

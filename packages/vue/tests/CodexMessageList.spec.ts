@@ -317,6 +317,7 @@ describe('CodexMessageList', () => {
     expect(wrapper.findAll('.chat-work-group .chat-fold--open')).toHaveLength(1);
     expect(wrapper.text()).toContain('Also check the tests.');
     expect(wrapper.text()).toContain('Keep this in the same turn.');
+    expect(wrapper.text()).toContain('Verifying the shared turn state.');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message__stream-dot')).toHaveLength(1);
 
@@ -346,9 +347,9 @@ describe('CodexMessageList', () => {
     await wrapper.get('.chat-work-group__header').trigger('click');
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
-    expect(wrapper.findAll('.chat-work-group--continuation')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-work-group--continuation')).toHaveLength(1);
     expect(wrapper.text()).toContain('Checking those now.');
-    expect(wrapper.text()).toContain('Verifying the shared turn state.');
+    expect(wrapper.text()).not.toContain('Verifying the shared turn state.');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(3);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(2);

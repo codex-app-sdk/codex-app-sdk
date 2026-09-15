@@ -247,6 +247,20 @@ describe('ChatMessageBlock', () => {
       },
     });
     expect(group.text()).toContain('2 actions done');
+
+    const titled = mount(ChatMessageBlock, {
+      props: {
+        block: {
+          type: 'tool-group',
+          activityTitle: 'Planning targeted filename searches',
+          toolCalls: [tool],
+        },
+      },
+    });
+    expect(titled.get('.chat-tool-group__title').text())
+      .toBe('Planning targeted filename searches · 1 action done');
+    await titled.get('.chat-tool-group__header').trigger('click');
+    expect(titled.get('.chat-tool-group__body').text()).toContain('Ran npm test');
   });
 
   it('keeps the completed counter while showing every active tool below it', async () => {

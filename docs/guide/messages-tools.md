@@ -31,10 +31,14 @@ Codex assistant items can distinguish intermediate `commentary` from the
 reasoning summaries as separate `reasoning` parts. It never exposes raw
 reasoning content.
 
-The stock Vue renderer groups commentary, reasoning summaries, tool calls, and
-generated media under an expanded `Working` section while the turn is active.
-Work blocks retain their chronological order, and the active section cannot be
-collapsed. When the final answer starts, the section becomes
+The stock Vue renderer groups commentary, tool calls, and generated media under
+an expanded `Working` section while the turn is active. The latest reasoning
+summary becomes the active tool-group title, for example
+`Inspecting component contracts · 7 actions done`, instead of rendering as a
+separate transcript row. A newer summary replaces that title. Normal assistant
+text ends the activity group and removes its transient reasoning title, leaving
+only `N actions done`. Work blocks retain their chronological order, and the
+active section cannot be collapsed. When the final answer starts, the section becomes
 `Done · View details` and collapses automatically; the reader can reopen it at
 any time to inspect the tools and generated media. The final answer, including
 images embedded in `final_answer` text, remains visible below it. If structured
@@ -70,8 +74,10 @@ the existing pane error.
 This presentation is capability-by-data rather than provider-specific. Messages
 without explicit phases or reasoning summaries keep the existing flat layout,
 so custom backends do not need to invent a final-answer boundary. Applications
-using the `message-block` slot continue to receive the original leaf blocks;
-the work-group wrapper itself is not passed through that customization slot.
+using the `message-block` slot receive the rendered leaf blocks; the work-group
+wrapper itself is not passed through that customization slot. Reasoning
+summaries used as transient activity titles are represented by the tool-group
+block rather than a separate reasoning block.
 
 ## Image previews
 
@@ -143,6 +149,10 @@ behavior is:
 | First tool is still running | Running tool rows; no `0 actions done` header | Same |
 | Completed and running tools | Counter plus all running rows | Counter, completed rows, then running rows |
 | All tools complete | Counter only | Counter plus completed rows |
+
+While an activity group is current, its latest reasoning summary prefixes the
+counter. A group with a summary but no tool yet shows only that summary. Once
+normal assistant text follows the group, the title returns to the plain counter.
 
 A tool that completes while the group is collapsed remains visible for about
 3 seconds before joining the hidden completed count. This prevents very fast

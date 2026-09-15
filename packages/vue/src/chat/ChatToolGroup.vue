@@ -115,6 +115,7 @@ import { useCodexToolCallDetails } from './tool-call-details'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
+  activityTitle?: string
   answeredClientRequestIds?: ReadonlySet<string>
   showToolDetails?: boolean
   toolCalls: MessageToolCall[]
@@ -146,7 +147,9 @@ const singleConfirmationToolCall = computed(() => {
 })
 const completedToolCalls = computed(() => props.toolCalls.filter((toolCall) => !isActiveToolCall(toolCall)))
 const headerToolCall = computed(() => (
-  isSingleTool.value && completedToolCalls.value.length === 1 ? props.toolCalls[0] : undefined
+  !props.activityTitle && isSingleTool.value && completedToolCalls.value.length === 1
+    ? props.toolCalls[0]
+    : undefined
 ))
 const statusToolCalls = computed(() => props.toolCalls.filter((toolCall) => (
   isActiveToolCall(toolCall)
@@ -159,15 +162,17 @@ const statusToolCalls = computed(() => props.toolCalls.filter((toolCall) => (
 const statusContainerVisible = ref(statusToolCalls.value.length > 0)
 const lineDiff = computed(() => getToolGroupLineDiff(props.toolCalls))
 const canExpand = computed(() => (
-  props.toolCalls.length > 1
+  Boolean(props.activityTitle)
+  || props.toolCalls.length > 1
   || (toolDetailsEnabled.value && props.toolCalls.some(hasToolDetails))
 ))
 const summary = computed(() => {
   if (completedToolCalls.value.length > 0) {
-    return `${formatActions(completedToolCalls.value.length)} done`
+    const completed = `${formatActions(completedToolCalls.value.length)} done`
+    return props.activityTitle ? `${props.activityTitle} · ${completed}` : completed
   }
 
-  return 'No actions'
+  return props.activityTitle ?? 'No actions'
 })
 
 watch(

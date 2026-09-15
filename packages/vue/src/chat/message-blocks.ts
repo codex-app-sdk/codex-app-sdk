@@ -14,7 +14,7 @@ export type MessageBlock =
   | ({ type: 'visualization'; path?: string; title: string } & PhasedMessageBlock)
   | ({ type: 'media'; media: MessageMedia; toolCall?: MessageToolCall } & PhasedMessageBlock)
   | { type: 'tool'; toolCall: MessageToolCall }
-  | { type: 'tool-group'; toolCalls: MessageToolCall[] }
+  | { type: 'tool-group'; toolCalls: MessageToolCall[]; activityTitle?: string }
   | ({ type: 'follow-ups'; prompts: string[] } & PhasedMessageBlock)
 
 export type RenderedMessageBlock = MessageBlock | {
@@ -251,17 +251,32 @@ export function stripMessageContext(content: string) {
 export function groupToolBlocks(blocks: MessageBlock[]): MessageBlock[] {
   const result: MessageBlock[] = []
   let toolGroup: MessageToolCall[] = []
+  let activityTitle: string | undefined
 
-  const flushGroup = () => {
+  const flushGroup = (showActivityTitle = false) => {
     if (toolGroup.length === 0) {
+      if (showActivityTitle && activityTitle) {
+        result.push({ type: 'tool-group', toolCalls: [], activityTitle })
+      }
+      activityTitle = undefined
       return
     }
 
-    result.push({ type: 'tool-group', toolCalls: [...toolGroup] })
+    result.push({
+      type: 'tool-group',
+      toolCalls: [...toolGroup],
+      ...(showActivityTitle && activityTitle ? { activityTitle } : {}),
+    })
     toolGroup = []
+    activityTitle = undefined
   }
 
   for (const block of blocks) {
+    if (block.type === 'reasoning') {
+      activityTitle = reasoningActivityTitle(block.content)
+      continue
+    }
+
     if (block.type === 'tool') {
       if (isUngroupedTool(block.toolCall)) {
         flushGroup()
@@ -277,8 +292,16 @@ export function groupToolBlocks(blocks: MessageBlock[]): MessageBlock[] {
     result.push(block)
   }
 
-  flushGroup()
+  flushGroup(true)
   return result
+}
+
+function reasoningActivityTitle(summary: string) {
+  const trimmed = summary.trim()
+  const emphasized = /^\*\*([\s\S]*)\*\*$/u.exec(trimmed)?.[1]
+    ?? /^__([\s\S]*)__$/u.exec(trimmed)?.[1]
+    ?? trimmed
+  return emphasized.trim().replace(/\s+/gu, ' ')
 }
 
 function isUngroupedTool(toolCall: MessageToolCall) {

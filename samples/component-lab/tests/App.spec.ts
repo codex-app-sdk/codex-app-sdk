@@ -150,6 +150,55 @@ describe('component lab', () => {
     expect(titles.slice(3)).toEqual(['Running npm run build']);
   });
 
+  it('demonstrates reasoning titles only while their tool group is active', async () => {
+    vi.useFakeTimers();
+    const wrapper = mount(App);
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Reasoning activity'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+
+    expect(wrapper.get('.chat-tool-group__title').text())
+      .toBe('Planning targeted filename searches · 2 actions done');
+    expect(wrapper.find('.chat-message-block--reasoning').exists()).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(wrapper.get('.chat-tool-group__title').text())
+      .toBe('Inspecting component contract backend · 3 actions done');
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(wrapper.get('.chat-tool-group__title').text()).toBe('4 actions done');
+    expect(wrapper.text()).toContain('The component contract is clear.');
+    expect(wrapper.text()).not.toContain('Planning targeted filename searches');
+    expect(wrapper.text()).not.toContain('Inspecting component contract backend');
+  });
+
+  it('visibly confirms that the current scenario was reset', async () => {
+    vi.useFakeTimers();
+    const wrapper = mount(App);
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Reasoning activity'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(wrapper.get('.chat-tool-group__title').text())
+      .toBe('Inspecting component contract backend · 3 actions done');
+
+    const resetButton = wrapper.findAll('button')
+      .find((button) => button.text() === 'Reset scenario');
+    expect(resetButton).toBeDefined();
+    await resetButton!.trigger('click');
+
+    expect(wrapper.get('.chat-tool-group__title').text())
+      .toBe('Planning targeted filename searches · 2 actions done');
+    expect(resetButton!.text()).toBe('Reset complete');
+
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(resetButton!.text()).toBe('Reset complete');
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(resetButton!.text()).toBe('Reset scenario');
+  });
+
   it('shows one work disclosure for a turn with multiple steers and assistant segments', async () => {
     const wrapper = mount(App);
     const busyButton = wrapper.findAll('nav button')

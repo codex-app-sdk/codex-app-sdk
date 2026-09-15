@@ -369,9 +369,10 @@ rendering key. The default behavior is identity.
 `CodexChatMessage` preserves the optional `turnId` from `SurfaceMessage`.
 `CodexMessageList` projects adjacent messages with that identity into one
 logical turn. Steering messages remain in chronological order, while all
-assistant commentary, reasoning, tool segments, and generated media share one
-`Working` / `Done` disclosure. Generated media retains its chronological
-position among those work blocks. A transform that returns a `CodexChatMessage` should retain
+assistant commentary, reasoning-aware tool groups, and generated media share
+one `Working` / `Done` disclosure. The latest reasoning summary labels only the
+currently active tool group; normal assistant text removes that transient label.
+Generated media retains its chronological position among those work blocks. A transform that returns a `CodexChatMessage` should retain
 `turnId` for that behavior. A tool-only active segment is treated as structured
 work before the first phased text arrives; unphased messages containing
 ordinary text retain the flat rendering path.

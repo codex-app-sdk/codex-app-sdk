@@ -3,6 +3,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
+import type { SurfaceMessagePart } from '@codex-app-sdk/core/surface';
 import ChatCompactionMessage from '../src/chat/ChatCompactionMessage.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
 import ChatMessageActions from '../src/chat/ChatMessageActions.vue';
@@ -296,7 +297,7 @@ describe('CodexMessage', () => {
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
     expect(wrapper.get('.chat-work-group .chat-fold').classes()).toContain('chat-fold--open');
-    expect(wrapper.get('.chat-message-block--reasoning').text()).toContain('Inspecting the message pipeline');
+    expect(wrapper.find('.chat-message-block--reasoning').exists()).toBe(false);
 
     await wrapper.setProps({
       message: {
@@ -335,6 +336,70 @@ describe('CodexMessage', () => {
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
   });
 
+  it('uses only the latest reasoning summary as the live activity title', async () => {
+    const completedTools: SurfaceMessagePart[] = Array.from({ length: 7 }, (_, index) => ({
+      type: 'tool' as const,
+      id: `completed-tool-${index}`,
+      title: `Completed tool ${index}`,
+      kind: 'command' as const,
+      status: 'completed',
+    }));
+    const runningTool: Extract<SurfaceMessagePart, { type: 'tool' }> = {
+      type: 'tool' as const,
+      id: 'running-tool',
+      title: 'Inspecting component contract backend',
+      kind: 'command' as const,
+      status: 'running',
+    };
+    const activeParts: SurfaceMessagePart[] = [
+      {
+        type: 'reasoning' as const,
+        summary: '**Planning targeted filename searches**',
+        itemId: 'reasoning-1',
+        summaryIndex: 0,
+      },
+      ...completedTools,
+      {
+        type: 'reasoning' as const,
+        summary: '**Inspecting component contract backend**',
+        itemId: 'reasoning-2',
+        summaryIndex: 0,
+      },
+      runningTool,
+    ];
+    const wrapper = mountMessage({
+      message: {
+        id: 'assistant-activity',
+        role: 'assistant',
+        status: 'streaming',
+        parts: activeParts,
+      },
+    });
+
+    expect(wrapper.findAll('.chat-tool-group')).toHaveLength(1);
+    expect(wrapper.get('.chat-tool-group__title').text())
+      .toBe('Inspecting component contract backend · 7 actions done');
+    expect(wrapper.find('.chat-message-block--reasoning').exists()).toBe(false);
+
+    await wrapper.setProps({
+      message: {
+        id: 'assistant-activity',
+        role: 'assistant',
+        status: 'streaming',
+        parts: [
+          ...activeParts.slice(0, -1),
+          { ...runningTool, status: 'completed' },
+          { type: 'text', text: 'The component contract is clear.', phase: 'commentary' },
+        ],
+      },
+    });
+
+    expect(wrapper.findAll('.chat-tool-group')).toHaveLength(1);
+    expect(wrapper.get('.chat-tool-group__title').text()).toBe('8 actions done');
+    expect(wrapper.find('.chat-message-block--reasoning').exists()).toBe(false);
+    expect(wrapper.text()).toContain('The component contract is clear.');
+  });
+
   it('shows completed phased work directly when there is no final answer', () => {
     const wrapper = mountMessage({
       message: {
@@ -367,7 +432,7 @@ describe('CodexMessage', () => {
     expect(wrapper.get('.chat-message-block--text').text()).toBe('Claude response');
   });
 
-  it('keeps phased work wrappers out of the public block slot', () => {
+  it('keeps phased work wrappers and superseded reasoning out of the public block slot', () => {
     const seenTypes: string[] = [];
     const wrapper = mount(CodexMessage, {
       props: {
@@ -399,8 +464,8 @@ describe('CodexMessage', () => {
       },
     });
 
-    expect(seenTypes).toStrictEqual(['reasoning', 'text']);
-    expect(wrapper.find('.custom-reasoning').exists()).toBe(true);
+    expect(seenTypes).toStrictEqual(['text']);
+    expect(wrapper.find('.custom-reasoning').exists()).toBe(false);
     expect(wrapper.find('.custom-text').exists()).toBe(true);
     expect(seenTypes).not.toContain('work-group');
   });

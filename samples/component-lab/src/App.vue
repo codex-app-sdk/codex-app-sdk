@@ -37,7 +37,15 @@
           <h2>{{ selected.title }}</h2>
           <p>{{ selected.description }}</p>
         </div>
-        <button type="button" @click="resetScenario">Reset scenario</button>
+        <button
+          type="button"
+          class="lab__reset"
+          :class="{ 'lab__reset--confirmed': resetConfirmed }"
+          aria-live="polite"
+          @click="resetScenario()"
+        >
+          {{ resetConfirmed ? 'Reset complete' : 'Reset scenario' }}
+        </button>
       </header>
 
       <div class="lab__frame">
@@ -339,6 +347,26 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
+    id: 'reasoning-activity',
+    name: 'Reasoning activity',
+    summary: 'Live reasoning titles become plain action counts',
+    title: 'Reasoning-aware tool group',
+    description: 'The latest app-server reasoning summary titles the active tool group, then disappears when commentary resumes.',
+    activeTurnId: 'reasoning-activity-turn',
+    turns: [{
+      id: 'reasoning-activity-turn', status: 'inProgress', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:04:00Z', completedAt: null, durationMs: null,
+    }],
+    busy: true,
+    messages: [{
+      id: 'reasoning-activity-assistant',
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'reasoning-activity-turn',
+      parts: reasoningActivityParts('planning'),
+    }],
+  },
+  {
     id: 'tool-icons',
     name: 'Tool icon gallery',
     summary: 'Codex actions, a host override, and the generic fallback',
@@ -432,20 +460,36 @@ const activity = ref('Ready');
 const messages = ref<SurfaceMessage[]>([]);
 const mockBusy = ref(false);
 const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
+const resetConfirmed = ref(false);
 const selected = computed<Scenario>(() => scenarios.find((scenario) => scenario.id === selectedId.value) ?? scenarios[0]);
 const streamTimers = new Set<number>();
 const mockAttachments = new Map<string, CodexNativeAttachment>();
+let resetFeedbackTimer: number | undefined;
 
-watch(selected, resetScenario, { immediate: true });
+watch(selected, () => resetScenario(false), { immediate: true });
 
-function resetScenario(): void {
+function resetScenario(confirmReset = true): void {
   clearMockStream();
+  clearResetFeedback();
   draft.value = '';
   messages.value = selected.value.messages.map((message) => ({ ...message, parts: [...message.parts] }));
   mockBusy.value = selected.value.busy ?? false;
   answeredClientRequestIds.value = new Set();
-  activity.value = 'Scenario reset';
+  activity.value = confirmReset ? 'Scenario reset' : 'Scenario loaded';
+  if (confirmReset) showResetFeedback();
   if (selected.value.id === 'busy') startBusyToolCompletion();
+  if (selected.value.id === 'reasoning-activity') startReasoningActivityLifecycle();
+}
+
+function showResetFeedback(): void {
+  resetConfirmed.value = true;
+  resetFeedbackTimer = window.setTimeout(clearResetFeedback, 2_500);
+}
+
+function clearResetFeedback(): void {
+  if (resetFeedbackTimer !== undefined) window.clearTimeout(resetFeedbackTimer);
+  resetFeedbackTimer = undefined;
+  resetConfirmed.value = false;
 }
 
 function respondToClientRequest(response: ClientRequestResponse): void {
@@ -498,6 +542,73 @@ function startBusyToolCompletion(): void {
     activity.value = 'Quick search completed';
   }, 600);
   streamTimers.add(timer);
+}
+
+function startReasoningActivityLifecycle(): void {
+  const inspectTimer = window.setTimeout(() => {
+    streamTimers.delete(inspectTimer);
+    updateReasoningActivity(reasoningActivityParts('inspecting'));
+    activity.value = 'Reasoning title updated';
+  }, 5_000);
+  const commentaryTimer = window.setTimeout(() => {
+    streamTimers.delete(commentaryTimer);
+    updateReasoningActivity(reasoningActivityParts('commentary'));
+    activity.value = 'Reasoning title cleared';
+  }, 10_000);
+  streamTimers.add(inspectTimer);
+  streamTimers.add(commentaryTimer);
+}
+
+function updateReasoningActivity(parts: SurfaceMessagePart[]): void {
+  messages.value = messages.value.map((message) => message.id === 'reasoning-activity-assistant'
+    ? { ...message, parts }
+    : message);
+}
+
+function reasoningActivityParts(stage: 'planning' | 'inspecting' | 'commentary'): SurfaceMessagePart[] {
+  const parts: SurfaceMessagePart[] = [
+    {
+      type: 'reasoning',
+      itemId: 'reasoning-activity-planning',
+      summaryIndex: 0,
+      summary: '**Planning targeted filename searches**',
+    },
+    {
+      type: 'tool', id: 'reasoning-activity-read', title: 'Read settings view', kind: 'command', status: 'completed',
+      statusText: JSON.stringify({ source: 'codex', action: 'read', phase: 'completed', params: { target: 'SettingsView.vue' } }),
+    },
+    {
+      type: 'tool', id: 'reasoning-activity-search', title: 'Search source', kind: 'search', status: 'completed',
+      statusText: JSON.stringify({ source: 'codex', action: 'search', phase: 'completed', params: { target: 'remote connection version' } }),
+    },
+    {
+      type: 'tool', id: 'reasoning-activity-find', title: 'Find connection components', kind: 'search',
+      status: stage === 'planning' ? 'running' : 'completed',
+      statusText: JSON.stringify({
+        source: 'codex', action: 'search', phase: stage === 'planning' ? 'running' : 'completed',
+        params: { target: 'Remote Codex Claw agents' },
+      }),
+    },
+  ];
+  if (stage === 'planning') return parts;
+
+  parts.push({
+    type: 'reasoning',
+    itemId: 'reasoning-activity-inspecting',
+    summaryIndex: 0,
+    summary: '**Inspecting component contract backend**',
+  }, {
+    type: 'tool', id: 'reasoning-activity-explore', title: 'Explore connection contracts', kind: 'command',
+    status: stage === 'inspecting' ? 'running' : 'completed',
+    statusText: JSON.stringify({
+      source: 'codex', action: 'explore', phase: stage === 'inspecting' ? 'running' : 'completed',
+      params: { target: 'core/src/contracts/connections.ts' },
+    }),
+  });
+  if (stage === 'commentary') {
+    parts.push({ type: 'text', text: 'The component contract is clear.', phase: 'commentary' });
+  }
+  return parts;
 }
 
 function submitPrompt(prompt: string, options?: CodexRendererSendMessageOptions): void {
@@ -591,5 +702,8 @@ function clearMockStream(): void {
   streamTimers.clear();
 }
 
-onBeforeUnmount(clearMockStream);
+onBeforeUnmount(() => {
+  clearMockStream();
+  clearResetFeedback();
+});
 </script>

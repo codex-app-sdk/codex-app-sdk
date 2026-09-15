@@ -63,6 +63,7 @@
   </slot>
   <slot v-else-if="block.type === 'tool-group'" name="tool" :block="block" :tool-calls="block.toolCalls">
     <ChatToolGroup
+      :activity-title="block.activityTitle"
       :answered-client-request-ids="answeredClientRequestIds"
       :show-tool-details="showToolDetails"
       :tool-calls="block.toolCalls"
