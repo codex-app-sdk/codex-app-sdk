@@ -58,7 +58,9 @@ const completedWithoutFinal = computed(() => (
 const localExpanded = ref(props.active && !props.finalStarted)
 const userToggled = ref(false)
 const active = computed(() => (
-  (usesTurn.value ? assistantWorkTurn!.active.value : props.active) && !props.finalStarted
+  usesTurn.value
+    ? assistantWorkTurn!.active.value
+    : props.active && !props.finalStarted
 ))
 const expanded = computed(() => (
   active.value

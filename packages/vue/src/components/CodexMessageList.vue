@@ -19,9 +19,7 @@
           :key="group.key"
           :entries="group.entries"
           :answered-client-request-ids="answeredClientRequestIds"
-          :active="activeTurnId === undefined
-            ? undefined
-            : group.turnId !== undefined && group.turnId === activeTurnId"
+          :active="activeOverrideForGroup(group)"
           :show-tool-blocks="effectivePresentation.messages.toolBlocks"
           :turn-id="group.turnId"
         >
@@ -309,13 +307,26 @@ const displayGroups = computed(() => {
   }
   return groups
 })
+
+function activeOverrideForGroup(group: (typeof displayGroups.value)[number]): boolean | undefined {
+  if (props.busy && group.entries.some(({ index, message }) => (
+    index < props.messages.length
+    && message.role === 'assistant'
+    && chatMessageFromInput(message).streaming === true
+  ))) return true
+  if (props.activeTurnId === undefined) return undefined
+  return group.turnId !== undefined && group.turnId === props.activeTurnId
+}
 const inferredActiveTurnId = computed(() => {
-  if (props.activeTurnId !== undefined) return props.activeTurnId
-  return [...props.messages]
-    .reverse()
-    .map(chatMessageFromInput)
-    .find((message) => message.role === 'assistant' && message.streaming)
-    ?.turnId?.trim() || null
+  if (props.activeTurnId !== undefined && props.activeTurnId !== null) return props.activeTurnId
+  const streamingTurnId = props.busy
+    ? [...props.messages]
+        .reverse()
+        .map(chatMessageFromInput)
+        .find((message) => message.role === 'assistant' && message.streaming)
+        ?.turnId?.trim()
+    : undefined
+  return streamingTurnId || null
 })
 const turnStatusById = computed(() => new Map(
   props.turns?.map((turn) => [turn.id, turn.status] as const) ?? [],

@@ -45,7 +45,7 @@
           v-model="draft"
           :active-turn-id="selected.activeTurnId"
           :answered-client-request-ids="answeredClientRequestIds"
-          :busy="selected.busy"
+          :busy="mockBusy"
           :context-usage="selected.contextUsage"
           :conversation-key="selected.id"
           :empty-description="selected.description"
@@ -216,6 +216,11 @@ const scenarios: [Scenario, ...Scenario[]] = [
     summary: 'A non-blocking question from an agent message',
     title: 'Codex needs a decision',
     description: 'The question remains actionable after the turn that asked it has completed.',
+    activeTurnId: null,
+    turns: [{
+      id: 'async-question-turn', status: 'completed', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:00:00Z', completedAt: '2026-08-01T12:00:01Z', durationMs: 1_000,
+    }],
     messages: [{
       id: 'async-question-message',
       role: 'assistant',
@@ -425,6 +430,7 @@ const theme = ref<'light' | 'dark' | 'system'>('light');
 const draft = ref('');
 const activity = ref('Ready');
 const messages = ref<SurfaceMessage[]>([]);
+const mockBusy = ref(false);
 const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
 const selected = computed<Scenario>(() => scenarios.find((scenario) => scenario.id === selectedId.value) ?? scenarios[0]);
 const streamTimers = new Set<number>();
@@ -436,6 +442,7 @@ function resetScenario(): void {
   clearMockStream();
   draft.value = '';
   messages.value = selected.value.messages.map((message) => ({ ...message, parts: [...message.parts] }));
+  mockBusy.value = selected.value.busy ?? false;
   answeredClientRequestIds.value = new Set();
   activity.value = 'Scenario reset';
   if (selected.value.id === 'busy') startBusyToolCompletion();
@@ -443,6 +450,11 @@ function resetScenario(): void {
 
 function respondToClientRequest(response: ClientRequestResponse): void {
   answeredClientRequestIds.value = new Set([...answeredClientRequestIds.value, response.id]);
+  const requestTurnId = messages.value.flatMap((message) => message.parts)
+    .flatMap((part) => part.type === 'question' && part.request.id === response.id
+      ? [part.request.turnId]
+      : [])
+    .at(0);
   const answers = response.payload?.answers ?? {};
   const answerText = Object.values(answers)
     .flatMap((answer) => answer.answers)
@@ -451,13 +463,16 @@ function respondToClientRequest(response: ClientRequestResponse): void {
   if (answerText) {
     messages.value.push({
       id: `mock-answer-${messages.value.length}`,
+      kind: requestTurnId ? 'steer' : undefined,
       role: 'user',
       status: 'complete',
+      turnId: requestTurnId,
       createdAt: new Date().toISOString(),
       parts: [{ type: 'text', text: answerText }],
     });
   }
   activity.value = answerText ? `Answered: ${answerText}` : 'Question dismissed';
+  if (answerText && requestTurnId) startMockStream(requestTurnId);
 }
 
 function startBusyToolCompletion(): void {
@@ -538,13 +553,15 @@ function arrayBufferToBase64(value: ArrayBuffer): string {
   return btoa(binary);
 }
 
-function startMockStream(): void {
+function startMockStream(turnId?: string): void {
   clearMockStream();
+  mockBusy.value = true;
   const id = `mock-assistant-${messages.value.length}`;
   messages.value.push({
     id,
     role: 'assistant',
     status: 'streaming',
+    turnId,
     parts: [{ type: 'text', text: '', phase: 'commentary' }],
   });
   const chunks = ['Mock response: ', 'the composer accepted the prompt ', 'and streamed this deterministic reply.'];
@@ -562,6 +579,7 @@ function startMockStream(): void {
         status: index === chunks.length - 1 ? 'complete' : 'streaming',
         parts: [{ type: 'text', text, phase: index === chunks.length - 1 ? 'final_answer' : 'commentary' }],
       };
+      if (index === chunks.length - 1) mockBusy.value = false;
       activity.value = index === chunks.length - 1 ? 'Mock stream completed' : 'Streaming mock response…';
     }, 300 * (index + 1));
     streamTimers.add(timer);

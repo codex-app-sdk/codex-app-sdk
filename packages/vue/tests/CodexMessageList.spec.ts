@@ -404,6 +404,73 @@ describe('CodexMessageList', () => {
     expect(idle.text()).toContain('Checking.');
   });
 
+  it('reopens a completed turn when an async answer resumes assistant streaming', async () => {
+    const completedMessages: SurfaceMessage[] = [{
+      id: 'assistant-before-async-answer',
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'turn-async-answer',
+      parts: [
+        { type: 'text', text: 'I need one detail first.', phase: 'commentary' },
+        { type: 'text', text: 'Choose where to run it.', phase: 'final_answer' },
+      ],
+    }];
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: null,
+        busy: false,
+        messages: completedMessages,
+        turns: [turnLifecycle('turn-async-answer', 'completed')],
+      },
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
+
+    const resumedMessages: SurfaceMessage[] = [
+      ...completedMessages,
+      {
+        id: 'async-answer',
+        kind: 'steer',
+        role: 'user',
+        status: 'complete',
+        turnId: 'turn-async-answer',
+        parts: [{ type: 'text', text: 'Run it locally.' }],
+      },
+      {
+        id: 'assistant-after-async-answer',
+        role: 'assistant',
+        status: 'streaming',
+        turnId: 'turn-async-answer',
+        parts: [{ type: 'text', text: 'Preparing the local workflow.', phase: 'commentary' }],
+      },
+    ];
+    await wrapper.setProps({ busy: true, messages: resumedMessages });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
+    expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('true');
+    expect(wrapper.get('.chat-work-group__header').attributes()).toHaveProperty('disabled');
+    expect(wrapper.text()).toContain('Preparing the local workflow.');
+
+    const finishedMessages: SurfaceMessage[] = resumedMessages.map((message) => (
+      message.id === 'assistant-after-async-answer'
+        ? {
+            ...message,
+            status: 'complete',
+            parts: [
+              ...message.parts,
+              { type: 'text', text: 'The local workflow is ready.', phase: 'final_answer' },
+            ],
+          }
+        : message
+    ));
+    await wrapper.setProps({ busy: false, messages: finishedMessages });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
+    expect(wrapper.text()).toContain('The local workflow is ready.');
+  });
+
   it('keeps unphased streaming text and tools on the flat rendering path', () => {
     const wrapper = mount(CodexMessageList, {
       props: {

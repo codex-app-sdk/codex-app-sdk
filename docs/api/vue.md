@@ -378,9 +378,12 @@ ordinary text retain the flat rendering path.
 
 Pass `activeTurnId` and `turns` when controlling the list, or put them in
 `controller.state.identity`. Surface-bound panes wire both automatically.
-`activeTurnId` is authoritative for `Working`; `busy` remains the broader
-conversation-level pending state used by the composer and Thinking placeholder.
-An active `Working` disclosure is always expanded and cannot be collapsed.
+`activeTurnId` is authoritative for completed message groups; `busy` remains
+the broader conversation-level pending state used by the composer and Thinking
+placeholder. A real streaming assistant segment reopens its own turn even when
+the provider has not restored `activeTurnId` yet, including after an asynchronous
+question answer resumes a previously completed turn. An active `Working`
+disclosure is always expanded and cannot be collapsed.
 
 Pass `busy` to `CodexMessageList` (the conversation pane wires this from its
 surface state) to keep a `Thinking` shimmer visible while a turn is accepted

@@ -48,8 +48,11 @@ shared `Working` section open until the next assistant segment arrives.
 Steering can split one active turn into multiple assistant message segments.
 `CodexMessageList` correlates adjacent segments by `turnId` and renders one
 shared disclosure for the logical turn. Steer bubbles stay in chronological
-order while work is active. Earlier and later work segments expand together,
-then fold together with the steer bubbles when a final answer starts. Reopening
+order while work is active. Answering an asynchronous question can similarly
+resume the same turn after it was completed; the next streaming segment changes
+the shared disclosure back to `Working` so new output is never hidden behind the
+older `Done` state. Earlier and later work segments expand together, then fold
+together with the steer bubbles when a final answer starts. Reopening
 `Done · View details` reveals both the work and its steers. If a completed turn
 has no final answer, its work stays visible directly without a disclosure
 header, while its completed steer bubbles remain hidden. Work-only segments do

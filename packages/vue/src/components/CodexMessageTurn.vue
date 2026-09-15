@@ -41,8 +41,25 @@ const turnId = computed(() => props.turnId)
 const phased = computed(() => messages.value.some(({ message }) => (
   message.role === 'assistant' && hasExplicitAssistantWorkPhases(message)
 )))
-const finalStarted = computed(() => messages.value.some(({ message }) => (
-  message.role === 'assistant' && (message.parts?.some((part) => (
+const latestStreamingAssistantIndex = computed(() => [...messages.value]
+  .reverse()
+  .find(({ message }) => message.role === 'assistant' && message.streaming === true)
+  ?.entry.index)
+const latestStreamingWorkIndex = computed(() => props.active === false
+  ? undefined
+  : [...messages.value]
+      .reverse()
+      .find(({ message }) => (
+        message.role === 'assistant'
+        && message.streaming === true
+        && (message.parts?.length ?? 0) > 0
+      ))
+      ?.entry.index)
+const finalStarted = computed(() => messages.value.some(({ entry, message }) => (
+  message.role === 'assistant'
+  && (latestStreamingWorkIndex.value === undefined
+    || entry.index >= latestStreamingWorkIndex.value)
+  && (message.parts?.some((part) => (
     part.type === 'text'
       && part.phase === 'final_answer'
       && part.content.trim().length > 0
@@ -52,10 +69,6 @@ const active = computed(() => !finalStarted.value && (props.active ?? messages.v
   message.role === 'assistant' && message.streaming === true
 ))))
 const completedWithoutFinal = computed(() => phased.value && !active.value && !finalStarted.value)
-const latestStreamingAssistantIndex = computed(() => [...messages.value]
-  .reverse()
-  .find(({ message }) => message.role === 'assistant' && message.streaming === true)
-  ?.entry.index)
 const headerMessageIndex = computed(() => messages.value.find(({ message }) => (
   message.role === 'assistant' && shouldGroupMessageWork(message)
 ))?.entry.index)

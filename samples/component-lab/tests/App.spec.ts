@@ -7,6 +7,7 @@ import App from '../src/App.vue';
 describe('component lab', () => {
   afterEach(() => vi.useRealTimers());
   it('exercises an asynchronous agent question through the controlled pane', async () => {
+    vi.useFakeTimers();
     const wrapper = mount(App);
     const scenarioButton = wrapper.findAll('nav button')
       .find((button) => button.text().includes('Async question'));
@@ -23,7 +24,11 @@ describe('component lab', () => {
     await send!.trigger('click');
 
     expect(wrapper.text()).toContain('Answered: Vue');
+    await vi.advanceTimersByTimeAsync(300);
     expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Vue');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
+    expect(wrapper.get('.chat-work-group__header').attributes()).toHaveProperty('disabled');
+    expect(wrapper.text()).toContain('Mock response:');
   });
   it('shows text-only asynchronous questions as an immediately focused field', async () => {
     const wrapper = mount(App, { attachTo: document.body });
