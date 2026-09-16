@@ -30,6 +30,45 @@ describe('CodexSurfaceItemsController', () => {
     }));
   });
 
+  it('promotes a completed Plan-mode final answer into the plan document lifecycle', () => {
+    const setup = itemController();
+    setup.runtime.planMode = true;
+    const markdown = '# Proposed plan\n\n- Build it';
+    const taggedPlan = `<proposed_plan>\n${markdown}\n</proposed_plan>`;
+
+    setup.controller.applyAgentDelta({
+      threadId: 'thread-1', turnId: 'turn-1', itemId: 'agent-plan', delta: taggedPlan,
+    });
+
+    setup.controller.applyItem(item('agentMessage', {
+      id: 'agent-plan',
+      text: taggedPlan,
+      phase: 'final_answer',
+    }), true);
+
+    expect(setup.runtime.messages).toStrictEqual([expect.objectContaining({
+      parts: [expect.objectContaining({
+        type: 'tool',
+        id: 'plan-progress-turn-1',
+        status: 'completed',
+        body: markdown,
+        metadata: { planProgress: true },
+      })],
+    })]);
+    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', {
+      type: 'message.updated',
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      payload: { message: setup.runtime.messages[0] },
+    });
+    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', {
+      type: 'plan.completed',
+      conversationId: 'thread-1',
+      turnId: 'turn-1',
+      payload: { itemId: 'agent-plan', markdown },
+    });
+  });
+
   it('handles empty agent/review text and plan lifecycle boundaries', () => {
     const setup = itemController();
     setup.controller.applyItem(item('agentMessage', { id: 'empty-agent', text: '' }), true);
@@ -244,6 +283,16 @@ describe('CodexSurfaceItemsController', () => {
       ],
     });
     expect(setup.runtime.planMarkdownByTurn.get('turn-1')).toBe('Updated\n- [x] Done\n- [ ] Next');
+    expect(setup.runtime.executionPlan).toStrictEqual({
+      turnId: 'turn-1',
+      explanation: '  Updated  ',
+      steps: [
+        { step: 'Done', status: 'completed' },
+        { step: 'Next', status: 'inProgress' },
+      ],
+      markdown: 'Updated\n- [x] Done\n- [ ] Next',
+      updatedAt: expect.any(String),
+    });
     expect(setup.runtime.messages[0]?.parts[0]).toMatchObject({
       type: 'tool', id: 'plan-progress-turn-1', kind: 'generic', title: 'plan',
       status: 'completed', body: 'Updated\n- [x] Done\n- [ ] Next', metadata: { planProgress: true },

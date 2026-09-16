@@ -307,6 +307,7 @@ function historyReplacementState(runtime: ThreadRuntimeState) {
     busy: runtime.busy,
     contextUsage: runtime.contextUsage,
     error: runtime.error,
+    executionPlan: runtime.executionPlan,
     historyLoading: runtime.historyLoading,
     historyState: runtimeHistoryState(runtime),
     turnGitDiff: runtime.turnGitDiff,

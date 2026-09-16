@@ -52,6 +52,7 @@ Event families cover:
 - `message.*`
 - `turn.*`
 - `tool.*`
+- `plan.*`
 - `file.activity`
 - `subagent.*`
 - `approval.*`
@@ -61,6 +62,13 @@ Event families cover:
 `phase: 'commentary' | 'final_answer'`. Completed reasoning summaries arrive
 through the full message carried by `message.updated`, avoiding a second
 streaming protocol for reasoning content.
+
+`plan.updated` carries the structured execution-plan explanation and steps.
+Applying it to a `CodexConversationReplica` also refreshes the snapshot's
+`executionPlan`; `plan.delta` and `plan.completed` continue to represent the
+separate plan-document tool stream. Plan-mode final answers wrapped in
+`<proposed_plan>` are normalized into that same plan-document lifecycle rather
+than exposed as tagged assistant text.
 
 A locally submitted prompt is first published optimistically through
 `message.appended`. After `turn/start` returns, `message.updated` republishes

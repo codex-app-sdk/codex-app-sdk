@@ -189,6 +189,30 @@ export function upsertAssistantText(
   return pruneEmptyAssistantPlaceholders(ensured, threadId);
 }
 
+export function removeAssistantText(
+  messages: readonly SurfaceMessage[],
+  threadId: string,
+  turnId: string,
+  itemId: string,
+): SurfaceMessage[] {
+  const next = messages.map((message) => {
+    if (message.role !== 'assistant' || message.metadata?.turnId !== turnId) return message;
+    const parts = message.parts.filter((part) => part.type !== 'text' || part.itemId !== itemId);
+    return parts.length === message.parts.length ? message : { ...message, parts };
+  });
+  return pruneEmptyAssistantPlaceholders(next, threadId);
+}
+
+export function extractProposedPlanDocument(text: string): { markdown: string; visibleText: string } | null {
+  const match = /<proposed_plan>([\s\S]*?)<\/proposed_plan>/iu.exec(text);
+  const markdown = match?.[1]?.trim() ?? '';
+  if (!match || !markdown) return null;
+  return {
+    markdown,
+    visibleText: `${text.slice(0, match.index)}${text.slice(match.index + match[0].length)}`.trim(),
+  };
+}
+
 export function upsertAssistantToolPart(
   messages: readonly SurfaceMessage[],
   threadId: string,

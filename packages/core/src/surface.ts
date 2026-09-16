@@ -453,6 +453,8 @@ export type CodexSurfaceSnapshot = {
   /** Selected app-server service tier. Optional for backwards-compatible snapshots. */
   selectedServiceTier?: string | null;
   planMode: boolean;
+  /** Latest structured execution plan. Optional for backwards-compatible snapshots. */
+  executionPlan?: CodexSurfaceExecutionPlan | null;
   contextUsage: CodexSurfaceContextUsage | null;
   goal: CodexSurfaceGoal | null;
   turnGitDiff: CodexSurfaceTurnGitDiff | null;
@@ -478,6 +480,7 @@ export type CodexConversationHistoryReplacementState = Pick<
   | 'busy'
   | 'contextUsage'
   | 'error'
+  | 'executionPlan'
   | 'historyLoading'
   | 'historyState'
   | 'turnGitDiff'
@@ -518,6 +521,13 @@ export type CodexSurfacePlanStepStatus = 'pending' | 'inProgress' | 'completed';
 export type CodexSurfacePlanStep = {
   step: string;
   status: CodexSurfacePlanStepStatus;
+};
+export type CodexSurfaceExecutionPlan = {
+  turnId: string;
+  explanation: string | null;
+  steps: readonly CodexSurfacePlanStep[];
+  markdown: string;
+  updatedAt: string;
 };
 export type CodexSurfaceSubagentItemLifecycle = 'started' | 'completed';
 export type CodexSurfaceSubagentTool =

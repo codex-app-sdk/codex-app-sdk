@@ -29,6 +29,7 @@ export type ThreadRuntimeState = {
   selectedReasoningEffort: string | null;
   selectedServiceTier: string | null;
   planMode: boolean;
+  executionPlan: CodexSurfaceSnapshot['executionPlan'];
   contextUsage: CodexSurfaceSnapshot['contextUsage'];
   goal: CodexSurfaceSnapshot['goal'];
   turnGitDiff: CodexSurfaceSnapshot['turnGitDiff'];
@@ -79,6 +80,7 @@ export function initialSurfaceSnapshot(authentication: CodexSurfaceAuthenticatio
     selectedReasoningEffort: null,
     selectedServiceTier: null,
     planMode: false,
+    executionPlan: null,
     contextUsage: null,
     goal: null,
     turnGitDiff: null,
@@ -120,6 +122,7 @@ export function createThreadRuntime(
     selectedReasoningEffort: state.selectedReasoningEffort,
     selectedServiceTier: state.selectedServiceTier ?? null,
     planMode: false,
+    executionPlan: null,
     contextUsage: null,
     goal: null,
     turnGitDiff: null,
@@ -155,6 +158,7 @@ export function runtimeProjection(
   | 'clientRequests'
   | 'contextUsage'
   | 'error'
+  | 'executionPlan'
   | 'goal'
   | 'historyLoading'
   | 'historyState'
@@ -204,6 +208,7 @@ export function runtimeProjection(
     clientRequests: projectedClientRequests,
     contextUsage: runtime.contextUsage,
     error: runtime.error,
+    executionPlan: runtime.executionPlan,
     goal: runtime.goal,
     historyLoading: runtime.historyLoading,
     historyState: {

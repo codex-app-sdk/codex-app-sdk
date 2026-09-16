@@ -11,6 +11,31 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 describe('Codex conversation replica', () => {
+  it('projects structured execution plans into the conversation snapshot', () => {
+    const replica = createCodexConversationReplica(snapshot());
+
+    apply(replica, event('plan.updated', 'turn-plan', {
+      explanation: 'Ship the fix',
+      steps: [
+        { step: 'Add the regression test', status: 'completed' },
+        { step: 'Render the plan panel', status: 'inProgress' },
+      ],
+      markdown: 'Ship the fix\n- [x] Add the regression test\n- [ ] Render the plan panel',
+      status: 'completed',
+    }));
+
+    expect(replica.getSnapshot().executionPlan).toStrictEqual({
+      turnId: 'turn-plan',
+      explanation: 'Ship the fix',
+      steps: [
+        { step: 'Add the regression test', status: 'completed' },
+        { step: 'Render the plan panel', status: 'inProgress' },
+      ],
+      markdown: 'Ship the fix\n- [x] Add the regression test\n- [ ] Render the plan panel',
+      updatedAt: '2026-09-06T20:00:00.000Z',
+    });
+  });
+
   it('applies streaming events with structural sharing instead of receiving another full snapshot', () => {
     const oldMessage = userMessage('old-user', 'Earlier', 'turn-old');
     const replica = createCodexConversationReplica(snapshot({

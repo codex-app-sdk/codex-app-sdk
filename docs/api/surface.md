@@ -30,6 +30,7 @@ type CodexSurfaceSnapshot = {
   selectedReasoningEffort: string | null;
   selectedServiceTier?: string | null;
   planMode: boolean;
+  executionPlan?: CodexSurfaceExecutionPlan | null;
   contextUsage: CodexSurfaceContextUsage | null;
   goal: CodexSurfaceGoal | null;
   turnGitDiff: CodexSurfaceTurnGitDiff | null;
@@ -52,6 +53,23 @@ from message streaming flags.
 `CodexConversationSnapshot` narrows the conversation ID to non-null and adds
 `turnIds`, the chronological IDs of all turns known to that conversation
 runtime. The `turns` array follows that same chronological order.
+
+`executionPlan` is the latest structured plan reported by Codex's execution
+planning tool. It carries the owning `turnId`, optional explanation, ordered
+step statuses, rendered Markdown, and update timestamp. Conversation replicas
+update it from `plan.updated`; hosts can render plan progress without parsing a
+generic tool part. The field is optional only for compatibility with snapshots
+created by older SDK versions.
+
+```ts
+type CodexSurfaceExecutionPlan = {
+  turnId: string;
+  explanation: string | null;
+  steps: readonly CodexSurfacePlanStep[];
+  markdown: string;
+  updatedAt: string;
+};
+```
 
 Conversation summaries include optional `sessionId`, `parentConversationId`,
 `agentNickname`, and `agentRole` fields for hosts that present app-server

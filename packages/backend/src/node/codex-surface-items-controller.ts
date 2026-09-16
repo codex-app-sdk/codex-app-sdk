@@ -27,9 +27,11 @@ import {
   appendAssistantTextDelta,
   appendCompactionMarker,
   ensureAssistantTurnMessage,
+  extractProposedPlanDocument,
   finalizeTurnToolParts,
   formatPlanMarkdown,
   planProgressToolPart,
+  removeAssistantText,
   surfaceMediaPartsEqual,
   updateAssistantToolPart,
   upsertAssistantMediaPart,
@@ -143,8 +145,16 @@ export class CodexSurfaceItemsController {
     const runtime = this.host.requireRuntime(params.threadId);
     this.host.markRuntimeTurnActive(runtime, params.turnId);
     const markdown = formatPlanMarkdown(params.explanation, params.plan);
+    const updatedAt = new Date().toISOString();
     runtime.planMarkdownByTurn.set(params.turnId, markdown);
     this.host.patchRuntime(params.threadId, {
+      executionPlan: {
+        turnId: params.turnId,
+        explanation: params.explanation,
+        steps: structuredClone(params.plan),
+        markdown,
+        updatedAt,
+      },
       messages: upsertAssistantToolPart(
         runtime.messages, params.threadId, params.turnId,
         planProgressToolPart(params.turnId, markdown, 'completed'),
@@ -283,6 +293,47 @@ export class CodexSurfaceItemsController {
         payload: { message: structuredClone(message) },
       });
       return;
+    }
+
+    if (
+      params.item.type === 'agentMessage'
+      && completed
+      && runtime.planMode
+      && params.item.phase === 'final_answer'
+    ) {
+      const proposedPlan = extractProposedPlanDocument(params.item.text);
+      if (proposedPlan) {
+        const previousMessage = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+        let messages = removeAssistantText(
+          runtime.messages, params.threadId, params.turnId, params.item.id,
+        );
+        if (proposedPlan.visibleText) {
+          messages = upsertAssistantText(
+            messages, params.threadId, params.turnId, params.item.id,
+            proposedPlan.visibleText, params.item.phase,
+          );
+        }
+        messages = upsertAssistantToolPart(
+          messages, params.threadId, params.turnId,
+          planProgressToolPart(params.turnId, proposedPlan.markdown, 'completed'),
+        );
+        runtime.planMarkdownByTurn.set(params.turnId, proposedPlan.markdown);
+        this.host.patchRuntime(params.threadId, { messages });
+        const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+        if (message) {
+          this.host.emitEvent('notification', {
+            type: previousMessage ? 'message.updated' : 'message.appended',
+            conversationId: params.threadId,
+            turnId: params.turnId,
+            payload: { message: structuredClone(message) },
+          });
+        }
+        this.host.emitEvent('notification', {
+          type: 'plan.completed', conversationId: params.threadId, turnId: params.turnId,
+          payload: { itemId: params.item.id, markdown: proposedPlan.markdown },
+        });
+        return;
+      }
     }
 
     if (params.item.type === 'agentMessage' || params.item.type === 'exitedReviewMode') {

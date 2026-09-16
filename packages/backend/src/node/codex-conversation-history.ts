@@ -12,7 +12,10 @@ import type {
   SurfaceMessageQuestionPart,
 } from '@codex-app-sdk/core/surface';
 import { codexThreadItemToToolPart } from './codex-tool-part-adapter';
-import { finalizeTurnToolParts } from './codex-surface-message-state';
+import {
+  extractProposedPlanDocument,
+  finalizeTurnToolParts,
+} from './codex-surface-message-state';
 
 export { codexThreadItemToToolPart as codexItemToToolPart } from './codex-tool-part-adapter';
 
@@ -145,7 +148,20 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
 
     if (item.type === 'agentMessage') {
       const text = typeof item.text === 'string' ? item.text : '';
-      if (text) {
+      const proposedPlan = item.phase === 'final_answer'
+        ? extractProposedPlanDocument(text)
+        : null;
+      if (proposedPlan) {
+        if (proposedPlan.visibleText) {
+          sawAssistantActivity = true;
+          assistantParts.push({
+            type: 'text',
+            text: proposedPlan.visibleText,
+            itemId: item.id,
+            ...(item.phase ? { phase: item.phase } : {}),
+          });
+        }
+      } else if (text) {
         sawAssistantActivity = true;
         assistantParts.push({
           type: 'text',
@@ -235,13 +251,16 @@ export function codexItemToSurfaceMessage(
 
   if (item.type === 'agentMessage' || item.type === 'exitedReviewMode') {
     const text = item.type === 'agentMessage' ? item.text : item.review;
+    const proposedPlan = item.type === 'agentMessage' && item.phase === 'final_answer'
+      ? extractProposedPlanDocument(text)
+      : null;
     const questionPart = item.type === 'agentMessage'
       ? codexItemToQuestionPart(threadId, turn.id, item, true)
       : null;
     const parts: SurfaceMessagePart[] = [
-      ...(text ? [{
+      ...(proposedPlan?.visibleText || (!proposedPlan && text) ? [{
         type: 'text' as const,
-        text,
+        text: proposedPlan?.visibleText ?? text,
         itemId: item.id,
         ...(item.type === 'agentMessage' && item.phase ? { phase: item.phase } : {}),
       }] : []),

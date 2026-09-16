@@ -41,6 +41,7 @@ describe('Codex surface runtime state', () => {
       selectedReasoningEffort: null,
       selectedServiceTier: null,
       planMode: false,
+      executionPlan: null,
       contextUsage: null,
       goal: null,
       turnGitDiff: null,
@@ -95,6 +96,7 @@ describe('Codex surface runtime state', () => {
       selectedReasoningEffort: 'high',
       selectedServiceTier: 'priority',
       planMode: false,
+      executionPlan: null,
       contextUsage: null,
       goal: null,
       turnGitDiff: null,
@@ -152,6 +154,7 @@ describe('Codex surface runtime state', () => {
       clientRequests,
       contextUsage: null,
       error: 'waiting',
+      executionPlan: null,
       goal: null,
       historyLoading: true,
       historyState: {

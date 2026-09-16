@@ -207,10 +207,25 @@ function applyConversationEvent(
       };
     case 'plan.delta':
       return applyPlan(snapshot, event.conversationId, event.turnId, event.payload.markdown, 'running');
-    case 'plan.updated':
-      return applyPlan(snapshot, event.conversationId, event.turnId, event.payload.markdown, event.payload.status === 'completed'
-        ? 'completed'
-        : 'running');
+    case 'plan.updated': {
+      const next = applyPlan(
+        snapshot,
+        event.conversationId,
+        event.turnId,
+        event.payload.markdown,
+        event.payload.status === 'completed' ? 'completed' : 'running',
+      );
+      return {
+        ...next,
+        executionPlan: {
+          turnId: event.turnId,
+          explanation: event.payload.explanation,
+          steps: event.payload.steps.map((step) => ({ ...step })),
+          markdown: event.payload.markdown,
+          updatedAt: event.occurredAt,
+        },
+      };
+    }
     case 'plan.completed':
       return applyPlan(snapshot, event.conversationId, event.turnId, event.payload.markdown, 'completed');
     case 'context.compactionStarted':

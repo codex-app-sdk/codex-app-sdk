@@ -32,6 +32,29 @@ describe('codexThreadToSurfaceMessages', () => {
     expect(message?.parts).toStrictEqual([{ type: 'text', text: '$cp first' }]);
   });
 
+  it('does not replay a tagged Plan-mode document as assistant text', () => {
+    const markdown = '# Proposed plan\n\n- Build it';
+    const messages = codexTurnToSurfaceMessages('thread-plan', {
+      id: 'turn-plan', status: 'completed', startedAt: 1, completedAt: 2,
+      items: [
+        {
+          type: 'agentMessage', id: 'agent-plan',
+          text: `<proposed_plan>\n${markdown}\n</proposed_plan>`,
+          phase: 'final_answer', memoryCitation: null,
+        },
+      ],
+    } as unknown as v2.Turn);
+
+    expect(messages).toStrictEqual([]);
+    expect(codexItemToSurfaceMessage('thread-plan', {
+      id: 'turn-plan', status: 'completed', startedAt: 1,
+    }, {
+      type: 'agentMessage', id: 'agent-plan',
+      text: `<proposed_plan>\n${markdown}\n</proposed_plan>`,
+      phase: 'final_answer', memoryCitation: null, delivery: null, questions: null,
+    })).toBeNull();
+  });
+
   it('normalizes incomplete history and every persisted user input type', () => {
     expect(codexThreadToSurfaceMessages({ id: 'empty', turns: null } as unknown as v2.Thread)).toStrictEqual([]);
     const messages = codexTurnToSurfaceMessages('thread-inputs', {
