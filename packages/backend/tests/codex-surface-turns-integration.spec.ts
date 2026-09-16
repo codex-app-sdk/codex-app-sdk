@@ -5,6 +5,99 @@ import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { generatedPngBase64, FakeTransport, createSurface, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('continues the latest interrupted turn without creating a user message', async () => {
+    const interrupted = turn('turn-interrupted', 'interrupted', [
+      {
+        type: 'agentMessage', id: 'agent-interrupted', text: 'Partial work',
+        phase: 'commentary', memoryCitation: null,
+      },
+    ]);
+    const transport = new FakeTransport({
+      'thread/resume': (params) => resumeResponse({
+        ...thread(String((params as { threadId: string }).threadId), false),
+        turns: [interrupted],
+      }),
+      'turn/start': () => ({ turn: turn('turn-continuation', 'inProgress', []) }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    const userMessageCount = surface.getSnapshot().messages.filter((message) => message.role === 'user').length;
+    events.length = 0;
+
+    await surface.continueInterruptedTurn();
+
+    const continuationRequest = lastRequest(transport, 'turn/start');
+    expect(continuationRequest).toMatchObject({
+      params: { threadId: 'thread-existing', input: [] },
+    });
+    expect(continuationRequest && 'params' in continuationRequest
+      ? continuationRequest.params
+      : undefined).not.toHaveProperty('clientUserMessageId');
+    expect(surface.getSnapshot()).toMatchObject({
+      activeTurnId: 'turn-continuation',
+      busy: true,
+      turns: [
+        expect.objectContaining({ id: 'turn-interrupted', status: 'interrupted' }),
+        expect.objectContaining({ id: 'turn-continuation', status: 'inProgress' }),
+      ],
+    });
+    expect(surface.getSnapshot().messages.filter((message) => message.role === 'user')).toHaveLength(userMessageCount);
+    expect(events.some((event) => event.type === 'message.appended' && event.payload.message.role === 'user')).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'turn.started', conversationId: 'thread-existing', turnId: 'turn-continuation',
+    }));
+  });
+
+  it('only continues an idle conversation whose latest turn is interrupted', async () => {
+    const completedTransport = new FakeTransport({
+      'thread/resume': (params) => resumeResponse({
+        ...thread(String((params as { threadId: string }).threadId), false),
+        turns: [turn('turn-completed', 'completed', [])],
+      }),
+    });
+    const completedSurface = new CodexSurface({
+      client: new CodexAppServerClient(completedTransport), cwd: '/tmp/project',
+    });
+    await completedSurface.connect();
+
+    await expect(completedSurface.continueInterruptedTurn()).rejects.toThrow('latest turn is not interrupted');
+    expect(lastRequest(completedTransport, 'turn/start')).toBeUndefined();
+
+    const { surface: activeSurface, transport: activeTransport } = createSurface();
+    await activeSurface.connect();
+    await activeSurface.sendMessage('Begin');
+    const activeTurnStart = lastRequest(activeTransport, 'turn/start');
+
+    await expect(activeSurface.continueInterruptedTurn()).rejects.toThrow('while a turn is active');
+    expect(lastRequest(activeTransport, 'turn/start')).toBe(activeTurnStart);
+  });
+
+  it('restores an interrupted conversation when continuation fails', async () => {
+    const interrupted = turn('turn-interrupted', 'interrupted', []);
+    const transport = new FakeTransport({
+      'thread/resume': (params) => resumeResponse({
+        ...thread(String((params as { threadId: string }).threadId), false),
+        turns: [interrupted],
+      }),
+      'turn/start': () => { throw new Error('continuation rejected'); },
+    });
+    const surface = new CodexSurface({
+      client: new CodexAppServerClient(transport), cwd: '/tmp/project',
+    });
+    await surface.connect();
+
+    await expect(surface.continueInterruptedTurn()).rejects.toThrow('continuation rejected');
+
+    expect(surface.getSnapshot()).toMatchObject({
+      activeTurnId: null,
+      busy: false,
+      error: 'continuation rejected',
+      turns: [expect.objectContaining({ id: 'turn-interrupted', status: 'interrupted' })],
+    });
+  });
+
   it('publishes the authoritative turn identity for an optimistic user prompt', async () => {
     const { surface } = createSurface();
     const events: CodexSurfaceEvent[] = [];

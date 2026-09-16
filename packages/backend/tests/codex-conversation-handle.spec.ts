@@ -102,7 +102,8 @@ describe('createCodexConversationHandle', () => {
 function operationSpies(snapshot: CodexConversationSnapshot): CodexConversationHandleOperations {
   const operation = () => vi.fn(async () => undefined);
   return {
-    clearGoal: operation(), compact: operation(), deleteTurn: operation(), deleteQueuedPrompt: operation(),
+    clearGoal: operation(), compact: operation(), continueInterruptedTurn: operation(),
+    deleteTurn: operation(), deleteQueuedPrompt: operation(),
     editTurn: operation(), fork: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
     forkTurn: vi.fn(async () => ({ conversationId: 'thread-fork' }) as never),
     getSnapshot: vi.fn(() => snapshot), interrupt: operation(), load: operation(),

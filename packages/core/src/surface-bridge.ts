@@ -54,6 +54,7 @@ export type CodexSurfaceBridgeInvokeOptions = {
 type CodexConversationBridgeOperationFunctions = {
   clearGoal(): Awaitable<CodexConversationSnapshot>;
   compactConversation(): Awaitable<CodexConversationSnapshot>;
+  continueInterruptedTurn(): Awaitable<CodexConversationSnapshot>;
   deleteTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Awaitable<CodexConversationSnapshot>;
   editTurn(turnId: string, content: string): Awaitable<CodexConversationSnapshot>;
@@ -81,7 +82,7 @@ type CodexConversationBridgeOperationFunctions = {
 };
 
 export const codexConversationBridgeOperations = [
-  'clearGoal', 'compactConversation', 'deleteTurn', 'deleteQueuedPrompt', 'editTurn',
+  'clearGoal', 'compactConversation', 'continueInterruptedTurn', 'deleteTurn', 'deleteQueuedPrompt', 'editTurn',
   'forkTurn', 'getSnapshot', 'interrupt', 'loadOlderConversationHistory',
   'readConversationHistory', 'readConversationPromptHistory', 'renameConversation',
   'respondToClientRequest', 'resolveApproval', 'retryTurn', 'sendMessage', 'setGoal',
@@ -98,6 +99,7 @@ export type CodexConversationBridgeOperationResult<Name extends CodexConversatio
 export type CodexConversationBridgeHandle = {
   clearGoal(): Awaitable<CodexConversationSnapshot>;
   compact(): Awaitable<CodexConversationSnapshot>;
+  continueInterruptedTurn(): Awaitable<CodexConversationSnapshot>;
   deleteTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Awaitable<CodexConversationSnapshot>;
   editTurn(turnId: string, content: string): Awaitable<CodexConversationSnapshot>;
@@ -234,7 +236,7 @@ export function subscribeCodexConversationReplicaBridge(
 
 export const codexSurfaceBridgeOperations = [
   'archiveConversation', 'cancelLogin', 'clearGoal', 'compactConversation', 'connect',
-  'createConversation', 'deleteConversation', 'deleteTurn', 'deleteQueuedPrompt',
+  'continueInterruptedTurn', 'createConversation', 'deleteConversation', 'deleteTurn', 'deleteQueuedPrompt',
   'editTurn', 'forkTurn', 'getSnapshot', 'interrupt', 'listConversations',
   'listModels', 'loadOlderConversationHistory', 'logout', 'readConversationHistory',
   'readConversationPromptHistory', 'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
@@ -248,7 +250,7 @@ export const codexSurfaceBridgeArities: Readonly<
   Record<CodexSurfaceBridgeOperation, readonly [minimum: number, maximum: number]>
 > = {
   archiveConversation: [1, 1], cancelLogin: [0, 1], clearGoal: [0, 0],
-  compactConversation: [0, 0], connect: [0, 0], createConversation: [0, 1],
+  compactConversation: [0, 0], connect: [0, 0], continueInterruptedTurn: [0, 0], createConversation: [0, 1],
   deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
   editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
   listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
@@ -265,7 +267,7 @@ export const codexSurfaceBridgeArities: Readonly<
 const conversationArities: Readonly<
   Record<CodexConversationBridgeOperation, readonly [minimum: number, maximum: number]>
 > = {
-  clearGoal: [0, 0], compactConversation: [0, 0], deleteTurn: [1, 1],
+  clearGoal: [0, 0], compactConversation: [0, 0], continueInterruptedTurn: [0, 0], deleteTurn: [1, 1],
   deleteQueuedPrompt: [1, 1], editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0],
   interrupt: [0, 0], loadOlderConversationHistory: [0, 0], readConversationHistory: [0, 0],
   readConversationPromptHistory: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
@@ -296,6 +298,7 @@ function conversationOperationTarget(conversation: CodexConversationBridgeHandle
   const target: Pick<CodexSurfaceBridgeTarget, CodexConversationBridgeOperation> = {
     clearGoal: () => conversation.clearGoal(),
     compactConversation: () => conversation.compact(),
+    continueInterruptedTurn: () => conversation.continueInterruptedTurn(),
     deleteTurn: (turnId) => conversation.deleteTurn(turnId),
     deleteQueuedPrompt: (promptId) => conversation.deleteQueuedPrompt(promptId),
     editTurn: (turnId, content) => conversation.editTurn(turnId, content),
@@ -332,6 +335,7 @@ async function invokeValidated(
     case 'clearGoal': return target.clearGoal();
     case 'compactConversation': return target.compactConversation();
     case 'connect': return target.connect();
+    case 'continueInterruptedTurn': return target.continueInterruptedTurn();
     case 'createConversation': return target.createConversation(conversationOptions(args[0]));
     case 'deleteConversation': return target.deleteConversation(nonEmptyString(args[0], 'Conversation id'));
     case 'deleteTurn': return target.deleteTurn(nonEmptyString(args[0], 'Turn id'));

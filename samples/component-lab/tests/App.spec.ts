@@ -222,6 +222,25 @@ describe('component lab', () => {
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
+  it('demonstrates restart-safe continuation without adding a user prompt', async () => {
+    const wrapper = mount(App);
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Interrupted turn'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · Hide details');
+    expect(wrapper.get('button[aria-label="Continue"]').attributes()).not.toHaveProperty('disabled');
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
+
+    await wrapper.get('button[aria-label="Continue"]').trigger('click');
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Stopped · Hide details', 'Working']);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
+    expect(wrapper.text()).toContain('Continuation started without a new prompt');
+  });
+
   it('removes completed steer and work-only rows until turn details are opened', async () => {
     const wrapper = mount(App);
     const scenarioButton = wrapper.findAll('nav button')

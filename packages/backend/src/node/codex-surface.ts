@@ -715,6 +715,10 @@ export class CodexSurface {
     return this.messagesController.send(prompt, options);
   }
 
+  async continueInterruptedTurn(): Promise<CodexSurfaceSnapshot> {
+    return this.messagesController.continueInterruptedTurn();
+  }
+
   async compactConversation(): Promise<CodexSurfaceSnapshot> {
     return this.turnActions.compact();
   }
@@ -787,6 +791,7 @@ export class CodexSurface {
     const handle = createCodexConversationHandle(id, {
       clearGoal: () => this.conversationSettings.clearGoalForThread(id),
       compact: () => this.turnActions.compactForThread(id),
+      continueInterruptedTurn: () => this.messagesController.continueInterruptedTurnForThread(id),
       deleteTurn: (turnId) => this.turnActions.deleteTurnForThread(id, turnId),
       deleteQueuedPrompt: (promptId) => this.messagesController.deleteQueuedPromptForThread(id, promptId),
       updateQueuedPrompt: (promptId, prompt) => this.messagesController.updateQueuedPromptForThread(id, promptId, prompt),

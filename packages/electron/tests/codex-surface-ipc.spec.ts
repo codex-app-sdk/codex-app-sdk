@@ -90,6 +90,7 @@ describe('Codex surface Electron bridge', () => {
       clearGoal: vi.fn(async () => snapshot),
       compactConversation: vi.fn(async () => snapshot),
       connect: vi.fn(async () => snapshot),
+      continueInterruptedTurn: vi.fn(async () => snapshot),
       createConversation: vi.fn(async () => snapshot),
       deleteConversation: vi.fn(async () => snapshot),
       deleteTurn: vi.fn(async () => snapshot),
@@ -144,6 +145,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:clear-goal',
       'codex-surface:compact-conversation',
       'codex-surface:connect',
+      'codex-surface:continue-interrupted-turn',
       'codex-surface:create-conversation',
       'codex-surface:delete-conversation',
       'codex-surface:delete-queued-prompt',
@@ -182,6 +184,7 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:clear-goal')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:compact-conversation')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:connect')).resolves.toBe(snapshot);
+    await expect(main.call('codex-surface:continue-interrupted-turn')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:load-older-conversation-history', 'thread-1')).resolves.toBe(history);
     await expect(main.call('codex-surface:logout')).resolves.toBe(snapshot);
     await expect(main.call('codex-surface:refresh-account')).resolves.toBe(snapshot);
@@ -577,6 +580,7 @@ describe('Codex surface Electron bridge', () => {
     await api.archiveConversation('thread-archive');
     await api.cancelLogin('login-1');
     await api.connect();
+    await api.continueInterruptedTurn();
     await api.clearGoal();
     await api.compactConversation();
     await api.createConversation({ model: 'gpt-5' });
@@ -622,6 +626,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:archive-conversation', 'thread-archive'],
       ['codex-surface:cancel-login', 'login-1'],
       ['codex-surface:connect'],
+      ['codex-surface:continue-interrupted-turn'],
       ['codex-surface:clear-goal'],
       ['codex-surface:compact-conversation'],
       ['codex-surface:create-conversation', { model: 'gpt-5' }],

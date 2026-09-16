@@ -173,6 +173,7 @@ import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../cha
 const props = defineProps<{
   autofocus?: boolean;
   attachEnabled?: boolean;
+  canContinueInterruptedTurn?: boolean;
   contextUsage?: CodexContextUsage | null;
   disabled: boolean;
   draft?: string;
@@ -207,6 +208,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  continueInterruptedTurn: [];
   error: [message: string | null];
   send: [prompt: string, options?: { inputMethod: 'dictated' }];
   steer: [prompt: string, options?: { inputMethod: 'dictated' }];
@@ -253,6 +255,13 @@ const voiceVisible = computed(() => (
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
 const canSend = computed(() => Boolean((hasPrompt.value || props.hasAttachments) && !props.disabled));
+const canContinueInterruptedTurn = computed(() => Boolean(
+  props.canContinueInterruptedTurn
+  && !props.isSending
+  && !hasPrompt.value
+  && !props.hasAttachments
+  && !props.disabled,
+));
 let pendingTranscriptCaret: number | null = null;
 const canInterrupt = computed(() => Boolean(
   props.isSending
@@ -267,9 +276,11 @@ const sendButtonDisabled = computed(() => {
   if (props.interruptArmed) return false;
   if (isTranscribing.value) return true;
   if (isRecording.value && !props.disabled) return false;
-  return !canSend.value && !canInterrupt.value;
+  return !canSend.value && !canInterrupt.value && !canContinueInterruptedTurn.value;
 });
-const sendButtonLabel = computed(() => (props.isSending ? 'Queue prompt' : 'Send prompt'));
+const sendButtonLabel = computed(() => (
+  canContinueInterruptedTurn.value ? 'Continue' : props.isSending ? 'Queue prompt' : 'Send prompt'
+));
 const {
   buttonDisabled: voiceButtonDisabled,
   buttonLabel: voiceButtonLabel,
@@ -367,6 +378,10 @@ onMounted(() => {
 });
 
 function submitPrompt(): void {
+  if (canContinueInterruptedTurn.value) {
+    emit('continueInterruptedTurn');
+    return;
+  }
   submitWithIntent('send');
 }
 

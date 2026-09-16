@@ -42,6 +42,7 @@ const channels = {
   clearGoal: 'codex-surface:clear-goal',
   compactConversation: 'codex-surface:compact-conversation',
   connect: 'codex-surface:connect',
+  continueInterruptedTurn: 'codex-surface:continue-interrupted-turn',
   createConversation: 'codex-surface:create-conversation',
   deleteConversation: 'codex-surface:delete-conversation',
   deleteTurn: 'codex-surface:delete-turn',
@@ -83,6 +84,7 @@ type SurfaceRequests = {
   [channels.clearGoal]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.compactConversation]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.connect]: IpcRequest<[], CodexSurfaceSnapshot>;
+  [channels.continueInterruptedTurn]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.createConversation]: IpcRequest<[options?: CreateCodexRendererConversationOptions], CodexSurfaceSnapshot>;
   [channels.deleteConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.deleteTurn]: IpcRequest<[turnId: string], CodexSurfaceSnapshot>;
@@ -163,6 +165,7 @@ export function registerCodexSurfaceIpc(
     [channels.clearGoal]: (_event, ...args) => invoke('clearGoal', args),
     [channels.compactConversation]: (_event, ...args) => invoke('compactConversation', args),
     [channels.connect]: (_event, ...args) => invoke('connect', args),
+    [channels.continueInterruptedTurn]: (_event, ...args) => invoke('continueInterruptedTurn', args),
     [channels.createConversation]: (_event, ...args) => invoke('createConversation', args),
     [channels.deleteConversation]: (_event, ...args) => invoke('deleteConversation', args),
     [channels.deleteTurn]: (_event, ...args) => invoke('deleteTurn', args),
@@ -212,6 +215,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     clearGoal: () => renderer.invoke(channels.clearGoal),
     compactConversation: () => renderer.invoke(channels.compactConversation),
     connect: () => renderer.invoke(channels.connect),
+    continueInterruptedTurn: () => renderer.invoke(channels.continueInterruptedTurn),
     createConversation: (options) => renderer.invoke(channels.createConversation, options),
     deleteConversation: (conversationId) => renderer.invoke(channels.deleteConversation, conversationId),
     deleteTurn: (turnId) => renderer.invoke(channels.deleteTurn, turnId),

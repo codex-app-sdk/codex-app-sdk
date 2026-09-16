@@ -12,6 +12,7 @@ import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import type { CodexComposerState } from '../src/composer-state';
 
 type ChatComposerProps = {
+  canContinueInterruptedTurn?: boolean;
   composerState?: CodexComposerState;
   disabled: boolean;
   draft?: string;
@@ -113,6 +114,19 @@ describe('ChatComposer', () => {
     const wrapper = mountComposer();
 
     expect(wrapper.get('.chat-composer__send').attributes('aria-label')).toBe('Send prompt');
+  });
+
+  it('continues an interrupted turn from an empty composer', async () => {
+    const wrapper = mountComposer({ canContinueInterruptedTurn: true });
+    const button = wrapper.get('.chat-composer__send');
+
+    expect(button.attributes()).not.toHaveProperty('disabled');
+    expect(button.attributes('aria-label')).toBe('Continue');
+
+    await button.trigger('click');
+
+    expect(wrapper.emitted('continueInterruptedTurn')).toStrictEqual([[]]);
+    expect(wrapper.emitted('send')).toBeUndefined();
   });
 
   it('submits attachment-only work instead of interrupting while Codex is working', async () => {

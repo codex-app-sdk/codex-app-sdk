@@ -78,6 +78,7 @@ export function fakeSurfaceApi(snapshot = surfaceSnapshot()) {
     cancelLogin: vi.fn(async () => snapshot),
     clearGoal: vi.fn(async () => snapshot),
     compactConversation: vi.fn(async () => snapshot),
+    continueInterruptedTurn: vi.fn(async () => snapshot),
     connect: vi.fn(async () => snapshot),
     createConversation: vi.fn(async () => surfaceSnapshot()),
     deleteConversation: vi.fn(async () => snapshot),

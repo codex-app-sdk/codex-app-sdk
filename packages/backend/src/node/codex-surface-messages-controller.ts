@@ -140,6 +140,68 @@ export class CodexSurfaceMessagesController {
     await this.sendPromptToThread(threadId, text, options);
   }
 
+  async continueInterruptedTurn(): Promise<CodexSurfaceSnapshot> {
+    await this.host.ensureConnected();
+    const threadId = this.host.getState().activeConversationId;
+    if (!threadId) throw new Error('There is no active conversation');
+    await this.continueInterruptedTurnForThread(threadId);
+    return this.host.getSnapshot();
+  }
+
+  async continueInterruptedTurnForThread(threadId: string): Promise<void> {
+    const runtime = await this.host.ensureThreadReady(threadId);
+    if (runtime.busy || runtime.turnStartPending || runtime.activeTurnId) {
+      throw new Error('Cannot continue while a turn is active');
+    }
+    const latestTurnId = runtime.turnIds.at(-1);
+    const latestTurn = latestTurnId
+      ? runtime.turns.find((turn) => turn.id === latestTurnId)
+      : undefined;
+    if (latestTurn?.status !== 'interrupted') {
+      throw new Error('The latest turn is not interrupted');
+    }
+
+    this.host.patchRuntime(threadId, { busy: true, turnStartPending: true, error: null });
+    this.host.patchConversationStatus(threadId, 'active', 'action');
+    this.host.emitConversationActivity(threadId, 'action');
+
+    try {
+      const response = await this.client.request('turn/start', {
+        threadId,
+        input: [],
+        ...turnSettings(this.host.snapshotForRuntime(runtime), {}),
+      });
+      const wasKnownTurn = runtime.turnIds.includes(response.turn.id);
+      runtime.activeTurnId = response.turn.status === 'inProgress' ? response.turn.id : null;
+      if (!wasKnownTurn) runtime.turnIds.push(response.turn.id);
+      this.host.patchConversationTurnCount(threadId, runtime.turnIds.length, 'action');
+      const busy = response.turn.status === 'inProgress';
+      this.host.patchRuntime(threadId, {
+        busy,
+        turnStartPending: false,
+        turns: upsertSurfaceTurn(runtime.turns, surfaceTurn(response.turn)),
+        messages: busy
+          ? ensureAssistantTurnMessage(runtime.messages, threadId, response.turn.id)
+          : runtime.messages,
+      });
+      this.host.patchConversationStatus(threadId, busy ? 'active' : 'idle', 'action');
+      if (busy && !wasKnownTurn) {
+        this.host.emitEvent('action', {
+          type: 'turn.started', conversationId: threadId, turnId: response.turn.id,
+          payload: { startedAt: timestampToIso(response.turn.startedAt) },
+        });
+      }
+      this.host.emitConversationActivity(threadId, 'action');
+    } catch (error) {
+      this.host.patchRuntime(threadId, {
+        busy: false, turnStartPending: false, error: errorMessage(error),
+      });
+      this.host.patchConversationStatus(threadId, 'error', 'action');
+      this.host.emitConversationActivity(threadId, 'action');
+      throw error;
+    }
+  }
+
   async sendPromptToThread(
     threadId: string,
     text: string,

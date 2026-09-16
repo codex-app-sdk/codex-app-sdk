@@ -994,6 +994,7 @@ export type CodexSurfaceApi = {
   renameConversation(title: string): Promise<CodexSurfaceSnapshot>;
   updateConversationSettings(settings: UpdateCodexConversationSettings): Promise<CodexSurfaceSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
+  continueInterruptedTurn(): Promise<CodexSurfaceSnapshot>;
   compactConversation(): Promise<CodexSurfaceSnapshot>;
   startReview(options?: StartCodexReviewOptions): Promise<CodexSurfaceSnapshot>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;

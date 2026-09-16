@@ -267,6 +267,13 @@ retain ownership of credentials and authentication lifecycle.
 `CodexSurfaceRendererApi` narrows trusted conversation-creation input and uses
 `CodexRendererSendMessageOptions` for send/steer attachments.
 
+`continueInterruptedTurn()` resumes the latest interrupted turn in the active
+conversation. It starts a new provider turn with empty input, does not append a
+user message, and leaves the interrupted turn immutable in `turns`. The new
+provider turn ID becomes `activeTurnId`. The operation rejects while another
+turn is active or when the latest turn is not `interrupted`; eligibility is
+therefore derivable from a restored snapshot after an app restart.
+
 ## Conversation-targeted bridge
 
 Multi-agent hosts must not route conversation work through global operations

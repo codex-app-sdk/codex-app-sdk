@@ -286,6 +286,7 @@ unsubscribes the ephemeral thread.
 
 - `updateConversationSettings(settings)`
 - `sendMessage(prompt, options?)`
+- `continueInterruptedTurn()`
 - `compactConversation()`
 - `startReview(options?)`
 - `steerMessage(prompt, options?)`
@@ -325,6 +326,7 @@ type CodexConversation = {
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
+  continueInterruptedTurn(): Promise<CodexConversationSnapshot>;
   compact(): Promise<CodexConversationSnapshot>;
   startReview(options?: StartCodexReviewOptions): Promise<CodexConversationSnapshot>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
@@ -361,6 +363,12 @@ until the host calls `result.conversation.select()`.
 `sendMessage` and `steerMessage` accept the same attachment options. Steering
 maps attachments to app-server `UserInput` blocks and includes them in the
 optimistic user steer message.
+
+`continueInterruptedTurn()` is available only when the handle's latest turn is
+`interrupted` and no turn is active. It sends `turn/start` with empty input,
+creates no synthetic user message, and returns the snapshot containing the new
+provider-authored turn. Because eligibility comes from loaded turn history, the
+same operation works after the host reconnects or restarts.
 
 Reviews accept:
 

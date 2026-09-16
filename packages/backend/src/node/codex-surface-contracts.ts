@@ -150,6 +150,7 @@ export type CodexConversation = {
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
+  continueInterruptedTurn(): Promise<CodexConversationSnapshot>;
   /** Starts an experimental app-server realtime voice session without exposing JSON-RPC. */
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   compact(): Promise<CodexConversationSnapshot>;

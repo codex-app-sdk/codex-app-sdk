@@ -76,6 +76,12 @@ const showHeader = computed(() => (
 ))
 const label = computed(() => {
   if (active.value) return t('chat.work.working')
+  if (assistantWorkTurn?.status.value === 'interrupted') {
+    return t(expanded.value ? 'chat.work.stoppedHideDetails' : 'chat.work.stoppedViewDetails')
+  }
+  if (assistantWorkTurn?.status.value === 'failed') {
+    return t(expanded.value ? 'chat.work.failedHideDetails' : 'chat.work.failedViewDetails')
+  }
   return t(expanded.value ? 'chat.work.doneHideDetails' : 'chat.work.doneViewDetails')
 })
 

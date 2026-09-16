@@ -24,6 +24,7 @@ import type {
 export type CodexConversationHandleOperations = {
   clearGoal(): Promise<void>;
   compact(): Promise<void>;
+  continueInterruptedTurn(): Promise<void>;
   deleteTurn(turnId: string): Promise<void>;
   deleteQueuedPrompt(promptId: string): Promise<void>;
   updateQueuedPrompt(promptId: string, prompt: string): Promise<void>;
@@ -87,6 +88,7 @@ export function createCodexConversationHandle(
     sendMessage: (prompt, options) => snapshotAfter(() => operations.sendMessage(prompt, options)),
     startRealtime: operations.startRealtime,
     compact: () => snapshotAfter(operations.compact),
+    continueInterruptedTurn: () => snapshotAfter(operations.continueInterruptedTurn),
     startReview: (options) => snapshotAfter(() => operations.startReview(options)),
     steerMessage: (prompt, options) => snapshotAfter(() => operations.steerMessage(prompt, options)),
     interrupt: () => snapshotAfter(operations.interrupt),

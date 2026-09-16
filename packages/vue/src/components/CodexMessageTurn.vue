@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import { computed, inject, provide, ref, shallowReactive, watch } from 'vue'
-import type { SurfaceMessage } from '@codex-app-sdk/core/surface'
+import type { CodexSurfaceTurnStatus, SurfaceMessage } from '@codex-app-sdk/core/surface'
 import {
   computeMessageBlocks,
   hasExplicitAssistantWorkPhases,
@@ -29,6 +29,7 @@ const props = defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
   entries: readonly TurnEntry[]
   showToolBlocks: boolean
+  status?: CodexSurfaceTurnStatus
   turnId?: string
 }>()
 // Stryker restore all
@@ -68,20 +69,31 @@ const finalStarted = computed(() => messages.value.some(({ entry, message }) => 
 const active = computed(() => !finalStarted.value && (props.active ?? messages.value.some(({ message }) => (
   message.role === 'assistant' && message.streaming === true
 ))))
-const completedWithoutFinal = computed(() => phased.value && !active.value && !finalStarted.value)
+const status = computed(() => props.status)
+const stoppedWithoutFinal = computed(() => (
+  !active.value
+  && !finalStarted.value
+  && (status.value === 'interrupted' || status.value === 'failed')
+))
+const completedWithoutFinal = computed(() => (
+  phased.value
+  && !active.value
+  && !finalStarted.value
+  && (status.value === undefined || status.value === 'completed')
+))
 const headerMessageIndex = computed(() => messages.value.find(({ message }) => (
   message.role === 'assistant' && shouldGroupMessageWork(message)
 ))?.entry.index)
 const enabled = computed(() => Boolean(turnId.value && headerMessageIndex.value !== undefined))
-const expanded = ref(active.value && !finalStarted.value)
+const expanded = ref((active.value && !finalStarted.value) || stoppedWithoutFinal.value)
 const userToggled = ref(false)
 
 watch(finalStarted, (started, previous) => {
   if (started && !previous) expanded.value = false
 })
 
-watch(active, (isActive) => {
-  if (!userToggled.value) expanded.value = isActive && !finalStarted.value
+watch([active, stoppedWithoutFinal], ([isActive, isStoppedWithoutFinal]) => {
+  if (!userToggled.value) expanded.value = (isActive && !finalStarted.value) || isStoppedWithoutFinal
 })
 
 provide(assistantWorkTurnKey, {
@@ -93,6 +105,7 @@ provide(assistantWorkTurnKey, {
   headerMessageIndex,
   latestStreamingAssistantIndex,
   phased,
+  status,
   turnId,
   toggle() {
     userToggled.value = true

@@ -189,6 +189,23 @@ describe('Codex web transport', () => {
     expect(surface.refreshAccount).toHaveBeenCalledOnce();
   });
 
+  it('routes interrupted-turn continuation through the web bridge', async () => {
+    const [browserSocket, serverSocket] = memorySocketPair();
+    const surface = fakeSurface();
+    const binding = bindCodexWebSocket({
+      socket: serverSocket,
+      context: undefined,
+      authorize: () => ({ surface: surface.target }),
+    });
+    const client = createCodexWebSurfaceClient({ createSocket: () => browserSocket });
+    await client.connect();
+    await binding.ready;
+
+    await expect(client.continueInterruptedTurn()).resolves.toStrictEqual(snapshot);
+
+    expect(surface.continueInterruptedTurn).toHaveBeenCalledOnce();
+  });
+
   it('keeps concurrently authorized user sessions isolated', async () => {
     const sessionOne = memorySocketPair();
     const sessionTwo = memorySocketPair();
@@ -275,6 +292,7 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
   const connect = vi.fn(async () => initialSnapshot);
   const sendMessage = vi.fn(async () => initialSnapshot);
   const archiveConversation = vi.fn(async () => initialSnapshot);
+  const continueInterruptedTurn = vi.fn(async () => initialSnapshot);
   const refreshAccount = vi.fn(async () => initialSnapshot);
   const createConversation = vi.fn(async () => initialSnapshot);
   const startChatGptDeviceCodeLogin = vi.fn(async () => ({
@@ -284,6 +302,7 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
   }));
   const partial = {
     connect,
+    continueInterruptedTurn,
     createConversation,
     getSnapshot: vi.fn(() => initialSnapshot),
     sendMessage,
@@ -302,6 +321,7 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
   return {
     target: partial as unknown as CodexSurfaceBridgeTarget,
     connect,
+    continueInterruptedTurn,
     sendMessage,
     archiveConversation,
     createConversation,

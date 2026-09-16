@@ -47,6 +47,7 @@ describe('useCodexSurface', () => {
     await surface.cancelLogin('login-1');
     await surface.createConversation(conversationOptions);
     await surface.compactConversation();
+    await surface.continueInterruptedTurn();
     await surface.deleteConversation('thread-delete');
     await surface.deleteTurn('turn-2');
     await surface.deleteQueuedPrompt('queued-1');
@@ -88,6 +89,7 @@ describe('useCodexSurface', () => {
     expect(api.archiveConversation).toHaveBeenCalledWith('thread-archive');
     expect(api.cancelLogin).toHaveBeenCalledWith('login-1');
     expect(api.createConversation).toHaveBeenCalledWith(conversationOptions);
+    expect(api.continueInterruptedTurn).toHaveBeenCalledOnce();
     expect(api.compactConversation).toHaveBeenCalledWith();
     expect(api.deleteConversation).toHaveBeenCalledWith('thread-delete');
     expect(api.deleteTurn).toHaveBeenCalledWith('turn-2');
@@ -411,6 +413,7 @@ function fakeApi(
     setGoal: vi.fn(async () => readySnapshot),
     selectConversation: vi.fn(async () => readySnapshot),
     sendMessage: vi.fn(async () => readySnapshot),
+    continueInterruptedTurn: vi.fn(async () => readySnapshot),
     startReview: vi.fn(async () => readySnapshot),
     startChatGptDeviceCodeLogin: vi.fn(async () => ({
       loginId: 'device-login-1',

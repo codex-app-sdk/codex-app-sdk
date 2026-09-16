@@ -261,6 +261,7 @@ function fakeSurfaceApi(): CodexSurfaceRendererApi & Record<string, ReturnType<t
     cancelLogin: vi.fn(async () => snapshot),
     clearGoal: vi.fn(async () => snapshot),
     compactConversation: vi.fn(async () => snapshot),
+    continueInterruptedTurn: vi.fn(async () => snapshot),
     connect: vi.fn(async () => snapshot),
     createConversation: vi.fn(async () => snapshot),
     deleteConversation: vi.fn(async () => snapshot),

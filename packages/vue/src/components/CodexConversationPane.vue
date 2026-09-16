@@ -120,6 +120,7 @@
             :autofocus="autofocus"
             :attach-enabled="effectiveAttachEnabled"
             :capabilities="effectiveCapabilities"
+            :can-continue-interrupted-turn="canContinueInterruptedTurn"
             :commands="effectiveCommands"
             :composer-state="localComposerState"
             :context-usage="effectiveContextUsage"
@@ -151,6 +152,7 @@
             :transcribe-audio="transcribeAudio"
             @error="handleComposerError"
             @attach="selectAttachments"
+            @continue-interrupted-turn="continueInterruptedTurn"
             @interrupt="interrupt"
             @menu-select="menuSelect"
             @mention-select="mentionSelect"
@@ -447,6 +449,7 @@ const emit = defineEmits<{
   clientResponse: [response: ClientRequestResponse];
   copyMessage: [index: number];
   clearGoal: [];
+  continueInterruptedTurn: [];
   deleteTurn: [turnId: string];
   deleteQueuedPrompt: [promptId: string];
   updateQueuedPrompt: [promptId: string, prompt: string];
@@ -554,6 +557,11 @@ const effectiveActiveTurnId = computed(() => controlledValue(
 const effectiveTurns = computed(() => controlledValue(
   (state) => state.identity.turns,
   () => props.turns ?? surfaceState.value?.turns ?? [],
+));
+const canContinueInterruptedTurn = computed(() => (
+  !effectiveBusy.value
+  && effectiveActiveTurnId.value == null
+  && (effectiveTurns.value ?? []).at(-1)?.status === 'interrupted'
 ));
 const visiblePromptHistory = computed(() => effectiveMessages.value.flatMap((message) => {
   const chatMessage = chatMessageFromInput(message);
@@ -940,6 +948,13 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
     void runSurfaceAction(() => props.surface!.sendMessage(prompt, options));
   }
   replaceAttachments([]);
+}
+
+function continueInterruptedTurn(): void {
+  if (dispatchControllerAction('continueInterruptedTurn')) return;
+  if (effectiveController.value) return;
+  emit('continueInterruptedTurn');
+  if (props.surface) void runSurfaceAction(() => props.surface!.continueInterruptedTurn());
 }
 
 function beginControlledSubmission(

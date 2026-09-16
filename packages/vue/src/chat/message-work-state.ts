@@ -1,4 +1,5 @@
 import type { ComputedRef, InjectionKey, Ref } from 'vue'
+import type { CodexSurfaceTurnStatus } from '@codex-app-sdk/core/surface'
 import type { ClientRequestResponse } from './contracts'
 
 export const questionResponsesKey: InjectionKey<Map<string, ClientRequestResponse['payload']>> = Symbol('codex-app-sdk-question-responses')
@@ -12,6 +13,7 @@ export type AssistantWorkTurnContext = {
   headerMessageIndex: ComputedRef<number | undefined>
   latestStreamingAssistantIndex: ComputedRef<number | undefined>
   phased: ComputedRef<boolean>
+  status: ComputedRef<CodexSurfaceTurnStatus | undefined>
   turnId: ComputedRef<string | undefined>
   toggle: () => void
 }

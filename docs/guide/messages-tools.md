@@ -65,6 +65,13 @@ history prepends preserve the disclosure state. Opening or closing turn details
 also preserves the reader's viewport instead of forcing the transcript back to
 the bottom.
 
+An interrupted turn is labeled `Stopped`, and a failed turn is labeled
+`Failed`; neither is presented as successfully `Done`. Work-only interrupted
+or failed turns start expanded, while a partial final answer stays visible with
+its earlier work behind the disclosure. Continuing an interrupted turn creates
+a separate `Working` group under a new provider turn ID. The old stopped group
+does not become active again and no empty user message is rendered.
+
 Deleting a turn is intentionally non-optimistic. The turn stays visible while
 the host or surface action runs, the Delete icon becomes a progress spinner,
 and the other actions on that turn are disabled. Success removes the turn when

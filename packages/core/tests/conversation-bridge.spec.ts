@@ -103,7 +103,7 @@ describe('Codex conversation bridge', () => {
     const snapshot = { activeConversationId: 'conversation-a' } as CodexConversationSnapshot;
     const forkSnapshot = { activeConversationId: 'conversation-fork' } as CodexConversationSnapshot;
     const operations = Object.fromEntries([
-      'clearGoal', 'compact', 'deleteTurn', 'deleteQueuedPrompt', 'editTurn', 'getSnapshot',
+      'clearGoal', 'compact', 'continueInterruptedTurn', 'deleteTurn', 'deleteQueuedPrompt', 'editTurn', 'getSnapshot',
       'interrupt', 'loadOlderHistory', 'onEvent', 'onStateChange', 'readHistory', 'readPromptHistory',
       'rename', 'respondToClientRequest', 'resolveApproval', 'retryTurn', 'sendMessage', 'setGoal',
       'startReview', 'steerMessage', 'steerQueuedPrompt', 'updateQueuedPrompt', 'updateSettings',
@@ -117,6 +117,7 @@ describe('Codex conversation bridge', () => {
     const cases = [
       ['clearGoal', [], 'clearGoal', []],
       ['compactConversation', [], 'compact', []],
+      ['continueInterruptedTurn', [], 'continueInterruptedTurn', []],
       ['deleteTurn', ['turn-1'], 'deleteTurn', ['turn-1']],
       ['deleteQueuedPrompt', ['queue-1'], 'deleteQueuedPrompt', ['queue-1']],
       ['editTurn', ['turn-2', 'Edited'], 'editTurn', ['turn-2', 'Edited']],

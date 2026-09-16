@@ -51,7 +51,7 @@
       <div class="lab__frame">
         <CodexConversationPane
           v-model="draft"
-          :active-turn-id="selected.activeTurnId"
+          :active-turn-id="mockActiveTurnId"
           :answered-client-request-ids="answeredClientRequestIds"
           :busy="mockBusy"
           :context-usage="selected.contextUsage"
@@ -70,10 +70,11 @@
           selected-reasoning-effort="medium"
           :skills="skills"
           :turn-git-diff="selected.turnGitDiff"
-          :turns="selected.turns"
+          :turns="mockTurns"
           :transcribe-audio="transcribeAudio"
           @interrupt="activity = 'Interrupt requested'"
           @client-response="respondToClientRequest"
+          @continue-interrupted-turn="continueInterruptedTurn"
           @submit="submitPrompt"
         >
           <template #message-header="{ message }">
@@ -367,6 +368,25 @@ const scenarios: [Scenario, ...Scenario[]] = [
     }],
   },
   {
+    id: 'interrupted-turn',
+    name: 'Interrupted turn',
+    summary: 'Stopped work that can continue after restart',
+    title: 'Turn interrupted',
+    description: 'The restored interrupted turn stays stopped until an empty submission starts a new provider turn.',
+    activeTurnId: null,
+    turns: [{
+      id: 'interrupted-turn-old', status: 'interrupted', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:03:00Z', completedAt: '2026-08-01T12:03:05Z', durationMs: 5_000,
+    }],
+    messages: [{
+      id: 'interrupted-turn-work',
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'interrupted-turn-old',
+      parts: [{ type: 'text', text: 'Work completed before the app was stopped.', phase: 'commentary' }],
+    }],
+  },
+  {
     id: 'tool-icons',
     name: 'Tool icon gallery',
     summary: 'Codex actions, a host override, and the generic fallback',
@@ -459,6 +479,8 @@ const draft = ref('');
 const activity = ref('Ready');
 const messages = ref<SurfaceMessage[]>([]);
 const mockBusy = ref(false);
+const mockActiveTurnId = ref<string | null>(null);
+const mockTurns = ref<readonly CodexSurfaceTurn[]>([]);
 const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
 const resetConfirmed = ref(false);
 const selected = computed<Scenario>(() => scenarios.find((scenario) => scenario.id === selectedId.value) ?? scenarios[0]);
@@ -474,11 +496,36 @@ function resetScenario(confirmReset = true): void {
   draft.value = '';
   messages.value = selected.value.messages.map((message) => ({ ...message, parts: [...message.parts] }));
   mockBusy.value = selected.value.busy ?? false;
+  mockActiveTurnId.value = selected.value.activeTurnId ?? null;
+  mockTurns.value = [...(selected.value.turns ?? [])];
   answeredClientRequestIds.value = new Set();
   activity.value = confirmReset ? 'Scenario reset' : 'Scenario loaded';
   if (confirmReset) showResetFeedback();
   if (selected.value.id === 'busy') startBusyToolCompletion();
   if (selected.value.id === 'reasoning-activity') startReasoningActivityLifecycle();
+}
+
+function continueInterruptedTurn(): void {
+  const latestTurn = mockTurns.value.at(-1);
+  if (mockBusy.value || latestTurn?.status !== 'interrupted') return;
+  const turnId = `${latestTurn.id}-continuation`;
+  mockTurns.value = [
+    ...mockTurns.value,
+    {
+      id: turnId, status: 'inProgress', error: null, willRetry: false,
+      startedAt: new Date().toISOString(), completedAt: null, durationMs: null,
+    },
+  ];
+  mockActiveTurnId.value = turnId;
+  mockBusy.value = true;
+  messages.value.push({
+    id: `${turnId}-assistant`,
+    role: 'assistant',
+    status: 'streaming',
+    turnId,
+    parts: [{ type: 'text', text: 'Continuation started without a new prompt.', phase: 'commentary' }],
+  });
+  activity.value = 'Interrupted turn continued';
 }
 
 function showResetFeedback(): void {

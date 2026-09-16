@@ -21,6 +21,7 @@
           :answered-client-request-ids="answeredClientRequestIds"
           :active="activeOverrideForGroup(group)"
           :show-tool-blocks="effectivePresentation.messages.toolBlocks"
+          :status="group.turnId ? turnStatusById.get(group.turnId) : undefined"
           :turn-id="group.turnId"
         >
           <template v-for="entry in group.entries" :key="entry.key">

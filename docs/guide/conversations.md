@@ -177,9 +177,17 @@ await build.updateSettings({
 });
 
 await build.interrupt();
+await build.continueInterruptedTurn();
 await build.compact();
 await build.deleteTurn(turnId);
 ```
+
+After `interrupt()`, the latest turn remains terminal with status
+`interrupted`. `continueInterruptedTurn()` starts a new turn with empty provider
+input and no user message, matching Codex's empty-Send continuation behavior.
+The operation is based on restored turn history, so a host can close, reconnect,
+load the conversation, and continue it later. It rejects if a turn is already
+active or the latest turn is not interrupted.
 
 Compaction progress is driven by app-server's `contextCompaction` item
 notifications. The compact action only requests the operation, so a host

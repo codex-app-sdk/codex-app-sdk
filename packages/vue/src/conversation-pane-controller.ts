@@ -132,6 +132,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   cancel?: PaneAction;
   clientResponse?: PaneAction<[response: ClientRequestResponse]>;
   clearGoal?: PaneAction;
+  continueInterruptedTurn?: PaneAction;
   /** Called after the SDK has copied a message to the clipboard. */
   onMessageCopied?: PaneAction<[index: number]>;
   deleteTurn?: PaneAction<[turnId: string]>;

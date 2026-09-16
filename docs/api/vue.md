@@ -13,6 +13,7 @@ Returned state and actions include:
 - authentication actions;
 - conversation list/create/select/archive/delete/unarchive actions;
 - history, settings, send, review, compact, steer, and interrupt actions;
+- interrupted-turn continuation;
 - message edit/delete/retry/fork actions;
 - goals, approvals, client requests, and queued prompts.
 
@@ -76,6 +77,13 @@ state groups are `identity`, `history`, `thread`, `composer`, `catalogs`,
 settings, history, turn actions, approvals, goals, queue operations, and
 client responses. Every action may return `void` or `Promise<void>`; rejected
 promises are surfaced through the pane error UI.
+
+When the latest controlled `identity.turns` entry is `interrupted`, no turn is
+active, and the composer is empty, the stock composer changes Send to
+**Continue**. Activating it dispatches `actions.continueInterruptedTurn()`; it
+does not call `submit` or create an optimistic user row. Surface-bound panes
+call the equivalent SDK surface operation. A typed prompt or attachment keeps
+the normal submission path.
 
 When a controlled pane with no messages submits its first prompt, the pane
 renders an optimistic user row immediately. The row survives settlement of the

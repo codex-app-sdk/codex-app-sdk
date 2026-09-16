@@ -662,6 +662,59 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('interrupt')).toHaveLength(1);
   });
 
+  it('continues a restored interrupted turn from an empty controlled composer', async () => {
+    const continueInterruptedTurn = vi.fn(async () => undefined);
+    const submit = vi.fn(async () => undefined);
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: 'thread-restored',
+          busy: false,
+          messages: [{
+            id: 'assistant-interrupted',
+            role: 'assistant',
+            status: 'complete',
+            turnId: 'turn-interrupted',
+            parts: [{ type: 'text', text: 'Partial work', phase: 'commentary' }],
+          }],
+          turns: [{
+            id: 'turn-interrupted', status: 'interrupted', error: null, willRetry: false,
+            startedAt: null, completedAt: null, durationMs: null,
+          }],
+        },
+      },
+      actions: { continueInterruptedTurn, submit },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    const button = wrapper.get('button[aria-label="Continue"]');
+    expect(button.attributes()).not.toHaveProperty('disabled');
+
+    await button.trigger('click');
+
+    expect(continueInterruptedTurn).toHaveBeenCalledOnce();
+    expect(submit).not.toHaveBeenCalled();
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
+  });
+
+  it('continues an interrupted turn through a directly bound surface', async () => {
+    const surface = fakeSurfaceController();
+    surface.state.activeConversationId = 'thread-restored';
+    surface.state.activeTurnId = null;
+    surface.state.turns = [{
+      id: 'turn-interrupted', status: 'interrupted', error: null, willRetry: false,
+      startedAt: null, completedAt: null, durationMs: null,
+    }];
+    const wrapper = mount(CodexConversationPane, { props: { surface } });
+    await flushPromises();
+
+    await wrapper.get('button[aria-label="Continue"]').trigger('click');
+
+    expect(surface.continueInterruptedTurn).toHaveBeenCalledOnce();
+    expect(surface.sendMessage).not.toHaveBeenCalled();
+    expect(wrapper.emitted('continueInterruptedTurn')).toStrictEqual([[]]);
+  });
+
   it('keeps a controlled initial submission visible while the provider conversation is created', async () => {
     const submit = vi.fn(async () => undefined);
     const state = reactive<CodexConversationPaneState>({
@@ -3514,6 +3567,7 @@ function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurface
     answeredClientRequestIds: new Set<string>(),
     clearGoal: action,
     compactConversation: action,
+    continueInterruptedTurn: action,
     connect,
     createConversation: action,
     deleteTurn: action,

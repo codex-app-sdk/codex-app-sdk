@@ -39,7 +39,7 @@ describe('Codex surface bridge', () => {
     expect(isCodexSurfaceBridgeOperation(42)).toBe(false);
     expect(codexSurfaceBridgeArities).toStrictEqual({
       archiveConversation: [1, 1], cancelLogin: [0, 1], clearGoal: [0, 0],
-      compactConversation: [0, 0], connect: [0, 0], createConversation: [0, 1],
+      compactConversation: [0, 0], connect: [0, 0], continueInterruptedTurn: [0, 0], createConversation: [0, 1],
       deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
       editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
       listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
@@ -69,6 +69,7 @@ describe('Codex surface bridge', () => {
       { operation: 'clearGoal', args: [] },
       { operation: 'compactConversation', args: [] },
       { operation: 'connect', args: [] },
+      { operation: 'continueInterruptedTurn', args: [] },
       { operation: 'createConversation', args: [{ model: 'gpt-5', reasoningEffort: 'high', serviceTier: null, approvalPreset: 'full-access' }] },
       { operation: 'deleteConversation', args: ['conversation-1'] },
       { operation: 'deleteTurn', args: ['turn-1'] },

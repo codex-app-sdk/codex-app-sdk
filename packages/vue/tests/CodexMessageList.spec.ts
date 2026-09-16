@@ -664,6 +664,111 @@ describe('CodexMessageList', () => {
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(0);
   });
 
+  it('shows an interrupted work-only turn as stopped and initially expanded', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: null,
+        busy: false,
+        messages: [{
+          id: 'assistant-interrupted-work',
+          role: 'assistant',
+          status: 'complete',
+          turnId: 'turn-interrupted',
+          parts: [{ type: 'text', text: 'Partial verification.', phase: 'commentary' }],
+        }],
+        turns: [turnLifecycle('turn-interrupted', 'interrupted')],
+      },
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · Hide details');
+    expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('true');
+    expect(wrapper.text()).toContain('Partial verification.');
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · View details');
+    expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
+  });
+
+  it('keeps an interrupted partial final visible while its work starts collapsed', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: null,
+        busy: false,
+        messages: [{
+          id: 'assistant-interrupted-final',
+          role: 'assistant',
+          status: 'complete',
+          turnId: 'turn-interrupted-final',
+          parts: [
+            { type: 'text', text: 'Checking the repository.', phase: 'commentary' },
+            { type: 'text', text: 'Partial result.', phase: 'final_answer' },
+          ],
+        }],
+        turns: [turnLifecycle('turn-interrupted-final', 'interrupted')],
+      },
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · View details');
+    expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
+    expect(wrapper.get('.chat-work-group .chat-fold').classes()).not.toContain('chat-fold--open');
+    expect(wrapper.text()).toContain('Partial result.');
+
+    await wrapper.get('.chat-work-group__header').trigger('click');
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · Hide details');
+    expect(wrapper.get('.chat-work-group .chat-fold').classes()).toContain('chat-fold--open');
+    expect(wrapper.text()).toContain('Checking the repository.');
+  });
+
+  it('labels failed work separately from completed work', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: null,
+        busy: false,
+        messages: [{
+          id: 'assistant-failed-work',
+          role: 'assistant',
+          status: 'complete',
+          turnId: 'turn-failed-work',
+          parts: [{ type: 'text', text: 'The command failed.', phase: 'commentary' }],
+        }],
+        turns: [turnLifecycle('turn-failed-work', 'failed')],
+      },
+    });
+
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Failed · Hide details');
+    expect(wrapper.text()).toContain('The command failed.');
+  });
+
+  it('renders a continued turn as new working output after the stopped turn', () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: 'turn-continuation',
+        busy: true,
+        messages: [
+          {
+            id: 'assistant-interrupted', role: 'assistant', status: 'complete', turnId: 'turn-interrupted',
+            parts: [{ type: 'text', text: 'Work before interruption.', phase: 'commentary' }],
+          },
+          {
+            id: 'assistant-continuation', role: 'assistant', status: 'streaming', turnId: 'turn-continuation',
+            parts: [{ type: 'text', text: 'Continuing now.', phase: 'commentary' }],
+          },
+        ],
+        turns: [
+          turnLifecycle('turn-interrupted', 'interrupted'),
+          turnLifecycle('turn-continuation', 'inProgress'),
+        ],
+      },
+    });
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Stopped · Hide details', 'Working']);
+    expect(wrapper.text()).toContain('Work before interruption.');
+    expect(wrapper.text()).toContain('Continuing now.');
+  });
+
   it('keeps a completed turn disclosure reachable while toggling its details', async () => {
     let resizeCallback: ResizeObserverCallback = () => undefined;
     vi.stubGlobal('MutationObserver', undefined);

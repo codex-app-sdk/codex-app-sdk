@@ -104,6 +104,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     cancelLogin: (loginId?: string) => run(() => api.cancelLogin(loginId)),
     clearGoal: () => run(() => api.clearGoal()),
     compactConversation: () => run(() => api.compactConversation()),
+    continueInterruptedTurn: () => run(() => api.continueInterruptedTurn()),
     connect: () => {
       mutableAnsweredClientRequestIds.clear();
       return run(() => api.connect());
