@@ -312,8 +312,9 @@ export class CodexSurfaceClientRequestsController {
     responder: CodexServerRequestResponder<'mcpServer/elicitation/request'>,
   ): boolean {
     const params = request.params;
+    if (params.mode !== 'form') return false;
     const meta = params._meta;
-    if (params.mode !== 'form' || !isRecord(meta) || meta.codex_approval_kind !== 'mcp_tool_call') return false;
+    if (!isRecord(meta) || meta.codex_approval_kind !== 'mcp_tool_call') return false;
     const requestId = String(request.id);
     const toolName = stringValue(meta.tool_name) ?? stringValue(meta.tool_title) ?? 'tool';
     const runtime = this.host.requireRuntime(params.threadId);

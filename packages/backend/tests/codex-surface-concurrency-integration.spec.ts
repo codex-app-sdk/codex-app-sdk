@@ -4,12 +4,12 @@ import {
   subscribeCodexConversationBridge,
   type CodexConversationBridgeNotification,
 } from '@codex-app-sdk/core/surface-bridge';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface, createCodexSurface } from '../src/node';
 import {
   createSurface,
   deferred,
-  FakeTransport,
+  MockCodexAppServer,
   lastRequest,
   lastResponse,
   requestsFor,
@@ -20,7 +20,7 @@ import {
 
 describe('CodexSurface', () => {
   it('forgets local conversation state without deleting the thread and recreates it on load', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/read': (params) => ({ thread: thread(String((params as { threadId: string }).threadId), false) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -102,7 +102,7 @@ describe('CodexSurface', () => {
 
   it('clears remembered host context and item-event deduplication when forgetting', async () => {
     const execute = vi.fn(async () => 'done');
-    const transport = new FakeTransport();
+    const transport = new MockCodexAppServer();
     const surface = new CodexSurface({
       client: new CodexAppServerClient(transport),
       extensions: [{
@@ -119,17 +119,15 @@ describe('CodexSurface', () => {
     await surface.conversation('thread-background').load({
       extensionContext: { stale: true },
     });
-    const emitRead = () => transport.emit({
-      method: 'item/started',
-      params: {
+    const emitRead = () => transport.emitNotification('item/started', {
         threadId: 'thread-background', turnId: 'turn-read', startedAtMs: 1,
-        item: {
+        item: { pluginId: null, scriptPath: null,
           type: 'commandExecution', id: 'read-file', command: 'cat README.md', cwd: '/tmp/project',
-          source: 'unifiedExec', status: 'inProgress',
-          commandActions: [{ type: 'read', name: 'README.md', path: 'README.md' }],
+          source: 'unifiedExecInteraction', status: 'inProgress',
+          commandActions: [{ type: 'read', command: 'cat README.md', name: 'README.md', path: 'README.md' }],
+          processId: null, aggregatedOutput: null, exitCode: null, durationMs: null,
         },
-      },
-    });
+      });
     emitRead();
     expect(fileEvents).toHaveLength(1);
 
@@ -137,23 +135,19 @@ describe('CodexSurface', () => {
     await surface.conversation('thread-background').load();
     emitRead();
     expect(fileEvents).toHaveLength(2);
-    transport.emit({
-      id: 'dynamic-after-forget',
-      method: 'item/tool/call',
-      params: {
+    transport.emitServerRequest('dynamic-after-forget', 'item/tool/call', {
         threadId: 'thread-background', turnId: 'turn-read', callId: 'call', namespace: null,
         tool: 'inspect', arguments: {},
-      },
-    });
+      });
     await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce());
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ extensionContext: undefined }));
   });
 
   it('starts an independent history load after forgetting an in-flight one', async () => {
-    const firstPage = deferred<{ data: unknown[]; nextCursor: null; backwardsCursor: null }>();
-    const secondPage = deferred<{ data: unknown[]; nextCursor: null; backwardsCursor: null }>();
+    const firstPage = deferred<v2.ThreadTurnsListResponse>();
+    const secondPage = deferred<v2.ThreadTurnsListResponse>();
     let pageIndex = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': (params) => ({
         ...resumeResponse(thread(String((params as { threadId: string }).threadId), false)),
         initialTurnsPage: { data: [], nextCursor: 'older', backwardsCursor: null },
@@ -179,10 +173,10 @@ describe('CodexSurface', () => {
   });
 
   it('invalidates the handle and in-flight history cache when a conversation is archived', async () => {
-    const firstPage = deferred<{ data: unknown[]; nextCursor: null; backwardsCursor: null }>();
-    const secondPage = deferred<{ data: unknown[]; nextCursor: null; backwardsCursor: null }>();
+    const firstPage = deferred<v2.ThreadTurnsListResponse>();
+    const secondPage = deferred<v2.ThreadTurnsListResponse>();
     let pageIndex = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': (params) => ({
         ...resumeResponse(thread(String((params as { threadId: string }).threadId), false)),
         initialTurnsPage: { data: [], nextCursor: 'older', backwardsCursor: null },
@@ -198,7 +192,7 @@ describe('CodexSurface', () => {
     const firstLoad = firstHandle.loadOlderHistory();
     await vi.waitFor(() => expect(requestsFor(transport, 'thread/turns/list')).toHaveLength(1));
 
-    transport.emit({ method: 'thread/archived', params: { threadId: 'thread-existing' } });
+    transport.emitNotification('thread/archived', { threadId: 'thread-existing' });
     await surface.unarchiveConversation('thread-existing');
     const secondHandle = surface.conversation('thread-existing');
     expect(secondHandle).not.toBe(firstHandle);
@@ -213,7 +207,7 @@ describe('CodexSurface', () => {
 
   it('clears remembered extension context when a conversation is archived', async () => {
     const execute = vi.fn(async () => 'done');
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/unarchive': (params) => ({
         thread: thread(String((params as { threadId: string }).threadId), false),
       }),
@@ -227,24 +221,20 @@ describe('CodexSurface', () => {
     await surface.connect();
     await surface.conversation('thread-existing').load({ extensionContext: { stale: true } });
 
-    transport.emit({ method: 'thread/archived', params: { threadId: 'thread-existing' } });
+    transport.emitNotification('thread/archived', { threadId: 'thread-existing' });
     await surface.unarchiveConversation('thread-existing');
     await surface.conversation('thread-existing').load();
-    transport.emit({
-      id: 'dynamic-after-archive',
-      method: 'item/tool/call',
-      params: {
+    transport.emitServerRequest('dynamic-after-archive', 'item/tool/call', {
         threadId: 'thread-existing', turnId: 'turn-after-archive', callId: 'call', namespace: null,
         tool: 'inspect', arguments: {},
-      },
-    });
+      });
 
     await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce());
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ extensionContext: undefined }));
   });
 
   it('removes a runtime-only conversation after its summary falls out of the catalog', async () => {
-    const transport = new FakeTransport();
+    const transport = new MockCodexAppServer();
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     const removed: string[] = [];
     surface.onEvent((event) => {
@@ -263,7 +253,7 @@ describe('CodexSurface', () => {
     ]));
     expect(runtimeOnlyHandle.getSnapshot().messages).not.toStrictEqual([]);
 
-    transport.emit({ method: 'thread/deleted', params: { threadId: 'thread-background' } });
+    transport.emitNotification('thread/deleted', { threadId: 'thread-background' });
 
     expect(surface.conversation('thread-background')).not.toBe(runtimeOnlyHandle);
     expect(surface.getConversationSnapshot('thread-background').messages).toStrictEqual([]);
@@ -271,8 +261,10 @@ describe('CodexSurface', () => {
   });
 
   it('enforces active-conversation defaults through the public factory', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({ data: [], nextCursor: null }),
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
     });
     const surface = createCodexSurface({
       autoSelectFirstConversation: false,
@@ -294,7 +286,7 @@ describe('CodexSurface', () => {
   });
 
   it('stops both surface and conversation state delivery after unsubscription', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start');
     await surface.connect();
     const surfaceListener = vi.fn();
     const conversationListener = vi.fn();
@@ -318,12 +310,9 @@ describe('CodexSurface', () => {
     unsubscribeSurface();
     unsubscribeConversation();
     unsubscribeBackground();
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: 'done',
-      },
-    });
+      });
 
     expect(surfaceListener).not.toHaveBeenCalled();
     expect(conversationListener).not.toHaveBeenCalled();
@@ -332,8 +321,8 @@ describe('CodexSurface', () => {
 
   it('keeps live runtime, approvals, client requests, and queued drains isolated per thread', async () => {
     let turnNumber = 0;
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -350,30 +339,19 @@ describe('CodexSurface', () => {
 
     await surface.selectConversation('thread-b');
     expect(surface.getSnapshot()).toMatchObject({ activeConversationId: 'thread-b', approvals: [] });
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-a', turnId: 'thread-a-turn-1', itemId: 'agent-a', delta: 'Background A',
-      },
-    });
-    transport.emit({
-      id: 'ask-a',
-      method: 'item/tool/requestUserInput',
-      params: {
+      });
+    transport.emitServerRequest('ask-a', 'item/tool/requestUserInput', { isBlocking: false,
         threadId: 'thread-a', turnId: 'thread-a-turn-1', itemId: 'ask-a-item', autoResolutionMs: null,
         questions: [{ id: 'q', header: 'Q', question: 'Continue A?', isOther: false, isSecret: false, options: null }],
-      },
-    });
-    transport.emit({
-      id: 'approval-a',
-      method: 'item/commandExecution/requestApproval',
-      params: {
+      });
+    transport.emitServerRequest('approval-a', 'item/commandExecution/requestApproval', { kind: 'command', startedAtMs: 1,
         threadId: 'thread-a', turnId: 'thread-a-turn-1', itemId: 'command-a',
         command: 'npm test', cwd: '/tmp/project', reason: null, environmentId: null,
         commandActions: [], networkApprovalContext: null, additionalPermissions: null,
         availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
-      },
-    });
+      });
     await new Promise<void>((resolve) => queueMicrotask(resolve));
     expect(surface.getSnapshot()).toMatchObject({ activeConversationId: 'thread-b', approvals: [] });
     expect(surface.getSnapshot().clientRequests).toStrictEqual([]);
@@ -403,10 +381,7 @@ describe('CodexSurface', () => {
     await surface.resolveApproval('approval-a', 'deny');
 
     await surface.selectConversation('thread-b');
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-a', turn: turn('thread-a-turn-1', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-a', turn: turn('thread-a-turn-1', 'completed', []) });
     await vi.waitFor(() => expect(
       transport.sent.filter((message) => 'method' in message && message.method === 'turn/start'),
     ).toHaveLength(2));
@@ -424,8 +399,8 @@ describe('CodexSurface', () => {
   });
 
   it('hydrates an uncached background thread before projecting its live status', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -433,10 +408,7 @@ describe('CodexSurface', () => {
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
-    transport.emit({
-      method: 'thread/status/changed',
-      params: { threadId: 'thread-b', status: { type: 'active', activeFlags: [] } },
-    });
+    transport.emitNotification('thread/status/changed', { threadId: 'thread-b', status: { type: 'active', activeFlags: [] } });
 
     await surface.selectConversation('thread-b');
     expect(transport.sent.filter((message) => (
@@ -449,8 +421,8 @@ describe('CodexSurface', () => {
   });
 
   it('runs independent conversation handles concurrently and delivers background state and approvals', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -463,9 +435,9 @@ describe('CodexSurface', () => {
         return {
           data: [{
             cwd,
-            skills: [{
+            skills: [{ pluginId: null,
               name: `skill-${cwd}`, description: `Skill for ${cwd}`, path: `${cwd}/SKILL.md`,
-              scope: 'repo', enabled: true, interface: null,
+              scope: 'repo', enabled: true, interface: undefined,
             }],
             errors: [],
           }],
@@ -517,12 +489,9 @@ describe('CodexSurface', () => {
     await a.select();
     aListener.mockClear();
     bListener.mockClear();
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: 'Foreground A',
-      },
-    });
+      });
     await vi.waitFor(() => expect(a.getSnapshot().messages.flatMap((message) => message.parts)).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'text', text: 'Foreground A' }),
     ])));
@@ -531,12 +500,9 @@ describe('CodexSurface', () => {
 
     aListener.mockClear();
     bListener.mockClear();
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-b', turnId: 'turn-thread-b', itemId: 'agent-b', delta: 'Background B',
-      },
-    });
+      });
     await vi.waitFor(() => expect(bListener).toHaveBeenCalledWith(expect.objectContaining({
       activeConversationId: 'thread-b',
       messages: expect.arrayContaining([
@@ -548,15 +514,12 @@ describe('CodexSurface', () => {
       ]),
     })));
     bListener.mockClear();
-    transport.emit({
-      id: 'approval-b', method: 'item/commandExecution/requestApproval',
-      params: {
+    transport.emitServerRequest('approval-b', 'item/commandExecution/requestApproval', { kind: 'command', startedAtMs: 1,
         threadId: 'thread-b', turnId: 'turn-thread-b', itemId: 'command-b', command: 'npm test',
         cwd: '/workspace/b', reason: null, environmentId: null, commandActions: [],
         networkApprovalContext: null, additionalPermissions: null, availableDecisions: ['accept', 'decline'],
         proposedExecpolicyAmendment: null,
-      },
-    });
+      });
     await vi.waitFor(() => expect(b.getSnapshot().approvals).toMatchObject([{ id: 'approval-b' }]));
     expect(surface.getSnapshot()).toMatchObject({ activeConversationId: 'thread-a', approvals: [] });
     expect(b.getSnapshot().messages.flatMap((message) => message.parts)).toEqual(expect.arrayContaining([
@@ -570,8 +533,8 @@ describe('CodexSurface', () => {
   });
 
   it('bridges concurrent conversation mutations and streams without selection cross-talk', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -618,18 +581,12 @@ describe('CodexSurface', () => {
       { params: { threadId: 'thread-b' } },
     ]);
 
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-a', turnId: 'turn-thread-a', itemId: 'agent-a', delta: 'Stream A',
-      },
-    });
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+      });
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-b', turnId: 'turn-thread-b', itemId: 'agent-b', delta: 'Stream B',
-      },
-    });
+      });
     await vi.waitFor(() => expect(aNotifications).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'event', conversationId: 'thread-a', event: expect.objectContaining({ type: 'message.delta' }),
@@ -663,9 +620,11 @@ describe('CodexSurface', () => {
         text: `${(extensionContext as { agent: string }).agent}:${JSON.stringify(input)}`,
       }],
     }));
-    const transport = new FakeTransport({
-      'thread/list': () => ({ data: [thread('thread-existing', false)], nextCursor: null }),
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
     });
     const surface = new CodexSurface({
       autoSelectFirstConversation: false,
@@ -705,13 +664,10 @@ describe('CodexSurface', () => {
       },
     });
 
-    transport.emit({
-      id: 'dynamic-b', method: 'item/tool/call',
-      params: {
+    transport.emitServerRequest('dynamic-b', 'item/tool/call', {
         threadId: 'thread-existing', turnId: 'turn-b', callId: 'call-b', namespace: null,
         tool: 'lookup_ticket', arguments: { id: 'SDK-42' },
-      },
-    });
+      });
     await vi.waitFor(() => expect(lastResponse(transport, 'dynamic-b')).toMatchObject({
       result: { success: true, contentItems: [{ type: 'inputText', text: 'b:{"id":"SDK-42"}' }] },
     }));
@@ -724,9 +680,11 @@ describe('CodexSurface', () => {
   });
 
   it('applies typed main-process MCP servers on conversation start and resume', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({ data: [thread('thread-existing', false)], nextCursor: null }),
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
     });
     const surface = new CodexSurface({
       autoSelectFirstConversation: false,
@@ -772,9 +730,11 @@ describe('CodexSurface', () => {
   });
 
   it('supports stdio MCP definitions and per-conversation replacement or disabling', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({ data: [thread('thread-existing', false)], nextCursor: null }),
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
     });
     const surface = new CodexSurface({
       autoSelectFirstConversation: false,
@@ -821,8 +781,8 @@ describe('CodexSurface', () => {
   });
 
   it('validates typed MCP definitions and raw-config collisions', async () => {
-    const client = () => new CodexAppServerClient(new FakeTransport({
-      'thread/list': () => ({ data: [], nextCursor: null }),
+    const client = () => new CodexAppServerClient(new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
     }));
     expect(() => new CodexSurface({
       client: client(),

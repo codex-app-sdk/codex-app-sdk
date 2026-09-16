@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
-import { generatedPngBase64, FakeTransport, createSurface, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
+import { generatedPngBase64, MockCodexAppServer, createSurface, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
   it('continues the latest interrupted turn without creating a user message', async () => {
     const interrupted = turn('turn-interrupted', 'interrupted', [
       {
         type: 'agentMessage', id: 'agent-interrupted', text: 'Partial work',
-        phase: 'commentary', memoryCitation: null,
+        phase: 'commentary', memoryCitation: null, delivery: null, questions: null,
       },
     ]);
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': (params) => resumeResponse({
         ...thread(String((params as { threadId: string }).threadId), false),
         turns: [interrupted],
@@ -51,7 +51,7 @@ describe('CodexSurface', () => {
   });
 
   it('only continues an idle conversation whose latest turn is interrupted', async () => {
-    const completedTransport = new FakeTransport({
+    const completedTransport = new MockCodexAppServer({
       'thread/resume': (params) => resumeResponse({
         ...thread(String((params as { threadId: string }).threadId), false),
         turns: [turn('turn-completed', 'completed', [])],
@@ -65,7 +65,7 @@ describe('CodexSurface', () => {
     await expect(completedSurface.continueInterruptedTurn()).rejects.toThrow('latest turn is not interrupted');
     expect(lastRequest(completedTransport, 'turn/start')).toBeUndefined();
 
-    const { surface: activeSurface, transport: activeTransport } = createSurface();
+    const { surface: activeSurface, transport: activeTransport } = createSurface('turn/start');
     await activeSurface.connect();
     await activeSurface.sendMessage('Begin');
     const activeTurnStart = lastRequest(activeTransport, 'turn/start');
@@ -76,7 +76,7 @@ describe('CodexSurface', () => {
 
   it('restores an interrupted conversation when continuation fails', async () => {
     const interrupted = turn('turn-interrupted', 'interrupted', []);
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': (params) => resumeResponse({
         ...thread(String((params as { threadId: string }).threadId), false),
         turns: [interrupted],
@@ -99,7 +99,7 @@ describe('CodexSurface', () => {
   });
 
   it('publishes the authoritative turn identity for an optimistic user prompt', async () => {
-    const { surface } = createSurface();
+    const { surface } = createSurface('turn/start');
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
 
@@ -123,8 +123,8 @@ describe('CodexSurface', () => {
   });
 
   it('reconciles a turnless app-server user item with the pending optimistic prompt', async () => {
-    let resolveStart!: (value: { turn: Record<string, unknown> }) => void;
-    const transport = new FakeTransport({
+    let resolveStart!: (value: v2.TurnStartResponse) => void;
+    const transport = new MockCodexAppServer({
       'turn/start': () => new Promise((resolve) => { resolveStart = resolve; }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
@@ -134,16 +134,13 @@ describe('CodexSurface', () => {
 
     const sending = surface.sendMessage('One prompt');
     await vi.waitFor(() => expect(lastRequest(transport, 'turn/start')).toBeDefined());
-    transport.emit({
-      method: 'item/started',
-      params: {
+    transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-live', startedAtMs: 1_700_000_000_000,
         item: {
           type: 'userMessage', id: 'server-user', clientId: null,
           content: [{ type: 'text', text: 'One prompt', text_elements: [] }],
         },
-      },
-    });
+      });
     resolveStart({ turn: turn('turn-live', 'inProgress', []) });
     await sending;
 
@@ -156,7 +153,8 @@ describe('CodexSurface', () => {
   });
 
   it('reports invalid and failed steering without losing the active conversation', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
       'turn/steer': () => { throw new Error('steer rejected'); },
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
@@ -173,8 +171,10 @@ describe('CodexSurface', () => {
   });
 
   it('uses the authoritative turn returned after steering', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
       'turn/steer': () => ({ turnId: 'turn-after-steer' }),
+      'turn/interrupt': () => ({}),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -192,7 +192,7 @@ describe('CodexSurface', () => {
   });
 
   it('includes attachments in steering input and the optimistic steer message', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start', 'turn/steer');
     await surface.connect();
     await surface.sendMessage('Begin');
     await surface.steerMessage('Inspect these', {
@@ -224,7 +224,7 @@ describe('CodexSurface', () => {
   });
 
   it('handles completed start responses and running history', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': (params) => {
         const value = thread(String((params as { threadId: string }).threadId), false);
         value.status = { type: 'active', activeFlags: [] };
@@ -236,10 +236,7 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
     await surface.connect();
     expect((await surface.selectConversation('thread-existing')).busy).toBe(true);
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-running', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-running', 'completed', []) });
     await surface.sendMessage('Quick answer');
     expect(surface.getSnapshot().busy).toBe(false);
     await expect(surface.interrupt()).resolves.toMatchObject({ busy: false });
@@ -251,25 +248,19 @@ describe('CodexSurface', () => {
     surface.onEvent((event) => lifecycleEvents.push(event));
     await surface.connect();
     await surface.selectConversation('thread-existing');
-    transport.emit({ method: 'thread/name/updated', params: { threadId: 'thread-existing', threadName: 'Renamed' } });
-    transport.emit({
-      method: 'item/completed',
-      params: {
+    transport.emitNotification('thread/name/updated', { threadId: 'thread-existing', threadName: 'Renamed' });
+    transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-tool', completedAtMs: 1_700_000_002_000,
-        item: {
+        item: { pluginId: null, scriptPath: null,
           type: 'commandExecution', id: 'command', command: 'npm test', cwd: '/tmp/project', processId: null,
-          source: 'unifiedExec', status: 'failed', commandActions: [], aggregatedOutput: 'failed', exitCode: 1,
+          source: 'unifiedExecInteraction', status: 'failed', commandActions: [], aggregatedOutput: 'failed', exitCode: 1,
           durationMs: 20,
         },
-      },
-    });
-    transport.emit({
-      method: 'error',
-      params: {
+      });
+    transport.emitNotification('error', {
         threadId: 'thread-existing', turnId: 'turn-tool', willRetry: false,
-        error: { message: 'No network', codexErrorInfo: null, additionalDetails: null },
-      },
-    });
+        error: { message: 'No network', codexErrorInfo: null, additionalDetails: null, misalignment: null },
+      });
 
     const snapshot = surface.getSnapshot();
     expect(snapshot.conversations[0]).toMatchObject({ title: 'Renamed' });
@@ -280,27 +271,19 @@ describe('CodexSurface', () => {
       id: 'assistant-turn-tool',
       parts: [{ type: 'tool', status: 'failed' }],
     });
-    transport.emit({
-      id: 'close-approval',
-      method: 'item/commandExecution/requestApproval',
-      params: {
+    transport.emitServerRequest('close-approval', 'item/commandExecution/requestApproval', { kind: 'command', startedAtMs: 1,
         threadId: 'thread-existing', turnId: 'turn-close', itemId: 'command-close', command: 'npm test',
         cwd: '/tmp/project', reason: null, environmentId: null, commandActions: [],
         networkApprovalContext: null, additionalPermissions: null,
         availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
-      },
-    });
-    transport.emit({
-      id: 'close-input',
-      method: 'item/tool/requestUserInput',
-      params: {
+      });
+    transport.emitServerRequest('close-input', 'item/tool/requestUserInput', { isBlocking: false,
         threadId: 'thread-existing', turnId: 'turn-close', itemId: 'input-close', autoResolutionMs: null,
         questions: [{
           id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
           options: null,
         }],
-      },
-    });
+      });
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
       busy: true,
       approvals: [{ id: 'close-approval' }],
@@ -330,29 +313,24 @@ describe('CodexSurface', () => {
     surface.onEvent((event) => events.push(event));
     await surface.connect();
 
-    transport.emit({
-      method: 'item/started',
-      params: {
+    transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-files', startedAtMs: 1,
-        item: {
+        item: { pluginId: null, scriptPath: null,
           type: 'commandExecution', id: 'read-file', command: 'cat README.md', cwd: '/tmp/project',
-          source: 'unifiedExec', status: 'inProgress', commandActions: [
-            { type: 'read', name: 'README.md', path: 'README.md' },
+          source: 'unifiedExecInteraction', status: 'inProgress', commandActions: [
+            { type: 'read', command: 'cat README.md', name: 'README.md', path: 'README.md' },
           ],
+          processId: null, aggregatedOutput: null, exitCode: null, durationMs: null,
         },
-      },
-    });
-    transport.emit({
-      method: 'item/completed',
-      params: {
+      });
+    transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-files', completedAtMs: 2,
         item: {
           type: 'fileChange', id: 'create-file', status: 'completed', changes: [
-            { kind: 'add', path: 'src/new-file.ts' },
+            { kind: { type: 'add' }, path: 'src/new-file.ts', diff: '+export {}' },
           ],
         },
-      },
-    });
+      });
 
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -382,53 +360,41 @@ describe('CodexSurface', () => {
     surface.onEvent((event) => events.push(event));
     await surface.connect();
 
-    transport.emit({
-      method: 'item/started',
-      params: {
+    transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-image', startedAtMs: 1,
-        item: {
+        item: { failure: null,
           type: 'imageGeneration', id: 'image-live', status: 'inProgress',
           revisedPrompt: null, result: '',
         },
-      },
-    });
+      });
     expect(surface.getSnapshot().messages.find((message) => (
       message.parts.some((part) => part.type === 'tool' && part.id === 'image-live')
     ))?.parts).toStrictEqual([
       expect.objectContaining({ type: 'tool', id: 'image-live', status: 'running' }),
     ]);
 
-    transport.emit({
-      method: 'rawResponseItem/completed',
-      params: {
+    transport.emitNotification('rawResponseItem/completed', {
         threadId: 'thread-existing', turnId: 'turn-image',
         item: {
           type: 'image_generation_call', id: 'image-live', status: 'completed',
           revised_prompt: 'Draw the route map', result: generatedPngBase64,
         },
-      },
-    });
+      });
     expect(JSON.stringify(surface.getSnapshot())).not.toContain(generatedPngBase64);
 
-    const completedItem = {
+    const completedItem: v2.ThreadItem = {
       type: 'imageGeneration', id: 'image-live', status: 'completed',
       revisedPrompt: 'Draw the route map', result: generatedPngBase64,
-      savedPath: '/tmp/generated route.png',
+      savedPath: '/tmp/generated route.png', failure: null,
     };
-    transport.emit({
-      method: 'item/completed',
-      params: {
+    transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-image', completedAtMs: 2,
         item: completedItem,
-      },
-    });
-    transport.emit({
-      method: 'item/completed',
-      params: {
+      });
+    transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-image', completedAtMs: 2,
         item: completedItem,
-      },
-    });
+      });
 
     const message = surface.getSnapshot().messages.find((candidate) => (
       candidate.parts.some((part) => part.type === 'tool' && part.id === 'image-live')
@@ -477,69 +443,40 @@ describe('CodexSurface', () => {
     startedThread.name = 'Named thread';
     startedThread.status = { type: 'active', activeFlags: [] };
     startedThread.recencyAt = 1_700_000_010;
-    transport.emit({ method: 'thread/started', params: { thread: startedThread } });
-    transport.emit({ method: 'thread/name/updated', params: { threadId: 'missing', threadName: '' } });
-    transport.emit({
-      method: 'turn/started',
-      params: { threadId: 'thread-existing', turn: turn('turn-variant', 'inProgress', []) },
-    });
-    const command = {
-      type: 'commandExecution', id: 'command-variant', command: 'pwd', cwd: '/tmp/project', processId: null,
-      source: 'unifiedExec', status: 'inProgress', commandActions: [], aggregatedOutput: null, exitCode: null, durationMs: null,
+    transport.emitNotification('thread/started', { thread: startedThread });
+    transport.emitNotification('thread/name/updated', { threadId: 'missing', threadName: '' });
+    transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-variant', 'inProgress', []) });
+    const command: v2.ThreadItem = {
+      type: 'commandExecution', id: 'command-variant', pluginId: null, scriptPath: null,
+      command: 'pwd', cwd: '/tmp/project', processId: null,
+      source: 'unifiedExecInteraction', status: 'inProgress', commandActions: [], aggregatedOutput: null, exitCode: null, durationMs: null,
     };
-    transport.emit({
-      method: 'item/started',
-      params: { threadId: 'thread-existing', turnId: 'turn-variant', startedAtMs: 1, item: command },
-    });
-    transport.emit({
-      method: 'item/completed',
-      params: {
+    transport.emitNotification('item/started', { threadId: 'thread-existing', turnId: 'turn-variant', startedAtMs: 1, item: command });
+    transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-variant', completedAtMs: 2,
         item: { ...command, status: 'completed' },
-      },
-    });
-    const user = {
+      });
+    const user: v2.ThreadItem = {
       type: 'userMessage', id: 'user-variant', clientId: null,
       content: [{ type: 'text', text: 'Steer', text_elements: [] }],
     };
-    transport.emit({
-      method: 'item/started',
-      params: { threadId: 'thread-existing', turnId: 'turn-variant', startedAtMs: 3, item: user },
-    });
-    transport.emit({
-      method: 'item/started',
-      params: { threadId: 'thread-existing', turnId: 'turn-variant', startedAtMs: 3, item: user },
-    });
-    transport.emit({
-      method: 'item/started',
-      params: {
+    transport.emitNotification('item/started', { threadId: 'thread-existing', turnId: 'turn-variant', startedAtMs: 3, item: user });
+    transport.emitNotification('item/started', { threadId: 'thread-existing', turnId: 'turn-variant', startedAtMs: 3, item: user });
+    transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-variant', startedAtMs: 4,
         item: { type: 'contextCompaction', id: 'compact' },
-      },
-    });
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: { threadId: 'other', turnId: 'turn', itemId: 'ignored', delta: 'ignored' },
-    });
-    transport.emit({
-      method: 'item/started',
-      params: { threadId: 'other', turnId: 'turn', startedAtMs: 1, item: command },
-    });
-    transport.emit({ method: 'turn/completed', params: { threadId: 'other', turn: turn('turn', 'completed', []) } });
-    transport.emit({
-      method: 'error',
-      params: {
+      });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'other', turnId: 'turn', itemId: 'ignored', delta: 'ignored' });
+    transport.emitNotification('item/started', { threadId: 'other', turnId: 'turn', startedAtMs: 1, item: command });
+    transport.emitNotification('turn/completed', { threadId: 'other', turn: turn('turn', 'completed', []) });
+    transport.emitNotification('error', {
         threadId: 'other', turnId: 'turn', willRetry: false,
-        error: { message: 'Ignored', codexErrorInfo: null, additionalDetails: null },
-      },
-    });
-    transport.emit({
-      method: 'turn/completed',
-      params: {
+        error: { message: 'Ignored', codexErrorInfo: null, additionalDetails: null, misalignment: null },
+      });
+    transport.emitNotification('turn/completed', {
         threadId: 'thread-existing',
-        turn: { ...turn('turn-variant', 'failed', []), error: { message: 'Failed turn', codexErrorInfo: null, additionalDetails: null } },
-      },
-    });
+        turn: { ...turn('turn-variant', 'failed', []), error: { misalignment: null, message: 'Failed turn', codexErrorInfo: null, additionalDetails: null } },
+      });
 
     const snapshot = surface.getSnapshot();
     expect(snapshot.conversations.find((conversation) => conversation.id === 'thread-started')).toMatchObject({

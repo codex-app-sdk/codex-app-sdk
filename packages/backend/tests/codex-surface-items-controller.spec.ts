@@ -663,7 +663,7 @@ describe('CodexSurfaceItemsController', () => {
   it('emits exact ordinary tool lifecycle events and preserves tracked command output', () => {
     const setup = itemController();
     const started = item('commandExecution', {
-      id: 'command-1', command: 'printf test > output.txt', cwd: '/workspace', source: 'unifiedExec',
+      id: 'command-1', command: 'printf test > output.txt', cwd: '/workspace', source: 'unifiedExecInteraction',
       status: 'inProgress', commandActions: [], aggregatedOutput: null, exitCode: null, durationMs: null,
     });
     setup.controller.applyItem(started, false);
@@ -675,7 +675,7 @@ describe('CodexSurfaceItemsController', () => {
     });
 
     setup.controller.applyItem(item('commandExecution', {
-      id: 'command-1', command: 'printf test > output.txt', cwd: '/workspace', source: 'unifiedExec',
+      id: 'command-1', command: 'printf test > output.txt', cwd: '/workspace', source: 'unifiedExecInteraction',
       status: 'completed', commandActions: [], aggregatedOutput: 'done', exitCode: 0, durationMs: 5,
     }), true);
     expect(setup.controller.isForwardingCommandOutput('thread-1', 'command-1')).toBe(false);

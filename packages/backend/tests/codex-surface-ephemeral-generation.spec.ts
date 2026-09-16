@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import {
-  FakeTransport,
+  MockCodexAppServer,
   resumeResponse,
   thread,
   turn,
@@ -10,7 +10,7 @@ import {
 
 describe('CodexSurface ephemeral generation', () => {
   it('connects on demand and rejects active generation when the app-server disconnects', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/start': () => resumeResponse({
         ...thread('thread-disconnected', false),
         ephemeral: true,
@@ -33,7 +33,7 @@ describe('CodexSurface ephemeral generation', () => {
   });
 
   it('returns structured text without changing or emitting visible surface state', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/start': () => resumeResponse({
         ...thread('thread-ephemeral', false),
         ephemeral: true,
@@ -66,34 +66,25 @@ describe('CodexSurface ephemeral generation', () => {
     await vi.waitFor(() => expect(transport.sent.some((message) => (
       'method' in message && message.method === 'turn/start'
     ))).toBe(true));
-    transport.emit({
-      method: 'thread/started',
-      params: {
+    transport.emitNotification('thread/started', {
         thread: { ...thread('thread-ephemeral', false), ephemeral: true },
-      },
-    });
-    transport.emit({
-      method: 'item/completed',
-      params: {
+      });
+    transport.emitNotification('item/completed', {
         threadId: 'thread-ephemeral',
         turnId: 'turn-ephemeral',
         completedAtMs: 2,
-        item: {
+        item: { delivery: null, questions: null,
           type: 'agentMessage',
           id: 'result',
           text: '{"message":"fix: keep state isolated"}',
           phase: 'final_answer',
           memoryCitation: null,
         },
-      },
-    });
-    transport.emit({
-      method: 'turn/completed',
-      params: {
+      });
+    transport.emitNotification('turn/completed', {
         threadId: 'thread-ephemeral',
         turn: turn('turn-ephemeral', 'completed', []),
-      },
-    });
+      });
 
     await expect(resultPromise).resolves.toEqual({
       text: '{"message":"fix: keep state isolated"}',
@@ -141,7 +132,7 @@ describe('CodexSurface ephemeral generation', () => {
   });
 
   it('interrupts and unsubscribes when generation is aborted', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/start': () => resumeResponse({
         ...thread('thread-aborted', false),
         ephemeral: true,
@@ -174,7 +165,7 @@ describe('CodexSurface ephemeral generation', () => {
   });
 
   it('rejects an active generation when the owning surface closes', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/start': () => resumeResponse({
         ...thread('thread-closing', false),
         ephemeral: true,
@@ -194,7 +185,7 @@ describe('CodexSurface ephemeral generation', () => {
   });
 
   it('deletes and rejects a thread when app-server does not honor ephemeral creation', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/start': () => resumeResponse({
         ...thread('thread-persisted', false),
         ephemeral: false,

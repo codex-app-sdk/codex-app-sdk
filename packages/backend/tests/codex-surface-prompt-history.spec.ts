@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import { promptsFromSummaryTurns } from '../src/node/codex-surface-prompt-history';
-import { FakeTransport, responseFor, turn } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface prompt history', () => {
   it('reads one bounded summary page and retains only chronological visible user prompts', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/turns/list': (params) => {
         expect(params).toStrictEqual({
           threadId: 'thread-prompts',
@@ -21,7 +21,7 @@ describe('CodexSurface prompt history', () => {
               { type: 'userMessage', id: 'user-empty', clientId: null, content: [
                 { type: 'text', text: '(no user instructions)', text_elements: [] },
               ] },
-              { type: 'agentMessage', id: 'assistant-new', text: 'Ignored', phase: null, memoryCitation: null },
+              { type: 'agentMessage', id: 'assistant-new', text: 'Ignored', phase: null, memoryCitation: null, delivery: null, questions: null },
               { type: 'userMessage', id: 'user-new', clientId: null, content: [
                 { type: 'text', text: '$cp', text_elements: [] },
                 { type: 'skill', name: 'Commit-Push', path: '/skills/cp/SKILL.md' },
@@ -32,14 +32,13 @@ describe('CodexSurface prompt history', () => {
                 { type: 'text', text: '<context>hidden</context> First prompt ', text_elements: [] },
                 { type: 'image', url: 'data:image/png;base64,abc' },
               ] },
-              { type: 'agentMessage', id: 'assistant-old', text: 'Ignored', phase: null, memoryCitation: null },
+              { type: 'agentMessage', id: 'assistant-old', text: 'Ignored', phase: null, memoryCitation: null, delivery: null, questions: null },
             ]),
           ],
           nextCursor: 'older',
           backwardsCursor: null,
         };
       },
-      'thread/list': (params) => responseFor('thread/list', params),
     });
     const surface = new CodexSurface({
       client: new CodexAppServerClient(transport),
@@ -62,7 +61,7 @@ describe('CodexSurface prompt history', () => {
   });
 
   it('rejects an absent active conversation before requesting turns', async () => {
-    const transport = new FakeTransport();
+    const transport = new MockCodexAppServer();
     const surface = new CodexSurface({
       client: new CodexAppServerClient(transport),
       autoSelectFirstConversation: false,
@@ -75,7 +74,7 @@ describe('CodexSurface prompt history', () => {
   it('joins adjacent text inputs without separators and ignores non-text inputs', () => {
     expect(promptsFromSummaryTurns([promptTurn([
       { type: 'text', text: 'first', text_elements: [] },
-      { type: 'image', url: 'data:image/png;base64,abc', text: 'must not leak' },
+      { type: 'image', url: 'data:image/png;base64,abc' },
       { type: 'text', text: ' second', text_elements: [] },
     ])])).toStrictEqual(['first second']);
   });
@@ -140,8 +139,8 @@ describe('CodexSurface prompt history', () => {
   });
 });
 
-function promptTurn(content: unknown[]): v2.Turn {
+function promptTurn(content: v2.UserInput[]): v2.Turn {
   return turn('turn', 'completed', [
     { type: 'userMessage', id: 'user', clientId: null, content },
-  ]) as unknown as v2.Turn;
+  ]);
 }

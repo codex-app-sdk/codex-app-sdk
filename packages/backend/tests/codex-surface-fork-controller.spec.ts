@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceModel, CodexSurfaceSnapshot, SurfaceMessage } from '@codex-app-sdk/core/surface';
-import type { CodexAppServerClient } from '../src/codex';
+import type { CodexAppServerClient, v2 } from '../src/codex';
 import { initialAuthentication } from '../src/node/codex-surface-authentication';
 import { CodexSurfaceForkController } from '../src/node/codex-surface-fork-controller';
 import { createThreadRuntime, initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
@@ -454,13 +454,14 @@ function summary(id: string) {
   };
 }
 
-function turnWithMessages(id: string, user: string, assistant: string, status = 'completed') {
-  const items: unknown[] = [{
+function turnWithMessages(id: string, user: string, assistant: string, status: v2.TurnStatus = 'completed') {
+  const items: v2.ThreadItem[] = [{
     type: 'userMessage', id: `user-${id}`, clientId: null,
     content: [{ type: 'text', text: user, text_elements: [] }],
   }];
   if (assistant) items.push({
     type: 'agentMessage', id: `agent-${id}`, text: assistant, phase: null, memoryCitation: null,
+    delivery: null, questions: null,
   });
   return turn(id, status, items);
 }

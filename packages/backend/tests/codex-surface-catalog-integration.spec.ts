@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import {
-  FakeTransport,
+  MockCodexAppServer,
   deferred,
   lastRequest,
   lastResponse,
@@ -14,7 +14,7 @@ import {
 
 describe('CodexSurface', () => {
   it('connects before serving an explicit catalog request', async () => {
-    const transport = new FakeTransport();
+    const transport = new MockCodexAppServer();
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
 
     await expect(surface.listSkills()).resolves.toStrictEqual([]);
@@ -28,8 +28,8 @@ describe('CodexSurface', () => {
   });
 
   it('does not publish a catalog failure when closing with a refresh in flight', async () => {
-    const pluginCatalog = deferred<unknown>();
-    const transport = new FakeTransport({
+    const pluginCatalog = deferred<v2.PluginInstalledResponse>();
+    const transport = new MockCodexAppServer({
       'plugin/installed': () => pluginCatalog.promise,
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -49,7 +49,7 @@ describe('CodexSurface', () => {
   });
 
   it('does not bootstrap plugins while authentication is required', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -67,12 +67,12 @@ describe('CodexSurface', () => {
 
   it('publishes conversation skill changes from an explicit catalog refresh', async () => {
     let skillVersion = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'skills/list': () => ({
         data: [{
-          cwd: '/tmp/project', errors: [], skills: [{
+          cwd: '/tmp/project', errors: [], skills: [{ pluginId: null,
             name: `skill-${skillVersion}`, description: 'Skill', path: `/tmp/skill-${skillVersion}/SKILL.md`,
-            scope: 'repo', enabled: true, interface: null,
+            scope: 'repo', enabled: true, interface: undefined,
           }],
         }],
       }),
@@ -99,7 +99,7 @@ describe('CodexSurface', () => {
 
   it('retries a transient plugin catalog failure on an explicit conversation refresh', async () => {
     let attempts = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'plugin/installed': () => {
         attempts += 1;
         if (attempts === 1) throw new Error('catalog unavailable');
@@ -118,10 +118,12 @@ describe('CodexSurface', () => {
 
   it('materializes bounded local plugin icons without exposing filesystem URLs', async () => {
     const readPaths: string[] = [];
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'plugin/installed': () => ({
         marketplaces: [{
           name: 'local',
+          path: '/tmp/local-marketplace.json',
+          interface: null,
           plugins: [
             pluginSummary('local-plugin', 'local-plugin', {
               displayName: 'Local plugin',
@@ -171,30 +173,30 @@ describe('CodexSurface', () => {
 
   it('materializes bounded local skill icons without exposing filesystem paths', async () => {
     const readPaths: string[] = [];
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'skills/list': () => ({
         data: [{
           cwd: '/tmp/project',
           skills: [
-            {
+            { pluginId: null,
               name: 'branded-skill',
               description: 'A skill with catalog artwork',
               path: '/skills/branded/SKILL.md',
               scope: 'user',
               enabled: true,
-              interface: {
+              interface: { iconSmallUrl: null, iconLargeUrl: null,
                 displayName: 'Branded Skill',
                 iconSmall: '/skills/branded/icon-small.svg',
                 iconLarge: '/skills/branded/icon-large.png',
               },
             },
-            {
+            { pluginId: null,
               name: 'invalid-icons',
               description: 'A skill whose artwork cannot be exposed safely',
               path: '/skills/invalid/SKILL.md',
               scope: 'user',
               enabled: true,
-              interface: {
+              interface: { iconSmallUrl: null, iconLargeUrl: null,
                 iconSmall: '/skills/invalid/readme.txt',
                 iconLarge: '/skills/invalid/oversized.png',
               },
@@ -251,17 +253,17 @@ describe('CodexSurface', () => {
 
   it('rereads same-path skill icons when the skill catalog is force reloaded', async () => {
     let iconReads = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'skills/list': () => ({
         data: [{
           cwd: '/tmp/project',
-          skills: [{
+          skills: [{ pluginId: null,
             name: 'changing-skill',
             description: 'A skill whose icon can change in place',
             path: '/skills/changing/SKILL.md',
             scope: 'user',
             enabled: true,
-            interface: { iconSmall: '/skills/changing/icon.png' },
+            interface: { iconSmallUrl: null, iconLargeUrl: null, iconSmall: '/skills/changing/icon.png' },
           }],
           errors: [],
         }],
@@ -287,8 +289,8 @@ describe('CodexSurface', () => {
   it('refreshes the plugin catalog when the conversation cwd union grows', async () => {
     let includeSecondCwd = false;
     const pluginScopes: unknown[] = [];
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [
           thread('thread-existing', false),
           ...(includeSecondCwd ? [{ ...thread('thread-new-cwd', false), cwd: '/workspace/new' }] : []),
@@ -316,7 +318,7 @@ describe('CodexSurface', () => {
 
   it('refreshes the plugin catalog after creating a conversation in a new cwd', async () => {
     const pluginScopes: unknown[] = [];
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'plugin/installed': (params) => {
         pluginScopes.push(params);
         return { marketplaces: [], marketplaceLoadErrors: [] };
@@ -325,6 +327,7 @@ describe('CodexSurface', () => {
         const created = { ...thread('thread-new', false), cwd: '/workspace/new' };
         return { ...resumeResponse(created), cwd: '/workspace/new' };
       },
+      'thread/settings/update': () => ({}),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -340,7 +343,7 @@ describe('CodexSurface', () => {
   });
 
   it('deduplicates concurrent bootstrap and honors client and list configuration', async () => {
-    const transport = new FakeTransport();
+    const transport = new MockCodexAppServer();
     const surface = new CodexSurface({
       client: new CodexAppServerClient(transport),
       clientInfo: { name: 'custom_surface', version: '2.0.0' },
@@ -363,7 +366,9 @@ describe('CodexSurface', () => {
   });
 
   it('owns archive, unarchive, and permanent deletion lifecycle actions', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
+      'thread/archive': () => ({}),
+      'thread/delete': () => ({}),
       'thread/unarchive': (params) => ({
         thread: thread((params as { threadId: string }).threadId, false),
       }),
@@ -380,7 +385,7 @@ describe('CodexSurface', () => {
     selectedEvents.length = 0;
 
     const beforeUnknownRemoval = surface.getSnapshot();
-    transport.emit({ method: 'thread/deleted', params: { threadId: 'thread-unknown' } });
+    transport.emitNotification('thread/deleted', { threadId: 'thread-unknown' });
     expect(surface.getSnapshot()).toStrictEqual(beforeUnknownRemoval);
     expect(removedEvents).toStrictEqual([]);
 
@@ -416,7 +421,7 @@ describe('CodexSurface', () => {
       }),
     ]);
 
-    transport.emit({ method: 'thread/archived', params: { threadId: 'thread-existing' } });
+    transport.emitNotification('thread/archived', { threadId: 'thread-existing' });
     expect(removedEvents).toHaveLength(1);
 
     await surface.unarchiveConversation('thread-existing');
@@ -443,17 +448,18 @@ describe('CodexSurface', () => {
     ]);
     expect(selectedEvents).toHaveLength(1);
 
-    transport.emit({ method: 'thread/deleted', params: { threadId: 'thread-existing' } });
+    transport.emitNotification('thread/deleted', { threadId: 'thread-existing' });
     expect(removedEvents).toHaveLength(2);
     await expect(surface.deleteConversation('   ')).rejects.toThrow('Conversation id cannot be empty');
   });
 
   it('removes a background conversation without disturbing active state and rejects its pending work', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [thread('thread-existing', false), thread('thread-background', false)],
         nextCursor: null,
       }),
+      'thread/delete': () => ({}),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     const selectedEvents: CodexSurfaceEvent[] = [];
@@ -467,28 +473,20 @@ describe('CodexSurface', () => {
     await surface.connect();
     await surface.conversation('thread-background').load();
     selectedEvents.length = 0;
-    transport.emit({
-      id: 'background-approval',
-      method: 'item/commandExecution/requestApproval',
-      params: {
+    transport.emitServerRequest('background-approval', 'item/commandExecution/requestApproval', { kind: 'command', startedAtMs: 1,
         threadId: 'thread-background', turnId: 'turn-background', itemId: 'command-background',
         command: 'npm test', cwd: '/tmp/project', reason: null, environmentId: null,
         commandActions: [], networkApprovalContext: null, additionalPermissions: null,
         availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
-      },
-    });
-    transport.emit({
-      id: 'background-input',
-      method: 'item/tool/requestUserInput',
-      params: {
+      });
+    transport.emitServerRequest('background-input', 'item/tool/requestUserInput', { isBlocking: false,
         threadId: 'thread-background', turnId: 'turn-background', itemId: 'input-background',
         autoResolutionMs: null,
         questions: [{
           id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
           options: null,
         }],
-      },
-    });
+      });
     await vi.waitFor(() => expect(surface.getConversationSnapshot('thread-background')).toMatchObject({
       approvals: [{ id: 'background-approval' }],
       clientRequests: [{ id: 'background-input' }],

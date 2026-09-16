@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceSnapshot, SurfaceMessage } from '@codex-app-sdk/core/surface';
-import type { CodexAppServerClient } from '../src/codex';
+import type { CodexAppServerClient, v2 } from '../src/codex';
 import { initialAuthentication } from '../src/node/codex-surface-authentication';
 import { createThreadRuntime, initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
 import { CodexSurfaceTurnActionsController } from '../src/node/codex-surface-turn-actions-controller';
@@ -678,8 +678,8 @@ function assistantMessage(id: string, turnId: string, text: string): SurfaceMess
   };
 }
 
-function agentItem(text: string) {
-  return { type: 'agentMessage', id: 'agent', text, phase: null, memoryCitation: null };
+function agentItem(text: string): v2.ThreadItem {
+  return { type: 'agentMessage', id: 'agent', text, phase: null, memoryCitation: null, delivery: null, questions: null };
 }
 
 function paramsFor(request: ReturnType<typeof vi.fn>, method: string): unknown {

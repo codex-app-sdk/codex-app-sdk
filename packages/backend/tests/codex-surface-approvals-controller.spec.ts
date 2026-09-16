@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type ServerRequest } from '../src/codex';
 import type { CodexSurfaceSnapshot } from '@codex-app-sdk/core/surface';
 import {
   CodexSurfaceApprovalsController,
@@ -7,13 +7,13 @@ import {
 } from '../src/node/codex-surface-approvals-controller';
 import { createThreadRuntime, initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
 import { initialAuthentication } from '../src/node/codex-surface-authentication';
-import { FakeCodexTransport } from './helpers/fake-codex-transport';
+import { MockCodexAppServer } from './helpers/codex-surface-fixture';
 
 describe('CodexSurfaceApprovalsController', () => {
   it('surfaces, validates, and resolves an app-server approval', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('approval-1'));
+    setup.transport.emitServerRequestFrame(commandApproval('approval-1'));
     await vi.waitFor(() => expect(setup.controller.approvalsForThread('thread-1')).toHaveLength(1));
     expect(setup.runtime.busy).toBe(true);
     expect(setup.host.patchConversationStatus).toHaveBeenCalledWith('thread-1', 'active');
@@ -39,14 +39,14 @@ describe('CodexSurfaceApprovalsController', () => {
   it('denies approvals when a conversation closes and observes server resolution', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('approval-close'));
+    setup.transport.emitServerRequestFrame(commandApproval('approval-close'));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
     setup.controller.clearForThread('thread-1', 'conversation_closed');
     expect(setup.transport.sent).toContainEqual(expect.objectContaining({
       id: 'approval-close', result: { decision: 'decline' },
     }));
 
-    setup.transport.emit(commandApproval('approval-server'));
+    setup.transport.emitServerRequestFrame(commandApproval('approval-server'));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
     setup.controller.handleServerResolved('approval-server');
     expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', expect.objectContaining({
@@ -58,8 +58,8 @@ describe('CodexSurfaceApprovalsController', () => {
   it('filters approvals by conversation and denies all pending requests', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('first'));
-    setup.transport.emit(commandApproval('second', { threadId: 'thread-2', itemId: 'command-2' }));
+    setup.transport.emitServerRequestFrame(commandApproval('first'));
+    setup.transport.emitServerRequestFrame(commandApproval('second', { threadId: 'thread-2', itemId: 'command-2' }));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-2')).toBe(true));
 
     expect(setup.controller.approvalsForThread('thread-1').map(({ id }) => id)).toStrictEqual(['first']);
@@ -78,11 +78,11 @@ describe('CodexSurfaceApprovalsController', () => {
   it('unsubscribes and clears pending approvals when closed', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('before-close'));
+    setup.transport.emitServerRequestFrame(commandApproval('before-close'));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
 
     setup.controller.close();
-    setup.transport.emit(commandApproval('after-close'));
+    setup.transport.emitServerRequestFrame(commandApproval('after-close'));
 
     expect(setup.controller.approvalsForThread('thread-1')).toStrictEqual([]);
   });
@@ -90,7 +90,7 @@ describe('CodexSurfaceApprovalsController', () => {
   it('rejects unknown, invalid, mismatched, and unavailable resolutions without consuming approval', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('approval-1', { availableDecisions: ['accept', 'decline'] }));
+    setup.transport.emitServerRequestFrame(commandApproval('approval-1', { availableDecisions: ['accept', 'decline'] }));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
 
     await expect(setup.controller.resolve(undefined, 'missing', 'deny', 'once'))
@@ -112,7 +112,7 @@ describe('CodexSurfaceApprovalsController', () => {
   it('resolves an approval without a turn and emits exact host activity', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(legacyCommandApproval('legacy'));
+    setup.transport.emitServerRequestFrame(legacyCommandApproval('legacy'));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
     const approval = setup.controller.approvalsForThread('thread-1')[0];
     setup.host.emitEvent.mockClear();
@@ -136,9 +136,9 @@ describe('CodexSurfaceApprovalsController', () => {
   it('clears only one conversation and reports every denied approval exactly', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('first'));
-    setup.transport.emit(legacyCommandApproval('without-turn'));
-    setup.transport.emit(commandApproval('other', { threadId: 'thread-2', itemId: 'other-item' }));
+    setup.transport.emitServerRequestFrame(commandApproval('first'));
+    setup.transport.emitServerRequestFrame(legacyCommandApproval('without-turn'));
+    setup.transport.emitServerRequestFrame(commandApproval('other', { threadId: 'thread-2', itemId: 'other-item' }));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-2')).toBe(true));
     setup.host.emitEvent.mockClear();
     setup.host.patchRuntime.mockClear();
@@ -176,7 +176,7 @@ describe('CodexSurfaceApprovalsController', () => {
   it('handles known and unknown server resolutions with exact state refresh', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('server'));
+    setup.transport.emitServerRequestFrame(commandApproval('server'));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
     const approval = setup.controller.approvalsForThread('thread-1')[0];
     setup.host.emitEvent.mockClear();
@@ -202,7 +202,7 @@ describe('CodexSurfaceApprovalsController', () => {
   it('adds approvals with exact runtime, active snapshot, event, and activity updates', async () => {
     const setup = approvals();
     await setup.client.start();
-    setup.transport.emit(commandApproval('new'));
+    setup.transport.emitServerRequestFrame(commandApproval('new'));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
     const approval = setup.controller.approvalsForThread('thread-1')[0];
 
@@ -223,7 +223,7 @@ describe('CodexSurfaceApprovalsController', () => {
     const setup = approvals();
     setup.state.activeConversationId = null;
     await setup.client.start();
-    setup.transport.emit(legacyCommandApproval('background'));
+    setup.transport.emitServerRequestFrame(legacyCommandApproval('background'));
     await vi.waitFor(() => expect(setup.controller.hasForThread('thread-1')).toBe(true));
 
     expect(setup.host.markRuntimeTurnActive).not.toHaveBeenCalled();
@@ -237,7 +237,7 @@ describe('CodexSurfaceApprovalsController', () => {
 });
 
 function approvals() {
-  const transport = new FakeCodexTransport();
+  const transport = new MockCodexAppServer();
   const client = new CodexAppServerClient(transport);
   const state = initialSurfaceSnapshot(initialAuthentication());
   state.activeConversationId = 'thread-1';
@@ -282,12 +282,18 @@ function approvals() {
   };
 }
 
-function commandApproval(id: string, overrides: Record<string, unknown> = {}) {
+type CommandApprovalRequest = Extract<ServerRequest, { method: 'item/commandExecution/requestApproval' }>;
+type LegacyCommandApprovalRequest = Extract<ServerRequest, { method: 'execCommandApproval' }>;
+
+function commandApproval(
+  id: string,
+  overrides: Partial<CommandApprovalRequest['params']> = {},
+): CommandApprovalRequest {
   return {
     id,
     method: 'item/commandExecution/requestApproval',
     params: {
-      threadId: 'thread-1', turnId: 'turn-1', itemId: 'command-1', startedAtMs: 1,
+      kind: 'command', threadId: 'thread-1', turnId: 'turn-1', itemId: 'command-1', startedAtMs: 1,
       command: 'npm test', cwd: '/workspace', reason: 'Run tests', environmentId: null,
       networkApprovalContext: null, additionalPermissions: null,
       availableDecisions: ['accept', 'decline'],
@@ -296,7 +302,7 @@ function commandApproval(id: string, overrides: Record<string, unknown> = {}) {
   };
 }
 
-function legacyCommandApproval(id: string) {
+function legacyCommandApproval(id: string): LegacyCommandApprovalRequest {
   return {
     id,
     method: 'execCommandApproval',

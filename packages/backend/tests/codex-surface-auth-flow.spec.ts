@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
-import { FakeTransport, deferred, lastRequest, requestsFor, testModel, thread } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, deferred, lastRequest, requestsFor, resumeResponse, testModel, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
   it('reports a failed post-login account refresh on the surface', async () => {
     let accountReadCount = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => {
         accountReadCount += 1;
         if (accountReadCount === 1) return { account: null, requiresOpenaiAuth: true };
@@ -17,10 +17,7 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    transport.emit({
-      method: 'account/login/completed',
-      params: { loginId: 'login-error', success: true, error: null },
-    });
+    transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'login-error', success: true, error: null });
 
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
       error: 'post-login account refresh failed',
@@ -34,12 +31,15 @@ describe('CodexSurface', () => {
   });
 
   it('gates immediate post-login sends until auth-dependent catalogs finish loading', async () => {
-    let account: Record<string, unknown> | null = null;
-    const models = deferred<unknown>();
-    const transport = new FakeTransport({
+    let account: v2.Account | null = null;
+    const models = deferred<v2.ModelListResponse>();
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account, requiresOpenaiAuth: true }),
       'model/list': () => models.promise,
-      'thread/list': () => ({ data: [], nextCursor: null }),
+      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     });
     const surface = new CodexSurface({
       autoSelectFirstConversation: false,
@@ -49,10 +49,7 @@ describe('CodexSurface', () => {
     await surface.connect();
 
     account = { type: 'chatgpt', email: 'kid@example.test', planType: 'plus' };
-    transport.emit({
-      method: 'account/login/completed',
-      params: { loginId: 'login-immediate', success: true, error: null },
-    });
+    transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'login-immediate', success: true, error: null });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toMatchObject({
       type: 'chatgpt',
       email: 'kid@example.test',
@@ -79,11 +76,13 @@ describe('CodexSurface', () => {
   });
 
   it('invalidates local conversation state when the authoritative account identity changes', async () => {
-    let account = { type: 'chatgpt', email: 'account-a@example.test', planType: 'pro' };
-    const transport = new FakeTransport({
+    let account: Extract<v2.Account, { type: 'chatgpt' }> = {
+      type: 'chatgpt', email: 'account-a@example.test', planType: 'pro',
+    };
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account, requiresOpenaiAuth: true }),
-      'thread/list': () => ({
-        data: account.email.startsWith('account-a') ? [thread('thread-existing', false)] : [],
+      'thread/list': () => ({ backwardsCursor: null,
+        data: account.email?.startsWith('account-a') ? [thread('thread-existing', false)] : [],
         nextCursor: null,
       }),
     });
@@ -99,7 +98,7 @@ describe('CodexSurface', () => {
 
     account = { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' };
     events.length = 0;
-    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: 'plus' } });
+    transport.emitNotification('account/updated', { authMode: 'chatgpt', planType: 'plus' });
 
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
       authentication: {
@@ -123,15 +122,17 @@ describe('CodexSurface', () => {
   });
 
   it('retains account identity across account/read errors so a later account switch still invalidates state', async () => {
-    let account = { type: 'chatgpt', email: 'account-a@example.test', planType: 'pro' };
+    let account: Extract<v2.Account, { type: 'chatgpt' }> = {
+      type: 'chatgpt', email: 'account-a@example.test', planType: 'pro',
+    };
     let failAccountRead = false;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => {
         if (failAccountRead) throw new Error('account temporarily unavailable');
         return { account, requiresOpenaiAuth: true };
       },
-      'thread/list': () => ({
-        data: account.email.startsWith('account-a') ? [thread('thread-existing', false)] : [],
+      'thread/list': () => ({ backwardsCursor: null,
+        data: account.email?.startsWith('account-a') ? [thread('thread-existing', false)] : [],
         nextCursor: null,
       }),
     });
@@ -140,7 +141,7 @@ describe('CodexSurface', () => {
     expect(surface.getSnapshot().activeConversationId).toBe('thread-existing');
 
     failAccountRead = true;
-    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: 'pro' } });
+    transport.emitNotification('account/updated', { authMode: 'chatgpt', planType: 'pro' });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication).toMatchObject({
       status: 'error',
       account: { email: 'account-a@example.test' },
@@ -159,8 +160,8 @@ describe('CodexSurface', () => {
   });
 
   it('does not invalidate conversation state for metadata changes on the same account', async () => {
-    let account = { type: 'chatgpt', email: 'same@example.test', planType: 'plus' };
-    const transport = new FakeTransport({
+    let account: v2.Account = { type: 'chatgpt', email: 'same@example.test', planType: 'plus' };
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account, requiresOpenaiAuth: true }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -169,7 +170,7 @@ describe('CodexSurface', () => {
     const resumeCount = requestsFor(transport, 'thread/resume').length;
 
     account = { type: 'chatgpt', email: 'same@example.test', planType: 'pro' };
-    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: 'pro' } });
+    transport.emitNotification('account/updated', { authMode: 'chatgpt', planType: 'pro' });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toMatchObject({ planType: 'pro' }));
 
     expect(surface.getSnapshot()).toMatchObject({
@@ -180,8 +181,8 @@ describe('CodexSurface', () => {
   });
 
   it('deduplicates concurrent managed ChatGPT login starts', async () => {
-    const login = deferred<unknown>();
-    const transport = new FakeTransport({
+    const login = deferred<v2.LoginAccountResponse>();
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
       'account/login/start': () => login.promise,
     });
@@ -205,8 +206,8 @@ describe('CodexSurface', () => {
   });
 
   it('starts a managed ChatGPT device-code login on a headless surface', async () => {
-    let account: Record<string, unknown> | null = null;
-    const transport = new FakeTransport({
+    let account: v2.Account | null = null;
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account, requiresOpenaiAuth: true }),
       'account/login/start': () => ({
         type: 'chatgptDeviceCode',
@@ -235,10 +236,7 @@ describe('CodexSurface', () => {
       error: null,
     });
     account = { type: 'chatgpt', email: 'headless@example.test', planType: 'pro' };
-    transport.emit({
-      method: 'account/login/completed',
-      params: { loginId: 'device-login', success: true, error: null },
-    });
+    transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'device-login', success: true, error: null });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication).toMatchObject({
       account: { type: 'chatgpt', email: 'headless@example.test', planType: 'pro' },
       login: { status: 'completed', loginId: 'device-login', error: null },
@@ -252,8 +250,8 @@ describe('CodexSurface', () => {
 
   it('reuses a pending device code until that login is cancelled', async () => {
     let attempt = 0;
-    const firstAttempt = deferred<unknown>();
-    const transport = new FakeTransport({
+    const firstAttempt = deferred<v2.LoginAccountResponse>();
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
       'account/login/start': () => {
         attempt += 1;
@@ -293,7 +291,7 @@ describe('CodexSurface', () => {
     await surface.close();
   });
 
-  it.each([
+  it.each<[v2.LoginAccountResponse, string]>([
     [
       { type: 'chatgpt', loginId: 'browser-login', authUrl: 'https://auth.example.test/login' },
       "unexpected login type 'chatgpt'",
@@ -313,7 +311,7 @@ describe('CodexSurface', () => {
       'empty device user code',
     ],
   ])('rejects an invalid device-code login response: %s', async (response, message) => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
       'account/login/start': () => response,
     });
@@ -328,9 +326,9 @@ describe('CodexSurface', () => {
   });
 
   it('runs a trailing authoritative account refresh when login completes during an older refresh', async () => {
-    const staleRefresh = deferred<unknown>();
+    const staleRefresh = deferred<v2.GetAccountResponse>();
     let accountReadCount = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => {
         accountReadCount += 1;
         if (accountReadCount === 1) return { account: null, requiresOpenaiAuth: true };
@@ -344,12 +342,9 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: null } });
+    transport.emitNotification('account/updated', { authMode: 'chatgpt', planType: null });
     await vi.waitFor(() => expect(requestsFor(transport, 'account/read')).toHaveLength(2));
-    transport.emit({
-      method: 'account/login/completed',
-      params: { loginId: 'login-trailing', success: true, error: null },
-    });
+    transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'login-trailing', success: true, error: null });
     staleRefresh.resolve({ account: null, requiresOpenaiAuth: true });
 
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
@@ -363,9 +358,9 @@ describe('CodexSurface', () => {
   });
 
   it('still runs the trailing account refresh when the superseded refresh rejects', async () => {
-    const staleRefresh = deferred<unknown>();
+    const staleRefresh = deferred<v2.GetAccountResponse>();
     let accountReadCount = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => {
         accountReadCount += 1;
         if (accountReadCount === 1) return { account: null, requiresOpenaiAuth: true };
@@ -379,12 +374,9 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    transport.emit({ method: 'account/updated', params: { authMode: 'chatgpt', planType: null } });
+    transport.emitNotification('account/updated', { authMode: 'chatgpt', planType: null });
     await vi.waitFor(() => expect(requestsFor(transport, 'account/read')).toHaveLength(2));
-    transport.emit({
-      method: 'account/login/completed',
-      params: { loginId: 'login-after-error', success: true, error: null },
-    });
+    transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'login-after-error', success: true, error: null });
     staleRefresh.reject(new Error('superseded account read failed'));
 
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
@@ -399,17 +391,17 @@ describe('CodexSurface', () => {
   });
 
   it('refreshes the full authoritative account projection on account updates', async () => {
-    let account: Record<string, unknown> = {
+    let account: v2.Account = {
       type: 'chatgpt', email: 'before@example.test', planType: 'pro',
     };
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account, requiresOpenaiAuth: true }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
     account = { type: 'apiKey' };
-    transport.emit({ method: 'account/updated', params: { authMode: 'apikey', planType: null } });
+    transport.emitNotification('account/updated', { authMode: 'apikey', planType: null });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toStrictEqual({ type: 'apiKey' }));
     expect(requestsFor(transport, 'account/read')).toHaveLength(2);
     expect(transport.sent.some((message) => 'method' in message && message.method === 'getAuthStatus')).toBe(false);
@@ -417,7 +409,7 @@ describe('CodexSurface', () => {
 
   it('validates managed login responses and exposes cancellation and logout state', async () => {
     let signedOut = false;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => signedOut
         ? { account: null, requiresOpenaiAuth: true }
         : { account: { type: 'apiKey' }, requiresOpenaiAuth: true },
@@ -447,7 +439,7 @@ describe('CodexSurface', () => {
   });
 
   it('cancels the active login by default and rejects cancellation without one', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/login/start': () => ({
         type: 'chatgpt', loginId: 'login-default', authUrl: 'https://example.test/login',
       }),
@@ -465,7 +457,7 @@ describe('CodexSurface', () => {
     await surface.close();
 
     const withoutLogin = new CodexSurface({
-      client: new CodexAppServerClient(new FakeTransport()),
+      client: new CodexAppServerClient(new MockCodexAppServer()),
     });
     await withoutLogin.connect();
     await expect(withoutLogin.cancelLogin()).rejects.toThrow('Codex login id cannot be empty');

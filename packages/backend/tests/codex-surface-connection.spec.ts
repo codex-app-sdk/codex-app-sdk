@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
-import { FakeTransport, createSurface, deferred, lastRequest, pluginSummary, requestsFor, thread } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, createSurface, deferred, lastRequest, pluginSummary, requestsFor, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
   it('validates the trusted top-level CODEX_HOME seam and rejects transport conflicts', () => {
-    const client = new CodexAppServerClient(new FakeTransport());
+    const client = new CodexAppServerClient(new MockCodexAppServer());
     expect(() => new CodexSurface({ client, codexHome: 'relative/home' })).toThrow(
       'codexHome must be an absolute path',
     );
@@ -24,7 +24,7 @@ describe('CodexSurface', () => {
   });
 
   it('enters an error state after disconnect and reconnects the app-server', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start');
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
     await surface.connect();
@@ -61,28 +61,20 @@ describe('CodexSurface', () => {
     surface.onEvent((event) => events.push(event));
     await surface.connect();
 
-    transport.emit({
-      id: 'disconnect-approval',
-      method: 'item/commandExecution/requestApproval',
-      params: {
+    transport.emitServerRequest('disconnect-approval', 'item/commandExecution/requestApproval', { kind: 'command', startedAtMs: 1,
         threadId: 'thread-existing', turnId: 'turn-disconnect', itemId: 'command-disconnect',
         command: 'npm test', cwd: '/tmp/project', reason: null, environmentId: null,
         commandActions: [], networkApprovalContext: null, additionalPermissions: null,
         availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
-      },
-    });
-    transport.emit({
-      id: 'disconnect-input',
-      method: 'item/tool/requestUserInput',
-      params: {
+      });
+    transport.emitServerRequest('disconnect-input', 'item/tool/requestUserInput', { isBlocking: false,
         threadId: 'thread-existing', turnId: 'turn-disconnect', itemId: 'input-disconnect',
         autoResolutionMs: null,
         questions: [{
           id: 'answer', header: 'Answer', question: 'Continue?', isOther: false, isSecret: false,
           options: null,
         }],
-      },
-    });
+      });
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
       approvals: [expect.objectContaining({ id: 'disconnect-approval' })],
       clientRequests: [expect.objectContaining({ id: 'disconnect-input' })],
@@ -106,10 +98,10 @@ describe('CodexSurface', () => {
   });
 
   it('clears authenticated state when a restarted app-server reports a signed-out account', async () => {
-    let account: Record<string, unknown> | null = {
+    let account: v2.Account | null = {
       type: 'chatgpt', email: 'before@example.test', planType: 'pro',
     };
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account, requiresOpenaiAuth: true }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -177,7 +169,7 @@ describe('CodexSurface', () => {
   });
 
   it('enables supported SDK runtime features when the app-server advertises them as disabled', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'experimentalFeature/list': () => ({
         data: [
           {
@@ -223,7 +215,7 @@ describe('CodexSurface', () => {
   });
 
   it('keeps older app-server releases usable when feature discovery is unavailable', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'experimentalFeature/list': () => Promise.reject(Object.assign(
         new Error('Method not found'),
         { code: -32601 },
@@ -236,8 +228,8 @@ describe('CodexSurface', () => {
   });
 
   it('exposes the installed plugin catalog with canonical ids and renderer-safe presentation metadata', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [
           thread('thread-existing', false),
           { ...thread('thread-other', false), cwd: '/workspace/other' },
@@ -247,6 +239,8 @@ describe('CodexSurface', () => {
       'plugin/installed': () => ({
         marketplaces: [{
           name: 'installed',
+          path: null,
+          interface: null,
           plugins: [
             pluginSummary('gmail@openai-curated-remote', 'gmail', {
               displayName: ' Gmail ',
@@ -314,8 +308,8 @@ describe('CodexSurface', () => {
   });
 
   it('does not block ready state on a cold installed-plugin lookup', async () => {
-    const pendingPlugins = deferred<unknown>();
-    const transport = new FakeTransport({
+    const pendingPlugins = deferred<v2.PluginInstalledResponse>();
+    const transport = new MockCodexAppServer({
       'plugin/installed': () => pendingPlugins.promise,
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -332,14 +326,17 @@ describe('CodexSurface', () => {
   });
 
   it('connects signed out and becomes fully usable after managed ChatGPT login completes', async () => {
-    let account: Record<string, unknown> | null = null;
-    const transport = new FakeTransport({
+    let account: v2.Account | null = null;
+    const transport = new MockCodexAppServer({
       'account/read': () => ({ account, requiresOpenaiAuth: true }),
       'account/login/start': () => ({
         type: 'chatgpt',
         loginId: 'login-1',
         authUrl: 'https://auth.example.test/login',
       }),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
 
@@ -369,10 +366,7 @@ describe('CodexSurface', () => {
     });
 
     account = { type: 'chatgpt', email: 'kid@example.test', planType: 'plus' };
-    transport.emit({
-      method: 'account/login/completed',
-      params: { loginId: 'login-1', success: true, error: null },
-    });
+    transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'login-1', success: true, error: null });
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
       status: 'ready',
       authentication: {

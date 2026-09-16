@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { createCodexConversationReplica } from '@codex-app-sdk/core';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
-import { FakeTransport, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, createSurface, deferred, lastRequest, resumeResponse, testGoal, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
   it('preserves completion and messages received while resume is pending', async () => {
@@ -11,16 +11,16 @@ describe('CodexSurface', () => {
     restored.status = { type: 'active', activeFlags: [] };
     restored.turns = [turn('race-turn', 'inProgress', [])];
     const response = deferred<ReturnType<typeof resumeResponse>>();
-    const transport = new FakeTransport({ 'thread/resume': () => response.promise });
+    const transport = new MockCodexAppServer({ 'thread/resume': () => response.promise });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     const connecting = surface.connect();
     await vi.waitFor(() => expect(lastRequest(transport, 'thread/resume')).toBeDefined());
-    transport.emit({ method: 'item/agentMessage/delta', params: {
+    transport.emitNotification('item/agentMessage/delta', {
       threadId: 'thread-existing', turnId: 'race-turn', itemId: 'race-answer', delta: 'Finished during resume',
-    } });
-    transport.emit({ method: 'turn/completed', params: {
+    });
+    transport.emitNotification('turn/completed', {
       threadId: 'thread-existing', turn: turn('race-turn', 'completed', []),
-    } });
+    });
     response.resolve(resumeResponse(restored));
     await connecting;
     expect(surface.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null,
@@ -36,7 +36,10 @@ describe('CodexSurface', () => {
       type: 'agentMessage', id: 'old-question', text: 'Pick one', phase: null,
       memoryCitation: null, delivery: 'async', questions: [{ title: 'Pick one', options: null }],
     }])];
-    const transport = new FakeTransport({ 'thread/resume': () => resumeResponse(restored) });
+    const transport = new MockCodexAppServer({
+      'thread/resume': () => resumeResponse(restored),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
+    });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
     expect(surface.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null, clientRequests: [] });
@@ -48,17 +51,17 @@ describe('CodexSurface', () => {
   });
 
   it('clears stale execution on authoritative idle even when turn/completed was missed', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start');
     await surface.connect();
     const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
     surface.onConversationEvent('thread-existing', (event) => replica.apply(event));
-    transport.emit({ method: 'turn/started', params: {
+    transport.emitNotification('turn/started', {
       threadId: 'thread-existing', turn: turn('lost-completion', 'inProgress', []),
-    } });
+    });
     expect(surface.getSnapshot().busy).toBe(true);
-    transport.emit({ method: 'thread/status/changed', params: {
+    transport.emitNotification('thread/status/changed', {
       threadId: 'thread-existing', status: { type: 'idle' },
-    } });
+    });
     expect(surface.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null });
     expect(surface.getSnapshot().turns).toContainEqual(expect.objectContaining({
       id: 'lost-completion', status: 'interrupted',
@@ -71,24 +74,19 @@ describe('CodexSurface', () => {
   });
 
   it('projects asynchronous agent questions as answerable surface requests', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start');
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
     await surface.connect();
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-existing',
         turnId: 'turn-question',
         itemId: 'agent-question',
         delta: 'I need one decision before continuing.',
-      },
-    });
+      });
     events.length = 0;
 
-    transport.emit({
-      method: 'item/completed',
-      params: {
+    transport.emitNotification('item/completed', {
         threadId: 'thread-existing',
         turnId: 'turn-question',
         completedAtMs: 1_700_000_002_000,
@@ -101,8 +99,7 @@ describe('CodexSurface', () => {
           delivery: 'async',
           questions: [{ title: 'Which framework should I use?', options: ['Vue', 'React'] }],
         },
-      },
-    });
+      });
 
     const request = {
       id: 'async-question:agent-question',
@@ -162,13 +159,10 @@ describe('CodexSurface', () => {
       turnId: 'turn-question',
       payload: { request },
     }));
-    transport.emit({
-      method: 'turn/completed',
-      params: {
+    transport.emitNotification('turn/completed', {
         threadId: 'thread-existing',
         turn: turn('turn-question', 'completed', []),
-      },
-    });
+      });
 
     await surface.conversation('thread-existing').respondToClientRequest({
       id: request.id,
@@ -201,7 +195,7 @@ describe('CodexSurface', () => {
 
   it('connects, returns state, publishes summaries, and refreshes plugins from conversation refresh', async () => {
     let pluginLoads = 0;
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'plugin/installed': () => {
         pluginLoads += 1;
         return { marketplaces: [], marketplaceLoadErrors: [] };
@@ -229,7 +223,7 @@ describe('CodexSurface', () => {
   });
 
   it('publishes the complete semantic state when creating a conversation', async () => {
-    const { surface } = createSurface();
+    const { surface } = createSurface('thread/start', 'thread/settings/update');
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
     await surface.connect();
@@ -264,7 +258,7 @@ describe('CodexSurface', () => {
   });
 
   it('restores conversation loading state when resume fails', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': () => {
         throw new Error('resume unavailable');
       },
@@ -284,8 +278,10 @@ describe('CodexSurface', () => {
   });
 
   it('creates a conversation when review starts before bootstrap without a selected thread', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({ data: [], nextCursor: null }),
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
       'review/start': (params) => ({
         turn: turn('turn-new-review', 'completed', []),
         reviewThreadId: (params as { threadId: string }).threadId,
@@ -317,7 +313,7 @@ describe('CodexSurface', () => {
 
   it('hydrates older history before rolling back to a non-materialized turn', async () => {
     const oldTurn = turn('turn-old', 'completed', []);
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': () => ({
         ...resumeResponse(thread('thread-existing', false)),
         initialTurnsPage: {
@@ -342,8 +338,8 @@ describe('CodexSurface', () => {
   });
 
   it('projects review startup and authoritative completion through conversation summaries', async () => {
-    const review = deferred<unknown>();
-    const transport = new FakeTransport({ 'review/start': () => review.promise });
+    const review = deferred<v2.ReviewStartResponse>();
+    const transport = new MockCodexAppServer({ 'review/start': () => review.promise });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
@@ -381,8 +377,8 @@ describe('CodexSurface', () => {
   });
 
   it('provides scoped conversation discovery, skill catalogs, attachments, and turn deletion', async () => {
-    const transport = new FakeTransport({
-      'thread/list': (params) => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': (params) => ({ backwardsCursor: null,
         data: [{ ...thread('thread-existing', true), cwd: String((params as { cwd?: string }).cwd ?? '/tmp/project') }],
         nextCursor: null,
       }),
@@ -391,14 +387,17 @@ describe('CodexSurface', () => {
         return {
           data: [{
             cwd,
-            skills: [{
+            skills: [{ pluginId: null,
               name: 'workspace-skill', description: cwd, path: `${cwd}/SKILL.md`, scope: 'repo',
-              enabled: true, interface: null,
+              enabled: true, interface: undefined,
             }],
             errors: [],
           }],
         };
       },
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
+      'turn/steer': () => ({ turnId: 'turn-live' }),
+      'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
     const events: CodexSurfaceEvent[] = [];
@@ -452,10 +451,7 @@ describe('CodexSurface', () => {
         ],
       },
     });
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
     const conversation = surface.conversation('thread-existing');
     expect(conversation.getSnapshot()).toMatchObject({
       activeTurnId: null,
@@ -498,7 +494,7 @@ describe('CodexSurface', () => {
   });
 
   it('preserves structured attachments when retrying and editing user messages', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start', 'thread/rollback');
     await surface.connect();
     const attachments = [
       {
@@ -511,10 +507,7 @@ describe('CodexSurface', () => {
       { type: 'file' as const, path: '/tmp/README.md', name: 'README', mimeType: 'text/markdown' },
     ];
     await surface.sendMessage('Original prompt', { attachments });
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
     await surface.retryTurn('turn-live');
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: {
@@ -525,10 +518,7 @@ describe('CodexSurface', () => {
         ],
       },
     });
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
     await surface.editTurn('turn-live', 'Edited prompt');
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: {
@@ -546,25 +536,19 @@ describe('CodexSurface', () => {
     runningThread.status = { type: 'active', activeFlags: [] };
     runningThread.turns = [turn('turn-running', 'inProgress', [
       { type: 'userMessage', id: 'user-running', clientId: null, content: [{ type: 'text', text: 'Continue', text_elements: [] }] },
-      { type: 'agentMessage', id: 'agent-running', text: 'Hello', phase: null, memoryCitation: null },
+      { type: 'agentMessage', id: 'agent-running', text: 'Hello', phase: null, memoryCitation: null, delivery: null, questions: null },
     ])];
-    const transport = new FakeTransport({
-      'thread/list': () => ({ data: [thread('thread-running', false)], nextCursor: null }),
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-running', false)], nextCursor: null }),
       'thread/resume': () => resumeResponse(runningThread),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-running', turnId: 'turn-running', itemId: 'agent-running', delta: ' world',
-      },
-    });
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-running', turn: turn('turn-running', 'completed', []) },
-    });
+      });
+    transport.emitNotification('turn/completed', { threadId: 'thread-running', turn: turn('turn-running', 'completed', []) });
 
     const assistant = surface.getSnapshot().messages.filter((message) => (
       message.role === 'assistant' && message.turnId === 'turn-running'
@@ -578,15 +562,16 @@ describe('CodexSurface', () => {
   });
 
   it('derives skill inputs from plain prompts and rejects renderer-supplied skill paths outside the catalog', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'skills/list': () => ({
         data: [{
           cwd: '/tmp/project', errors: [], skills: [
-            { name: 'pdf', description: 'PDF tools', path: '/trusted/pdf/SKILL.md', scope: 'user', enabled: true },
-            { name: 'disabled', description: 'Disabled', path: '/trusted/disabled/SKILL.md', scope: 'user', enabled: false },
+            { pluginId: null, name: 'pdf', description: 'PDF tools', path: '/trusted/pdf/SKILL.md', scope: 'user', enabled: true },
+            { pluginId: null, name: 'disabled', description: 'Disabled', path: '/trusted/disabled/SKILL.md', scope: 'user', enabled: false },
           ],
         }],
       }),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -617,11 +602,8 @@ describe('CodexSurface', () => {
   });
 
   it('preserves slash command semantics and exposes structured review, rename, and non-mutating history operations', async () => {
-    const goal = {
-      threadId: 'thread-existing', objective: 'Existing goal', status: 'active', tokenBudget: null,
-      tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1,
-    };
-    const transport = new FakeTransport({
+    const goal = testGoal({ objective: 'Existing goal' });
+    const transport = new MockCodexAppServer({
       'thread/goal/get': () => ({ goal }),
       'thread/resume': (params) => {
         const threadId = (params as { threadId: string }).threadId;
@@ -647,7 +629,7 @@ describe('CodexSurface', () => {
         return {
           data: threadId === 'thread-running-read'
             ? [turn('turn-running-read', 'inProgress', [])]
-            : (thread(threadId, true).turns as unknown[]),
+            : thread(threadId, true).turns,
           nextCursor: null,
           backwardsCursor: null,
         };
@@ -656,6 +638,9 @@ describe('CodexSurface', () => {
         turn: turn('review-complete', 'completed', []),
         reviewThreadId: (params as { threadId: string }).threadId,
       }),
+      'thread/settings/update': () => ({}),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
+      'thread/name/set': () => ({}),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     const events: CodexSurfaceEvent[] = [];
@@ -680,10 +665,7 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'turn/start')).toMatchObject({
       params: { threadId: 'thread-existing', input: [{ type: 'text', text: 'Build a plan' }] },
     });
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
 
     await surface.sendMessage('/review focus on regressions');
     expect(lastRequest(transport, 'review/start')).toMatchObject({
@@ -741,7 +723,9 @@ describe('CodexSurface', () => {
   });
 
   it('validates create settings before persistence and rejects detached responses for inline reviews', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
       'review/start': () => ({
         turn: turn('turn-review', 'inProgress', []),
         reviewThreadId: 'thread-detached',
@@ -768,18 +752,15 @@ describe('CodexSurface', () => {
   });
 
   it('does not clear optimistic busy state when a stale idle status arrives during turn/start', async () => {
-    const pendingTurn = deferred<unknown>();
-    const transport = new FakeTransport({
+    const pendingTurn = deferred<v2.TurnStartResponse>();
+    const transport = new MockCodexAppServer({
       'turn/start': () => pendingTurn.promise,
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
     const first = surface.sendMessage('First');
     await vi.waitFor(() => expect(lastRequest(transport, 'turn/start')).toBeDefined());
-    transport.emit({
-      method: 'thread/status/changed',
-      params: { threadId: 'thread-existing', status: { type: 'idle' } },
-    });
+    transport.emitNotification('thread/status/changed', { threadId: 'thread-existing', status: { type: 'idle' } });
     expect(surface.getSnapshot().busy).toBe(true);
     await surface.sendMessage('Second');
     expect(surface.getSnapshot().queuedPrompts).toMatchObject([{ text: 'Second' }]);
@@ -789,9 +770,10 @@ describe('CodexSurface', () => {
   });
 
   it('keeps plan mode selection isolated per thread across refreshed idle histories', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({ data: [thread('thread-a', false), thread('thread-b', false)], nextCursor: null }),
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-a', false), thread('thread-b', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
+      'thread/settings/update': () => ({}),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -807,8 +789,8 @@ describe('CodexSurface', () => {
   });
 
   it('keeps multiple conversation handles active and readable at the same time', async () => {
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)], nextCursor: null,
       }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, false)),
@@ -853,10 +835,10 @@ describe('CodexSurface', () => {
   });
 
   it('does not let out-of-order resume responses steal the active selection', async () => {
-    const resumeB = deferred<unknown>();
-    const resumeC = deferred<unknown>();
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const resumeB = deferred<v2.ThreadResumeResponse>();
+    const resumeC = deferred<v2.ThreadResumeResponse>();
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: [thread('thread-existing', false), thread('thread-b', false), thread('thread-c', false)],
         nextCursor: null,
       }),

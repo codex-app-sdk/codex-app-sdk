@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexMarkdownImageHydrator, localImagePath } from '../src/node/codex-markdown-images';
-import { FakeTransport, generatedPngBase64 } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, generatedPngBase64 } from './helpers/codex-surface-fixture';
 
 describe('CodexMarkdownImageHydrator', () => {
   const clients: CodexAppServerClient[] = [];
@@ -12,7 +12,7 @@ describe('CodexMarkdownImageHydrator', () => {
 
   it('materializes absolute and workspace-relative Markdown images through app-server', async () => {
     const paths: string[] = [];
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'fs/readFile': (params) => {
         paths.push((params as { path: string }).path);
         return { dataBase64: generatedPngBase64 };
@@ -36,7 +36,7 @@ describe('CodexMarkdownImageHydrator', () => {
   });
 
   it('leaves remote, unsafe, unsupported, invalid, and fenced image references unchanged', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'fs/readFile': () => ({ dataBase64: 'not-an-image' }),
     });
     const client = new CodexAppServerClient(transport);
@@ -58,7 +58,7 @@ describe('CodexMarkdownImageHydrator', () => {
 
   it('isolates read failures and invalid image data while hydrating later images', async () => {
     const paths: string[] = [];
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'fs/readFile': (params) => {
         const path = (params as { path: string }).path;
         paths.push(path);
@@ -85,7 +85,7 @@ describe('CodexMarkdownImageHydrator', () => {
 
   it('recognizes opening, closing, and unclosed fences without hiding later prose images', async () => {
     const paths: string[] = [];
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'fs/readFile': (params) => {
         paths.push((params as { path: string }).path);
         return { dataBase64: generatedPngBase64 };
@@ -116,7 +116,7 @@ describe('CodexMarkdownImageHydrator', () => {
 
   it('hydrates every supported extension and preserves Markdown title spacing', async () => {
     const paths: string[] = [];
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'fs/readFile': (params) => {
         paths.push((params as { path: string }).path);
         return { dataBase64: generatedPngBase64 };

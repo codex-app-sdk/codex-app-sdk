@@ -431,6 +431,7 @@ function requirements(overrides: Partial<v2.ConfigRequirements>): v2.ConfigRequi
     hooks: null,
     enforceResidency: null,
     network: null,
+    application: null,
     autoReview: null,
     models: null,
     sqliteHome: null,

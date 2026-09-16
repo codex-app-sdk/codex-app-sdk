@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceSnapshot, SurfaceMessage } from '@codex-app-sdk/core/surface';
-import type { CodexAppServerClient } from '../src/codex';
+import type { CodexAppServerClient, v2 } from '../src/codex';
 import { initialAuthentication } from '../src/node/codex-surface-authentication';
 import { CodexSurfaceConversationsController } from '../src/node/codex-surface-conversations-controller';
 import { createThreadRuntime, initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
@@ -693,7 +693,7 @@ function threadWith(id: string, overrides: Record<string, unknown> = {}) {
   return { ...thread(id, false), preview: id, ...overrides };
 }
 
-function turnWithUser(id: string, text: string, status = 'completed') {
+function turnWithUser(id: string, text: string, status: v2.TurnStatus = 'completed') {
   return turn(id, status, [{
     type: 'userMessage', id: `user-${id}`, clientId: null,
     content: [{ type: 'text', text, text_elements: [] }],

@@ -104,7 +104,8 @@ Do not commit `.vitepress/cache` or `.vitepress/dist`.
 
 ## Generated app-server schema
 
-Checked-in generated bindings currently target `codex-cli 0.151.0`.
+Checked-in generated bindings record their exact source CLI version in
+`packages/backend/src/codex/schema-version.ts`.
 
 ```bash
 npm run generate:schema
@@ -112,6 +113,12 @@ npm run generate:schema
 
 The generator records the source CLI version and recreates request/response,
 notification, and server-request types. Do not hand-edit generated files.
+
+`npm run check:schema` regenerates the complete protocol into a temporary
+directory using the installed real app-server and fails on any difference. It
+does not modify the checkout. This is the compatibility gate: when app-server
+changes, refresh the generated schema and make the SDK compile and pass its
+behavior tests against the new contract before updating the pinned CI CLI.
 
 After regeneration:
 
@@ -141,6 +148,9 @@ the documentation build output.
 
 Tests should prove risky boundaries:
 
+- app-server behavior through the strict, schema-typed
+  `MockCodexAppServer`, driving real `CodexAppServerClient` and `CodexSurface`
+  instances rather than mocking SDK controllers;
 - complete protocol request shapes and event ordering;
 - main/renderer policy separation;
 - cleanup of every IPC handler and transport listener;

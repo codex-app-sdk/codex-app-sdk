@@ -2,15 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
-import { FakeTransport, createSurface, lastRequest, testModel, thread, threadSettings, turn } from './helpers/codex-surface-fixture';
+import {
+  configRequirements, MockCodexAppServer, createSurface, lastRequest, resumeResponse,
+  testGoal, testModel, thread, threadSettings, turn,
+} from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
   it('connects and clears an authoritative goal when called before bootstrap', async () => {
-    const goal = {
-      threadId: 'thread-existing', objective: 'Clear me', status: 'active', tokenBudget: null,
-      tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1,
-    };
-    const transport = new FakeTransport({
+    const goal = testGoal({ objective: 'Clear me' });
+    const transport = new MockCodexAppServer({
       'thread/goal/get': () => ({ goal }),
       'thread/goal/clear': () => ({ cleared: true }),
     });
@@ -29,7 +29,9 @@ describe('CodexSurface', () => {
   });
 
   it('creates conversations with app-server-backed permission defaults and interrupts active turns', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface(
+      'thread/start', 'thread/settings/update', 'turn/start', 'turn/interrupt',
+    );
     await surface.connect();
     await surface.createConversation();
     const startRequest = transport.sent.find((message) => 'method' in message && message.method === 'thread/start');
@@ -45,14 +47,11 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'turn/interrupt')).toMatchObject({
       params: { threadId: 'thread-new', turnId: 'turn-live' },
     });
-    transport.emit({
-      method: 'turn/started',
-      params: { threadId: 'another-thread', turn: turn('ignored-turn', 'inProgress', []) },
-    });
+    transport.emitNotification('turn/started', { threadId: 'another-thread', turn: turn('ignored-turn', 'inProgress', []) });
   });
 
   it('maps product options, creates on first send, and queues concurrent prompts', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('thread/start', 'thread/settings/update', 'turn/start');
     await surface.connect();
     await surface.createConversation({
       approvalMode: 'ask', cwd: '/tmp/other', model: 'gpt-mini-runtime', permissionMode: 'full-access',
@@ -68,14 +67,14 @@ describe('CodexSurface', () => {
       queuedPrompts: [{ text: 'Second' }],
     });
 
-    const fresh = createSurface();
+    const fresh = createSurface('turn/start');
     await fresh.surface.sendMessage('Continue automatically');
     expect(lastRequest(fresh.transport, 'thread/start')).toBeUndefined();
     expect(lastRequest(fresh.transport, 'turn/start')).toMatchObject({ params: { threadId: 'thread-existing' } });
   });
 
   it('passes a host thread source to thread/start', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('thread/start', 'thread/settings/update');
     await surface.connect();
 
     await surface.createConversation({ threadSource: 'user' });
@@ -91,9 +90,12 @@ describe('CodexSurface', () => {
         data: [testModel('gpt-5.6-terra', 'gpt-5.6-terra', true)],
         nextCursor: null,
       }),
-      'thread/list': () => ({ data: [], nextCursor: null }),
+      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     };
-    const createTransport = new FakeTransport(responses);
+    const createTransport = new MockCodexAppServer(responses);
     const createSurface = new CodexSurface({
       autoSelectFirstConversation: false,
       client: new CodexAppServerClient(createTransport),
@@ -115,7 +117,7 @@ describe('CodexSurface', () => {
       },
     });
 
-    const automaticTransport = new FakeTransport(responses);
+    const automaticTransport = new MockCodexAppServer(responses);
     const automaticSurface = new CodexSurface({
       autoSelectFirstConversation: false,
       client: new CodexAppServerClient(automaticTransport),
@@ -134,7 +136,7 @@ describe('CodexSurface', () => {
   });
 
   it('updates model, reasoning, plan mode, and permissions through app-server settings', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('thread/settings/update');
     await surface.connect();
 
     const snapshot = await surface.updateConversationSettings({
@@ -170,17 +172,14 @@ describe('CodexSurface', () => {
   });
 
   it('uses a model selected during generation for the next queued turn', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start', 'thread/settings/update');
     await surface.connect();
     await surface.sendMessage('First turn');
 
     await surface.updateConversationSettings({ modelId: 'gpt-mini' });
     await surface.sendMessage('Next turn');
 
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
 
     await vi.waitFor(() => {
       const starts = transport.sent.filter((message) => 'method' in message && message.method === 'turn/start');
@@ -196,10 +195,13 @@ describe('CodexSurface', () => {
   });
 
   it('keeps catalogs and settings useful when there is no persisted conversation', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'model/list': () => ({ data: [], nextCursor: null }),
       'permissionProfile/list': () => ({ data: [], nextCursor: null }),
-      'thread/list': () => ({ data: [], nextCursor: null }),
+      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
 
@@ -224,10 +226,10 @@ describe('CodexSurface', () => {
   });
 
   it('degrades catalogs safely when app-server catalog requests fail', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'model/list': () => { throw new Error('models unavailable'); },
       'permissionProfile/list': () => { throw new Error('profiles unavailable'); },
-      'thread/list': () => ({ data: [], nextCursor: null }),
+      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
 
@@ -243,7 +245,7 @@ describe('CodexSurface', () => {
   });
 
   it('paginates catalogs and applies app-server permission requirements', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'model/list': (params) => (params as { cursor?: string | null }).cursor
         ? { data: [testModel('model-default', 'runtime-default', true)], nextCursor: null }
         : { data: [testModel('model-first', 'runtime-first', false)], nextCursor: 'models-2' },
@@ -260,14 +262,14 @@ describe('CodexSurface', () => {
             nextCursor: 'profiles-2',
           },
       'configRequirements/read': () => ({
-        requirements: {
+        requirements: configRequirements({
           allowedApprovalPolicies: ['on-request'],
           allowedApprovalsReviewers: ['user'],
-        },
+        }),
       }),
       'thread/list': (params) => (params as { cursor?: string | null }).cursor
-        ? { data: [thread('thread-second-page', false)], nextCursor: null }
-        : { data: [thread('thread-first-page', false)], nextCursor: 'threads-2' },
+        ? { backwardsCursor: null, data: [thread('thread-second-page', false)], nextCursor: null }
+        : { backwardsCursor: null, data: [thread('thread-first-page', false)], nextCursor: 'threads-2' },
     });
     const surface = new CodexSurface({
       approvalPreset: 'full-access',
@@ -298,7 +300,7 @@ describe('CodexSurface', () => {
   });
 
   it('rejects invalid settings and falls back to a supported effort when the model changes', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('thread/settings/update');
     await surface.connect();
 
     await expect(surface.updateConversationSettings({ modelId: 'missing' })).rejects.toThrow("Unknown model 'missing'");
@@ -318,7 +320,7 @@ describe('CodexSurface', () => {
   });
 
   it('supports focused settings updates and authoritative settings notifications', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('thread/settings/update');
     await surface.connect();
 
     await surface.updateConversationSettings({ approvalPreset: 'approve-for-me' });
@@ -330,9 +332,7 @@ describe('CodexSurface', () => {
       params: { collaborationMode: { mode: 'default' } },
     });
 
-    transport.emit({
-      method: 'thread/settings/updated',
-      params: {
+    transport.emitNotification('thread/settings/updated', {
         threadId: 'thread-existing',
         threadSettings: threadSettings({
           approvalPolicy: 'never',
@@ -346,8 +346,7 @@ describe('CodexSurface', () => {
           model: 'gpt-mini-runtime',
           effort: 'high',
         }),
-      },
-    });
+      });
     expect(surface.getSnapshot()).toMatchObject({
       approvalPreset: 'full-access',
       planMode: true,
@@ -355,21 +354,18 @@ describe('CodexSurface', () => {
       selectedReasoningEffort: 'high',
     });
 
-    transport.emit({
-      method: 'thread/settings/updated',
-      params: {
+    transport.emitNotification('thread/settings/updated', {
         threadId: 'thread-existing',
         threadSettings: threadSettings({
           approvalPolicy: 'on-request',
           approvalsReviewer: 'guardian_subagent',
         }),
-      },
-    });
+      });
     expect(surface.getSnapshot().approvalPreset).toBe('approve-for-me');
   });
 
   it('routes authoritative settings notifications to a background conversation', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('thread/settings/update');
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
     await surface.connect();
@@ -378,19 +374,18 @@ describe('CodexSurface', () => {
     await background.updateSettings({ approvalPreset: 'full-access' });
     events.length = 0;
 
-    transport.emit({
-      method: 'thread/settings/updated',
-      params: {
+    transport.emitNotification('thread/settings/updated', {
         threadId: 'thread-background',
         threadSettings: threadSettings({
           approvalPolicy: 'untrusted',
           approvalsReviewer: 'user',
           sandboxPolicy: { type: 'readOnly', networkAccess: false },
           activePermissionProfile: null,
-          collaborationMode: { mode: 'plan', settings: null },
+          collaborationMode: { mode: 'plan', settings: {
+            model: 'gpt-5', reasoning_effort: 'medium', developer_instructions: null,
+          } },
         }),
-      },
-    });
+      });
 
     expect(surface.getSnapshot()).toMatchObject({
       activeConversationId: 'thread-existing',
@@ -423,7 +418,7 @@ describe('CodexSurface', () => {
     ];
 
     for (const entry of cases) {
-      const transport = new FakeTransport({ 'thread/list': () => ({ data: [], nextCursor: null }) });
+      const transport = new MockCodexAppServer({ 'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }) });
       const surface = new CodexSurface({
         ...entry.options,
         client: new CodexAppServerClient(transport),

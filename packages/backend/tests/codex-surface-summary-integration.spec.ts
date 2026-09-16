@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
-import { FakeTransport, lastRequest, thread } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, lastRequest, thread } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface conversation summaries', () => {
   it('reads child metadata without loading turns or mutating surface state', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/read': (params) => ({
         thread: {
           ...thread(String((params as { threadId: string }).threadId), false),
@@ -53,7 +53,7 @@ describe('CodexSurface conversation summaries', () => {
   });
 
   it('rejects a summary returned for a different conversation', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/read': () => ({ thread: thread('thread-other', false) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });

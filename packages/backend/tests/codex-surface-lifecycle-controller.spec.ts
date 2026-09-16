@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '@codex-app-sdk/core/surface';
+import type { v2 } from '../src/codex';
 import {
   CodexSurfaceLifecycleController,
   type CodexSurfaceLifecycleHost,
@@ -206,7 +207,7 @@ describe('CodexSurfaceLifecycleController', () => {
       metadata: { conversationId: 'compacted', turnId: 'turn-compaction' },
     }];
 
-    const resumedThread = {
+    const resumedThread: v2.Thread = {
       ...thread('compacted', false),
       status: { type: 'active', activeFlags: [] },
       turns: [turn('turn-compaction', 'inProgress', [
@@ -214,9 +215,9 @@ describe('CodexSurfaceLifecycleController', () => {
           type: 'userMessage', id: 'user-compaction', clientId: null,
           content: [{ type: 'text', text: 'Continue after compaction.', text_elements: [] }],
         },
-        { type: 'agentMessage', id: 'before', text: 'Before.', phase: null, memoryCitation: null },
+        { type: 'agentMessage', id: 'before', text: 'Before.', phase: null, memoryCitation: null, delivery: null, questions: null },
         { type: 'contextCompaction', id: 'compaction' },
-        { type: 'agentMessage', id: 'after', text: 'After.', phase: null, memoryCitation: null },
+        { type: 'agentMessage', id: 'after', text: 'After.', phase: null, memoryCitation: null, delivery: null, questions: null },
       ])],
     };
     resume.resolve(resumeResponse(resumedThread));
@@ -283,7 +284,9 @@ describe('CodexSurfaceLifecycleController', () => {
 
   it('preserves paginated history mode across create, resume, and history resync', async () => {
     const setup = setupLifecycle();
-    const paginatedThread = (id: string) => ({ ...thread(id, false), historyMode: 'paginated' });
+    const paginatedThread = (id: string): v2.Thread => ({
+      ...thread(id, false), historyMode: 'paginated',
+    });
     setup.client.request.mockImplementation(async (method: string, params?: unknown) => {
       const threadId = String((params as { threadId?: string } | undefined)?.threadId ?? 'thread-new');
       if (method === 'thread/start') return resumeResponse(paginatedThread('thread-new'));
@@ -451,11 +454,11 @@ describe('CodexSurfaceLifecycleController', () => {
       { type: 'userMessage', id: 'user-old', clientId: null, content: [{ type: 'text', text: 'Old', text_elements: [] }] },
     ]);
     const running = turn('turn-live', 'inProgress', [
-      { type: 'agentMessage', id: 'agent-live', text: 'Working', phase: null, memoryCitation: null },
+      { type: 'agentMessage', id: 'agent-live', text: 'Working', phase: null, memoryCitation: null, delivery: null, questions: null },
     ]);
     const resumedThread = thread('target', false);
     resumedThread.status = { type: 'active', activeFlags: [] };
-    const response = resumeResponse(resumedThread);
+    const response = resumeResponse(resumedThread) as unknown as Record<string, unknown>;
     delete response.initialTurnsPage;
     response.cwd = null;
     setup.client.request.mockImplementation(async (method: string, params?: unknown) => {

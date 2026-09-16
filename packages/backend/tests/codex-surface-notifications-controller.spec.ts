@@ -225,7 +225,9 @@ describe('CodexSurfaceNotificationsController', () => {
     ['selectedModelId', { model: 'gpt-mini-runtime' }],
     ['selectedReasoningEffort', { effort: 'high' }],
     ['selectedServiceTier', { serviceTier: 'priority' }],
-    ['planMode', { collaborationMode: { mode: 'plan', settings: null } }],
+    ['planMode', { collaborationMode: { mode: 'plan', settings: {
+      model: 'gpt-5', reasoning_effort: 'medium', developer_instructions: null,
+    } } }],
   ] as const)('emits settings when only %s changes', (_field, overrides) => {
     const setup = createController({
       approvalPreset: 'ask-for-approval',

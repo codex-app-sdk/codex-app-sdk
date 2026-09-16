@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '@codex-app-sdk/core/surface';
-import type { CodexAppServerClient } from '../src/codex';
+import type { CodexAppServerClient, v2 } from '../src/codex';
 import { initialAuthentication } from '../src/node/codex-surface-authentication';
 import { initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
 import { CodexSurfaceTextGenerationController } from '../src/node/codex-surface-text-generation-controller';
@@ -489,11 +489,11 @@ function model(options: {
   };
 }
 
-function agentMessage(text: string) {
-  return { type: 'agentMessage', id: `agent-${text}`, text, phase: null, memoryCitation: null };
+function agentMessage(text: string): v2.ThreadItem {
+  return { type: 'agentMessage', id: `agent-${text}`, text, phase: null, memoryCitation: null, delivery: null, questions: null };
 }
 
-function turnWithMessage(id: string, status: string, text: string) {
+function turnWithMessage(id: string, status: v2.TurnStatus, text: string) {
   return turn(id, status, [agentMessage(text)]);
 }
 

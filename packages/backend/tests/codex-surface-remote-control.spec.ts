@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '../src/codex';
 import { CodexSurface } from '../src/node';
-import { FakeCodexTransport, lastRequest } from './helpers/fake-codex-transport';
+import { configRequirements, MockCodexAppServer, lastRequest } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface remote control', () => {
   it('exposes state-neutral pairing, client management, and managed requirements methods', async () => {
@@ -11,8 +11,11 @@ describe('CodexSurface remote control', () => {
       installationId: 'installation-1',
       environmentId: 'environment-1',
     };
-    const transport = new FakeCodexTransport({
-      'configRequirements/read': () => ({ requirements: { allowRemoteControl: true } }),
+    const requirements = configRequirements({ allowRemoteControl: true });
+    const transport = new MockCodexAppServer({
+      'configRequirements/read': () => ({
+        requirements,
+      }),
       'remoteControl/status/read': () => status,
       'remoteControl/enable': () => ({ ...status, status: 'connecting' as const }),
       'remoteControl/disable': () => ({ ...status, status: 'disabled' as const, environmentId: null }),
@@ -55,7 +58,7 @@ describe('CodexSurface remote control', () => {
       .resolves.toMatchObject({ data: [expect.objectContaining({ clientId: 'client-1' })], nextCursor: null });
     await expect(surface.revokeRemoteControlClient({ environmentId: 'environment-1', clientId: 'client-1' }))
       .resolves.toStrictEqual({});
-    await expect(surface.readConfigRequirements()).resolves.toStrictEqual({ allowRemoteControl: true });
+    await expect(surface.readConfigRequirements()).resolves.toStrictEqual(requirements);
 
     expect(surface.getSnapshot()).toStrictEqual(snapshotBeforeActions);
     expect(lastRequest(transport, 'remoteControl/enable')).toMatchObject({ params: { ephemeral: true } });

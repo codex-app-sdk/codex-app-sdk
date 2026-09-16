@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import {
-  FakeTransport,
+  MockCodexAppServer,
   lastRequest,
   lastResponse,
   requestsFor,
@@ -182,13 +182,10 @@ describe('CodexSurface conversation forks', () => {
       selectedReasoningEffort: 'high',
       selectedServiceTier: 'priority',
     });
-    transport.emit({
-      id: 'fork-context', method: 'item/tool/call',
-      params: {
+    transport.emitServerRequest('fork-context', 'item/tool/call', {
         threadId: 'thread-forked', turnId: 'turn-forked', callId: 'call-forked',
         namespace: null, tool: 'inspect', arguments: {},
-      },
-    });
+      });
     await vi.waitFor(() => expect(lastResponse(transport, 'fork-context')).toMatchObject({
       result: { success: true },
     }));
@@ -202,7 +199,7 @@ describe('CodexSurface conversation forks', () => {
       forkNextCursor: 'fork-older',
       forkOlderTurns: [turn('turn-forked-older', 'completed', [
         { type: 'userMessage', id: 'forked-older-user', clientId: null, content: [{ type: 'text', text: 'Older fork prompt', text_elements: [] }] },
-        { type: 'agentMessage', id: 'forked-older-agent', text: 'Older fork reply', phase: null, memoryCitation: null },
+        { type: 'agentMessage', id: 'forked-older-agent', text: 'Older fork reply', phase: null, memoryCitation: null, delivery: null, questions: null },
       ])],
     });
     const surface = new CodexSurface({
@@ -238,11 +235,11 @@ describe('CodexSurface conversation forks', () => {
       sourceTurns: [
         turn('turn-one', 'completed', [
           { type: 'userMessage', id: 'user-one', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
-          { type: 'agentMessage', id: 'agent-one', text: 'First reply', phase: null, memoryCitation: null },
+          { type: 'agentMessage', id: 'agent-one', text: 'First reply', phase: null, memoryCitation: null, delivery: null, questions: null },
         ]),
         turn('turn-two', 'completed', [
           { type: 'userMessage', id: 'user-two', clientId: null, content: [{ type: 'text', text: 'Second', text_elements: [] }] },
-          { type: 'agentMessage', id: 'agent-two', text: 'Second reply', phase: null, memoryCitation: null },
+          { type: 'agentMessage', id: 'agent-two', text: 'Second reply', phase: null, memoryCitation: null, delivery: null, questions: null },
         ]),
       ],
     });
@@ -263,7 +260,7 @@ describe('CodexSurface conversation forks', () => {
       sourceTurns: [
         turn('turn-one', 'completed', [
           { type: 'userMessage', id: 'user-one', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
-          { type: 'agentMessage', id: 'agent-one', text: 'First reply', phase: null, memoryCitation: null },
+          { type: 'agentMessage', id: 'agent-one', text: 'First reply', phase: null, memoryCitation: null, delivery: null, questions: null },
         ]),
         turn('turn-two', 'completed', [
           {
@@ -273,7 +270,7 @@ describe('CodexSurface conversation forks', () => {
               { type: 'localImage', path: '/tmp/second.png' },
             ],
           },
-          { type: 'agentMessage', id: 'agent-two', text: 'Second reply', phase: null, memoryCitation: null },
+          { type: 'agentMessage', id: 'agent-two', text: 'Second reply', phase: null, memoryCitation: null, delivery: null, questions: null },
         ]),
       ],
     });
@@ -306,18 +303,20 @@ function forkTransport(overrides: {
   serviceTier?: string | null;
   cwd?: string;
   reasoningEffort?: string | null;
-  sourceTurns?: unknown[];
+  sourceTurns?: v2.Turn[];
   forkNextCursor?: string | null;
-  forkOlderTurns?: unknown[];
-} = {}): FakeTransport {
+  forkOlderTurns?: v2.Turn[];
+} = {}): MockCodexAppServer {
   const forkedTurn = turn('turn-forked-history', 'completed', [
     {
       type: 'userMessage', id: 'forked-user', clientId: null,
       content: [{ type: 'text', text: 'Forked request', text_elements: [] }],
     },
-    { type: 'agentMessage', id: 'forked-agent', text: 'Forked reply', phase: null, memoryCitation: null },
+    { type: 'agentMessage', id: 'forked-agent', text: 'Forked reply', phase: null, memoryCitation: null, delivery: null, questions: null },
   ]);
-  return new FakeTransport({
+  return new MockCodexAppServer({
+    'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
+    'thread/settings/update': () => ({}),
     'thread/fork': () => ({
       thread: thread('thread-forked', false),
       model: overrides.model ?? 'gpt-5',
@@ -340,7 +339,7 @@ function forkTransport(overrides: {
       const { threadId, cursor } = params as { threadId: string; cursor: string | null };
       if (threadId !== 'thread-forked') {
         return {
-          data: overrides.sourceTurns ?? (thread('thread-existing', true).turns as unknown[]),
+          data: overrides.sourceTurns ?? thread('thread-existing', true).turns,
           nextCursor: null,
           backwardsCursor: null,
         };
@@ -355,7 +354,7 @@ function forkTransport(overrides: {
         ? resumeResponse({ ...thread('thread-forked', false), turns: [forkedTurn] })
         : resumeResponse({
           ...thread('thread-existing', false),
-          turns: overrides.sourceTurns ?? (thread('thread-existing', true).turns as unknown[]),
+          turns: (overrides.sourceTurns ?? thread('thread-existing', true).turns) as ReturnType<typeof turn>[],
         });
     },
   });

@@ -1,70 +1,25 @@
-import { vi } from 'vitest';
-import type { RpcMessage, RpcTransport } from '../../src/codex';
+import type { RpcMessage, v2 } from '../../src/codex';
 import { CodexAppServerClient } from '../../src/codex';
 import { CodexSurface } from '../../src/node';
+import {
+  MockCodexAppServer as StrictMockCodexAppServer,
+  type MockCodexAppServerHandlers,
+} from './mock-codex-app-server';
 
 export const generatedPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-export class FakeTransport implements RpcTransport {
-  readonly sent: RpcMessage[] = [];
-  readonly close = vi.fn(async () => undefined);
-  readonly start = vi.fn(async () => undefined);
-  private readonly messageListeners = new Set<(message: unknown) => void>();
-  private readonly errorListeners = new Set<(error: Error) => void>();
-
-  constructor(private readonly responses: Record<string, (params: unknown) => unknown> = {}) {}
-
-  send(message: RpcMessage): void {
-    this.sent.push(message);
-    if (!('id' in message) || !('method' in message)) return;
-    const params = 'params' in message ? message.params : undefined;
-    try {
-      const response = this.responses[message.method]?.(params) ?? responseFor(message.method, params);
-      void Promise.resolve(response).then(
-        (result) => this.emit({ id: message.id, result }),
-        (error: unknown) => this.emit({
-          id: message.id,
-          error: rpcTestError(error),
-        }),
-      );
-    } catch (error) {
-      queueMicrotask(() => this.emit({
-        id: message.id,
-        error: rpcTestError(error),
-      }));
-    }
-  }
-
-  onMessage(listener: (message: unknown) => void): () => void {
-    this.messageListeners.add(listener);
-    return () => this.messageListeners.delete(listener);
-  }
-
-  onError(listener: (error: Error) => void): () => void {
-    this.errorListeners.add(listener);
-    return () => this.errorListeners.delete(listener);
-  }
-
-  emit(message: unknown): void {
-    for (const listener of this.messageListeners) listener(message);
-  }
-
-  fail(error: Error): void {
-    for (const listener of this.errorListeners) listener(error);
+export class MockCodexAppServer extends StrictMockCodexAppServer {
+  constructor(overrides: MockCodexAppServerHandlers = {}) {
+    super({ ...defaultHandlers, ...overrides });
   }
 }
 
-function rpcTestError(error: unknown): { code: number; message: string } {
-  return {
-    code: typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'number'
-      ? error.code
-      : -1,
-    message: error instanceof Error ? error.message : String(error),
-  };
-}
+export type StandardMutation = keyof typeof standardMutationHandlers;
 
-export function createSurface(): { surface: CodexSurface; transport: FakeTransport } {
-  const transport = new FakeTransport();
+export function createSurface(
+  ...mutations: StandardMutation[]
+): { surface: CodexSurface; transport: MockCodexAppServer } {
+  const transport = new MockCodexAppServer(selectStandardMutations(mutations));
   return {
     transport,
     surface: new CodexSurface({
@@ -74,46 +29,76 @@ export function createSurface(): { surface: CodexSurface; transport: FakeTranspo
   };
 }
 
-export function responseFor(method: string, params: unknown): unknown {
-  switch (method) {
-    case 'initialize': return { userAgent: 'test' };
-    case 'account/read': return {
+function selectStandardMutations(methods: StandardMutation[]): MockCodexAppServerHandlers {
+  return Object.fromEntries(methods.map((method) => [method, standardMutationHandlers[method]]));
+}
+
+const standardMutationHandlers = {
+  'thread/start': () => resumeResponse(thread('thread-new', false)),
+  'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
+  'turn/steer': () => ({ turnId: 'turn-live' }),
+  'turn/interrupt': () => ({}),
+  'thread/compact/start': () => ({}),
+  'thread/settings/update': () => ({}),
+  'thread/name/set': () => ({}),
+  'thread/goal/clear': () => ({ cleared: true }),
+  'thread/archive': () => ({}),
+  'thread/delete': () => ({}),
+  'thread/realtime/start': () => ({}),
+  'thread/realtime/appendAudio': () => ({}),
+  'thread/realtime/appendText': () => ({}),
+  'thread/realtime/appendSpeech': () => ({}),
+  'thread/realtime/stop': () => ({}),
+  'review/start': () => ({
+    turn: turn('turn-review', 'inProgress', []),
+    reviewThreadId: 'thread-existing',
+  }),
+  'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
+} satisfies MockCodexAppServerHandlers;
+
+const defaultHandlers: MockCodexAppServerHandlers = {
+  initialize: () => ({
+    userAgent: 'test', codexHome: '/tmp/codex', platformFamily: 'unix', platformOs: 'macos',
+  }),
+  'account/read': () => ({
       account: { type: 'chatgpt', email: 'test@example.test', planType: 'pro' },
       requiresOpenaiAuth: true,
-    };
-    case 'model/list': return {
+    }),
+  'model/list': () => ({
       data: [
         {
           id: 'gpt-5', model: 'gpt-5', upgrade: null, upgradeInfo: null, availabilityNux: null,
-          displayName: 'GPT-5', description: 'Test model', hidden: false,
+          displayName: 'GPT-5', description: 'Test model', modelSpecialty: null, hidden: false,
           supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
           defaultReasoningEffort: 'medium', inputModalities: ['text'], supportsPersonality: true,
+          multiAgentVersion: null,
           additionalSpeedTiers: [], serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast mode' }], defaultServiceTier: null, isDefault: true,
         },
         {
           id: 'gpt-mini', model: 'gpt-mini-runtime', upgrade: null, upgradeInfo: null, availabilityNux: null,
-          displayName: 'GPT Mini', description: 'Fast model', hidden: false,
+          displayName: 'GPT Mini', description: 'Fast model', modelSpecialty: null, hidden: false,
           supportedReasoningEfforts: [
             { reasoningEffort: 'medium', description: 'Balanced' },
             { reasoningEffort: 'high', description: 'Deep' },
           ],
           defaultReasoningEffort: 'medium', inputModalities: ['text'], supportsPersonality: true,
+          multiAgentVersion: null,
           additionalSpeedTiers: [], serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast mode' }], defaultServiceTier: null, isDefault: false,
         },
       ],
       nextCursor: null,
-    };
-    case 'skills/list': return { data: [{ cwd: '/tmp/project', skills: [], errors: [] }] };
-    case 'plugin/installed': return { marketplaces: [], marketplaceLoadErrors: [] };
-    case 'permissionProfile/list': return {
+    }),
+  'skills/list': () => ({ data: [{ cwd: '/tmp/project', skills: [], errors: [] }] }),
+  'plugin/installed': () => ({ marketplaces: [], marketplaceLoadErrors: [] }),
+  'permissionProfile/list': () => ({
       data: [
         { id: ':read-only', description: null, allowed: true },
         { id: ':workspace', description: null, allowed: true },
         { id: ':danger-full-access', description: null, allowed: true },
       ],
       nextCursor: null,
-    };
-    case 'experimentalFeature/list': return {
+    }),
+  'experimentalFeature/list': () => ({
       data: [{
         name: 'compaction_image_budget',
         stage: 'stable',
@@ -124,57 +109,75 @@ export function responseFor(method: string, params: unknown): unknown {
         defaultEnabled: true,
       }],
       nextCursor: null,
-    };
-    case 'configRequirements/read': return { requirements: null };
-    case 'thread/list': return { data: [thread('thread-existing', false)], nextCursor: null };
-    case 'thread/turns/list': {
-      const threadId = String((params as { threadId: string }).threadId);
-      return {
-        data: (thread(threadId, true).turns as unknown[]),
+    }),
+  'configRequirements/read': () => ({ requirements: null }),
+  'thread/list': () => ({ data: [thread('thread-existing', false)], nextCursor: null, backwardsCursor: null }),
+  'thread/turns/list': (params) => ({
+        data: thread(params.threadId, true).turns,
         nextCursor: null,
         backwardsCursor: null,
-      };
-    }
-    case 'thread/resume': return resumeResponse(thread(String((params as { threadId: string }).threadId), true));
-    case 'thread/start': return resumeResponse(thread('thread-new', false));
-    case 'turn/start': return { turn: turn('turn-live', 'inProgress', []) };
-    case 'turn/steer': return { turnId: 'turn-live' };
-    case 'turn/interrupt': return {};
-    case 'thread/compact/start': return {};
-    case 'review/start': return { turn: turn('turn-review', 'inProgress', []), reviewThreadId: 'thread-existing' };
-    case 'thread/rollback': return { thread: thread('thread-existing', false) };
-    default: return {};
-  }
-}
+      }),
+  'thread/resume': (params) => resumeResponse(thread(params.threadId, true)),
+};
 
-export function thread(id: string, includeHistory: boolean): Record<string, unknown> {
+export function thread(id: string, includeHistory: boolean): v2.Thread {
   return {
     id,
+    environments: null,
+    extra: null,
+    sessionId: `session-${id}`,
+    forkedFromId: null,
+    parentThreadId: null,
     preview: id === 'thread-existing' ? 'Existing thread' : '',
+    ephemeral: false,
+    section: null,
+    sectionEnteredAt: null,
+    projectId: null,
+    historyMode: 'legacy',
+    modelProvider: 'openai',
+    model: 'gpt-5',
+    reasoningEffort: 'medium',
     name: null,
     cwd: '/tmp/project',
     status: { type: 'idle' },
+    path: null,
+    cliVersion: 'test',
+    originator: null,
+    source: 'appServer',
+    canAcceptDirectInput: true,
+    threadSource: null,
+    agentNickname: null,
+    agentRole: null,
+    gitInfo: null,
+    daybreakEnabled: null,
     createdAt: 1_700_000_000,
     updatedAt: 1_700_000_001,
     recencyAt: null,
     turns: includeHistory ? [turn('turn-history', 'completed', [
       { type: 'userMessage', id: 'user-history', clientId: null, content: [{ type: 'text', text: 'Hello', text_elements: [] }] },
-      { type: 'agentMessage', id: 'agent-history', text: 'Hi there', phase: null, memoryCitation: null },
+      { type: 'agentMessage', id: 'agent-history', text: 'Hi there', phase: null, memoryCitation: null, delivery: null, questions: null },
     ])] : [],
   };
 }
 
-export function turn(id: string, status: string, items: unknown[]): Record<string, unknown> {
-  return { id, status, items, startedAt: 1_700_000_000, completedAt: null, error: null };
+export function turn(id: string, status: v2.TurnStatus, items: v2.ThreadItem[]): v2.Turn {
+  return {
+    id, status, items, itemsView: 'full',
+    startedAt: 1_700_000_000, completedAt: null, durationMs: null, error: null,
+  };
 }
 
-export function resumeResponse(value: Record<string, unknown>): Record<string, unknown> {
-  const turns = Array.isArray(value.turns) ? value.turns : [];
+export function resumeResponse(value: v2.Thread): v2.ThreadResumeResponse {
+  const turns = value.turns;
   return {
     thread: { ...value, turns: [] },
     initialTurnsPage: { data: [...turns].reverse(), nextCursor: null, backwardsCursor: null },
     model: 'gpt-5',
+    modelProvider: 'openai',
+    serviceTier: null,
     cwd: '/tmp/project',
+    runtimeWorkspaceRoots: [],
+    instructionSources: [],
     approvalPolicy: 'on-request',
     approvalsReviewer: 'user',
     sandbox: {
@@ -183,10 +186,66 @@ export function resumeResponse(value: Record<string, unknown>): Record<string, u
     },
     activePermissionProfile: { id: ':workspace', extends: null },
     reasoningEffort: 'medium',
+    multiAgentMode: 'explicitRequestOnly',
+    turnsBackwardsCursor: null,
+    itemsBackwardsCursor: null,
   };
 }
 
-export function testModel(id: string, model: string, isDefault: boolean): Record<string, unknown> {
+export function testGoal(overrides: Partial<v2.ThreadGoal> = {}): v2.ThreadGoal {
+  return {
+    threadId: 'thread-existing',
+    objective: 'Ship it',
+    status: 'active',
+    tokenBudget: null,
+    tokensUsed: 0,
+    timeUsedSeconds: 0,
+    createdAt: 1,
+    updatedAt: 1,
+    ...overrides,
+  };
+}
+
+export function configRequirements(
+  overrides: Partial<v2.ConfigRequirements> = {},
+): v2.ConfigRequirements {
+  return {
+    cliAuthCredentialsStore: null,
+    chatgptBaseUrl: null,
+    additionalDeveloperInstructions: null,
+    allowedApprovalPolicies: null,
+    allowedApprovalsReviewers: null,
+    allowedSandboxModes: null,
+    allowedWindowsSandboxImplementations: null,
+    allowedPermissionProfiles: null,
+    defaultPermissions: null,
+    allowedWebSearchModes: null,
+    allowManagedHooksOnly: null,
+    allowBrowserAndComputerUse: null,
+    allowAppshots: null,
+    allowRemoteControl: null,
+    computerUse: null,
+    browserUse: null,
+    inAppBrowser: null,
+    featureRequirements: null,
+    hooks: null,
+    enforceResidency: null,
+    network: null,
+    application: null,
+    autoReview: null,
+    models: null,
+    sqliteHome: null,
+    logDir: null,
+    modelCatalogJson: null,
+    checkForUpdateOnStartup: null,
+    allowLoginShell: null,
+    feedback: null,
+    windowsSandboxPrivateDesktop: null,
+    ...overrides,
+  };
+}
+
+export function testModel(id: string, model: string, isDefault: boolean): v2.Model {
   return {
     id,
     model,
@@ -195,11 +254,13 @@ export function testModel(id: string, model: string, isDefault: boolean): Record
     availabilityNux: null,
     displayName: id,
     description: 'Test model',
+    modelSpecialty: null,
     hidden: false,
     supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
     defaultReasoningEffort: 'medium',
     inputModalities: ['text'],
     supportsPersonality: true,
+    multiAgentVersion: null,
     additionalSpeedTiers: [],
     serviceTiers: [],
     defaultServiceTier: null,
@@ -210,18 +271,53 @@ export function testModel(id: string, model: string, isDefault: boolean): Record
 export function pluginSummary(
   id: string,
   name: string,
-  pluginInterface: Record<string, unknown>,
-): Record<string, unknown> {
+  pluginInterface: Partial<v2.PluginInterface>,
+): v2.PluginSummary {
   return {
     id,
+    remotePluginId: null,
+    version: null,
+    localVersion: null,
     name,
+    shareContext: null,
+    source: { type: 'local', path: `/tmp/${id}` },
     installed: true,
+    installedAt: null,
     enabled: true,
-    interface: pluginInterface,
+    installPolicy: 'AVAILABLE',
+    installPolicySource: null,
+    mustShowInstallationInterstitial: null,
+    authPolicy: 'ON_USE',
+    availability: 'AVAILABLE',
+    disabledReason: null,
+    eligiblePlanTypes: null,
+    keywords: [],
+    interface: {
+      displayName: null,
+      shortDescription: null,
+      longDescription: null,
+      developerName: null,
+      category: null,
+      capabilities: [],
+      websiteUrl: null,
+      privacyPolicyUrl: null,
+      termsOfServiceUrl: null,
+      defaultPrompt: null,
+      brandColor: null,
+      composerIcon: null,
+      composerIconUrl: null,
+      logo: null,
+      logoDark: null,
+      logoUrl: null,
+      logoUrlDark: null,
+      screenshots: [],
+      screenshotUrls: [],
+      ...pluginInterface,
+    },
   };
 }
 
-export function threadSettings(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+export function threadSettings(overrides: Partial<v2.ThreadSettings> = {}): v2.ThreadSettings {
   return {
     cwd: '/tmp/project',
     approvalPolicy: 'on-request',
@@ -246,7 +342,7 @@ export function threadSettings(overrides: Record<string, unknown> = {}): Record<
   };
 }
 
-export function lastRequest(transport: FakeTransport, method: string): RpcMessage | undefined {
+export function lastRequest(transport: MockCodexAppServer, method: string): RpcMessage | undefined {
   for (let index = transport.sent.length - 1; index >= 0; index -= 1) {
     const message = transport.sent[index];
     if (message && 'method' in message && message.method === method) return message;
@@ -254,11 +350,11 @@ export function lastRequest(transport: FakeTransport, method: string): RpcMessag
   return undefined;
 }
 
-export function requestsFor(transport: FakeTransport, method: string): RpcMessage[] {
+export function requestsFor(transport: MockCodexAppServer, method: string): RpcMessage[] {
   return transport.sent.filter((message) => 'method' in message && message.method === method);
 }
 
-export function lastResponse(transport: FakeTransport, id: string | number): RpcMessage | undefined {
+export function lastResponse(transport: MockCodexAppServer, id: string | number): RpcMessage | undefined {
   for (let index = transport.sent.length - 1; index >= 0; index -= 1) {
     const message = transport.sent[index];
     if (message && 'id' in message && message.id === id && !('method' in message)) return message;

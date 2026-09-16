@@ -1,24 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../src/codex';
+import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import { createCodexConversationReplica } from '@codex-app-sdk/core';
 import type { CodexSurfaceEvent, SurfaceMessage } from '@codex-app-sdk/core/surface';
-import { FakeTransport, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
-function historyTurn(id: string, index: number): Record<string, unknown> {
+function historyTurn(id: string, index: number): v2.Turn {
   return turn(id, 'completed', [
     { type: 'userMessage', id: `${id}-user-1`, clientId: null, content: [{ type: 'text', text: `Older ${index} request`, text_elements: [] }] },
-    { type: 'agentMessage', id: `${id}-agent-1`, text: `Older ${index} first reply`, phase: null, memoryCitation: null },
+    { type: 'agentMessage', id: `${id}-agent-1`, text: `Older ${index} first reply`, phase: null, memoryCitation: null, delivery: null, questions: null },
     { type: 'userMessage', id: `${id}-user-2`, clientId: null, content: [{ type: 'text', text: `Older ${index} follow-up`, text_elements: [] }] },
-    { type: 'agentMessage', id: `${id}-agent-2`, text: `Older ${index} second reply`, phase: null, memoryCitation: null },
+    { type: 'agentMessage', id: `${id}-agent-2`, text: `Older ${index} second reply`, phase: null, memoryCitation: null, delivery: null, questions: null },
     { type: 'userMessage', id: `${id}-user-3`, clientId: null, content: [{ type: 'text', text: `Older ${index} last request`, text_elements: [] }] },
-    { type: 'agentMessage', id: `${id}-agent-3`, text: `Older ${index} last reply`, phase: null, memoryCitation: null },
+    { type: 'agentMessage', id: `${id}-agent-3`, text: `Older ${index} last reply`, phase: null, memoryCitation: null, delivery: null, questions: null },
   ]);
 }
 
 describe('CodexSurface', () => {
   it('loads history, sends a message, and reduces streaming events into surface state', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start', 'turn/steer');
     await surface.connect();
     const selected = await surface.selectConversation('thread-existing');
     const replica = createCodexConversationReplica(surface.conversation('thread-existing').getSnapshot());
@@ -50,18 +50,9 @@ describe('CodexSurface', () => {
       },
     });
 
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: 'Working' },
-    });
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: '… done' },
-    });
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) },
-    });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: 'Working' });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: '… done' });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
 
     const snapshot = surface.getSnapshot();
     const conversationSnapshot = surface.conversation('thread-existing').getSnapshot();
@@ -89,23 +80,25 @@ describe('CodexSurface', () => {
     const firstTurn = turn('turn-first', 'completed', [
       { type: 'userMessage', id: 'user-first', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
       {
-        type: 'commandExecution', id: 'command-first', command: 'npm test', cwd: '/tmp/project', processId: null,
-        source: 'unifiedExec', status: 'completed', commandActions: [], aggregatedOutput: 'passed', exitCode: 0,
+        type: 'commandExecution', id: 'command-first', pluginId: null, scriptPath: null,
+        command: 'npm test', cwd: '/tmp/project', processId: null,
+        source: 'unifiedExecInteraction', status: 'completed', commandActions: [], aggregatedOutput: 'passed', exitCode: 0,
         durationMs: 20,
       },
-      { type: 'agentMessage', id: 'agent-first', text: 'First reply', phase: null, memoryCitation: null },
+      { type: 'agentMessage', id: 'agent-first', text: 'First reply', phase: null, memoryCitation: null, delivery: null, questions: null },
     ]);
     const secondTurn = turn('turn-second', 'completed', [
       { type: 'userMessage', id: 'user-second', clientId: null, content: [{ type: 'text', text: 'Second', text_elements: [] }] },
       {
-        type: 'commandExecution', id: 'command-second', command: 'npm run build', cwd: '/tmp/project', processId: null,
-        source: 'unifiedExec', status: 'completed', commandActions: [], aggregatedOutput: 'passed', exitCode: 0,
+        type: 'commandExecution', id: 'command-second', pluginId: null, scriptPath: null,
+        command: 'npm run build', cwd: '/tmp/project', processId: null,
+        source: 'unifiedExecInteraction', status: 'completed', commandActions: [], aggregatedOutput: 'passed', exitCode: 0,
         durationMs: 20,
       },
-      { type: 'agentMessage', id: 'agent-second', text: 'Second reply', phase: null, memoryCitation: null },
+      { type: 'agentMessage', id: 'agent-second', text: 'Second reply', phase: null, memoryCitation: null, delivery: null, questions: null },
     ]);
-    const remainingFullPage = deferred<unknown>();
-    const transport = new FakeTransport({
+    const remainingFullPage = deferred<v2.ThreadTurnsListResponse>();
+    const transport = new MockCodexAppServer({
       'thread/resume': (params) => ({
         ...resumeResponse(thread(String((params as { threadId: string }).threadId), false)),
         initialTurnsPage: { data: [secondTurn], nextCursor: 'remaining-page-2', backwardsCursor: null },
@@ -169,11 +162,11 @@ describe('CodexSurface', () => {
   it('emits chronological non-cumulative batches during background hydration', async () => {
     const initialTurn = turn('turn-initial', 'completed', [
       { type: 'userMessage', id: 'user-initial', clientId: null, content: [{ type: 'text', text: 'Initial', text_elements: [] }] },
-      { type: 'agentMessage', id: 'agent-initial', text: 'Initial reply', phase: null, memoryCitation: null },
+      { type: 'agentMessage', id: 'agent-initial', text: 'Initial reply', phase: null, memoryCitation: null, delivery: null, questions: null },
     ]);
     const olderTurns = Array.from({ length: 5 }, (_, index) => historyTurn(`turn-older-${index}`, index));
-    const remainingPage = deferred<unknown>();
-    const transport = new FakeTransport({
+    const remainingPage = deferred<v2.ThreadTurnsListResponse>();
+    const transport = new MockCodexAppServer({
       'thread/resume': () => ({
         ...resumeResponse(thread('thread-existing', false)),
         initialTurnsPage: { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null },
@@ -225,10 +218,10 @@ describe('CodexSurface', () => {
   it('keeps older history demand-paged by default', async () => {
     const initialTurn = turn('turn-initial', 'completed', [
       { type: 'userMessage', id: 'user-initial', clientId: null, content: [{ type: 'text', text: 'Initial', text_elements: [] }] },
-      { type: 'agentMessage', id: 'agent-initial', text: 'Initial reply', phase: null, memoryCitation: null },
+      { type: 'agentMessage', id: 'agent-initial', text: 'Initial reply', phase: null, memoryCitation: null, delivery: null, questions: null },
     ]);
     const olderTurn = historyTurn('turn-older', 1);
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': () => ({
         ...resumeResponse(thread('thread-existing', false)),
         initialTurnsPage: { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null },
@@ -275,9 +268,9 @@ describe('CodexSurface', () => {
   });
 
   it('does not resurrect a completed turn from a stale background history page', async () => {
-    const staleFullPage = deferred<unknown>();
+    const staleFullPage = deferred<v2.ThreadTurnsListResponse>();
     const runningTurn = turn('turn-running', 'inProgress', []);
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': () => {
         const running = thread('thread-existing', false);
         running.status = { type: 'active', activeFlags: [] };
@@ -296,10 +289,7 @@ describe('CodexSurface', () => {
     await surface.connect();
     expect(surface.getSnapshot().busy).toBe(true);
 
-    transport.emit({
-      method: 'turn/completed',
-      params: { threadId: 'thread-existing', turn: turn('turn-running', 'completed', []) },
-    });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-running', 'completed', []) });
     expect(surface.getSnapshot().busy).toBe(false);
     staleFullPage.resolve({ data: [runningTurn], nextCursor: null, backwardsCursor: null });
     await vi.waitFor(() => expect(surface.conversation('thread-existing').getSnapshot().activeTurnId).toBeNull());
@@ -312,7 +302,7 @@ describe('CodexSurface', () => {
   });
 
   it('keeps an active resumed thread busy when its initial history page has no running turn', async () => {
-    const transport = new FakeTransport({
+    const transport = new MockCodexAppServer({
       'thread/resume': () => {
         const running = thread('thread-existing', false);
         running.status = { type: 'active', activeFlags: [] };
@@ -334,7 +324,7 @@ describe('CodexSurface', () => {
   });
 
   it('emits ordered semantic events after matching state mutations for conversation handles', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('thread/settings/update', 'turn/start');
     await surface.connect();
     const events: CodexSurfaceEvent[] = [];
     const handleEvents: CodexSurfaceEvent[] = [];
@@ -357,10 +347,7 @@ describe('CodexSurface', () => {
     const conversation = surface.conversation('thread-existing');
     const unsubscribeConversation = conversation.onEvent((event) => handleEvents.push(event));
 
-    transport.emit({
-      method: 'turn/started',
-      params: { threadId: 'thread-other', turn: turn('turn-other', 'inProgress', []) },
-    });
+    transport.emitNotification('turn/started', { threadId: 'thread-other', turn: turn('turn-other', 'inProgress', []) });
     expect(handleEvents).toStrictEqual([]);
 
     await conversation.updateSettings({ planMode: true });
@@ -380,67 +367,41 @@ describe('CodexSurface', () => {
         { type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown' },
       ],
     });
-    transport.emit({
-      method: 'turn/started',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'inProgress', []) },
-    });
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: 'Working' },
-    });
-    transport.emit({
-      method: 'item/plan/delta',
-      params: { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'plan-live', delta: '# Draft' },
-    });
-    transport.emit({
-      method: 'turn/plan/updated',
-      params: {
+    transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-live', 'inProgress', []) });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: 'Working' });
+    transport.emitNotification('item/plan/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'plan-live', delta: '# Draft' });
+    transport.emitNotification('turn/plan/updated', {
         threadId: 'thread-existing', turnId: 'turn-live', explanation: 'Implementation',
         plan: [{ step: 'Wire events', status: 'inProgress' }],
-      },
-    });
-    transport.emit({
-      method: 'item/started',
-      params: {
+      });
+    transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-live', startedAtMs: 1,
-        item: {
+        item: { readOnlyHint: null,
           type: 'mcpToolCall', id: 'mcp-live', server: 'tools', tool: 'run', status: 'inProgress',
           arguments: {}, appContext: null, pluginId: null, result: null, error: null, durationMs: null,
         },
-      },
-    });
-    transport.emit({
-      method: 'item/mcpToolCall/progress',
-      params: { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'mcp-live', message: 'halfway' },
-    });
-    transport.emit({
-      id: 'ask-event',
-      method: 'item/tool/requestUserInput',
-      params: {
+      });
+    transport.emitNotification('item/mcpToolCall/progress', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'mcp-live', message: 'halfway' });
+    transport.emitServerRequest('ask-event', 'item/tool/requestUserInput', { isBlocking: false,
         threadId: 'thread-existing', turnId: 'turn-live', itemId: 'ask-live', autoResolutionMs: null,
         questions: [{
           id: 'target', header: 'Target', question: 'Which target?', isOther: false, isSecret: false,
           options: null,
         }],
-      },
-    });
+      });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'clientRequest.requested')).toBe(true));
     await conversation.respondToClientRequest({
       id: 'ask-event', payload: { answers: { target: { answers: ['SDK'] } } },
     });
-    transport.emit({
-      id: 'approval-event',
-      method: 'item/commandExecution/requestApproval',
-      params: {
+    transport.emitServerRequest('approval-event', 'item/commandExecution/requestApproval', { kind: 'command', startedAtMs: 1,
         threadId: 'thread-existing', turnId: 'turn-live', itemId: 'command-live', command: 'npm test',
         cwd: '/tmp/project', reason: null, environmentId: null, commandActions: [],
         networkApprovalContext: null, additionalPermissions: null,
         availableDecisions: ['accept', 'decline'], proposedExecpolicyAmendment: null,
-      },
-    });
+      });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'approval.requested')).toBe(true));
     await conversation.resolveApproval('approval-event', 'approve');
-    transport.emit({ method: 'skills/changed', params: {} });
+    transport.emitNotification('skills/changed', {});
     await vi.waitFor(() => expect(handleEvents.some((event) => event.type === 'conversation.skillsChanged')).toBe(true));
     expect(handleEvents).toContainEqual(expect.objectContaining({
       type: 'conversation.permissionsChanged',
@@ -493,39 +454,27 @@ describe('CodexSurface', () => {
 
     const handleEventCount = handleEvents.length;
     unsubscribeConversation();
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: ' done' },
-    });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: ' done' });
     expect(handleEvents).toHaveLength(handleEventCount);
     const surfaceEventCount = events.length;
     unsubscribeSurface();
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: '!' },
-    });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: '!' });
     expect(events).toHaveLength(surfaceEventCount);
   });
 
   it('exposes safe reasoning summaries while keeping raw reasoning content internal', async () => {
-    const { surface, transport } = createSurface();
+    const { surface, transport } = createSurface('turn/start');
     await surface.connect();
     await surface.sendMessage('Think carefully');
 
-    transport.emit({
-      method: 'item/started',
-      params: {
+    transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-live', startedAtMs: 1,
         item: { type: 'reasoning', id: 'reasoning-live', summary: [], content: [] },
-      },
-    });
-    transport.emit({
-      method: 'item/completed',
-      params: {
+      });
+    transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-live', completedAtMs: 2,
         item: { type: 'reasoning', id: 'reasoning-live', summary: ['Internal'], content: ['Hidden'] },
-      },
-    });
+      });
 
     const assistant = surface.getSnapshot().messages.at(-1);
     expect(assistant).toMatchObject({
@@ -547,34 +496,25 @@ describe('CodexSurface', () => {
     await surface.connect();
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
-    transport.emit({
-      method: 'turn/started',
-      params: { threadId: 'thread-existing', turn: turn('turn-live', 'inProgress', []) },
-    });
-    transport.emit({
-      method: 'item/started',
-      params: {
+    transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-live', 'inProgress', []) });
+    transport.emitNotification('item/started', {
         threadId: 'thread-existing',
         turnId: 'turn-live',
         startedAtMs: 1,
-        item: {
+        item: { delivery: null, questions: null,
           type: 'agentMessage',
           id: 'agent-final',
           text: '',
           phase: 'final_answer',
           memoryCitation: null,
         },
-      },
-    });
-    transport.emit({
-      method: 'item/agentMessage/delta',
-      params: {
+      });
+    transport.emitNotification('item/agentMessage/delta', {
         threadId: 'thread-existing',
         turnId: 'turn-live',
         itemId: 'agent-final',
         delta: 'Final response',
-      },
-    });
+      });
 
     expect(surface.getSnapshot().messages.flatMap((message) => message.parts)).toEqual(
       expect.arrayContaining([

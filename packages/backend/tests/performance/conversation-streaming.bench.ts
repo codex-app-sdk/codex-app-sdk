@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { CodexAppServerClient } from '../../src/codex';
 import { CodexSurface } from '../../src/node';
-import { FakeTransport, resumeResponse, thread, turn } from '../helpers/codex-surface-fixture';
+import { MockCodexAppServer, resumeResponse, thread, turn } from '../helpers/codex-surface-fixture';
 
 const THREAD_COUNT = 5;
 const TURNS_PER_THREAD = 200;
@@ -23,8 +23,8 @@ afterAll(async () => {
 describe('five active long conversations', () => {
   bench('cold-loads history and routes interleaved app-server deltas', async () => {
     const histories = new Map(threadIds.map((threadId) => [threadId, longThread(threadId)]));
-    const transport = new FakeTransport({
-      'thread/list': () => ({
+    const transport = new MockCodexAppServer({
+      'thread/list': () => ({ backwardsCursor: null,
         data: threadIds.map((threadId) => thread(threadId, false)),
         nextCursor: null,
       }),
@@ -49,23 +49,17 @@ describe('five active long conversations', () => {
       cwd: path.join(temporaryCodexHome, `workspace-${index}`),
     })));
     for (const threadId of threadIds) {
-      transport.emit({
-        method: 'turn/started',
-        params: { threadId, turn: turn(`live-turn-${threadId}`, 'inProgress', []) },
-      });
+      transport.emitNotification('turn/started', { threadId, turn: turn(`live-turn-${threadId}`, 'inProgress', []) });
     }
     const notificationsBeforeStreaming = stateNotifications;
     for (let index = 0; index < STREAM_DELTAS; index += 1) {
       const threadId = threadIds[index % threadIds.length]!;
-      transport.emit({
-        method: 'item/agentMessage/delta',
-        params: {
+      transport.emitNotification('item/agentMessage/delta', {
           threadId,
           turnId: `live-turn-${threadId}`,
           itemId: `live-message-${threadId}`,
           delta: 'x',
-        },
-      });
+        });
     }
 
     if (stateNotifications - notificationsBeforeStreaming !== STREAM_DELTAS) {
@@ -81,7 +75,7 @@ describe('five active long conversations', () => {
   });
 });
 
-function longThread(threadId: string): Record<string, unknown> {
+function longThread(threadId: string) {
   return {
     ...thread(threadId, false),
     turns: Array.from({ length: TURNS_PER_THREAD }, (_, index) => turn(
@@ -100,6 +94,8 @@ function longThread(threadId: string): Record<string, unknown> {
           text: `Answer ${index}`,
           phase: null,
           memoryCitation: null,
+          delivery: null,
+          questions: null,
         },
       ],
     )),

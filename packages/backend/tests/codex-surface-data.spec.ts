@@ -228,7 +228,7 @@ describe('Codex surface data codecs', () => {
     });
     expect(surfaceRateLimits({
       rateLimits: rateSnapshot(), rateLimitsByLimitId: null, rateLimitResetCredits: null,
-      accountId: null, rateLimitUpsell: null,
+      accountId: null, rateLimitUpsell: null, ordinaryUsageAllowed: null,
     }).rateLimitResetCredits).toBeNull();
 
     const individual = { limit: '10', used: '2', remainingPercent: 80, resetsAt: 10 };
@@ -236,7 +236,7 @@ describe('Codex surface data codecs', () => {
       rateLimits: rateSnapshot({ individualLimit: individual }),
       rateLimitsByLimitId: null,
       rateLimitResetCredits: null,
-      accountId: null,
+      accountId: null, ordinaryUsageAllowed: null,
       rateLimitUpsell: null,
     });
     expect(mapped.rateLimits.individualLimit).toStrictEqual(individual);
@@ -252,7 +252,7 @@ describe('Codex surface data codecs', () => {
       }),
       rateLimitsByLimitId: null,
       rateLimitResetCredits: null,
-      accountId: null,
+      accountId: null, ordinaryUsageAllowed: null,
       rateLimitUpsell: null,
     });
     const merged = mergeSurfaceRateLimits(current, rateSnapshot({
@@ -360,7 +360,7 @@ function tokenUsage(lastTotalTokens: number, modelContextWindow: number | null):
 
 function rateSnapshot(overrides: Partial<v2.RateLimitSnapshot> = {}): v2.RateLimitSnapshot {
   return {
-    limitId: null, limitName: null, primary: null, secondary: null,
+    limitId: null, limitName: null, normalModelSlug: null, primary: null, secondary: null,
     credits: null, individualLimit: null, spendControlReached: null, planType: null, rateLimitReachedType: null,
     ...overrides,
   };
