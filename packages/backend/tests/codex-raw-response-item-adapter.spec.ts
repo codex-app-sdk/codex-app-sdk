@@ -11,24 +11,6 @@ describe('rawResponseItemToEvent', () => {
     expect(adapt({ type: 'message', role: 'assistant', content: [] })).toBeNull();
   });
 
-  it('maps local shell calls with completed, failed, and running status', () => {
-    expect(adapt({
-      type: 'local_shell_call', call_id: 'shell-1', status: 'completed',
-      action: { command: ['npm', 'run test'], working_directory: '/tmp/project' },
-    })).toMatchObject({
-      type: 'item.completed',
-      payload: { toolPart: { id: 'shell-1', title: 'npm "run test"', status: 'completed' } },
-    });
-    expect(adapt({
-      type: 'local_shell_call', id: 'shell-2', call_id: null, status: 'failed', action: { command: 'false' },
-    })).toMatchObject({
-      type: 'item.completed', payload: { toolPart: { id: 'shell-2', title: 'false', status: 'failed' } },
-    });
-    expect(adapt({ type: 'local_shell_call', call_id: null, status: 'in_progress', action: null })).toMatchObject({
-      type: 'item.started', payload: { toolPart: { id: 'raw-local_shell_call', title: 'local shell', status: 'running' } },
-    });
-  });
-
   it('maps function and custom tool calls plus their outputs', () => {
     expect(adapt({
       type: 'function_call', call_id: 'function-shell', name: 'shell_command',
@@ -108,12 +90,18 @@ describe('rawResponseItemToEvent', () => {
         toolPart: {
           id: 'image-1', title: 'image_generation', status: 'completed', body: undefined,
           input: { revisedPrompt: 'A polished UI' },
+          metadata: { namespace: null, tool: 'image_generation', success: true, durationMs: null },
         },
       },
     });
     expect(JSON.stringify(imageEvent)).not.toContain('png-data');
-    expect(adapt({ type: 'image_generation_call', status: 'failed', result: '' })).toMatchObject({
-      payload: { toolPart: { id: 'raw-image_generation_call', status: 'failed' } },
+    expect(adapt({
+      type: 'image_generation_call', status: 'failed', result: '', revised_prompt: null,
+    })).toMatchObject({
+      payload: { toolPart: {
+        id: 'raw-image_generation_call', status: 'failed', input: { revisedPrompt: null },
+        metadata: { namespace: null, tool: 'image_generation', success: false, durationMs: null },
+      } },
     });
   });
 
@@ -147,6 +135,13 @@ describe('rawResponseItemToEvent', () => {
   });
 
   it('maps exact local-shell fallbacks when the action is malformed', () => {
+    expect(adapt({
+      type: 'local_shell_call', call_id: 'shell-1', status: 'completed',
+      action: { command: ['npm', 'run test'], working_directory: '/tmp/project' },
+    })).toMatchObject({
+      type: 'item.completed',
+      payload: { toolPart: { id: 'shell-1', title: 'npm "run test"', status: 'completed' } },
+    });
     expect(adapt({ type: 'local_shell_call', action: null })).toMatchObject({
       type: 'item.started',
       payload: {
@@ -245,27 +240,4 @@ describe('rawResponseItemToEvent', () => {
     });
   });
 
-  it('records image-generation success independently from renderer status', () => {
-    expect(adapt({
-      type: 'image_generation_call', id: '', status: 'completed', revised_prompt: null,
-    })).toMatchObject({
-      type: 'item.completed',
-      payload: {
-        toolPart: {
-          id: 'raw-image_generation_call', status: 'completed', input: { revisedPrompt: null },
-          metadata: { namespace: null, tool: 'image_generation', success: true, durationMs: null },
-        },
-      },
-    });
-    expect(adapt({
-      type: 'image_generation_call', id: 'failed-image', status: 'failed', revised_prompt: 'prompt',
-    })).toMatchObject({
-      payload: {
-        toolPart: {
-          id: 'failed-image', status: 'failed', input: { revisedPrompt: 'prompt' },
-          metadata: { success: false },
-        },
-      },
-    });
-  });
 });

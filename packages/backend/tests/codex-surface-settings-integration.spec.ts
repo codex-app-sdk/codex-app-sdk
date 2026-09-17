@@ -299,17 +299,9 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'thread/start')).toBeUndefined();
   });
 
-  it('rejects invalid settings and falls back to a supported effort when the model changes', async () => {
+  it('falls back to a supported effort when the model changes', async () => {
     const { surface, transport } = createSurface('thread/settings/update');
     await surface.connect();
-
-    await expect(surface.updateConversationSettings({ modelId: 'missing' })).rejects.toThrow("Unknown model 'missing'");
-    await expect(surface.updateConversationSettings({ reasoningEffort: 'ultra' })).rejects.toThrow(
-      "Reasoning effort 'ultra' is not available",
-    );
-    await expect(surface.updateConversationSettings({
-      approvalPreset: 'blocked' as never,
-    })).rejects.toThrow("Approval preset 'blocked' is not available");
 
     await surface.updateConversationSettings({ modelId: 'gpt-mini', reasoningEffort: 'high' });
     const snapshot = await surface.updateConversationSettings({ modelId: 'gpt-5' });

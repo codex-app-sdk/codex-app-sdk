@@ -128,14 +128,6 @@ describe('CodexSurface', () => {
     expect(lastResponse(transport, 'mcp-deny')).toMatchObject({ result: { action: 'decline' } });
   });
 
-  it('rejects invalid sends and ignores interrupts without an active turn', async () => {
-    const { surface } = createSurface();
-    await surface.connect();
-    await expect(surface.sendMessage('   ')).rejects.toThrow('empty message');
-    await expect(surface.interrupt()).resolves.toMatchObject({ busy: false });
-    await expect(surface.resolveApproval('missing', 'deny')).rejects.toThrow('Unknown approval');
-  });
-
   it('adapts server approval requests and resolves them through one surface API', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();

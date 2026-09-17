@@ -7,28 +7,6 @@ import { CodexSurfaceTurnActionsController } from '../src/node/codex-surface-tur
 import { thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurfaceTurnActionsController', () => {
-  it('makes active-conversation compact and interrupt wrappers no-ops without a selection', async () => {
-    const setup = createController({ active: false });
-
-    await expect(setup.controller.compact()).resolves.toBe(setup.state);
-    await expect(setup.controller.interrupt()).resolves.toBe(setup.state);
-
-    expect(setup.host.ensureThreadReady).not.toHaveBeenCalled();
-    expect(setup.request).not.toHaveBeenCalled();
-  });
-
-  it('delegates active-conversation compact and interrupt wrappers and returns the latest snapshot', async () => {
-    const setup = createController();
-    const compact = vi.spyOn(setup.controller, 'compactForThread').mockResolvedValue();
-    const interrupt = vi.spyOn(setup.controller, 'interruptThread').mockResolvedValue();
-
-    await expect(setup.controller.compact()).resolves.toBe(setup.state);
-    await expect(setup.controller.interrupt()).resolves.toBe(setup.state);
-
-    expect(compact).toHaveBeenCalledExactlyOnceWith('thread-1');
-    expect(interrupt).toHaveBeenCalledExactlyOnceWith('thread-1');
-  });
-
   it('requests compaction and leaves its lifecycle to provider notifications', async () => {
     const setup = createController({ turnIds: ['turn-latest'] });
     await setup.controller.compactForThread('thread-1');
@@ -294,6 +272,10 @@ describe('CodexSurfaceTurnActionsController', () => {
   });
 
   it('interrupts only an active turn with the exact identifiers', async () => {
+    const inactive = createController({ active: false });
+    await expect(inactive.controller.interrupt()).resolves.toBe(inactive.state);
+    expect(inactive.request).not.toHaveBeenCalled();
+
     const idle = createController();
     await idle.controller.interruptThread('thread-1');
     expect(idle.request).not.toHaveBeenCalled();
@@ -303,14 +285,6 @@ describe('CodexSurfaceTurnActionsController', () => {
     expect(active.request).toHaveBeenCalledExactlyOnceWith('turn/interrupt', {
       threadId: 'thread-1', turnId: 'turn-active',
     });
-  });
-
-  it('requires an active conversation for turn action wrappers', async () => {
-    const setup = createController({ active: false });
-    await expect(setup.controller.deleteTurn('turn-1')).rejects.toThrow('There is no active conversation');
-    await expect(setup.controller.editTurn('turn-1', 'text')).rejects.toThrow('There is no active conversation');
-    await expect(setup.controller.retryTurn('turn-1')).rejects.toThrow('There is no active conversation');
-    expect(setup.host.ensureThreadReady).not.toHaveBeenCalled();
   });
 
   it('deletes the selected turn by stable id', async () => {

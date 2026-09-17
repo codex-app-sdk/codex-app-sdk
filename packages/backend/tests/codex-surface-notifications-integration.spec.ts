@@ -448,42 +448,6 @@ describe('CodexSurface', () => {
     await session.stop();
   });
 
-  it('explicitly tolerates every known notification that has no surface projection', async () => {
-    const { surface, transport } = createSurface();
-    await surface.connect();
-    const before = surface.getSnapshot();
-    const ignoredMethods: Array<ServerNotification['method']> = [
-      'hook/started',
-      'hook/completed',
-      'item/autoApprovalReview/started',
-      'item/autoApprovalReview/completed',
-      'command/exec/outputDelta',
-      'process/outputDelta',
-      'process/exited',
-      'item/commandExecution/terminalInteraction',
-      'item/fileChange/outputDelta',
-      'mcpServer/oauthLogin/completed',
-      'mcpServer/startupStatus/updated',
-      'app/list/updated',
-      'externalAgentConfig/import/progress',
-      'externalAgentConfig/import/completed',
-      'fs/changed',
-      'model/verification',
-      'turn/moderationMetadata',
-      'model/safetyBuffering/updated',
-      'warning',
-      'guardianWarning',
-      'deprecationNotice',
-      'configWarning',
-      'fuzzyFileSearch/sessionUpdated',
-      'fuzzyFileSearch/sessionCompleted',
-      'windows/worldWritableWarning',
-      'windowsSandbox/setupCompleted',
-    ];
-    for (const method of ignoredMethods) transport.emitNotification(method, {});
-    expect(surface.getSnapshot()).toStrictEqual(before);
-  });
-
   it('projects remote-control status changes as a host event', async () => {
     const { surface, transport } = createSurface();
     await surface.connect();

@@ -210,9 +210,9 @@ describe('Codex executable discovery', () => {
     ]);
   });
 
-  it('takes the environment shell before the process shell', () => {
+  it('selects environment, process, and bash shell fallbacks in order', () => {
     vi.stubEnv('SHELL', '/process/fish');
-    const execFileSync = vi.fn((_file: string) => '');
+    let execFileSync = vi.fn((_file: string) => '');
     codexRuntimePathEntries({
       env: { PATH: '', SHELL: '/environment/zsh' },
       execFileSync,
@@ -225,11 +225,8 @@ describe('Codex executable discovery', () => {
     expect(execFileSync.mock.calls.map(([shell]) => shell)).toStrictEqual([
       '/environment/zsh', '/environment/zsh',
     ]);
-  });
 
-  it('falls back to the process shell and environment when dependencies omit both', () => {
-    vi.stubEnv('SHELL', '/process/fish');
-    const execFileSync = vi.fn(() => '');
+    execFileSync = vi.fn(() => '');
     codexRuntimePathEntries({
       execFileSync,
       existsSync: vi.fn(() => false),
@@ -243,11 +240,9 @@ describe('Codex executable discovery', () => {
     expect(execFileSync).toHaveBeenNthCalledWith(2, '/process/fish', expect.any(Array), expect.objectContaining({
       env: process.env,
     }));
-  });
 
-  it('uses bash when no shell source has a value', () => {
     vi.stubEnv('SHELL', undefined);
-    const execFileSync = vi.fn((_file: string) => '');
+    execFileSync = vi.fn((_file: string) => '');
     codexRuntimePathEntries({
       env: { PATH: '', SHELL: undefined },
       execFileSync,
@@ -306,7 +301,7 @@ describe('Codex executable discovery', () => {
     expect(codexRuntimePathEntries(dependencies)).not.toContain('/nvm/v22/bin');
   });
 
-  it('requires both nvm metadata paths before reading the default alias', () => {
+  it('requires complete nvm metadata and a nonempty alias before scanning versions', () => {
     const readFileSync = vi.fn(() => '22');
     const readdirSync = vi.fn(() => ['v22.1.0']);
     const base = {
@@ -327,12 +322,9 @@ describe('Codex executable discovery', () => {
 
     expect(readFileSync).not.toHaveBeenCalled();
     expect(readdirSync).not.toHaveBeenCalled();
-  });
 
-  it('does not scan nvm versions for an empty alias and reads a present alias as UTF-8', () => {
     const home = '/home/test';
-    const readdirSync = vi.fn(() => ['v22.1.0']);
-    const readFileSync = vi.fn(() => '   \n');
+    readFileSync.mockReturnValue('   \n');
     codexRuntimePathEntries({
       env: { PATH: '' },
       execFileSync: vi.fn(() => { throw new Error('no nvm command'); }),
@@ -386,8 +378,8 @@ describe('Codex executable discovery', () => {
     })).toStrictEqual([]);
   });
 
-  it('normalizes explicit Windows extensions, ignores blanks, and preserves candidate priority', () => {
-    const probes: string[] = [];
+  it('normalizes Windows executable extensions from explicit and process environments', () => {
+    let probes: string[] = [];
     expect(discoverCodexExecutable({
       env: { PATH: 'C:\\Tools', PATHEXT: '.EXE;;.CmD;' },
       existsSync: vi.fn((filePath: string) => {
@@ -400,11 +392,9 @@ describe('Codex executable discovery', () => {
     expect(probes.map((entry) => entry.slice(entry.lastIndexOf('/') + 1))).toStrictEqual([
       'codex', 'codex.exe', 'codex.cmd',
     ]);
-  });
 
-  it('uses process PATHEXT only when the supplied environment does not define it', () => {
     vi.stubEnv('PATHEXT', '.Process;.CMD');
-    const probes: string[] = [];
+    probes = [];
     discoverCodexExecutable({
       env: { PATH: 'C:\\Tools' },
       existsSync: vi.fn((filePath: string) => {
@@ -418,9 +408,7 @@ describe('Codex executable discovery', () => {
     expect(probes.map((entry) => entry.slice(entry.lastIndexOf('/') + 1))).toStrictEqual([
       'codex', 'codex.process', 'codex.cmd',
     ]);
-  });
 
-  it('uses process PATH and PATHEXT when the dependency environment is absent', () => {
     vi.stubEnv('PATH', 'C:\\ProcessTools');
     vi.stubEnv('PATHEXT', '.EXE');
 

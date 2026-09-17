@@ -194,34 +194,34 @@ describe('CodexSurfaceClientRequestsController', () => {
     expect(responder.resolve).toHaveBeenCalledWith({ answers: {} });
   });
 
-  it.each([
-    ['allow', { action: 'accept', content: null, _meta: null }],
-    ['allow_conversation', { action: 'accept', content: null, _meta: { persist: 'session' } }],
-    ['always_allow', { action: 'accept', content: null, _meta: { persist: 'always' } }],
-    ['deny', { action: 'decline', content: null, _meta: null }],
-  ] as const)('maps MCP decision %s and records it on the displayed tool', async (decision, expected) => {
-    const setup = clientRequests();
-    const responder = { resolve: vi.fn(), reject: vi.fn() };
-    setup.controller.handleMcpElicitationRequest(mcpRequest(), responder as never);
-    setup.runtime.activeTurnId = null;
+  it('maps every MCP decision, including omitted responses, through one contract', async () => {
+    const cases = [
+      ['allow', { action: 'accept', content: null, _meta: null }],
+      ['allow_conversation', { action: 'accept', content: null, _meta: { persist: 'session' } }],
+      ['always_allow', { action: 'accept', content: null, _meta: { persist: 'always' } }],
+      ['deny', { action: 'decline', content: null, _meta: null }],
+      [undefined, { action: 'decline', content: null, _meta: null }],
+    ] as const;
 
-    await setup.controller.respond('thread-1', { id: 'mcp-1', payload: { decision } });
+    for (const [decision, expected] of cases) {
+      const setup = clientRequests();
+      const responder = { resolve: vi.fn(), reject: vi.fn() };
+      setup.controller.handleMcpElicitationRequest(mcpRequest(), responder as never);
+      setup.runtime.activeTurnId = null;
 
-    expect(responder.resolve).toHaveBeenCalledWith(expected);
-    expect(setup.runtime.messages[0]?.parts).toContainEqual(expect.objectContaining({
-      type: 'tool', id: 'approval-mcp-1', output: { decision },
-    }));
-    expect(setup.host.emitConversationActivity).toHaveBeenCalledWith('thread-1', 'action');
-  });
+      await setup.controller.respond('thread-1', {
+        id: 'mcp-1',
+        ...(decision ? { payload: { decision } } : {}),
+      });
 
-  it('defaults an omitted MCP response payload to denial', async () => {
-    const setup = clientRequests();
-    const responder = { resolve: vi.fn(), reject: vi.fn() };
-    setup.controller.handleMcpElicitationRequest(mcpRequest(), responder as never);
-
-    await setup.controller.respond(undefined, { id: 'mcp-1' });
-
-    expect(responder.resolve).toHaveBeenCalledWith({ action: 'decline', content: null, _meta: null });
+      expect(responder.resolve).toHaveBeenCalledWith(expected);
+      if (decision) {
+        expect(setup.runtime.messages[0]?.parts).toContainEqual(expect.objectContaining({
+          type: 'tool', id: 'approval-mcp-1', output: { decision },
+        }));
+      }
+      expect(setup.host.emitConversationActivity).toHaveBeenCalledWith('thread-1', 'action');
+    }
   });
 
   it('records server resolution on the owning conversation but clears waiting state for the reported thread', () => {

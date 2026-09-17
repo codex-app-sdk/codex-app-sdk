@@ -106,13 +106,16 @@ describe('CodexSurfaceNotificationsController', () => {
     expect(setup.host.emitConversationActivity).toHaveBeenCalledWith('unlisted', 'notification');
   });
 
-  it.each([
-    ['thread/archived', 'archived'],
-    ['thread/deleted', 'deleted'],
-  ] as const)('routes %s with its exact removal reason', (method, reason) => {
+  it('routes thread removals with their exact reasons', () => {
     const setup = createController();
-    handle(setup, method, { threadId: 'thread-1' });
-    expect(setup.host.removeThread).toHaveBeenCalledExactlyOnceWith('thread-1', reason);
+    for (const [method, reason] of [
+      ['thread/archived', 'archived'],
+      ['thread/deleted', 'deleted'],
+    ] as const) {
+      handle(setup, method, { threadId: 'thread-1' });
+      expect(setup.host.removeThread).toHaveBeenLastCalledWith('thread-1', reason);
+    }
+    expect(setup.host.removeThread).toHaveBeenCalledTimes(2);
   });
 
   it('refreshes unarchived conversations and contains refresh failures', async () => {
@@ -374,27 +377,32 @@ describe('CodexSurfaceNotificationsController', () => {
     expect(setup.host.emitEvent).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['item/agentMessage/delta', 'applyAgentDelta'],
-    ['item/plan/delta', 'applyPlanDelta'],
-    ['rawResponseItem/completed', 'applyRawResponseItem'],
-    ['turn/plan/updated', 'applyPlanUpdated'],
-    ['turn/completed', 'applyTurnCompleted'],
-  ] as const)('routes %s to %s without reshaping params', (method, target) => {
+  it('routes item and turn notifications without reshaping params', () => {
     const setup = createController();
-    const params = { threadId: 'thread-1', turnId: 'turn-1', marker: method };
-    handle(setup, method, params);
-    expect(setup.items[target]).toHaveBeenCalledExactlyOnceWith(params);
+    for (const [method, target] of [
+      ['item/agentMessage/delta', 'applyAgentDelta'],
+      ['item/plan/delta', 'applyPlanDelta'],
+      ['rawResponseItem/completed', 'applyRawResponseItem'],
+      ['turn/plan/updated', 'applyPlanUpdated'],
+      ['turn/completed', 'applyTurnCompleted'],
+    ] as const) {
+      const params = { threadId: 'thread-1', turnId: 'turn-1', marker: method };
+      handle(setup, method, params);
+      expect(setup.items[target]).toHaveBeenCalledExactlyOnceWith(params);
+    }
   });
 
-  it.each([
-    ['item/started', false],
-    ['item/completed', true],
-  ] as const)('routes %s with the exact completion flag', (method, completed) => {
+  it('routes item lifecycle notifications with exact completion flags', () => {
     const setup = createController();
-    const params = { threadId: 'thread-1', turnId: 'turn-1', item: { id: 'item' } };
-    handle(setup, method, params);
-    expect(setup.items.applyItem).toHaveBeenCalledExactlyOnceWith(params, completed);
+    for (const [method, completed] of [
+      ['item/started', false],
+      ['item/completed', true],
+    ] as const) {
+      const params = { threadId: 'thread-1', turnId: 'turn-1', item: { id: method } };
+      handle(setup, method, params);
+      expect(setup.items.applyItem).toHaveBeenLastCalledWith(params, completed);
+    }
+    expect(setup.items.applyItem).toHaveBeenCalledTimes(2);
   });
 
   it('forwards command output only for tracked command items', () => {
@@ -547,25 +555,30 @@ describe('CodexSurfaceNotificationsController', () => {
     expect(login.authentication.handleLoginCompleted).toHaveBeenCalledExactlyOnceWith(params);
   });
 
-  it.each([
-    ['thread/realtime/started', { threadId: 'thread-1', realtimeSessionId: 'rtc', version: 'v2' },
-      { type: 'realtime.started', conversationId: 'thread-1', payload: { realtimeSessionId: 'rtc', version: 'v2' } }],
-    ['thread/realtime/itemAdded', { threadId: 'thread-1', item: { id: 'item', nested: { value: 1 } } },
-      { type: 'realtime.itemAdded', conversationId: 'thread-1', payload: { item: { id: 'item', nested: { value: 1 } } } }],
-    ['thread/realtime/transcript/delta', { threadId: 'thread-1', role: 'user', delta: 'partial' },
-      { type: 'realtime.transcriptDelta', conversationId: 'thread-1', payload: { role: 'user', delta: 'partial' } }],
-    ['thread/realtime/transcript/done', { threadId: 'thread-1', role: 'assistant', text: 'complete' },
-      { type: 'realtime.transcriptCompleted', conversationId: 'thread-1', payload: { role: 'assistant', text: 'complete' } }],
-    ['thread/realtime/sdp', { threadId: 'thread-1', sdp: 'v=0' },
-      { type: 'realtime.sdp', conversationId: 'thread-1', payload: { sdp: 'v=0' } }],
-    ['thread/realtime/error', { threadId: 'thread-1', message: 'rtc failed' },
-      { type: 'realtime.error', conversationId: 'thread-1', payload: { message: 'rtc failed' } }],
-    ['thread/realtime/closed', { threadId: 'thread-1', reason: 'requested' },
-      { type: 'realtime.closed', conversationId: 'thread-1', payload: { reason: 'requested' } }],
-  ] as const)('projects %s as an exact event', (method, params, event) => {
+  it('projects an exact realtime lifecycle event trace', () => {
     const setup = createController();
-    handle(setup, method, params);
-    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', event);
+    const trace = [
+      ['thread/realtime/started', { threadId: 'thread-1', realtimeSessionId: 'rtc', version: 'v2' },
+        { type: 'realtime.started', conversationId: 'thread-1', payload: { realtimeSessionId: 'rtc', version: 'v2' } }],
+      ['thread/realtime/itemAdded', { threadId: 'thread-1', item: { id: 'item', nested: { value: 1 } } },
+        { type: 'realtime.itemAdded', conversationId: 'thread-1', payload: { item: { id: 'item', nested: { value: 1 } } } }],
+      ['thread/realtime/transcript/delta', { threadId: 'thread-1', role: 'user', delta: 'partial' },
+        { type: 'realtime.transcriptDelta', conversationId: 'thread-1', payload: { role: 'user', delta: 'partial' } }],
+      ['thread/realtime/transcript/done', { threadId: 'thread-1', role: 'assistant', text: 'complete' },
+        { type: 'realtime.transcriptCompleted', conversationId: 'thread-1', payload: { role: 'assistant', text: 'complete' } }],
+      ['thread/realtime/sdp', { threadId: 'thread-1', sdp: 'v=0' },
+        { type: 'realtime.sdp', conversationId: 'thread-1', payload: { sdp: 'v=0' } }],
+      ['thread/realtime/error', { threadId: 'thread-1', message: 'rtc failed' },
+        { type: 'realtime.error', conversationId: 'thread-1', payload: { message: 'rtc failed' } }],
+      ['thread/realtime/closed', { threadId: 'thread-1', reason: 'requested' },
+        { type: 'realtime.closed', conversationId: 'thread-1', payload: { reason: 'requested' } }],
+    ] as const;
+
+    for (const [method, params] of trace) handle(setup, method, params);
+
+    expect(setup.host.emitEvent.mock.calls).toStrictEqual(
+      trace.map(([, , event]) => ['notification', event]),
+    );
   });
 
   it('projects realtime audio bytes and metadata', () => {

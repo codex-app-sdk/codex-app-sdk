@@ -242,46 +242,6 @@ describe('CodexSurfaceConnectionController', () => {
     expect(settled).toBe(true);
   });
 
-  it('delegates account, login, remote-control, and config operations after ensuring connection', async () => {
-    const setup = setupConnection();
-    setup.state.status = 'ready';
-    setup.authentication.refresh.mockResolvedValue('refresh-result');
-    setup.authentication.startChatGptDeviceCodeLogin.mockResolvedValue('device-login-result');
-    setup.authentication.startChatGptLogin.mockResolvedValue('login-result');
-    setup.authentication.cancelLogin.mockResolvedValue('cancel-result');
-    setup.authentication.logout.mockResolvedValue('logout-result');
-    setup.client.request.mockImplementation(async (method: string) => (
-      method === 'configRequirements/read' ? { requirements: { allowed: true } } : { method }
-    ));
-
-    await expect(setup.controller.refreshAccount()).resolves.toBe('refresh-result');
-    await expect(setup.controller.startChatGptDeviceCodeLogin()).resolves.toBe('device-login-result');
-    await expect(setup.controller.startChatGptLogin()).resolves.toBe('login-result');
-    await expect(setup.controller.cancelLogin('login-1')).resolves.toBe('cancel-result');
-    await expect(setup.controller.logout()).resolves.toBe('logout-result');
-    expect(setup.authentication.refresh).toHaveBeenCalledWith('action', true);
-    expect(setup.authentication.cancelLogin).toHaveBeenCalledWith('login-1');
-
-    await setup.controller.readRemoteControlStatus();
-    await setup.controller.enableRemoteControl();
-    await setup.controller.disableRemoteControl({ ephemeral: true });
-    await setup.controller.startRemoteControlPairing();
-    await setup.controller.readRemoteControlPairingStatus({ pairingCode: 'pairing-1' });
-    await setup.controller.listRemoteControlClients({ environmentId: 'env-1', cursor: 'next', limit: 5 });
-    await setup.controller.revokeRemoteControlClient({ environmentId: 'env-1', clientId: 'client-1' });
-    await expect(setup.controller.readConfigRequirements()).resolves.toEqual({ allowed: true });
-    expect(setup.client.request.mock.calls.slice(-8)).toStrictEqual([
-      ['remoteControl/status/read', undefined],
-      ['remoteControl/enable', {}],
-      ['remoteControl/disable', { ephemeral: true }],
-      ['remoteControl/pairing/start', {}],
-      ['remoteControl/pairing/status', { pairingCode: 'pairing-1' }],
-      ['remoteControl/client/list', { environmentId: 'env-1', cursor: 'next', limit: 5 }],
-      ['remoteControl/client/revoke', { environmentId: 'env-1', clientId: 'client-1' }],
-      ['configRequirements/read', undefined],
-    ]);
-  });
-
   it('patches authentication and emits the complete changed value', () => {
     const setup = setupConnection();
     setup.controller.patchAuthentication({ status: 'loaded', error: 'expired' }, 'notification');

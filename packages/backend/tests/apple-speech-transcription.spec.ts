@@ -48,118 +48,45 @@ describe('transcribeWithAppleSpeechAnalyzer', () => {
     expect(fs.readFile).toHaveBeenCalledWith('/tmp/codex-app-sdk-apple-stt-123/output.txt', 'utf8');
   });
 
-  it('trims locale and enables live transcription in the exact CLI arguments', async () => {
-    const fs = fakeFs('live result');
-    const spawn = fakeSpawn(0);
-
-    await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {
-      locale: '  fr-FR  ',
-      live: true,
-    }, {
-      assetsPath: '/app/assets',
-      fs,
-      spawn,
-      tmpdir: () => '/tmp',
-    });
-
-    expect(spawn).toHaveBeenCalledWith('/tmp/codex-app-sdk-apple-stt-123/apple-speechanalyzer-cli', [
-      '--input-audio-path',
-      '/tmp/codex-app-sdk-apple-stt-123/input.wav',
-      '--output-txt-path',
-      '/tmp/codex-app-sdk-apple-stt-123/output.txt',
-      '--locale',
-      'fr-FR',
-      '--live',
-    ]);
+  it('normalizes optional locale and live CLI arguments', async () => {
+    const required = [
+      '--input-audio-path', '/tmp/codex-app-sdk-apple-stt-123/input.wav',
+      '--output-txt-path', '/tmp/codex-app-sdk-apple-stt-123/output.txt',
+    ];
+    for (const [options, optional] of [
+      [{ locale: '  fr-FR  ', live: true }, ['--locale', 'fr-FR', '--live']],
+      [{ locale: '   ', live: false }, []],
+    ] as const) {
+      const spawn = fakeSpawn(0);
+      await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), options, {
+        assetsPath: '/app/assets', fs: fakeFs('result'), spawn, tmpdir: () => '/tmp',
+      });
+      expect(spawn).toHaveBeenCalledWith(
+        '/tmp/codex-app-sdk-apple-stt-123/apple-speechanalyzer-cli', [...required, ...optional],
+      );
+    }
   });
 
-  it('omits a blank locale and disabled live flag from the CLI arguments', async () => {
-    const fs = fakeFs('plain result');
-    const spawn = fakeSpawn(0);
+  it('normalizes process and filesystem failures for renderer transport and always cleans up', async () => {
+    for (const [spawn, expected] of [
+      [fakeSpawn(2, 'permission denied\n'), 'Apple speech CLI exited with code 2: permission denied'],
+      [fakeSpawnError(new Error('operation not permitted')), 'Failed to spawn Apple speech CLI: operation not permitted'],
+      [fakeSpawn(9, undefined, false), 'Apple speech CLI exited with code 9: '],
+    ] as const) {
+      const fs = fakeFs('');
+      await expect(transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {}, {
+        assetsPath: '/app/assets', fs, spawn, tmpdir: () => '/tmp',
+      })).resolves.toStrictEqual({ text: '', error: expected });
+      expect(fs.rm).toHaveBeenCalledWith(
+        '/tmp/codex-app-sdk-apple-stt-123', { recursive: true, force: true },
+      );
+    }
 
-    await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {
-      locale: '   ',
-      live: false,
-    }, {
-      assetsPath: '/app/assets',
-      fs,
-      spawn,
-      tmpdir: () => '/tmp',
-    });
-
-    expect(spawn).toHaveBeenCalledWith('/tmp/codex-app-sdk-apple-stt-123/apple-speechanalyzer-cli', [
-      '--input-audio-path',
-      '/tmp/codex-app-sdk-apple-stt-123/input.wav',
-      '--output-txt-path',
-      '/tmp/codex-app-sdk-apple-stt-123/output.txt',
-    ]);
-  });
-
-  it('returns a renderer-safe error when the CLI fails', async () => {
-    const fs = fakeFs('');
-    const spawn = fakeSpawn(2, 'permission denied\n');
-
-    const result = await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {}, {
-      assetsPath: '/app/assets',
-      fs,
-      spawn,
-      tmpdir: () => '/tmp',
-    });
-
-    expect(result).toStrictEqual({
-      text: '',
-      error: 'Apple speech CLI exited with code 2: permission denied',
-    });
-    expect(fs.rm).toHaveBeenCalledWith('/tmp/codex-app-sdk-apple-stt-123', { recursive: true, force: true });
-  });
-
-  it('returns a renderer-safe error when spawning the CLI fails', async () => {
-    const fs = fakeFs('');
-    const spawn = fakeSpawnError(new Error('operation not permitted'));
-
-    const result = await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {}, {
-      assetsPath: '/app/assets',
-      fs,
-      spawn,
-      tmpdir: () => '/tmp',
-    });
-
-    expect(result).toStrictEqual({
-      text: '',
-      error: 'Failed to spawn Apple speech CLI: operation not permitted',
-    });
-    expect(fs.rm).toHaveBeenCalledWith('/tmp/codex-app-sdk-apple-stt-123', { recursive: true, force: true });
-  });
-
-  it('handles a CLI without a stderr stream', async () => {
-    const fs = fakeFs('');
-    const spawn = fakeSpawn(9, undefined, false);
-
-    const result = await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {}, {
-      assetsPath: '/app/assets',
-      fs,
-      spawn,
-      tmpdir: () => '/tmp',
-    });
-
-    expect(result).toStrictEqual({
-      text: '',
-      error: 'Apple speech CLI exited with code 9: ',
-    });
-  });
-
-  it('normalizes non-Error failures for renderer transport', async () => {
     const fs = fakeFs('');
     fs.writeFile.mockRejectedValueOnce('disk unavailable');
-
-    const result = await transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {}, {
-      assetsPath: '/app/assets',
-      fs,
-      spawn: fakeSpawn(0),
-      tmpdir: () => '/tmp',
-    });
-
-    expect(result).toStrictEqual({ text: '', error: 'disk unavailable' });
+    await expect(transcribeWithAppleSpeechAnalyzer(Buffer.from('audio'), {}, {
+      assetsPath: '/app/assets', fs, spawn: fakeSpawn(0), tmpdir: () => '/tmp',
+    })).resolves.toStrictEqual({ text: '', error: 'disk unavailable' });
   });
 
   it('uses the backend assets path environment when no per-call override is provided', async () => {
@@ -208,26 +135,27 @@ describe('transcribeWithAppleSpeechAnalyzer', () => {
     ))).toBe(expectedPath);
   });
 
-  it('skips a Vite build resources directory', async () => {
-    const resourcesPath = '/bundle/.vite/build';
-    const packagedPath = path.join(resourcesPath, 'apple-speechanalyzer-cli');
-
+  it('walks past unusable resource and package candidates into the cwd candidates', () => {
+    const vitePath = '/bundle/.vite/build/apple-speechanalyzer-cli';
     expect(resolveAppleSpeechAnalyzerPath(undefined, discoveryDependencies(
-      (filePath) => filePath === packagedPath,
-      { resourcesPath },
-    ))).not.toBe(packagedPath);
-  });
+      (filePath) => filePath === vitePath, { resourcesPath: '/bundle/.vite/build' },
+    ))).not.toBe(vitePath);
 
-  it('continues discovery when a resources directory has no helper', () => {
     const packagePath = '/installed/sdk/assets/apple-speechanalyzer-cli';
-
     expect(resolveAppleSpeechAnalyzerPath(undefined, discoveryDependencies(
       (filePath) => filePath === packagePath,
-      {
-        packageResolve: () => 'file:///installed/sdk/dist/index.js',
-        resourcesPath: '/bundle/resources',
-      },
+      { packageResolve: () => 'file:///installed/sdk/dist/index.js', resourcesPath: '/bundle/resources' },
     ))).toBe(packagePath);
+
+    const cwdPath = '/workspace/application/node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli';
+    for (const packageResolve of [
+      () => 'file:///installed/sdk/dist/index.js',
+      () => { throw new Error('package is unavailable'); },
+    ]) {
+      expect(resolveAppleSpeechAnalyzerPath(undefined, discoveryDependencies(
+        (filePath) => filePath === cwdPath, { packageResolve },
+      ))).toBe(cwdPath);
+    }
   });
 
   it('uses the process resources path when no dependency override is provided', () => {
@@ -252,9 +180,8 @@ describe('transcribeWithAppleSpeechAnalyzer', () => {
     }
   });
 
-  it('uses the installed package assets when package resolution finds the helper', async () => {
+  it('uses installed and runtime package resolution when they find the helper', () => {
     const packagePath = '/installed/sdk/assets/apple-speechanalyzer-cli';
-
     expect(resolveAppleSpeechAnalyzerPath(undefined, discoveryDependencies(
       (filePath) => filePath === packagePath,
       {
@@ -264,38 +191,13 @@ describe('transcribeWithAppleSpeechAnalyzer', () => {
         },
       },
     ))).toBe(packagePath);
-  });
 
-  it('uses the runtime package resolver when no dependency override is provided', () => {
-    const packagePath = path.resolve(import.meta.dirname, '../assets/apple-speechanalyzer-cli');
-
+    const runtimePath = path.resolve(import.meta.dirname, '../assets/apple-speechanalyzer-cli');
     expect(resolveAppleSpeechAnalyzerPath(undefined, {
-      ...discoveryDependencies((filePath) => filePath === packagePath),
+      ...discoveryDependencies((filePath) => filePath === runtimePath),
       moduleUrl: 'file:///unrelated/module/dist/index.js',
       packageResolve: undefined,
-    })).toBe(packagePath);
-  });
-
-  it('continues discovery when the resolved package has no helper', () => {
-    const cwdPath = '/workspace/application/node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli';
-
-    expect(resolveAppleSpeechAnalyzerPath(undefined, discoveryDependencies(
-      (filePath) => filePath === cwdPath,
-      { packageResolve: () => 'file:///installed/sdk/dist/index.js' },
-    ))).toBe(cwdPath);
-  });
-
-  it('falls through when package resolution fails', () => {
-    const cwdPath = '/workspace/application/node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli';
-
-    expect(resolveAppleSpeechAnalyzerPath(undefined, discoveryDependencies(
-      (filePath) => filePath === cwdPath,
-      {
-        packageResolve: () => {
-          throw new Error('package is unavailable');
-        },
-      },
-    ))).toBe(cwdPath);
+    })).toBe(runtimePath);
   });
 
   it.each([

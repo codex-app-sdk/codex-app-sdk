@@ -43,16 +43,20 @@ const models: CodexSurfaceModel[] = [
 ];
 
 describe('CodexSurfaceConversationSettingsController', () => {
-  it.each([
-    [{ approvalPreset: 'full-access' as const }, 'full-access'],
-    [{ approvalMode: 'never' as const, permissionMode: 'full-access' as const }, 'full-access'],
-    [{ approvalMode: 'ask' as const, permissionMode: 'workspace-write' as const }, 'ask-for-approval'],
-    [{ approvalMode: 'ask' as const, permissionMode: 'full-access' as const }, null],
-    [{ approvalMode: 'never' as const }, null],
-    [{ permissionMode: 'workspace-write' as const }, null],
-    [{}, 'ask-for-approval'],
-  ])('derives the preferred approval preset from exact host defaults %#', (defaults, expected) => {
-    expect(setupSettings({ defaults }).controller.preferredApprovalPreset()).toBe(expected);
+  it('derives the preferred approval preset from every host-default combination', () => {
+    const cases = [
+      [{ approvalPreset: 'full-access' as const }, 'full-access'],
+      [{ approvalMode: 'never' as const, permissionMode: 'full-access' as const }, 'full-access'],
+      [{ approvalMode: 'ask' as const, permissionMode: 'workspace-write' as const }, 'ask-for-approval'],
+      [{ approvalMode: 'ask' as const, permissionMode: 'full-access' as const }, null],
+      [{ approvalMode: 'never' as const }, null],
+      [{ permissionMode: 'workspace-write' as const }, null],
+      [{}, 'ask-for-approval'],
+    ] as const;
+
+    for (const [defaults, expected] of cases) {
+      expect(setupSettings({ defaults }).controller.preferredApprovalPreset()).toBe(expected);
+    }
   });
 
   it('selects explicit, preferred, first-available, and legacy thread-start policies', () => {
@@ -173,38 +177,42 @@ describe('CodexSurfaceConversationSettingsController', () => {
     expect(setup.host.emitConversationSettings).toHaveBeenCalledWith('thread-1', 'action');
   });
 
-  it.each([
-    ['approval preset', { approvalPreset: 'full-access' as const }, {
+  it('emits isolated changes with only their protocol fields', async () => {
+    const cases = [
+      [{ approvalPreset: 'full-access' as const }, {
       approvalPolicy: 'never', approvalsReviewer: 'user', permissions: ':danger-full-access',
-    }],
-    ['model', { modelId: 'fast-id' }, {
+      }],
+      [{ modelId: 'fast-id' }, {
       model: 'fast-model', effort: 'high', serviceTier: null,
       collaborationMode: {
         mode: 'default',
         settings: { model: 'fast-model', reasoning_effort: 'high', developer_instructions: null },
       },
-    }],
-    ['reasoning', { reasoningEffort: 'high' }, {
+      }],
+      [{ reasoningEffort: 'high' }, {
       effort: 'high',
       collaborationMode: {
         mode: 'default',
         settings: { model: 'standard-model', reasoning_effort: 'high', developer_instructions: null },
       },
-    }],
-    ['service tier', { serviceTier: 'priority' }, { serviceTier: 'priority' }],
-    ['plan mode', { planMode: true }, {
+      }],
+      [{ serviceTier: 'priority' }, { serviceTier: 'priority' }],
+      [{ planMode: true }, {
       collaborationMode: {
         mode: 'plan',
         settings: { model: 'standard-model', reasoning_effort: 'medium', developer_instructions: null },
       },
-    }],
-  ] as const)('emits for an isolated %s change and sends only its protocol fields', async (_label, settings, fields) => {
-    const setup = setupSettings();
-    await setup.controller.updateForThread('thread-1', settings);
-    expect(setup.client.request).toHaveBeenCalledWith('thread/settings/update', {
-      threadId: 'thread-1', ...fields,
-    });
-    expect(setup.host.emitConversationSettings).toHaveBeenCalledOnce();
+      }],
+    ] as const;
+
+    for (const [settings, fields] of cases) {
+      const setup = setupSettings();
+      await setup.controller.updateForThread('thread-1', settings);
+      expect(setup.client.request).toHaveBeenCalledWith('thread/settings/update', {
+        threadId: 'thread-1', ...fields,
+      });
+      expect(setup.host.emitConversationSettings).toHaveBeenCalledOnce();
+    }
   });
 
   it('sends and emits an explicit service-tier clear', async () => {

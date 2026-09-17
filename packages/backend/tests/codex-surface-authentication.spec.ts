@@ -67,22 +67,22 @@ describe('Codex surface authentication values', () => {
 });
 
 describe('CodexSurfaceAuthenticationController', () => {
-  it.each([
-    [{ status: 'pending', loginId: null, authUrl: 'https://old.test' }, 'missing id'],
-    [{ status: 'pending', loginId: 'old', authUrl: null }, 'missing URL'],
-    [{ status: 'idle', loginId: 'old', authUrl: 'https://old.test' }, 'non-pending status'],
-  ] as const)('starts a new login instead of reusing an incomplete current login: %s', async (login, _reason) => {
-    const request = vi.fn(async () => ({
-      type: 'chatgpt', loginId: 'new', authUrl: 'https://new.test/login',
-    }));
-    const setup = setupController(request);
-    setup.state.authentication.login = { ...login, error: null };
-
-    await expect(setup.controller.startChatGptLogin()).resolves.toStrictEqual({
-      loginId: 'new', authUrl: 'https://new.test/login',
-    });
-
-    expect(request).toHaveBeenCalledExactlyOnceWith('account/login/start', { type: 'chatgpt' });
+  it('starts a new login instead of reusing any incomplete current login', async () => {
+    for (const login of [
+      { status: 'pending', loginId: null, authUrl: 'https://old.test' },
+      { status: 'pending', loginId: 'old', authUrl: null },
+      { status: 'idle', loginId: 'old', authUrl: 'https://old.test' },
+    ] as const) {
+      const request = vi.fn(async () => ({
+        type: 'chatgpt', loginId: 'new', authUrl: 'https://new.test/login',
+      }));
+      const setup = setupController(request);
+      setup.state.authentication.login = { ...login, error: null };
+      await expect(setup.controller.startChatGptLogin()).resolves.toStrictEqual({
+        loginId: 'new', authUrl: 'https://new.test/login',
+      });
+      expect(request).toHaveBeenCalledExactlyOnceWith('account/login/start', { type: 'chatgpt' });
+    }
   });
 
   it('shares an in-flight login and clears it before a later independent attempt', async () => {

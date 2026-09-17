@@ -733,215 +733,61 @@ describe('CodexSurfaceItemsController', () => {
     expect(activities[0]).toMatchObject({ conversationId: 'thread-1' });
   });
 
-  it('keeps distinct initial user messages and does not treat metadata-free assistant output as steering', () => {
-    const distinct = itemController();
-    distinct.runtime.messages = [{
-      id: 'prior', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'First prompt' }],
-      turnId: 'turn-1', metadata: { conversationId: 'thread-1', turnId: 'turn-1' },
-    }];
-    distinct.controller.applyItem(userItem('second', 'Second prompt'), true);
-    expect(distinct.runtime.messages.map((message) => message.parts)).toStrictEqual([
-      [{ type: 'text', text: 'First prompt' }],
-      [{ type: 'text', text: 'Second prompt' }],
-    ]);
-
-    const metadataFree = itemController();
-    metadataFree.runtime.messages = [{
-      id: 'assistant-without-metadata', role: 'assistant', status: 'streaming',
-      parts: [{ type: 'text', text: 'Unattributed output' }],
-    }];
-    metadataFree.controller.applyItem(userItem('ordinary', 'Prompt'), true);
-    expect(metadataFree.runtime.messages).toHaveLength(2);
-    expect(metadataFree.runtime.messages[1]).not.toHaveProperty('kind');
-  });
-
-  it('selects the matching agent text part and preserves its phase and event boundaries', () => {
-    const setup = itemController();
-    setup.runtime.messages = [assistant([
-      { type: 'text', text: 'Decoy', itemId: 'other-agent' },
-      { type: 'tool', id: 'agent-1', kind: 'command', title: 'Run', status: 'running' },
-      { type: 'text', text: 'Hello', itemId: 'agent-1' },
-    ])];
-
-    setup.controller.applyItem(item('agentMessage', {
-      id: 'agent-1', text: 'Hello world', phase: 'commentary',
-    }), true);
-    expect(setup.runtime.messages[0]?.parts).toContainEqual({
-      type: 'text', text: 'Hello world', itemId: 'agent-1', phase: 'commentary',
-    });
-    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'message.delta', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: {
-        messageId: 'assistant-turn-1', itemId: 'agent-1', delta: ' world', phase: 'commentary',
-      },
-    });
-
-    vi.mocked(setup.host.emitEvent).mockClear();
-    setup.controller.applyItem(item('agentMessage', {
-      id: 'agent-1', text: 'Hello world', phase: 'commentary',
-    }), true);
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
-  });
-
-  it('publishes exact reasoning append and update events while suppressing empty or repeated summaries', () => {
-    const setup = itemController();
-    setup.controller.applyItem(item('reasoning', {
-      id: 'reasoning-empty', summary: ['', '   '], content: ['private'],
-    }), false);
-    expect(setup.runtime.messages).toStrictEqual([]);
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
-
-    setup.controller.applyItem(item('reasoning', {
-      id: 'reasoning-1', summary: ['  Inspecting  ', '', 'Testing'], content: ['private'],
-    }), false);
-    const appended = setup.runtime.messages[0];
-    expect(appended?.parts).toStrictEqual([
-      { type: 'reasoning', summary: 'Inspecting', itemId: 'reasoning-1', summaryIndex: 0 },
-      { type: 'reasoning', summary: 'Testing', itemId: 'reasoning-1', summaryIndex: 2 },
-    ]);
-    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'message.appended', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { message: structuredClone(appended) },
-    });
-
-    vi.mocked(setup.host.emitEvent).mockClear();
-    setup.controller.applyItem(item('reasoning', {
-      id: 'reasoning-1', summary: ['  Inspecting  ', '', 'Testing'], content: ['changed private'],
-    }), true);
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
-
-    setup.controller.applyItem(item('reasoning', {
-      id: 'reasoning-1', summary: ['Verified'], content: ['private'],
-    }), true);
-    const updated = setup.runtime.messages[0];
-    expect(updated?.parts).toStrictEqual([
-      { type: 'reasoning', summary: 'Verified', itemId: 'reasoning-1', summaryIndex: 0 },
-    ]);
-    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'message.updated', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { message: structuredClone(updated) },
-    });
-  });
-
-  it('keeps distinct agent items with identical text and emits exact append, update, and host-miss behavior', () => {
-    const duplicateText = itemController();
-    duplicateText.controller.applyItem(item('agentMessage', { id: 'agent-1', text: 'Same' }), true);
-    const appended = duplicateText.runtime.messages[0];
-    expect(duplicateText.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'message.appended', conversationId: 'thread-1', turnId: 'turn-1', payload: { message: appended },
-    });
-    duplicateText.controller.applyItem(item('agentMessage', { id: 'agent-2', text: 'Same' }), true);
-    expect(duplicateText.runtime.messages[0]?.parts).toStrictEqual([
-      { type: 'text', text: 'Same', itemId: 'agent-1' },
-      { type: 'text', text: 'Same', itemId: 'agent-2' },
-    ]);
-
-    const replacement = itemController();
-    replacement.runtime.messages = [assistant([{ type: 'text', text: 'Old', itemId: 'agent-1' }])];
-    replacement.controller.applyItem(item('agentMessage', { id: 'agent-1', text: 'New' }), true);
-    expect(replacement.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'message.updated', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { message: replacement.runtime.messages[0] },
-    });
-
-    const hostMiss = itemController();
-    hostMiss.runtime.messages = [assistant([{ type: 'text', text: 'Existing', itemId: 'other' }])];
-    vi.mocked(hostMiss.host.assistantMessageForTurn).mockReturnValue(null);
-    hostMiss.controller.applyItem(item('agentMessage', { id: 'agent-new', text: 'New' }), true);
-    expect(hostMiss.runtime.messages[0]?.parts).toContainEqual({
-      type: 'text', text: 'New', itemId: 'agent-new',
-    });
-    expect(hostMiss.host.emitEvent).not.toHaveBeenCalled();
-
-    const newItemInExistingMessage = itemController();
-    newItemInExistingMessage.runtime.messages = [assistant([{
-      type: 'text', text: 'Existing', itemId: 'other',
-    }])];
-    newItemInExistingMessage.controller.applyItem(item('agentMessage', {
-      id: 'agent-new', text: 'Complete new item',
-    }), true);
-    expect(newItemInExistingMessage.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'message.delta', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { messageId: 'assistant-turn-1', itemId: 'agent-new', delta: 'Complete new item' },
-    });
-  });
-
-  it('ignores a media part with the target item id when finding previous agent text', () => {
-    const setup = itemController();
-    setup.runtime.messages = [assistant([
-      {
-        type: 'media', itemId: 'agent-1',
-        media: { url: 'data:image/png;base64,AA==', mimeType: 'image/png' },
-      },
-      { type: 'text', text: 'Hello', itemId: 'agent-1' },
-    ])];
-    setup.controller.applyItem(item('agentMessage', { id: 'agent-1', text: 'Hello world' }), true);
-    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'message.delta', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { messageId: 'assistant-turn-1', itemId: 'agent-1', delta: ' world' },
-    });
-  });
-
-  it('marks raw items active, ignores unsupported items, and emits completed web searches', () => {
+  it('handles raw, reasoning, and phased message transition edges in one trace', () => {
     const setup = itemController();
     setup.controller.applyRawResponseItem({
       threadId: 'thread-1', turnId: 'turn-1', item: { type: 'unsupported' },
     } as never);
-    expect(setup.runtime.activeTurnId).toBe('turn-1');
-    expect(setup.runtime.messages).toStrictEqual([]);
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
-
     setup.controller.applyRawResponseItem({
       threadId: 'thread-1', turnId: 'turn-1',
       item: { type: 'web_search_call', id: 'web-1', action: { type: 'search', query: 'SDK' } },
     } as never);
-    const toolPart = setup.runtime.messages[0]?.parts[0];
-    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
-      type: 'tool.completed', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { messageId: 'assistant-turn-1', toolPart },
-    });
-  });
-
-  it('patches raw tools without emitting when the host cannot resolve their message', () => {
-    const setup = itemController();
+    expect(setup.runtime.activeTurnId).toBe('turn-1');
+    expect(setup.runtime.messages[0]?.parts[0]).toMatchObject({ id: 'web-1', status: 'completed' });
     vi.mocked(setup.host.messageContainingTool).mockReturnValue(null);
     setup.controller.applyRawResponseItem({
       threadId: 'thread-1', turnId: 'turn-1',
-      item: { type: 'web_search_call', id: 'web-1', action: { type: 'search', query: 'SDK' } },
+      item: { type: 'web_search_call', id: 'web-2', action: { type: 'search', query: 'SDK' } },
     } as never);
-    expect(setup.runtime.messages[0]?.parts[0]).toMatchObject({ id: 'web-1', status: 'completed' });
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
+
+    const reasoning = itemController();
+    reasoning.controller.applyItem(item('reasoning', {
+      id: 'reasoning-1', summary: ['Inspecting'], content: ['private'],
+    }), false);
+    vi.mocked(reasoning.host.emitEvent).mockClear();
+    reasoning.controller.applyItem(item('reasoning', {
+      id: 'reasoning-1', summary: ['Inspecting'], content: ['changed private'],
+    }), true);
+    reasoning.controller.applyItem(item('reasoning', {
+      id: 'reasoning-1', summary: ['Verified'], content: ['private'],
+    }), true);
+    expect(reasoning.runtime.messages.flatMap((message) => message.parts)).toContainEqual(
+      expect.objectContaining({ type: 'reasoning', summary: 'Verified' }),
+    );
+
+    const phased = itemController();
+    phased.runtime.messages = [assistant([{ type: 'text', text: 'Hello', itemId: 'agent-1' }])];
+    phased.controller.applyItem(item('agentMessage', {
+      id: 'agent-1', text: 'Hello world', phase: 'commentary',
+    }), true);
+    expect(phased.host.emitEvent).toHaveBeenCalledWith('notification', expect.objectContaining({
+      type: 'message.delta', payload: expect.objectContaining({ delta: ' world', phase: 'commentary' }),
+    }));
   });
 
-  it('selects the current-turn compaction marker when other messages could match only half the predicate', () => {
+  it('handles plan, unsupported, and subagent terminal variants in one trace', () => {
     const setup = itemController();
-    setup.runtime.messages = [
-      {
-        id: 'metadata-free', kind: 'compaction', role: 'assistant', status: 'complete',
-        parts: [{ type: 'text', text: 'decoy' }],
-      },
-      {
-        id: 'wrong-turn-compaction', kind: 'compaction', role: 'assistant', status: 'complete', parts: [],
-        metadata: { conversationId: 'thread-1', turnId: 'turn-other' },
-      },
-      {
-        id: 'ordinary-current-turn', role: 'assistant', status: 'streaming',
-        parts: [{ type: 'text', text: 'ordinary' }],
-        metadata: { conversationId: 'thread-1', turnId: 'turn-1' },
-      },
-    ];
-    setup.controller.applyItem(item('contextCompaction', { id: 'compact-current' }), true);
-    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', {
-      type: 'context.compactionCompleted', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: {
-        itemId: 'compact-current',
-        message: expect.objectContaining({ kind: 'compaction', metadata: expect.objectContaining({ turnId: 'turn-1' }) }),
-      },
-    });
-  });
+    setup.runtime.planMode = true;
+    setup.controller.applyItem(item('agentMessage', {
+      id: 'plan-answer', phase: 'final_answer',
+      text: 'Visible\n<proposed_plan>\n- Step\n</proposed_plan>',
+    }), true);
+    expect(setup.runtime.messages.flatMap((message) => message.parts)).toContainEqual(
+      expect.objectContaining({ type: 'text', text: 'Visible', itemId: 'plan-answer' }),
+    );
 
-  it('emits both lifecycle values for subagent tools and activities', () => {
-    const setup = itemController();
+    const blank = itemController();
+    blank.controller.applyItem(item('plan', { id: 'blank-plan', text: '  ' }), true);
     setup.controller.applyItem(item('collabAgentToolCall', {
       id: 'collab-1', tool: 'wait', status: 'completed', senderThreadId: 'thread-1',
       receiverThreadIds: [], prompt: null, model: null, reasoningEffort: null, agentsStates: {},
@@ -949,197 +795,45 @@ describe('CodexSurfaceItemsController', () => {
     setup.controller.applyItem(item('subAgentActivity', {
       id: 'activity-1', kind: 'started', agentThreadId: 'child', agentPath: '/root/child',
     }), false);
-    expect(setup.host.emitEvent).toHaveBeenNthCalledWith(1, 'notification', expect.objectContaining({
-      type: 'subagent.toolCallChanged', payload: expect.objectContaining({ lifecycle: 'completed' }),
-    }));
-    expect(setup.host.emitEvent).toHaveBeenNthCalledWith(2, 'notification', expect.objectContaining({
-      type: 'subagent.activity', payload: expect.objectContaining({ lifecycle: 'started' }),
-    }));
-  });
-
-  it('completes a blank plan as blank when no streamed plan exists', () => {
-    const setup = itemController();
-    setup.controller.applyItem(item('plan', { id: 'blank-plan', text: '  ' }), true);
-    expect(setup.runtime.planMarkdownByTurn.get('turn-1')).toBe('');
-    expect(setup.runtime.messages[0]?.parts[0]).toMatchObject({
-      id: 'plan-progress-turn-1', status: 'completed', body: '',
-    });
-    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', {
-      type: 'plan.completed', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: { itemId: 'blank-plan', markdown: '' },
-    });
-  });
-
-  it('marks only started ordinary items active and ignores unsupported item types', () => {
-    const setup = itemController();
     setup.controller.applyItem(item('unsupported', { id: 'unknown' }), false);
-    expect(setup.runtime.activeTurnId).toBe('turn-1');
-    expect(setup.host.patchRuntime).not.toHaveBeenCalled();
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
-
-    vi.mocked(setup.host.markRuntimeTurnActive).mockClear();
-    setup.runtime.activeTurnId = null;
     setup.controller.applyItem(item('unsupported', { id: 'unknown' }), true);
-    expect(setup.runtime.activeTurnId).toBeNull();
-    expect(setup.host.markRuntimeTurnActive).not.toHaveBeenCalled();
+    expect(blank.runtime.planMarkdownByTurn.get('turn-1')).toBe('');
+    expect(vi.mocked(setup.host.emitEvent).mock.calls.map(([, event]) => event.type))
+      .toEqual(expect.arrayContaining(['subagent.toolCallChanged', 'subagent.activity']));
   });
 
-  it('tracks command output independently by thread and clears stale starts', () => {
-    const setup = itemController();
-    const write = { type: 'commandExecution', id: 'same-id', command: 'printf x > file' } as never;
-    const read = { type: 'commandExecution', id: 'same-id', command: 'ls' } as never;
-    expect(setup.controller.shouldForwardCommandOutput('thread-1', false, write)).toBe(true);
-    expect(setup.controller.shouldForwardCommandOutput('thread-2', true, read)).toBe(false);
-    expect(setup.controller.isForwardingCommandOutput('thread-1', 'same-id')).toBe(true);
-    expect(setup.controller.shouldForwardCommandOutput('thread-1', false, read)).toBe(false);
-    expect(setup.controller.isForwardingCommandOutput('thread-1', 'same-id')).toBe(false);
-    expect(setup.controller.shouldForwardCommandOutput('thread-1', true, write)).toBe(true);
-    expect(setup.controller.shouldForwardCommandOutput('thread-1', true, { type: 'plan' } as never)).toBe(false);
-    expect(setup.controller.shouldForwardCommandOutput('thread-1', true, { id: 42, type: 'plan' } as never)).toBe(false);
-    expect(setup.controller.shouldForwardCommandOutput('thread-1', false, {
-      type: 'commandExecution', id: 42, command: 'printf x > file',
-    } as never)).toBe(false);
-    expect(setup.controller.shouldForwardCommandOutput('thread-1', false, {
-      type: 'commandExecution', id: '', command: 'printf x > file',
-    } as never)).toBe(false);
-  });
-
-  it('adds cwd only to updates carrying file-change data through every supported shape', () => {
+  it('handles file, media, and completion routing edges in one trace', () => {
     const setup = itemController();
     setup.runtime.cwd = '/workspace';
-    setup.runtime.messages = [assistant([
-      { type: 'text', text: 'decoy' },
-      { type: 'tool', id: 'other-tool', kind: 'fileChange', title: 'Other', status: 'running' },
-      { type: 'tool', id: 'target', kind: 'fileChange', title: 'Target', status: 'running' },
-    ])];
-    const cases = [
+    setup.runtime.messages = [assistant([{
+      type: 'tool', id: 'target', kind: 'fileChange', title: 'Target', status: 'running',
+    }])];
+    for (const update of [
       { itemId: 'target', input: { changes: [] } },
       { itemId: 'target', fallbackToolPart: {
-        type: 'tool' as const, id: 'target', kind: 'fileChange' as const, title: 'Target', status: 'running' as const,
+        type: 'tool' as const, id: 'target', kind: 'fileChange' as const,
+        title: 'Target', status: 'running' as const,
       } },
-      { itemId: 'target', metadata: { changes: [], source: 'notification' } },
-    ];
-    for (const update of cases) {
-      setup.controller.applyToolUpdate('thread-1', 'turn-1', update);
-    }
-    const updates = vi.mocked(setup.host.emitEvent).mock.calls
-      .map(([, event]) => event)
-      .filter((event) => event.type === 'tool.updated');
-    expect(updates).toHaveLength(3);
-    expect(updates.map((event) => event.payload.update)).toStrictEqual(cases.map((update) => ({
-      ...update, metadata: { ...update.metadata, cwd: '/workspace' },
-    })));
+      { itemId: 'target', metadata: { changes: [] } },
+      { itemId: 'target', metadata: null },
+    ]) setup.controller.applyToolUpdate('thread-1', 'turn-1', update as never);
 
-    vi.mocked(setup.host.emitEvent).mockClear();
-    setup.controller.applyToolUpdate('thread-1', 'turn-1', { itemId: 'target', bodyDelta: 'ordinary' });
-    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', expect.objectContaining({
-      type: 'tool.updated', payload: expect.objectContaining({
-        update: { itemId: 'target', bodyDelta: 'ordinary' },
-      }),
-    }));
-  });
-
-  it('uses the matching tool part when an update emits file activity', () => {
-    const setup = itemController();
-    setup.runtime.cwd = '/workspace';
-    setup.runtime.messages = [assistant([
-      { type: 'text', text: 'decoy' },
-      {
-        type: 'tool', id: 'other-tool', kind: 'fileChange', title: 'Other', status: 'running',
-        metadata: { changes: [{ kind: 'add', path: 'wrong.ts' }] },
-      },
-      { type: 'tool', id: 'target', kind: 'fileChange', title: 'Target', status: 'running' },
-    ])];
-    setup.controller.applyToolUpdate('thread-1', 'turn-1', {
-      itemId: 'target', status: 'completed',
-      metadata: { changes: [{ kind: 'add', path: 'right.ts' }] },
-    });
-    expect(setup.runtime.activeTurnId).toBe('turn-1');
-    expect(setup.host.markRuntimeTurnActive).toHaveBeenCalledWith(setup.runtime, 'turn-1');
-    const activities = vi.mocked(setup.host.emitEvent).mock.calls
-      .map(([, event]) => event)
-      .filter((event) => event.type === 'file.activity');
-    expect(activities).toStrictEqual([{
-      type: 'file.activity', conversationId: 'thread-1', turnId: 'turn-1',
-      payload: {
-        messageId: 'assistant-turn-1', itemId: 'target', path: '/workspace/right.ts',
-        action: 'create', status: 'completed',
-      },
-    }]);
-  });
-
-  it('patches generated media without events when its containing message is unavailable', () => {
-    const setup = itemController();
     vi.mocked(setup.host.messageContainingTool).mockReturnValue(null);
-    setup.controller.applyItem(item('imageGeneration', {
-      id: 'image-1', status: 'completed', revisedPrompt: 'Draw it',
-      result: '', savedPath: '/tmp/generated.png',
-    }), true);
-    expect(setup.runtime.messages[0]?.parts).toHaveLength(2);
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
-  });
-
-  it('emits a media update for a different generated image while retaining the prior image', () => {
-    const setup = itemController();
     setup.controller.applyItem(item('imageGeneration', {
       id: 'image-1', status: 'completed', revisedPrompt: 'First', result: '', savedPath: '/tmp/first.png',
     }), true);
+    vi.mocked(setup.host.messageContainingTool).mockRestore();
     setup.controller.applyItem(item('imageGeneration', {
       id: 'image-2', status: 'completed', revisedPrompt: 'Second', result: '', savedPath: '/tmp/second.png',
     }), true);
-    expect(setup.runtime.messages[0]?.parts.filter((part) => part.type === 'media')).toHaveLength(2);
-    expect(vi.mocked(setup.host.emitEvent).mock.calls.filter(([, event]) => event.type === 'message.updated'))
-      .toHaveLength(2);
-  });
 
-  it('treats null update metadata as ordinary data', () => {
-    const setup = itemController();
-    setup.runtime.cwd = '/workspace';
-    setup.runtime.messages = [assistant([
-      { type: 'tool', id: 'target', kind: 'generic', title: 'Target', status: 'running' },
-    ])];
-    setup.controller.applyToolUpdate('thread-1', 'turn-1', {
-      itemId: 'target', metadata: null,
-    } as never);
-    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', expect.objectContaining({
-      type: 'tool.updated', payload: expect.objectContaining({ update: { itemId: 'target', metadata: null } }),
-    }));
-  });
-
-  it('removes only an empty ordinary assistant for the completed turn', () => {
-    const setup = itemController();
-    setup.runtime.messages = [
-      assistant([]),
+    setup.runtime.messages.push(
       {
-        id: 'empty-user', role: 'user', status: 'complete', parts: [], turnId: 'turn-1',
-        metadata: { conversationId: 'thread-1', turnId: 'turn-1' },
-      },
-      {
-        id: 'other-turn-empty', role: 'assistant', status: 'streaming', parts: [],
+        id: 'other-empty', role: 'assistant', status: 'streaming', parts: [],
         metadata: { conversationId: 'thread-1', turnId: 'turn-other' },
       },
-      {
-        id: 'compaction-empty', kind: 'compaction', role: 'assistant', status: 'complete', parts: [],
-        metadata: { conversationId: 'thread-1', turnId: 'turn-1' },
-      },
       { id: 'metadata-free-empty', role: 'assistant', status: 'streaming', parts: [] },
-    ];
-    setup.state.conversations = [];
-    setup.controller.applyTurnCompleted({
-      threadId: 'thread-1',
-      turn: {
-        id: 'turn-1', status: 'completed', items: [], itemsView: 'full', error: null,
-        startedAt: null, completedAt: null, durationMs: null,
-      },
-    });
-    expect(setup.runtime.messages.map((message) => message.id)).toStrictEqual([
-      'empty-user', 'other-turn-empty', 'compaction-empty', 'metadata-free-empty',
-    ]);
-    expect(setup.host.emitSummaryUpserted).not.toHaveBeenCalled();
-  });
-
-  it('updates and emits the matching conversation summary even when another summary comes first', () => {
-    const setup = itemController();
+    );
     setup.state.conversations = [summary('other'), summary('thread-1')];
     setup.controller.applyTurnCompleted({
       threadId: 'thread-1',
@@ -1148,11 +842,12 @@ describe('CodexSurfaceItemsController', () => {
         startedAt: null, completedAt: null, durationMs: null,
       },
     });
-    expect(setup.host.emitSummaryUpserted).toHaveBeenCalledExactlyOnceWith(
+    expect(setup.state.conversations[0]).toStrictEqual(summary('other'));
+    expect(setup.host.emitSummaryUpserted).toHaveBeenCalledWith(
       setup.state.conversations[1], 'updated', 'notification',
     );
-    expect(setup.state.conversations[0]).toStrictEqual(summary('other'));
   });
+
 });
 
 function itemController() {

@@ -81,17 +81,6 @@ describe('CodexAppServerClient', () => {
     ]);
   });
 
-  it('cleans subscriptions after start failures and permits retry', async () => {
-    const transport = new FakeTransport();
-    transport.start.mockRejectedValueOnce(new Error('spawn failed'));
-    const client = new CodexAppServerClient(transport);
-
-    await expect(client.start()).rejects.toThrow('spawn failed');
-    await client.start();
-
-    expect(transport.start).toHaveBeenCalledTimes(2);
-  });
-
   it('matches typed responses and preserves remote error details', async () => {
     const transport = new FakeTransport();
     const client = new CodexAppServerClient(transport);
@@ -113,31 +102,21 @@ describe('CodexAppServerClient', () => {
     });
   });
 
-  it('registers pending requests before sending to synchronous transports', async () => {
+  it('registers pending requests before synchronous responses and preserves them through late write failures', async () => {
     const transport = new FakeTransport();
     const client = new CodexAppServerClient(transport);
     await client.start();
+    let writes = 0;
     vi.spyOn(transport, 'send').mockImplementation((message) => {
       transport.sent.push(message);
       if ('id' in message && 'method' in message) {
         transport.receive({ id: message.id, result: { requirements: null } });
       }
+      writes += 1;
+      if (writes === 2) throw new Error('late write failure');
     });
 
     await expect(client.request('configRequirements/read')).resolves.toStrictEqual({ requirements: null });
-  });
-
-  it('keeps a synchronous response when the transport throws after delivering it', async () => {
-    const transport = new FakeTransport();
-    const client = new CodexAppServerClient(transport);
-    await client.start();
-    vi.spyOn(transport, 'send').mockImplementation((message) => {
-      if ('id' in message && 'method' in message) {
-        transport.receive({ id: message.id, result: { requirements: null } });
-      }
-      throw new Error('late write failure');
-    });
-
     await expect(client.request('configRequirements/read')).resolves.toStrictEqual({ requirements: null });
   });
 
@@ -222,6 +201,7 @@ describe('CodexAppServerClient', () => {
     await client.start();
     client.onServerRequest('item/tool/requestUserInput', (_request, responder) => {
       responder.resolve({ answers: { framework: { answers: ['Vue'] } } });
+      responder.resolve({ answers: { framework: { answers: ['ignored duplicate'] } } });
       responder.reject('too late');
       return true;
     });
@@ -303,6 +283,7 @@ describe('CodexAppServerClient', () => {
     client.onAnyServerRequest((_request, responder) => {
       requestCount += 1;
       responder.reject(requestCount === 1 ? 'denied' : new Error('also denied'));
+      responder.reject('ignored duplicate');
       return true;
     });
 
@@ -313,12 +294,14 @@ describe('CodexAppServerClient', () => {
       expect(transport.sent).toContainEqual({ id: 'string-error', error: { code: -32603, message: 'denied' } });
       expect(transport.sent).toContainEqual({ id: 'object-error', error: { code: -32603, message: 'also denied' } });
     });
+    expect(transport.sent).toHaveLength(2);
   });
 
   it('reports malformed messages and send failures at the abstraction boundary', async () => {
+    vi.useFakeTimers();
     const transport = new FakeTransport();
     const onProtocolError = vi.fn();
-    const client = new CodexAppServerClient(transport, { onProtocolError });
+    const client = new CodexAppServerClient(transport, { onProtocolError, requestTimeoutMs: 50 });
     await client.start();
 
     transport.receive('not an object');
@@ -330,10 +313,19 @@ describe('CodexAppServerClient', () => {
     transport.receive({ id: 1, error: { nope: true } });
     await expect(malformed).rejects.toThrow('Codex app-server returned a malformed error for configRequirements/read');
 
-    vi.spyOn(transport, 'send').mockImplementation(() => {
+    const send = vi.spyOn(transport, 'send').mockImplementation(() => {
       throw 'write failed';
     });
     await expect(client.request('configRequirements/read')).rejects.toThrow('write failed');
+    expect(vi.getTimerCount()).toBe(0);
+
+    send.mockRestore();
+    const successful = client.request('configRequirements/read');
+    expect(vi.getTimerCount()).toBe(1);
+    transport.receive({ id: 3, result: { requirements: null } });
+    await successful;
+    expect(vi.getTimerCount()).toBe(0);
+    transport.receive({ id: 3, result: { requirements: 'late duplicate' } });
   });
 
   it('cleans up subscriptions and pending work when closed', async () => {
@@ -362,6 +354,7 @@ describe('CodexAppServerClient', () => {
     transport.receive('ignored after failure');
     await client.start();
     expect(transport.subscribed).toBe(true);
+    expect(transport.start).toHaveBeenCalledTimes(2);
     await client.close();
     expect(transport.subscribed).toBe(false);
     transport.receive('ignored after close');
@@ -423,23 +416,6 @@ describe('CodexAppServerClient', () => {
     expect(transport.sent).toStrictEqual([
       { method: 'future/notification', params: { enabled: false } },
     ]);
-  });
-
-  it('clears request timers when sending throws or a response arrives', async () => {
-    vi.useFakeTimers();
-    const transport = new FakeTransport();
-    const client = new CodexAppServerClient(transport, { requestTimeoutMs: 50 });
-    await client.start();
-    vi.spyOn(transport, 'send').mockImplementationOnce(() => { throw new Error('write failed'); });
-
-    await expect(client.request('configRequirements/read')).rejects.toThrow('write failed');
-    expect(vi.getTimerCount()).toBe(0);
-    const successful = client.request('configRequirements/read');
-    expect(vi.getTimerCount()).toBe(1);
-    transport.receive({ id: 2, result: { requirements: null } });
-    await successful;
-    expect(vi.getTimerCount()).toBe(0);
-    transport.receive({ id: 2, result: { requirements: 'late duplicate' } });
   });
 
   it('honors disconnect unsubscription and isolates unknown correlated protocol errors', async () => {
@@ -525,41 +501,6 @@ describe('CodexAppServerClient', () => {
     await vi.waitFor(() => expect(transport.sent).toContainEqual({ id: 'claim', result: { accepted: true } }));
 
     expect(later).not.toHaveBeenCalled();
-  });
-
-  it('allows each responder to send only its first resolution or rejection', async () => {
-    const transport = new FakeTransport();
-    const client = new CodexAppServerClient(transport);
-    client.onAnyServerRequest((_request, responder) => {
-      responder.resolve('first');
-      responder.resolve('second');
-      responder.reject('third');
-      return true;
-    });
-    await client.start();
-
-    transport.receive({ id: 'once', method: 'future/request' });
-    await vi.waitFor(() => expect(transport.sent).toHaveLength(1));
-
-    expect(transport.sent).toStrictEqual([{ id: 'once', result: 'first' }]);
-  });
-
-  it('allows each responder to reject only once', async () => {
-    const transport = new FakeTransport();
-    const client = new CodexAppServerClient(transport);
-    client.onAnyServerRequest((_request, responder) => {
-      responder.reject('first');
-      responder.reject('second');
-      return true;
-    });
-    await client.start();
-
-    transport.receive({ id: 'reject-once', method: 'future/request' });
-    await vi.waitFor(() => expect(transport.sent).toHaveLength(1));
-
-    expect(transport.sent).toStrictEqual([
-      { id: 'reject-once', error: { code: -32603, message: 'first' } },
-    ]);
   });
 
   it('tolerates malformed inbound data when no protocol-error callback is configured', async () => {

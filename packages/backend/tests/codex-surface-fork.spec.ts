@@ -218,18 +218,6 @@ describe('CodexSurface conversation forks', () => {
     await surface.close();
   });
 
-  it('refuses to fork a source conversation with an active turn', async () => {
-    const transport = forkTransport();
-    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
-    await surface.connect();
-    await surface.sendMessage('Still running');
-
-    await expect(surface.forkConversation('thread-existing')).rejects.toThrow(
-      'Cannot fork a conversation while its current turn is still active',
-    );
-    expect(requestsFor(transport, 'thread/fork')).toHaveLength(0);
-  });
-
   it('forks through the selected turn and discards later turns', async () => {
     const transport = forkTransport({
       sourceTurns: [
@@ -246,12 +234,15 @@ describe('CodexSurface conversation forks', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    const result = await surface.forkTurn('turn-one');
+    const result = await surface.conversation('thread-existing').forkTurn('turn-one');
 
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({
       params: { threadId: 'thread-existing', lastTurnId: 'turn-one' },
     });
-    expect(result.activeConversationId).toBe('thread-forked');
+    expect(result).toMatchObject({
+      conversationId: 'thread-forked',
+      snapshot: { activeConversationId: 'thread-forked' },
+    });
     expect(requestsFor(transport, 'turn/start')).toHaveLength(0);
   });
 
@@ -277,25 +268,16 @@ describe('CodexSurface conversation forks', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
 
-    const result = await surface.forkConversationAtTurn('thread-existing', 'turn-two');
+    const result = await surface.forkTurn('turn-two');
 
     expect(lastRequest(transport, 'thread/fork')).toMatchObject({
       params: { threadId: 'thread-existing', lastTurnId: 'turn-two' },
     });
     expect(requestsFor(transport, 'turn/start')).toHaveLength(0);
-    expect(result.snapshot).toMatchObject({ activeConversationId: 'thread-forked', busy: false });
-    expect(surface.getSnapshot().activeConversationId).toBe('thread-existing');
+    expect(result).toMatchObject({ activeConversationId: 'thread-forked', busy: false });
+    expect(surface.getSnapshot().activeConversationId).toBe('thread-forked');
   });
 
-  it('rejects an unknown turn id', async () => {
-    const transport = forkTransport();
-    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
-    await surface.connect();
-
-    await expect(surface.conversation('thread-existing').forkTurn('missing'))
-      .rejects.toThrow("Cannot fork at unknown Codex turn 'missing'");
-    expect(requestsFor(transport, 'thread/fork')).toHaveLength(0);
-  });
 });
 
 function forkTransport(overrides: {

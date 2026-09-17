@@ -276,6 +276,9 @@ describe('CodexSurface', () => {
     await expect(surface.loadOlderConversationHistory()).rejects.toThrow('Conversation id cannot be empty');
     await expect(surface.renameConversation('Name')).rejects.toThrow('There is no active conversation');
     await expect(surface.forkTurn('turn-1')).rejects.toThrow('There is no active conversation');
+    await expect(surface.deleteTurn('turn-1')).rejects.toThrow('There is no active conversation');
+    await expect(surface.editTurn('turn-1', 'text')).rejects.toThrow('There is no active conversation');
+    await expect(surface.retryTurn('turn-1')).rejects.toThrow('There is no active conversation');
     await expect(surface.compactConversation()).resolves.toStrictEqual(surface.getSnapshot());
 
     await surface.sendMessage('/plan');

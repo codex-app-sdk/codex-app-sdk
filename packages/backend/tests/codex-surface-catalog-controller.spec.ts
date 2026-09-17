@@ -462,21 +462,23 @@ describe('CodexSurfaceCatalogController', () => {
     expect(setup.request).toHaveBeenCalledWith('fs/readFile', { path: '/skills/conversation/icon.svg' });
   });
 
-  it.each([
-    ['closed', { closed: true, status: 'ready' as const, authBlocked: false }],
-    ['not ready', { closed: false, status: 'idle' as const, authBlocked: false }],
-    ['authentication blocked', { closed: false, status: 'ready' as const, authBlocked: true }],
-  ])('does not schedule plugins while the surface is %s', (_label, blocked) => {
-    const setup = setupCatalog(vi.fn());
-    setup.controls.closed = blocked.closed;
-    setup.controls.authBlocked = blocked.authBlocked;
-    setup.state.status = blocked.status;
+  it('does not schedule plugins while the surface is blocked', () => {
+    for (const blocked of [
+      { closed: true, status: 'ready' as const, authBlocked: false },
+      { closed: false, status: 'idle' as const, authBlocked: false },
+      { closed: false, status: 'ready' as const, authBlocked: true },
+    ]) {
+      const setup = setupCatalog(vi.fn());
+      setup.controls.closed = blocked.closed;
+      setup.controls.authBlocked = blocked.authBlocked;
+      setup.state.status = blocked.status;
 
-    setup.controller.schedulePluginRefresh();
+      setup.controller.schedulePluginRefresh();
 
-    expect(setup.request).not.toHaveBeenCalled();
-    expect(setup.host.patch).not.toHaveBeenCalled();
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
+      expect(setup.request).not.toHaveBeenCalled();
+      expect(setup.host.patch).not.toHaveBeenCalled();
+      expect(setup.host.emitEvent).not.toHaveBeenCalled();
+    }
   });
 
   it('emits loading state, deduplicates in-flight refreshes, and reruns a forced request afterward', async () => {
@@ -595,9 +597,8 @@ describe('CodexSurfaceCatalogController', () => {
     await vi.waitFor(() => expect(attempts).toBe(2));
   });
 
-  it.each(['closed', 'authentication'] as const)(
-    'suppresses plugin success and failure publication when %s becomes blocking in flight',
-    async (blocking) => {
+  it('suppresses plugin results when the surface becomes blocked in flight', async () => {
+    for (const blocking of ['closed', 'authentication'] as const) {
       for (const outcome of ['resolve', 'reject'] as const) {
         const pending = deferred<unknown>();
         const setup = setupCatalog(vi.fn(() => pending.promise));
@@ -613,8 +614,8 @@ describe('CodexSurfaceCatalogController', () => {
         expect(setup.host.patch).not.toHaveBeenCalled();
         expect(setup.host.emitEvent).not.toHaveBeenCalled();
       }
-    },
-  );
+    }
+  });
 
   it('accepts only absolute supported readable icon paths and caches rejected reads', async () => {
     const reads: string[] = [];

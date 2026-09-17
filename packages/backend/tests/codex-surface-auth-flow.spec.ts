@@ -291,38 +291,42 @@ describe('CodexSurface', () => {
     await surface.close();
   });
 
-  it.each<[v2.LoginAccountResponse, string]>([
-    [
-      { type: 'chatgpt', loginId: 'browser-login', authUrl: 'https://auth.example.test/login' },
-      "unexpected login type 'chatgpt'",
-    ],
-    [
-      {
-        type: 'chatgptDeviceCode', loginId: 'device-login',
-        verificationUrl: 'file:///tmp/device', userCode: 'CODE-1',
-      },
-      "unsupported authentication URL scheme 'file:'",
-    ],
-    [
-      {
-        type: 'chatgptDeviceCode', loginId: 'device-login',
-        verificationUrl: 'https://auth.example.test/device', userCode: '   ',
-      },
-      'empty device user code',
-    ],
-  ])('rejects an invalid device-code login response: %s', async (response, message) => {
-    const transport = new MockCodexAppServer({
-      'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
-      'account/login/start': () => response,
-    });
-    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
-    await surface.connect();
+  it('rejects every invalid device-code login response through one contract', async () => {
+    const cases: Array<[v2.LoginAccountResponse, string]> = [
+      [
+        { type: 'chatgpt', loginId: 'browser-login', authUrl: 'https://auth.example.test/login' },
+        "unexpected login type 'chatgpt'",
+      ],
+      [
+        {
+          type: 'chatgptDeviceCode', loginId: 'device-login',
+          verificationUrl: 'file:///tmp/device', userCode: 'CODE-1',
+        },
+        "unsupported authentication URL scheme 'file:'",
+      ],
+      [
+        {
+          type: 'chatgptDeviceCode', loginId: 'device-login',
+          verificationUrl: 'https://auth.example.test/device', userCode: '   ',
+        },
+        'empty device user code',
+      ],
+    ];
 
-    await expect(surface.startChatGptDeviceCodeLogin()).rejects.toThrow(message);
-    expect(surface.getSnapshot().authentication.login).toMatchObject({
-      status: 'error', loginId: null, authUrl: null,
-    });
-    await surface.close();
+    for (const [response, message] of cases) {
+      const transport = new MockCodexAppServer({
+        'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
+        'account/login/start': () => response,
+      });
+      const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+      await surface.connect();
+
+      await expect(surface.startChatGptDeviceCodeLogin()).rejects.toThrow(message);
+      expect(surface.getSnapshot().authentication.login).toMatchObject({
+        status: 'error', loginId: null, authUrl: null,
+      });
+      await surface.close();
+    }
   });
 
   it('runs a trailing authoritative account refresh when login completes during an older refresh', async () => {

@@ -328,23 +328,27 @@ describe('CodexSurfaceTextGenerationController', () => {
     await expect(setup.controller.generate('prompt')).resolves.toStrictEqual({ text: 'answer' });
   });
 
-  it.each([
-    ['failed with its server error', { ...turn('turn-1', 'failed', []), error: { message: 'server failed' } }, 'server failed'],
-    ['failed without a server error', turn('turn-1', 'failed', []), 'Codex ephemeral generation failed'],
-    ['was interrupted', turn('turn-1', 'interrupted', []), 'Codex ephemeral generation was interrupted'],
-    ['completed without text', turn('turn-1', 'completed', []), 'Codex ephemeral generation returned no text'],
-    ['completed with only a user item', turn('turn-1', 'completed', [{
-      type: 'userMessage', id: 'user', content: [], clientId: null,
-    }]), 'Codex ephemeral generation returned no text'],
-    ['completed with only blank agent text', turnWithMessage('turn-1', 'completed', '   '), 'Codex ephemeral generation returned no text'],
-  ])('rejects when an immediate turn %s', async (_label, immediateTurn, error) => {
-    const setup = createController({ turn: immediateTurn });
+  it('rejects every immediate terminal turn without usable text', async () => {
+    const outcomes = [
+      [{ ...turn('turn-1', 'failed', []), error: { message: 'server failed' } }, 'server failed'],
+      [turn('turn-1', 'failed', []), 'Codex ephemeral generation failed'],
+      [turn('turn-1', 'interrupted', []), 'Codex ephemeral generation was interrupted'],
+      [turn('turn-1', 'completed', []), 'Codex ephemeral generation returned no text'],
+      [turn('turn-1', 'completed', [{
+        type: 'userMessage', id: 'user', content: [], clientId: null,
+      }]), 'Codex ephemeral generation returned no text'],
+      [turnWithMessage('turn-1', 'completed', '   '), 'Codex ephemeral generation returned no text'],
+    ] as const;
 
-    await expect(setup.controller.generate('prompt')).rejects.toThrow(error);
-    expect(setup.request).toHaveBeenCalledWith('turn/interrupt', {
-      threadId: 'thread-1', turnId: 'turn-1',
-    });
-    expect(setup.request).toHaveBeenCalledWith('thread/unsubscribe', { threadId: 'thread-1' });
+    for (const [immediateTurn, error] of outcomes) {
+      const setup = createController({ turn: immediateTurn });
+
+      await expect(setup.controller.generate('prompt')).rejects.toThrow(error);
+      expect(setup.request).toHaveBeenCalledWith('turn/interrupt', {
+        threadId: 'thread-1', turnId: 'turn-1',
+      });
+      expect(setup.request).toHaveBeenCalledWith('thread/unsubscribe', { threadId: 'thread-1' });
+    }
   });
 
   it('cleans up without interrupting when turn/start itself fails', async () => {

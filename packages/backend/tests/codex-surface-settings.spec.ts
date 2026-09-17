@@ -17,6 +17,9 @@ import {
   validateReasoningEffort,
   validateServiceTier,
 } from '../src/node/codex-surface-settings';
+import { initialAuthentication } from '../src/node/codex-surface-authentication';
+import { initialSurfaceSnapshot } from '../src/node/codex-surface-runtime';
+import { configRequirements } from './helpers/codex-surface-fixture';
 
 const models: CodexSurfaceModel[] = [
   {
@@ -95,13 +98,13 @@ describe('Codex surface settings policy', () => {
     expect(approvalPresetsForProfiles(profiles, null)).toStrictEqual([
       'ask-for-approval', 'approve-for-me', 'full-access',
     ]);
-    expect(approvalPresetsForProfiles(profiles, requirements({
+    expect(approvalPresetsForProfiles(profiles, configRequirements({
       allowedApprovalPolicies: ['on-request'],
       allowedApprovalsReviewers: ['user'],
     }))).toStrictEqual(['ask-for-approval']);
     expect(approvalPresetsForProfiles([
       { id: ':danger-no-sandbox', description: null, allowed: true },
-    ], requirements({
+    ], configRequirements({
       allowedApprovalPolicies: [],
       allowedApprovalsReviewers: [],
     }))).toStrictEqual(['full-access']);
@@ -112,21 +115,21 @@ describe('Codex surface settings policy', () => {
   it('applies every approval-policy and reviewer requirement independently', () => {
     const workspace = [{ id: ':workspace', description: null, allowed: true }];
 
-    expect(approvalPresetsForProfiles(workspace, requirements({
+    expect(approvalPresetsForProfiles(workspace, configRequirements({
       allowedApprovalPolicies: ['on-request'],
       allowedApprovalsReviewers: ['auto_review'],
     }))).toStrictEqual(['approve-for-me']);
-    expect(approvalPresetsForProfiles(workspace, requirements({
+    expect(approvalPresetsForProfiles(workspace, configRequirements({
       allowedApprovalPolicies: ['never'],
       allowedApprovalsReviewers: ['user', 'auto_review'],
     }))).toStrictEqual([]);
-    expect(approvalPresetsForProfiles(workspace, requirements({
+    expect(approvalPresetsForProfiles(workspace, configRequirements({
       allowedApprovalPolicies: ['on-request'],
       allowedApprovalsReviewers: ['guardian_subagent'],
     }))).toStrictEqual([]);
     expect(approvalPresetsForProfiles([
       { id: ':danger-full-access', description: null, allowed: true },
-    ], requirements({
+    ], configRequirements({
       allowedApprovalPolicies: ['never'],
       allowedApprovalsReviewers: ['auto_review'],
     }))).toStrictEqual([]);
@@ -408,82 +411,15 @@ describe('Codex surface settings policy', () => {
   });
 });
 
-function requirements(overrides: Partial<v2.ConfigRequirements>): v2.ConfigRequirements {
-  return {
-    cliAuthCredentialsStore: null,
-    chatgptBaseUrl: null,
-    additionalDeveloperInstructions: null,
-    allowedApprovalPolicies: null,
-    allowedApprovalsReviewers: null,
-    allowedSandboxModes: null,
-    allowedWindowsSandboxImplementations: null,
-    allowedPermissionProfiles: null,
-    defaultPermissions: null,
-    allowedWebSearchModes: null,
-    allowManagedHooksOnly: null,
-    allowBrowserAndComputerUse: null,
-    allowAppshots: null,
-    allowRemoteControl: null,
-    computerUse: null,
-    browserUse: null,
-    inAppBrowser: null,
-    featureRequirements: null,
-    hooks: null,
-    enforceResidency: null,
-    network: null,
-    application: null,
-    autoReview: null,
-    models: null,
-    sqliteHome: null,
-    logDir: null,
-    modelCatalogJson: null,
-    checkForUpdateOnStartup: null,
-    allowLoginShell: null,
-    feedback: null,
-    windowsSandboxPrivateDesktop: null,
-    ...overrides,
-  };
-}
-
 function snapshot(overrides: Partial<CodexSurfaceSnapshot> = {}): CodexSurfaceSnapshot {
-  return {
+  return Object.assign(initialSurfaceSnapshot({
+    ...initialAuthentication(),
+    status: 'loaded',
+  }), {
     status: 'ready',
-    authentication: {
-      status: 'loaded',
-      account: null,
-      requiresOpenaiAuth: null,
-      error: null,
-      login: { status: 'idle', loginId: null, authUrl: null, error: null },
-    },
-    conversations: [],
-    activeConversationId: null,
-    activeTurnId: null,
-    turns: [],
-    messages: [],
-    clientRequests: [],
-    answeredClientRequestIds: [],
-    approvals: [],
-    models: [],
     modelCatalogStatus: 'loaded',
-    skills: [],
     skillCatalogStatus: 'loaded',
-    plugins: [],
     pluginCatalogStatus: 'loaded',
-    permissionProfiles: [],
-    approvalPresets: [],
-    approvalPreset: null,
-    selectedModelId: null,
-    selectedReasoningEffort: null,
-    planMode: false,
-    contextUsage: null,
-    goal: null,
-    turnGitDiff: null,
-    threadStatus: null,
-    rateLimits: null,
-    queuedPrompts: [],
-    busy: false,
-    historyLoading: false,
-    error: null,
     ...overrides,
-  };
+  });
 }
