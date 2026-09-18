@@ -61,6 +61,8 @@
           :error="selected.error"
           :files="files"
           :ingest-attachments="ingestMockAttachments"
+          :has-composer-context="selectedMessageContexts.length > 0"
+          :message-text-selection="selected.id === 'message-selection'"
           :messages="messages"
           :models="models"
           :plan-mode="false"
@@ -75,6 +77,7 @@
           @interrupt="activity = 'Interrupt requested'"
           @client-response="respondToClientRequest"
           @continue-interrupted-turn="continueInterruptedTurn"
+          @message-text-selection-change="selectedMessageText = $event"
           @submit="submitPrompt"
         >
           <template #message-header="{ message }">
@@ -82,7 +85,25 @@
               {{ messageHeaderFor(message) }}
             </span>
           </template>
+          <template #composer-context="{ disabled }">
+            <div v-if="selectedMessageContexts.length > 0" class="lab__composer-context">
+              <div v-for="context in selectedMessageContexts" :key="`${context.messageIndex}:${context.text}`" class="lab__composer-context-card">
+                <span>{{ context.text }}</span>
+                <button type="button" :disabled="disabled" aria-label="Remove selected context" @click="removeSelectedContext(context)">×</button>
+              </div>
+            </div>
+          </template>
         </CodexConversationPane>
+        <button
+          v-if="selected.id === 'message-selection' && selectedMessageText"
+          type="button"
+          class="lab__selection-action"
+          :style="selectionActionStyle"
+          @pointerdown.prevent
+          @click="addSelectedContext"
+        >
+          Add selected context
+        </button>
       </div>
 
       <footer class="lab__footer">
@@ -106,6 +127,7 @@ import {
   type CodexContextUsage,
   type ClientRequestResponse,
   type CodexModelOption,
+  type CodexMessageTextSelection,
   type CodexNativeAttachment,
   type CodexNativeAttachmentInput,
   type CodexQueuedPromptData,
@@ -217,6 +239,23 @@ const scenarios: [Scenario, ...Scenario[]] = [
         ],
       },
       { id: 'conversation-steer', kind: 'steer', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Focus on the attachment renderer first.' }] },
+    ],
+  },
+  {
+    id: 'message-selection',
+    name: 'Message selection',
+    summary: 'Opt-in selected text and host composer context',
+    title: 'Select text from a message',
+    description: 'Highlight text in the assistant response, add it as host-owned context, remove it, or submit it without typing.',
+    messages: [
+      {
+        id: 'selection-user', role: 'user', status: 'complete', turnId: 'selection-turn',
+        parts: [{ type: 'text', text: 'Review the proposed product direction.' }],
+      },
+      {
+        id: 'selection-assistant', role: 'assistant', status: 'complete', turnId: 'selection-turn',
+        parts: [{ type: 'text', text: 'The strongest part is the clear separation between reusable SDK mechanics and product-owned annotation behavior.', phase: 'final_answer' }],
+      },
     ],
   },
   {
@@ -482,8 +521,14 @@ const mockBusy = ref(false);
 const mockActiveTurnId = ref<string | null>(null);
 const mockTurns = ref<readonly CodexSurfaceTurn[]>([]);
 const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
+const selectedMessageText = ref<CodexMessageTextSelection | null>(null);
+const selectedMessageContexts = ref<CodexMessageTextSelection[]>([]);
 const resetConfirmed = ref(false);
 const selected = computed<Scenario>(() => scenarios.find((scenario) => scenario.id === selectedId.value) ?? scenarios[0]);
+const selectionActionStyle = computed(() => selectedMessageText.value ? {
+  left: `${selectedMessageText.value.anchor.x}px`,
+  top: `${selectedMessageText.value.anchor.y + selectedMessageText.value.anchor.height + 8}px`,
+} : undefined);
 const streamTimers = new Set<number>();
 const mockAttachments = new Map<string, CodexNativeAttachment>();
 let resetFeedbackTimer: number | undefined;
@@ -499,10 +544,26 @@ function resetScenario(confirmReset = true): void {
   mockActiveTurnId.value = selected.value.activeTurnId ?? null;
   mockTurns.value = [...(selected.value.turns ?? [])];
   answeredClientRequestIds.value = new Set();
+  selectedMessageText.value = null;
+  selectedMessageContexts.value = [];
   activity.value = confirmReset ? 'Scenario reset' : 'Scenario loaded';
   if (confirmReset) showResetFeedback();
   if (selected.value.id === 'busy') startBusyToolCompletion();
   if (selected.value.id === 'reasoning-activity') startReasoningActivityLifecycle();
+}
+
+function addSelectedContext(): void {
+  const selection = selectedMessageText.value;
+  if (!selection) return;
+  selectedMessageContexts.value = [...selectedMessageContexts.value, selection];
+  selectedMessageText.value = null;
+  window.getSelection()?.removeAllRanges();
+  activity.value = 'Selected message text added as host context';
+}
+
+function removeSelectedContext(context: CodexMessageTextSelection): void {
+  selectedMessageContexts.value = selectedMessageContexts.value.filter((candidate) => candidate !== context);
+  activity.value = 'Selected message context removed';
 }
 
 function continueInterruptedTurn(): void {
@@ -659,6 +720,10 @@ function reasoningActivityParts(stage: 'planning' | 'inspecting' | 'commentary')
 }
 
 function submitPrompt(prompt: string, options?: CodexRendererSendMessageOptions): void {
+  const contextText = selectedMessageContexts.value.length > 0
+    ? `Selected message context:\n${selectedMessageContexts.value.map(({ text }) => `- ${text}`).join('\n')}`
+    : '';
+  const submittedPrompt = [prompt, contextText].filter(Boolean).join('\n\n');
   const attachmentParts: SurfaceMessagePart[] = (options?.attachments ?? []).map((attachment) => {
     const resolved = mockAttachments.get(attachment.reference);
     return {
@@ -677,10 +742,11 @@ function submitPrompt(prompt: string, options?: CodexRendererSendMessageOptions)
     role: 'user',
     status: 'complete',
     createdAt: new Date().toISOString(),
-    parts: [{ type: 'text', text: prompt }, ...attachmentParts],
+    parts: [{ type: 'text', text: submittedPrompt }, ...attachmentParts],
   });
-  activity.value = `Submitted ${prompt.split('\n').length}-line prompt with ${attachmentParts.length} attachment(s)`;
+  activity.value = `Submitted ${submittedPrompt.split('\n').length}-line prompt with ${attachmentParts.length} attachment(s)`;
   draft.value = '';
+  selectedMessageContexts.value = [];
   startMockStream();
 }
 

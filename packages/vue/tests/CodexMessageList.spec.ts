@@ -2,7 +2,7 @@
 
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref, toRaw } from 'vue';
+import { defineComponent, h, nextTick, ref, toRaw } from 'vue';
 import CodexMessageList from '../src/components/CodexMessageList.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
 import type { Message } from '../src/chat/types';
@@ -98,12 +98,105 @@ function turnLifecycle(id: string, status: CodexSurfaceTurn['status']): CodexSur
   };
 }
 
+function selectText(
+  startNode: Node,
+  startOffset: number,
+  endNode: Node,
+  endOffset: number,
+  rect = { left: 100, top: 120, width: 80, height: 20 },
+): void {
+  const range = document.createRange();
+  range.setStart(startNode, startOffset);
+  range.setEnd(endNode, endOffset);
+  Object.defineProperty(range, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({ ...rect, bottom: rect.top + rect.height, right: rect.left + rect.width }),
+  });
+  const selection = {
+    getRangeAt: () => range,
+    isCollapsed: false,
+    rangeCount: 1,
+    toString: () => range.toString(),
+  } as unknown as Selection;
+  vi.spyOn(window, 'getSelection').mockReturnValue(selection);
+}
+
+async function finishTextSelection(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await wrapper.get('.message-list').trigger('pointerdown');
+  document.dispatchEvent(new Event('pointerup'));
+  await nextTick();
+}
+
+function textNodeContaining(element: Element, value?: string): Text {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (!value ? node.textContent?.trim() : node.textContent?.includes(value)) return node as Text;
+    node = walker.nextNode();
+  }
+  throw new Error(`Unable to find text node${value ? ` containing ${value}` : ''}`);
+}
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe('CodexMessageList', () => {
+  it('emits an opt-in text selection contained within one message', async () => {
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        messageTextSelection: true,
+        messages: [{
+          id: 'assistant-selection',
+          role: 'assistant',
+          content: 'A useful framing for the review.',
+          turnId: 'turn-selection',
+        }],
+      },
+    });
+    const textNode = textNodeContaining(wrapper.get('.chat-message-block--text').element, 'useful framing');
+    const start = textNode.data.indexOf('useful');
+
+    selectText(textNode, start, textNode, start + 'useful framing'.length);
+    await finishTextSelection(wrapper);
+
+    expect(wrapper.emitted('message-text-selection-change')).toStrictEqual([[
+      {
+        anchor: { x: 100, y: 120, width: 80, height: 20 },
+        messageId: 'assistant-selection',
+        messageIndex: 0,
+        role: 'assistant',
+        text: 'useful framing',
+        turnId: 'turn-selection',
+      },
+    ]]);
+
+    await wrapper.get('.message-list').trigger('scroll');
+    expect(wrapper.emitted('message-text-selection-change')?.at(-1)).toStrictEqual([null]);
+  });
+
+  it('ignores selections by default and rejects selections spanning messages', async () => {
+    const wrapper = mount(CodexMessageList, { props: { messages } });
+    const paragraphs = wrapper.findAll('.chat-message-block--text p');
+    const firstNode = textNodeContaining(paragraphs[0]!.element);
+    const secondNode = textNodeContaining(paragraphs[1]!.element);
+
+    selectText(firstNode, 0, firstNode, 6);
+    await finishTextSelection(wrapper);
+    expect(wrapper.emitted('message-text-selection-change')).toBeUndefined();
+
+    await wrapper.setProps({ messageTextSelection: true });
+    selectText(firstNode, 0, firstNode, 6);
+    await finishTextSelection(wrapper);
+    expect(wrapper.emitted('message-text-selection-change')).toHaveLength(1);
+
+    selectText(firstNode, 0, secondNode, 4);
+    await finishTextSelection(wrapper);
+    expect(wrapper.emitted('message-text-selection-change')?.at(-1)).toStrictEqual([null]);
+  });
+
   it('keeps the thinking shimmer visible while a busy turn has no assistant row yet', async () => {
     const wrapper = mount(CodexMessageList, {
       props: {

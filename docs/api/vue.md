@@ -233,6 +233,35 @@ In `CodexConversationPane`, queued-prompt Edit loads the text into an empty
 composer. Enter dispatches `updateQueuedPrompt(promptId, prompt)`, while
 Cmd/Ctrl+Enter dispatches `steerQueuedPrompt(promptId, prompt)`.
 
+### Host-owned message selection and composer context
+
+`CodexMessageList` and `CodexConversationPane` accept
+`messageTextSelection` (default `false`) and emit
+`messageTextSelectionChange` with `CodexMessageTextSelection | null`:
+
+```ts
+type CodexMessageTextSelection = {
+  text: string;
+  messageId?: string;
+  turnId?: string;
+  messageIndex: number;
+  role: 'user' | 'assistant';
+  anchor: { x: number; y: number; width: number; height: number };
+};
+```
+
+Only a non-empty selection contained by one rendered message is emitted. The
+anchor uses viewport coordinates. Scrolling, collapsing the selection,
+changing the conversation key, or disabling the feature emits `null` after an
+active selection.
+
+`CodexConversationPane` also provides the `composer-context` slot and
+`hasComposerContext`. These are for host-rendered context cards whose semantics
+remain outside the SDK. `hasComposerContext` enables Send with no typed prompt;
+a context-only controlled submit receives an empty string so the host can
+serialize the cards. `CodexComposer` exposes the lower-level equivalent as
+`hasExternalContent`. Neither API modifies renderer attachments.
+
 ## Leaf components
 
 ### Composer and menus

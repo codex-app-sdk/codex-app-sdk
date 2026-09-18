@@ -32,6 +32,11 @@ button, select { font: inherit; }
 .lab__header p:last-child { max-width: 720px; margin: 6px 0 0; }
 .lab__frame { min-height: 0; overflow: hidden; border: 1px solid var(--color-border, #ddd); border-radius: 18px; background: var(--color-shell-main, #fff); box-shadow: 0 18px 60px rgb(0 0 0 / 8%); }
 .lab__frame > * { height: 100%; }
+.lab__selection-action { position: fixed; z-index: 20; height: auto; padding: 8px 12px; border: 1px solid var(--color-border, #ddd); border-radius: 10px; background: var(--color-surface-lowest, #fff); color: var(--color-text, #171717); box-shadow: 0 6px 20px rgb(0 0 0 / 14%); cursor: pointer; }
+.lab__composer-context { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px 0; }
+.lab__composer-context-card { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--color-border, #ddd); border-radius: 8px; background: var(--color-surface-high, #f3f3f3); color: var(--color-text-muted, #666); font-size: 12px; }
+.lab__composer-context-card span { max-width: 440px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lab__composer-context-card button { border: 0; background: transparent; color: inherit; cursor: pointer; }
 .lab__footer { display: flex; align-items: center; gap: 18px; max-width: 1100px; width: 100%; margin: 0 auto; padding: 14px 2px 0; color: var(--color-text-muted, #666); font-size: 12px; }
 .lab__footer output { margin-left: auto; color: var(--color-primary, #1b4fb2); }
 kbd { padding: 2px 5px; border: 1px solid var(--color-border-strong, #bbb); border-radius: 5px; background: var(--color-surface-lowest, #fff); color: var(--color-text, #171717); font: inherit; box-shadow: 0 1px 0 var(--color-border, #ddd); }

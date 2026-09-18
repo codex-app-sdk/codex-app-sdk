@@ -180,6 +180,7 @@ const props = defineProps<{
   draftRevision?: number;
   files?: readonly CodexFileSearchItem[];
   hasAttachments?: boolean;
+  hasExternalContent?: boolean;
   plugins?: readonly CodexSurfacePlugin[];
   promptHistory?: readonly string[];
   promptHistoryLoading?: boolean;
@@ -254,12 +255,17 @@ const voiceVisible = computed(() => (
 ));
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
-const canSend = computed(() => Boolean((hasPrompt.value || props.hasAttachments) && !props.disabled));
+const canSend = computed(() => Boolean((
+  hasPrompt.value
+  || props.hasAttachments
+  || props.hasExternalContent
+) && !props.disabled));
 const canContinueInterruptedTurn = computed(() => Boolean(
   props.canContinueInterruptedTurn
   && !props.isSending
   && !hasPrompt.value
   && !props.hasAttachments
+  && !props.hasExternalContent
   && !props.disabled,
 ));
 let pendingTranscriptCaret: number | null = null;
@@ -267,6 +273,7 @@ const canInterrupt = computed(() => Boolean(
   props.isSending
   && !hasPrompt.value
   && !props.hasAttachments
+  && !props.hasExternalContent
   && !props.disabled
   && !isRecording.value
   && !isTranscribing.value,
@@ -417,7 +424,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   if (!canSend.value || (intent === 'steer' && !trimmed)) {
     return;
   }
-  const submittedPrompt = trimmed || '(no user instructions)';
+  const submittedPrompt = trimmed || (props.hasAttachments ? '(no user instructions)' : '');
   const submissionOptions = dictatedInput.value ? { inputMethod: 'dictated' as const } : undefined;
   if (trimmed) rememberSubmittedPrompt(submittedPrompt);
 

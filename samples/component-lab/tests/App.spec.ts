@@ -3,6 +3,7 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App.vue';
+import type { CodexMessageTextSelection } from '@codex-app-sdk/vue';
 
 describe('component lab', () => {
   afterEach(() => vi.useRealTimers());
@@ -78,6 +79,35 @@ describe('component lab', () => {
     expect(steer.find('.chat-message__actions').exists()).toBe(false);
     expect(messageHeader.element.compareDocumentPosition(steer.get('.chat-message__stack').element))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('demonstrates opt-in message selection and host-owned composer context', async () => {
+    const wrapper = mount(App);
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Message selection'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+    const selection: CodexMessageTextSelection = {
+      anchor: { x: 100, y: 120, width: 80, height: 20 },
+      messageId: 'selection-assistant',
+      messageIndex: 1,
+      role: 'assistant',
+      text: 'clear separation',
+      turnId: 'selection-turn',
+    };
+
+    wrapper.getComponent({ name: 'CodexConversationPane' }).vm.$emit('messageTextSelectionChange', selection);
+    await wrapper.vm.$nextTick();
+    await wrapper.get('.lab__selection-action').trigger('click');
+
+    expect(wrapper.get('.lab__composer-context-card').text()).toContain('clear separation');
+    const send = wrapper.get('button[aria-label="Send prompt"]');
+    expect(send.attributes()).not.toHaveProperty('disabled');
+    await send.trigger('click');
+
+    expect(wrapper.find('.lab__composer-context-card').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Selected message context:');
+    expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('clear separation');
   });
 
   it('renders every tool action icon and label in the tool gallery', async () => {

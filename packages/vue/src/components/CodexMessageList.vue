@@ -7,6 +7,7 @@
       ref="scrollElement"
       class="codex-message-list__viewport message-list"
       @click.capture="handleViewportClick"
+      @pointerdown="handleSelectionPointerDown"
       @scroll="handleScroll"
     >
       <div class="codex-message-list__content">
@@ -25,49 +26,54 @@
           :turn-id="group.turnId"
         >
           <template v-for="entry in group.entries" :key="entry.key">
-            <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(entry.message)" :index="entry.index" />
-            <CodexMessage
-              v-else
-              :actions-disabled="actionsDisabled"
-              :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
-              :answered-client-request-ids="answeredClientRequestIds"
-              :can-delete-turn="canDeleteTurn && isTerminalTurn(group.turnId)"
-              :can-edit-turn="canEditTurn && isTerminalTurn(group.turnId)"
-              :can-fork-turn="canForkTurn && isForkableTurn(group.turnId)"
-              :can-retry-turn="canRetryTurn && isTerminalTurn(group.turnId)"
-              :deleting-turn="group.turnId === deletingTurnId"
-              :follow-ups-disabled="followUpsDisabled"
-              :index="entry.index"
-              :message="entry.message"
-              :mention-groups="mentionGroups"
-              :open-image="openImage"
-              :plugins="plugins"
-              :presentation="presentation"
-              :show-tool-details="showToolDetails"
-              :skills="skills"
-              :thread-actions-disabled="busy"
-              @cancel="emit('cancel')"
-              @client-response="emit('client-response', $event)"
-              @copy-message="emit('copy-message', $event)"
-              @delete-turn="emit('delete-turn', $event)"
-              @edit-turn="emit('edit-turn', $event)"
-              @fork-turn="emit('fork-turn', $event)"
-              @open-link="emit('open-link', $event)"
-              @open-visualization="emit('open-visualization', $event)"
-              @quote-message="emit('quote-message', $event)"
-              @retry-turn="emit('retry-turn', $event)"
-              @send-follow-up="emit('send-follow-up', $event)"
+            <div
+              class="codex-message-list__entry"
+              :data-codex-message-index="entry.index"
             >
-              <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
-              <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
-              <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
-              <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
-              <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
-              <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
-              <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
-              <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
-              <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
-            </CodexMessage>
+              <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(entry.message)" :index="entry.index" />
+              <CodexMessage
+                v-else
+                :actions-disabled="actionsDisabled"
+                :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
+                :answered-client-request-ids="answeredClientRequestIds"
+                :can-delete-turn="canDeleteTurn && isTerminalTurn(group.turnId)"
+                :can-edit-turn="canEditTurn && isTerminalTurn(group.turnId)"
+                :can-fork-turn="canForkTurn && isForkableTurn(group.turnId)"
+                :can-retry-turn="canRetryTurn && isTerminalTurn(group.turnId)"
+                :deleting-turn="group.turnId === deletingTurnId"
+                :follow-ups-disabled="followUpsDisabled"
+                :index="entry.index"
+                :message="entry.message"
+                :mention-groups="mentionGroups"
+                :open-image="openImage"
+                :plugins="plugins"
+                :presentation="presentation"
+                :show-tool-details="showToolDetails"
+                :skills="skills"
+                :thread-actions-disabled="busy"
+                @cancel="emit('cancel')"
+                @client-response="emit('client-response', $event)"
+                @copy-message="emit('copy-message', $event)"
+                @delete-turn="emit('delete-turn', $event)"
+                @edit-turn="emit('edit-turn', $event)"
+                @fork-turn="emit('fork-turn', $event)"
+                @open-link="emit('open-link', $event)"
+                @open-visualization="emit('open-visualization', $event)"
+                @quote-message="emit('quote-message', $event)"
+                @retry-turn="emit('retry-turn', $event)"
+                @send-follow-up="emit('send-follow-up', $event)"
+              >
+                <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
+                <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
+                <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
+                <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
+                <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
+                <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
+                <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
+                <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
+                <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
+              </CodexMessage>
+            </div>
           </template>
         </CodexMessageTurn>
       </div>
@@ -97,6 +103,7 @@ import type { Message } from '../chat/types'
 import type { MessageBlock } from '../chat/message-blocks'
 import type { CodexMessageImageOpenHandler } from '../chat/message-image'
 import type { CodexConversationVisualization } from '../chat/visualization'
+import type { CodexMessageTextSelection } from '../chat/message-text-selection'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
 import CodexMessage from './CodexMessage.vue'
 import CodexMessageTurn from './CodexMessageTurn.vue'
@@ -125,6 +132,7 @@ const props = withDefaults(defineProps<{
   initialMessageBatchSize?: number
   loadingOlderMessages?: boolean
   messageBatchSize?: number
+  messageTextSelection?: boolean
   messages: readonly (Message | SurfaceMessage)[]
   mentionGroups?: readonly CodexComposerMentionGroup[]
   openImage?: CodexMessageImageOpenHandler
@@ -184,6 +192,7 @@ const emit = defineEmits<{
   'edit-turn': [payload: { content: string; turnId: string }]
   'fork-turn': [turnId: string]
   'load-older-messages': []
+  'message-text-selection-change': [selection: CodexMessageTextSelection | null]
   'open-link': [link: CodexConversationLink]
   'open-visualization': [visualization: CodexConversationVisualization]
   'quote-message': [index: number]
@@ -357,8 +366,12 @@ const stickToBottom = ref(true)
 let contentObserver: MutationObserver | null = null
 let contentResizeObserver: ResizeObserver | null = null
 let scrollFrame: number | ReturnType<typeof setTimeout> | null = null
+let pointerSelecting = false
+let lastTextSelection: CodexMessageTextSelection | null = null
 
 onMounted(async () => {
+  document.addEventListener('pointerup', handleSelectionPointerUp)
+  document.addEventListener('selectionchange', handleDocumentSelectionChange)
   await nextTick()
   scrollToBottom()
   const content = scrollElement.value?.querySelector('.codex-message-list__content')
@@ -396,7 +409,12 @@ watch(() => props.messages.length, async (nextLength) => {
   }
 })
 
+watch(() => props.messageTextSelection, (enabled) => {
+  if (!enabled) clearMessageTextSelection()
+})
+
 watch(() => props.resetKey, async (nextKey, previousKey) => {
+  clearMessageTextSelection()
   const target = scrollElement.value
   if (target && previousKey !== null && previousKey !== undefined) {
     conversationScrollStates.set(previousKey, {
@@ -442,12 +460,93 @@ watch(() => [effectiveRenderStrategy.value, effectiveInitialMessageBatchSize.val
 })
 
 function handleScroll(): void {
+  clearMessageTextSelection()
   updateStickiness()
   if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange() && renderStartIndex.value <= 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
     requestOlderMessages()
   } else if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange()) {
     void loadOlderMessages()
   }
+}
+
+function handleSelectionPointerDown(): void {
+  if (props.messageTextSelection) pointerSelecting = true
+}
+
+function handleSelectionPointerUp(): void {
+  if (!pointerSelecting) return
+  pointerSelecting = false
+  updateMessageTextSelection()
+}
+
+function handleDocumentSelectionChange(): void {
+  if (!props.messageTextSelection || pointerSelecting) return
+  updateMessageTextSelection()
+}
+
+function updateMessageTextSelection(): void {
+  if (!props.messageTextSelection) {
+    clearMessageTextSelection()
+    return
+  }
+  const selection = window.getSelection()
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    clearMessageTextSelection()
+    return
+  }
+  const text = selection.toString().trim()
+  const range = selection.getRangeAt(0)
+  const startEntry = messageEntryForNode(range.startContainer)
+  const endEntry = messageEntryForNode(range.endContainer)
+  if (!text || !startEntry || startEntry !== endEntry) {
+    clearMessageTextSelection()
+    return
+  }
+  const messageIndex = Number.parseInt(startEntry.dataset.codexMessageIndex ?? '', 10)
+  const entry = displayEntries.value.find((candidate) => candidate.index === messageIndex)
+  if (!entry) {
+    clearMessageTextSelection()
+    return
+  }
+  const rect = range.getBoundingClientRect()
+  const message = chatMessageFromInput(entry.message)
+  const next: CodexMessageTextSelection = {
+    anchor: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+    messageIndex,
+    role: message.role,
+    text,
+    ...(message.id ? { messageId: message.id } : {}),
+    ...(message.turnId ? { turnId: message.turnId } : {}),
+  }
+  if (sameTextSelection(lastTextSelection, next)) return
+  lastTextSelection = next
+  emit('message-text-selection-change', next)
+}
+
+function messageEntryForNode(node: Node): HTMLElement | null {
+  const element = node instanceof Element ? node : node.parentElement
+  const entry = element?.closest<HTMLElement>('[data-codex-message-index]') ?? null
+  return entry && scrollElement.value?.contains(entry) ? entry : null
+}
+
+function clearMessageTextSelection(): void {
+  pointerSelecting = false
+  if (!lastTextSelection) return
+  lastTextSelection = null
+  emit('message-text-selection-change', null)
+}
+
+function sameTextSelection(
+  left: CodexMessageTextSelection | null,
+  right: CodexMessageTextSelection,
+): boolean {
+  return Boolean(left
+    && left.text === right.text
+    && left.messageIndex === right.messageIndex
+    && left.anchor.x === right.anchor.x
+    && left.anchor.y === right.anchor.y
+    && left.anchor.width === right.anchor.width
+    && left.anchor.height === right.anchor.height)
 }
 
 function handleViewportClick(event: MouseEvent): void {
@@ -608,6 +707,8 @@ function queueScrollToBottom(): void {
 }
 
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerup', handleSelectionPointerUp)
+  document.removeEventListener('selectionchange', handleDocumentSelectionChange)
   contentObserver?.disconnect()
   contentObserver = null
   contentResizeObserver?.disconnect()
@@ -666,6 +767,10 @@ defineExpose({ scrollToBottom })
   margin: 0 auto;
   padding: var(--codex-message-list-content-padding, 0);
   box-sizing: border-box;
+}
+
+.codex-message-list__entry {
+  display: contents;
 }
 
 .codex-message-list__content :deep(.chat-message),

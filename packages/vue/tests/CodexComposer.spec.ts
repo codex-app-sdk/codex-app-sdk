@@ -19,6 +19,7 @@ type ChatComposerProps = {
   draftRevision?: number;
   isSending: boolean;
   hasAttachments?: boolean;
+  hasExternalContent?: boolean;
   interruptArmed?: boolean;
   placeholder: string;
   promptHistory?: readonly string[];
@@ -138,6 +139,28 @@ describe('ChatComposer', () => {
 
     expect(wrapper.emitted('send')).toStrictEqual([['(no user instructions)']]);
     expect(wrapper.emitted('interrupt')).toBeUndefined();
+  });
+
+  it('submits empty text for host-owned composer context', async () => {
+    const wrapper = mountComposer({ hasExternalContent: true });
+
+    const button = wrapper.get('.chat-composer__send');
+    expect(button.attributes()).not.toHaveProperty('disabled');
+    await button.trigger('click');
+
+    expect(wrapper.emitted('send')).toStrictEqual([['']]);
+  });
+
+  it('does not continue or interrupt while host-owned composer context is present', async () => {
+    const interrupted = mountComposer({ canContinueInterruptedTurn: true, hasExternalContent: true });
+    await interrupted.get('.chat-composer__send').trigger('click');
+    expect(interrupted.emitted('send')).toStrictEqual([['']]);
+    expect(interrupted.emitted('continueInterruptedTurn')).toBeUndefined();
+
+    const working = mountComposer({ hasExternalContent: true, isSending: true });
+    await working.get('.chat-composer__send').trigger('click');
+    expect(working.emitted('send')).toStrictEqual([['']]);
+    expect(working.emitted('interrupt')).toBeUndefined();
   });
 
   it('recalls submitted prompts from an empty composer and exits navigation after an edit', async () => {

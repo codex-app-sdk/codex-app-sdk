@@ -113,6 +113,7 @@ scroll anchoring, and eager opt-out.
 - `message-thinking`, `message-status`, and `message-actions`
 - `approval`
 - `before-composer` and `after-composer`
+- `composer-context` for host-owned context cards inside the composer
 - `composer-attachment-actions`
 - `composer-after-input` and `composer-after`
 - `menu-icon` and `menu-item`

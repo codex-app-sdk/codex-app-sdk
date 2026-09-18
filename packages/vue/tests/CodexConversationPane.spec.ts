@@ -13,6 +13,7 @@ import {
   type CodexComposerMenuItem,
   type CodexNativeAttachment,
   type CodexConversationPaneState,
+  type CodexMessageTextSelection,
   type CodexSurfaceController,
   type SurfaceMessage,
 } from '../src';
@@ -46,6 +47,56 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
+  it('forwards opt-in message selections and host-owned composer context', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        hasComposerContext: true,
+        messageTextSelection: true,
+        messages,
+        modelValue: '',
+      },
+      slots: {
+        'composer-context': ({ disabled }: { disabled: boolean }) => h(
+          'div',
+          { class: 'host-composer-context', 'data-disabled': String(disabled) },
+          'Selected quote',
+        ),
+      },
+    });
+    const selection: CodexMessageTextSelection = {
+      anchor: { x: 10, y: 20, width: 30, height: 40 },
+      messageId: 'assistant-1',
+      messageIndex: 0,
+      role: 'assistant',
+      text: 'Ready to build',
+    };
+    const list = wrapper.getComponent(CodexMessageList);
+
+    expect(list.props('messageTextSelection')).toBe(true);
+    expect(composerProps(wrapper).hasExternalContent).toBe(true);
+    expect(wrapper.get('.host-composer-context').text()).toBe('Selected quote');
+
+    list.vm.$emit('message-text-selection-change', selection);
+    await nextTick();
+    expect(wrapper.emitted('messageTextSelectionChange')).toStrictEqual([[selection]]);
+  });
+
+  it('submits host-owned composer context without inventing prompt text', async () => {
+    const submit = vi.fn(async () => undefined);
+    const controller = createCodexConversationPaneController({
+      state: { identity: { conversationKey: 'thread-context', messages } },
+      actions: { submit },
+    });
+    const wrapper = mount(CodexConversationPane, {
+      props: { controller, hasComposerContext: true },
+    });
+
+    await wrapper.get('button[aria-label="Send prompt"]').trigger('click');
+    await flushPromises();
+
+    expect(submit).toHaveBeenCalledWith('', undefined);
+  });
+
   it('seeds prompt recall from existing user messages', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: {

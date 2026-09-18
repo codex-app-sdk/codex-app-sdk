@@ -189,6 +189,10 @@ export type {
   ToolExecutionState as CodexToolExecutionState,
   ToolStatusDescriptor as CodexToolStatusDescriptor,
 } from './chat/types';
+export type {
+  CodexMessageTextSelection,
+  CodexMessageTextSelectionAnchor,
+} from './chat/message-text-selection';
 export type { ChatMessageInput as CodexMessageInput } from './chat/renderer-message-adapter';
 export type { CodexChatTranslate } from './chat/chat-i18n';
 export type { QueuedChatPrompt as CodexQueuedPromptData } from './chat/queued-prompts';

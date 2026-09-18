@@ -110,6 +110,42 @@ export const paneController = createCodexConversationPaneController({
 The adapter is intentionally a controlled-view boundary. It does not create a
 `CodexSurface`, fetch history, clone messages, or own application state.
 
+## Host-owned message selection and composer context
+
+Hosts can opt into text selection from rendered chat messages without moving
+their product workflow into the SDK:
+
+```vue
+<CodexConversationPane
+  :controller="paneController"
+  :message-text-selection="true"
+  :has-composer-context="annotations.length > 0"
+  @message-text-selection-change="selectedMessageText = $event"
+>
+  <template #composer-context="{ disabled }">
+    <AppAnnotationList
+      :annotations="annotations"
+      :disabled="disabled"
+      @remove="removeAnnotation"
+    />
+  </template>
+</CodexConversationPane>
+```
+
+`messageTextSelectionChange` emits `CodexMessageTextSelection | null`. A
+selection contains the trimmed text, message ID/index/role, optional turn ID,
+and a viewport-relative anchor rectangle suitable for a host-owned popover.
+The SDK rejects selections spanning messages and clears the value when the
+selection collapses, leaves the transcript, scrolls, or the conversation key
+changes. The feature is disabled by default.
+
+`composer-context` is a generic rendering slot; the SDK does not serialize its
+contents. Set `hasComposerContext` while host-owned cards are present so Send
+remains available with an empty text field. A context-only controlled submit
+passes `prompt === ''` to `actions.submit`, and the host must serialize its
+context before transport. Native image/file attachment-only submissions keep
+the existing `(no user instructions)` prompt.
+
 ## State groups
 
 | Group | Contents |

@@ -40,6 +40,7 @@
         :loading-older-messages="effectiveLoadingOlderHistory"
         :initial-message-batch-size="initialMessageBatchSize"
         :message-batch-size="messageBatchSize"
+        :message-text-selection="messageTextSelection"
         :messages="effectiveMessages"
         :mention-groups="effectiveMentionGroups"
         :open-image="openImage"
@@ -58,6 +59,7 @@
         @edit-turn="editTurn"
         @fork-turn="forkTurn"
         @load-older-messages="loadOlderHistory"
+        @message-text-selection-change="emit('messageTextSelectionChange', $event)"
         @open-link="handleConversationLink"
         @open-visualization="handleVisualization"
         @quote-message="quoteMessage"
@@ -128,6 +130,7 @@
             :draft="localDraft"
             :files="effectiveFiles"
             :has-attachments="selectedAttachments.length > 0"
+            :has-external-content="hasComposerContext"
             :interrupt-armed="escapeInterruptArmed"
             :plugins="effectivePlugins"
             :prompt-history="effectivePromptHistory"
@@ -206,6 +209,7 @@
                   </span>
                 </div>
               </div>
+              <slot name="composer-context" :disabled="effectiveDisabled" />
             </template>
             <template v-if="$slots['menu-icon']" #menu-icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
             <template v-if="$slots['menu-item']" #menu-item="scope"><slot name="menu-item" v-bind="scope" /></template>
@@ -253,6 +257,7 @@ import type {
   CodexConversationVisualization,
   CodexConversationVisualizationOpenHandler,
 } from '../chat/visualization';
+import type { CodexMessageTextSelection } from '../chat/message-text-selection';
 import { stripMessageContext } from '../chat/message-blocks';
 import type { QueuedChatPrompt } from '../chat/queued-prompts';
 import { chatMessageFromInput } from '../chat/renderer-message-adapter';
@@ -327,6 +332,7 @@ const props = withDefaults(defineProps<{
   files?: readonly CodexFileSearchItem[];
   followUpsDisabled?: boolean;
   goal?: ThreadGoal | null;
+  hasComposerContext?: boolean;
   hasOlderHistory?: boolean;
   historyLoading?: boolean;
   renderStrategy?: CodexConversationRenderStrategy;
@@ -335,6 +341,7 @@ const props = withDefaults(defineProps<{
   initialMessageBatchSize?: number;
   loadingOlderHistory?: boolean;
   messageBatchSize?: number;
+  messageTextSelection?: boolean;
   leadingMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   menuItems?: readonly CodexComposerMenuItem<Payload>[];
   modelMenuItems?: readonly CodexComposerMenuItem<Payload>[];
@@ -406,6 +413,7 @@ defineSlots<{
     disabled: boolean;
     index: number;
   }): unknown;
+  'composer-context'(props: { disabled: boolean }): unknown;
   empty(props: { description: string; title: string }): unknown;
   'menu-icon'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
   'menu-item'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
@@ -460,6 +468,7 @@ const emit = defineEmits<{
   error: [message: string | null];
   interrupt: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
+  messageTextSelectionChange: [selection: CodexMessageTextSelection | null];
   mentionSelect: [item: CodexComposerMentionItem<Payload>, group: CodexComposerMentionGroup<Payload>];
   openLink: [link: CodexConversationLink];
   openVisualization: [visualization: CodexConversationVisualization];
