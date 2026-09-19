@@ -1,11 +1,11 @@
-# create-codex-app
+# @codex-app-sdk/create-codex-app
 
 Scaffold a secure Electron or Express web Vue application powered by Codex App
 SDK.
 
 ```bash
-npx create-codex-app@latest my-codex-app
-npx create-codex-app@latest my-codex-web --target web
+npx @codex-app-sdk/create-codex-app@latest my-codex-app
+npx @codex-app-sdk/create-codex-app@latest my-codex-web --target web
 ```
 
 See the canonical

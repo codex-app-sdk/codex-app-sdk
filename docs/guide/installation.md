@@ -38,13 +38,13 @@ the consuming project's `.npmrc`:
 
 ```ini
 @codex-app-sdk:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
 
-Never commit the token. Export `GITHUB_PACKAGES_TOKEN` in the shell or provide
+Never commit the token. Export `NODE_AUTH_TOKEN` in the shell or provide
 it through the consuming repository's secret store. The packages inherit the
 private repository's access; they are not available from the public npm
-registry. `create-codex-app` is not published yet.
+registry.
 :::
 
 ## Install from npm

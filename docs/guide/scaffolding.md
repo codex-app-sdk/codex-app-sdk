@@ -5,26 +5,19 @@ recommended modular boundaries. Electron + Vue is the backward-compatible
 default; `--target web` generates an Express + `ws` + Vue application.
 
 ```bash
-npm create codex-app@latest my-codex-app
+npx @codex-app-sdk/create-codex-app@latest my-codex-app
 cd my-codex-app
 npm run dev
-```
-
-The equivalent direct executable form is:
-
-```bash
-npx create-codex-app@latest my-codex-app
 ```
 
 Generate the web target with:
 
 ```bash
-npx create-codex-app@latest my-codex-web --target web
+npx @codex-app-sdk/create-codex-app@latest my-codex-web --target web
 ```
 
-::: warning Package publication pending
-`create-codex-app` and `codex-app-sdk` are not yet published to npm. The command
-above is the intended public workflow. From a checkout of this repository, use:
+The scaffolder is private and uses the same GitHub Packages authentication as
+the SDK packages. From a checkout of this repository, use:
 
 ```bash
 npm run create:app -- ../my-codex-app
@@ -37,7 +30,6 @@ For a web target from the repository checkout, append `--target web`:
 ```bash
 npm run create:app -- ../my-codex-web --target web
 ```
-:::
 
 ## Scaffold, then update
 
@@ -62,7 +54,7 @@ The initializer installs dependencies by default. Use `--no-install` when a
 package manager or automation system will install them later:
 
 ```bash
-npm create codex-app@latest my-codex-app -- --no-install
+npx @codex-app-sdk/create-codex-app@latest my-codex-app --no-install
 ```
 
 ## Command options
@@ -85,7 +77,7 @@ Builder applications and automation can call the same implementation through
 the package root:
 
 ```ts
-import { scaffoldProject } from 'create-codex-app';
+import { scaffoldProject } from '@codex-app-sdk/create-codex-app';
 
 const project = await scaffoldProject({
   cwd: '/absolute/parent/directory',

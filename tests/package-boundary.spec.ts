@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const vueSourceRoot = path.join(packageRoot, 'packages/vue/src');
 const sdkPackages = ['core', 'backend', 'vue', 'electron', 'web'] as const;
+const scaffolderPackage = '@codex-app-sdk/create-codex-app';
 const ignoredDirectories = new Set(['.git', 'coverage', 'dist', 'node_modules']);
 const inspectedExtensions = new Set(['.css', '.json', '.md', '.mjs', '.ts', '.vue']);
 
@@ -22,7 +23,7 @@ describe('package boundary', () => {
       '@codex-app-sdk/web',
     ];
     const supportingWorkspaces = [
-      'create-codex-app',
+      scaffolderPackage,
       '@codex-app-sdk/component-lab',
       '@codex-app-sdk/basic-sample',
       '@codex-app-sdk/spark-sample',
@@ -58,10 +59,13 @@ describe('package boundary', () => {
       expect(manifest.scripts['check:workspaces:owned']).toContain(`-w ${workspace}`);
       expect(manifest.scripts['test:workspaces']).toContain(`-w ${workspace}`);
       expect(manifest.scripts['lint:workspaces']).toContain(`-w ${workspace}`);
-      if (workspace !== 'create-codex-app') {
+      if (workspace !== scaffolderPackage) {
         expect(manifest.scripts['typecheck:workspaces']).toContain(`-w ${workspace}`);
         expect(manifest.scripts['build:workspaces']).toContain(`-w ${workspace}`);
       }
+    }
+    for (const workspace of [...sdkWorkspaces, scaffolderPackage]) {
+      expect(manifest.scripts['publish:packages']).toContain(`-w ${workspace}`);
     }
 
     for (const surface of ['electron', 'web']) {
@@ -69,6 +73,37 @@ describe('package boundary', () => {
         expect(manifest.scripts).toHaveProperty(`${command}:${surface}`);
       }
     }
+  });
+
+  it('publishes the project scaffolder with the SDK release line', async () => {
+    const rootManifest = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
+      version: string;
+    };
+    const manifest = JSON.parse(await readFile(
+      path.join(packageRoot, 'packages/create-codex-app/package.json'),
+      'utf8',
+    )) as {
+      bin?: Record<string, string>;
+      name?: string;
+      publishConfig?: Record<string, string>;
+      repository?: Record<string, string>;
+      version?: string;
+    };
+
+    expect(manifest).toEqual(expect.objectContaining({
+      bin: { 'create-codex-app': './bin/create-codex-app.js' },
+      name: scaffolderPackage,
+      publishConfig: {
+        access: 'restricted',
+        registry: 'https://npm.pkg.github.com',
+      },
+      repository: {
+        directory: 'packages/create-codex-app',
+        type: 'git',
+        url: 'git+https://github.com/codex-app-sdk/codex-app-sdk.git',
+      },
+      version: rootManifest.version,
+    }));
   });
 
   it('gives every SDK package owned source, tests, and quality gates', async () => {
