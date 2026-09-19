@@ -4,6 +4,15 @@
   "description": "Renderer-safe contracts and shared primitives for Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codex-app-sdk/codex-app-sdk.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  },
   "sideEffects": false,
   "files": [
     "dist",

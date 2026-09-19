@@ -6,12 +6,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nbonamy/codex-app-sdk.git"
+    "url": "git+https://github.com/codex-app-sdk/codex-app-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/nbonamy/codex-app-sdk/issues"
+    "url": "https://github.com/codex-app-sdk/codex-app-sdk/issues"
   },
-  "homepage": "https://nbonamy.github.io/codex-app-sdk/",
+  "homepage": "https://github.com/codex-app-sdk/codex-app-sdk#readme",
   "workspaces": [
     "packages/*",
     "samples/*",
@@ -107,6 +107,7 @@
     "mutation:web": "npm run test:mutation -w @codex-app-sdk/web",
     "prepare": "npm run build",
     "preview:docs": "vitepress preview docs --port 4175",
+    "publish:packages": "npm publish -w @codex-app-sdk/core && npm publish -w @codex-app-sdk/backend && npm publish -w @codex-app-sdk/vue && npm publish -w @codex-app-sdk/electron && npm publish -w @codex-app-sdk/web",
     "start:electron": "npm run start -w @codex-app-sdk/basic-sample",
     "start:relay": "npm run start -w @codex-app-sdk/relay-sample",
     "start:spark": "npm run start -w @codex-app-sdk/spark-sample",

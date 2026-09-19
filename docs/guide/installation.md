@@ -30,10 +30,21 @@ scaffolder](/guide/scaffolding): Electron is the default and `--target web`
 creates a runnable Express + `ws` baseline. Continue below when integrating the
 SDK into an existing host.
 
-::: warning Package publication pending
-The scoped SDK packages and `create-codex-app` are not yet published to npm.
-The npm commands below are the intended public API; use the repository source
-workflow at the end of this section until publication.
+::: warning Private package access
+The scoped SDK packages are private and hosted by GitHub Packages. Authenticate
+with a classic GitHub personal access token that has `read:packages` and access
+to the `codex-app-sdk` organization, then route the scope to GitHub Packages in
+the consuming project's `.npmrc`:
+
+```ini
+@codex-app-sdk:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
+```
+
+Never commit the token. Export `GITHUB_PACKAGES_TOKEN` in the shell or provide
+it through the consuming repository's secret store. The packages inherit the
+private repository's access; they are not available from the public npm
+registry. `create-codex-app` is not published yet.
 :::
 
 ## Install from npm
@@ -73,8 +84,8 @@ adapter.
 | `@codex-app-sdk/web/protocol` | Versioned envelopes for custom transport integrations |
 | `@codex-app-sdk/vue` | Surface controller, complete Vue component kit, and styles |
 
-The root `codex-app-sdk` package retains compatibility entry points during the
-modular transition. New applications should use the scoped packages directly.
+The root `codex-app-sdk` compatibility facade is repository-only. Applications
+should use the scoped packages directly.
 
 ## Import the component theme
 
@@ -114,7 +125,7 @@ intentionally absent from the renderer creation API.
 ## Repository development
 
 ```bash
-git clone git@github.com:nbonamy/codex-app-sdk.git
+git clone git@github.com:codex-app-sdk/codex-app-sdk.git
 cd codex-app-sdk
 npm install
 npm run check

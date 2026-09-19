@@ -4,6 +4,15 @@
   "description": "Framework-neutral WebSocket bindings for browser-based Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codex-app-sdk/codex-app-sdk.git",
+    "directory": "packages/web"
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  },
   "files": [
     "dist",
     "README.md"

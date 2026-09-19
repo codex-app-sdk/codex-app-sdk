@@ -75,6 +75,13 @@ describe('package boundary', () => {
     for (const packageName of sdkPackages) {
       const workspaceRoot = path.join(packageRoot, 'packages', packageName);
       const manifest = JSON.parse(await readFile(path.join(workspaceRoot, 'package.json'), 'utf8')) as {
+        name?: string;
+        publishConfig?: Record<string, string>;
+        repository?: {
+          directory?: string;
+          type?: string;
+          url?: string;
+        };
         scripts?: Record<string, string>;
       };
       const source = await sourceFiles(path.join(workspaceRoot, 'src'));
@@ -91,6 +98,16 @@ describe('package boundary', () => {
         typecheck: expect.any(String),
       }));
       expect(manifest.scripts?.check, `${packageName} coverage gate`).toContain('test:coverage');
+      expect(manifest.name, `${packageName} package scope`).toBe(`@codex-app-sdk/${packageName}`);
+      expect(manifest.publishConfig, `${packageName} private registry`).toStrictEqual({
+        access: 'restricted',
+        registry: 'https://npm.pkg.github.com',
+      });
+      expect(manifest.repository, `${packageName} repository link`).toStrictEqual({
+        directory: `packages/${packageName}`,
+        type: 'git',
+        url: 'git+https://github.com/codex-app-sdk/codex-app-sdk.git',
+      });
       await expect(readFile(path.join(workspaceRoot, 'vitest.config.ts'), 'utf8')).resolves.toContain(
         "include: ['tests/**/*.spec.ts']",
       );

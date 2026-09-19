@@ -144,6 +144,21 @@ The package should contain built entry points, declarations, source maps,
 `codex-app-sdk.css`, native assets, README, and LICENSE—not samples, tests, or
 the documentation build output.
 
+## Private package publication
+
+The five scoped SDK workspaces publish privately to GitHub Packages. Their
+package manifests pin `https://npm.pkg.github.com` as the registry and link each
+package to this repository so package permissions follow repository access.
+
+Publishing is intentionally CI-owned. Update all five package versions and
+their internal dependency versions together, commit the generated lockfile,
+let CI pass, then run the **Publish private packages** workflow on `main`. The
+workflow authenticates with its short-lived `GITHUB_TOKEN`; no long-lived
+publishing token or repository secret is required.
+
+Package versions are immutable. Re-running the workflow for an already
+published version fails instead of overwriting it.
+
 ## Architectural test philosophy
 
 Tests should prove risky boundaries:

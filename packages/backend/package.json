@@ -4,6 +4,15 @@
   "description": "Node.js app-server runtime and backend composition for Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codex-app-sdk/codex-app-sdk.git",
+    "directory": "packages/backend"
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  },
   "files": [
     "assets",
     "dist",
