@@ -11,13 +11,11 @@ const suites = [
   { name: '@codex-app-sdk/vue', directory: 'packages/vue', runner: 'vitest' },
   { name: '@codex-app-sdk/electron', directory: 'packages/electron', runner: 'vitest' },
   { name: '@codex-app-sdk/web', directory: 'packages/web', runner: 'vitest' },
-  { name: 'compatibility package', directory: '.', runner: 'vitest' },
-  { name: 'create-codex-app', directory: 'packages/create-codex-app', runner: 'node' },
+  { name: '@codex-app-sdk/create-codex-app', directory: 'packages/create-codex-app', runner: 'node' },
   { name: 'component lab', directory: 'samples/component-lab', runner: 'vitest' },
   { name: 'basic Electron sample', directory: 'samples/electron/basic', runner: 'vitest' },
   { name: 'Spark sample', directory: 'samples/electron/spark', runner: 'vitest' },
   { name: 'Relay sample', directory: 'samples/electron/relay', runner: 'vitest' },
-  { name: 'basic web sample', directory: 'samples/web/basic', runner: 'node' },
 ].map((suite) => ({ ...suite, root: resolve(repositoryRoot, suite.directory) }));
 
 const requestedArguments = process.argv.slice(2);

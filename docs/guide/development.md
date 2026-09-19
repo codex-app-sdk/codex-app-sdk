@@ -39,7 +39,7 @@ npm run check -w @codex-app-sdk/web
 legacy `codex-app-sdk` compatibility facade. `npm run check:workspaces` first
 builds the SDK, then checks the scaffolder and all sample workspaces.
 
-The Basic Electron and Basic Web samples expose matching command families:
+The Basic Electron sample exposes the full command family:
 
 ```bash
 npm run dev:electron
@@ -48,10 +48,15 @@ npm run test:electron
 npm run typecheck:electron
 npm run build:electron
 npm run check:electron
+```
 
+The Basic Web sample has no separate unit-test suite; its transport behavior is
+covered by `@codex-app-sdk/web`, while its own check typechecks and builds the
+real sample:
+
+```bash
 npm run dev:web
 npm run start:web
-npm run test:web
 npm run typecheck:web
 npm run build:web
 npm run check:web
@@ -183,7 +188,9 @@ Tests should prove risky boundaries:
 - keyboard and interaction behavior in reusable components;
 - package export and scoped-style completeness.
 
-Avoid shallow coverage padding and brittle product-name scans.
+Avoid shallow coverage padding and brittle product-name scans. Do not unit-test
+manifest text, npm script strings, or implementation source. Exercise the
+behavior instead; keep release invariants in executable release validation.
 
 ## Mutation testing
 
