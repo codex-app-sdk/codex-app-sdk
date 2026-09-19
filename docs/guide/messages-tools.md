@@ -31,17 +31,18 @@ Codex assistant items can distinguish intermediate `commentary` from the
 reasoning summaries as separate `reasoning` parts. It never exposes raw
 reasoning content.
 
-The stock Vue renderer groups commentary, tool calls, and generated media under
-an expanded `Working` section while the turn is active. The latest reasoning
-summary becomes the active tool-group title, for example
+The stock Vue renderer groups commentary and tool calls under an expanded
+`Working` section while the turn is active. Generated media remains visible
+outside that fold in its chronological position. The latest reasoning summary
+becomes the active tool-group title, for example
 `Inspecting component contracts · 7 actions done`, instead of rendering as a
 separate transcript row. A newer summary replaces that title. Normal assistant
 text ends the activity group and removes its transient reasoning title, leaving
 only `N actions done`. Work blocks retain their chronological order, and the
 active section cannot be collapsed. When the final answer starts, the section becomes
 `Done · View details` and collapses automatically; the reader can reopen it at
-any time to inspect the tools and generated media. The final answer, including
-images embedded in `final_answer` text, remains visible below it. If structured
+any time to inspect the commentary and tools. Generated media and the final
+answer, including images embedded in `final_answer` text, remain visible. If structured
 tool activity arrives before the first phased text or reasoning summary,
 `CodexMessageList` opens the `Working` section immediately.
 
@@ -91,7 +92,9 @@ block rather than a separate reasoning block.
 Clicking an image attachment or generated assistant image opens the SDK
 fullscreen lightbox by default. The overlay closes from its close control, the
 backdrop, or Escape. Generated-image footer controls open the same fullscreen
-behavior and download the renderer-safe image source with a useful filename.
+behavior, copy the rendered image to the clipboard, and download the
+renderer-safe image source with a useful filename. Successful copy actions show
+a check for 1.5 seconds before restoring the copy icon.
 
 Controlled applications can replace that behavior with `actions.openImage`:
 

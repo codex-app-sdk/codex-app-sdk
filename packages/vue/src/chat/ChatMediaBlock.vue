@@ -18,6 +18,11 @@
         <ChatIconButton :label="fullscreenLabel" @click="handleImageAction('fullscreen')">
           <Maximize2 />
         </ChatIconButton>
+        <ChatCopyButton
+          :action="copyImage"
+          :copied-label="copiedLabel"
+          :label="copyLabel"
+        />
         <ChatIconButton
           :download="downloadName"
           :href="media.url"
@@ -51,6 +56,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Download, Info, Maximize2 } from '../icons/app-icons'
+import ChatCopyButton from './ChatCopyButton.vue'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import ChatImageLightbox from './ChatImageLightbox.vue'
 import ChatIconButton from './ChatIconButton.vue'
@@ -65,6 +71,8 @@ const props = defineProps<{
 // Stryker restore all
 
 const downloadLabel = 'Download media'
+const copyLabel = 'Copy image'
+const copiedLabel = 'Image copied'
 const fullscreenLabel = 'Open fullscreen'
 const generatedAltLabel = 'Generated media'
 const generatedLabel = 'Generated media'
@@ -90,6 +98,14 @@ async function handleImageAction(intent: CodexMessageImageOpenIntent) {
 
 function closeFullscreen() {
   fullscreenOpen.value = false
+}
+
+async function copyImage() {
+  const blob = await fetch(props.media.url).then((response) => response.blob())
+  const mimeType = blob.type || props.media.mimeType || 'image/png'
+  await navigator.clipboard.write([
+    new ClipboardItem({ [mimeType]: blob }),
+  ])
 }
 
 function toggleDetails() {

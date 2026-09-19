@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { mount, type VueWrapper } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ChatImageLightbox from '../../src/chat/ChatImageLightbox.vue';
 import ChatMediaBlock from '../../src/chat/ChatMediaBlock.vue';
@@ -17,6 +17,9 @@ function mountMedia(media: MessageMedia, openImage?: NonNullable<InstanceType<ty
 afterEach(() => {
   for (const wrapper of wrappers.splice(0)) wrapper.unmount();
   document.body.innerHTML = '';
+  Reflect.deleteProperty(navigator, 'clipboard');
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -42,6 +45,46 @@ describe('ChatMediaBlock', () => {
     wrapper.get('[aria-label="Download media"]').element.addEventListener('click', (event) => event.preventDefault());
     await wrapper.get('[aria-label="Download media"]').trigger('click');
     expect(openImage).not.toHaveBeenCalled();
+  });
+
+  it('copies the rendered image between fullscreen and download actions', async () => {
+    vi.useFakeTimers();
+    const blob = new Blob(['png'], { type: 'image/png' });
+    const write = vi.fn(async () => undefined);
+    const fetchImage = vi.fn(async () => ({ blob: async () => blob, ok: true } as Response));
+    const ClipboardItemMock = vi.fn(function ClipboardItem(
+      this: { values: Record<string, Blob> },
+      values: Record<string, Blob>,
+    ) {
+      this.values = values;
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { write },
+    });
+    vi.stubGlobal('fetch', fetchImage);
+    vi.stubGlobal('ClipboardItem', ClipboardItemMock);
+    const wrapper = mountMedia({ mimeType: 'image/png', url: '/artifacts/generated.png' });
+
+    expect(wrapper.findAll('.chat-media-block__actions [aria-label]')
+      .map((action) => action.attributes('aria-label')))
+      .toStrictEqual(['Open fullscreen', 'Copy image', 'Download media']);
+
+    await wrapper.get('[aria-label="Copy image"]').trigger('click');
+    await flushPromises();
+
+    expect(fetchImage).toHaveBeenCalledWith('/artifacts/generated.png');
+    expect(write).toHaveBeenCalledOnce();
+    expect(ClipboardItemMock).toHaveBeenCalledWith({ 'image/png': blob });
+    expect(wrapper.find('[aria-label="Image copied"] .tabler-icon-check').exists()).toBe(true);
+
+    vi.advanceTimersByTime(1_499);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[aria-label="Image copied"]').exists()).toBe(true);
+
+    vi.advanceTimersByTime(1);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[aria-label="Copy image"]').exists()).toBe(true);
   });
 
   it.each([

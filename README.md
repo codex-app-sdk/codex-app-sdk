@@ -38,8 +38,8 @@ authentication, tenancy, policy, business data, and integrations.
 - `CodexConversationPane` with prompt recall, editable queues, double-Escape
   interruption, tools, generated media, code copying, context usage, and
   customization hooks.
-- Renderer-safe restored images with a stock fullscreen viewer and download,
-  plus host-owned image and visualization actions.
+- Renderer-safe restored images with stock fullscreen, clipboard, and download
+  actions, plus host-owned image and visualization actions.
 - A grouped controlled-pane adapter for hosts that own conversation state
   outside the SDK surface.
 - Host extensions, dynamic tools, trusted per-surface or per-conversation MCP

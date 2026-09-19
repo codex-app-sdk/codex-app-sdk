@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
 import ChatMessageActions from '../../src/chat/ChatMessageActions.vue';
 import { formatMessageSentAt, fullMessageSentAt } from '../../src/chat/message-time';
 import type { CodexMessageActionsPresentation } from '../../src/chat/contracts';
@@ -12,7 +12,7 @@ function mountActions(
   options: {
     deleting?: boolean;
     canFork?: boolean;
-    copied?: boolean;
+    copyAction?: () => Promise<void> | void;
     mutationDisabled?: boolean;
     presentation?: CodexMessageActionsPresentation;
   } = {},
@@ -20,7 +20,7 @@ function mountActions(
   return mount(ChatMessageActions, {
     props: {
       canFork: options.canFork,
-      copied: options.copied,
+      copyAction: options.copyAction,
       deleting: options.deleting,
       message,
       mutationDisabled: options.mutationDisabled,
@@ -67,18 +67,22 @@ describe('ChatMessageActions', () => {
   });
 
   it('forwards mutation disabling and emits every visible action exactly', async () => {
+    const copyAction = vi.fn(async () => undefined);
     const assistant = mountActions(
       { role: 'assistant', content: 'Answer' },
-      { canFork: true, copied: true, mutationDisabled: true },
+      { canFork: true, copyAction, mutationDisabled: true },
     );
 
-    expect(actionLabels(assistant)).toStrictEqual(['Copied', 'Retry', 'Fork', 'Delete']);
-    expect(assistant.get('button[aria-label="Copied"]').attributes('disabled')).toBeUndefined();
+    expect(actionLabels(assistant)).toStrictEqual(['Copy', 'Retry', 'Fork', 'Delete']);
+    expect(assistant.get('button[aria-label="Copy"]').attributes('disabled')).toBeUndefined();
     for (const label of ['Retry', 'Fork', 'Delete']) {
       expect(assistant.get(`button[aria-label="${label}"]`).attributes('disabled')).toBeDefined();
     }
 
-    await assistant.get('button[aria-label="Copied"]').trigger('click');
+    await assistant.get('button[aria-label="Copy"]').trigger('click');
+    await flushPromises();
+    expect(copyAction).toHaveBeenCalledOnce();
+    expect(assistant.find('button[aria-label="Copied"] .tabler-icon-check').exists()).toBe(true);
     expect(assistant.emitted('copy')).toStrictEqual([[]]);
 
     const user = mountActions({ role: 'user', content: 'Question' }, { canFork: true });

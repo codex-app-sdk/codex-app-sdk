@@ -73,10 +73,9 @@ export const presentation: CodexConversationPresentation = {
 ```
 
 Generated images remain available as rich media when technical tool blocks are
-hidden. In phased turns they follow the shared work disclosure: visible while
-`Working`, collapsed under `Done · View details`, and visible again when the
-reader opens the details. Disabled attachment/transcription behavior does not
-leave dead controls.
+hidden. In phased turns they remain visible in chronological order outside the
+shared `Working` / `Done · View details` disclosure. Disabled
+attachment/transcription behavior does not leave dead controls.
 
 ::: warning Visibility is not authorization
 Hiding a model, permission preset, tool block, or action is a presentation

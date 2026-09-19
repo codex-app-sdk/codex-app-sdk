@@ -147,12 +147,12 @@
           :can-edit="canEdit"
           :can-fork="canFork"
           :can-retry="canRetry"
-          :copied="copied"
+          :copy-action="copyMessage"
           :deleting="deletingTurn"
           :message="chatMessage"
           :mutation-disabled="threadActionsDisabled"
           :presentation="effectivePresentation.messages.actions"
-          @copy="copyMessage"
+          @copy="emit('copy-message', index)"
           @delete="deleteTurn"
           @edit="startEdit"
           @fork="forkTurn"
@@ -168,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, provide, ref, shallowReactive } from 'vue'
+import { computed, inject, provide, ref, shallowReactive } from 'vue'
 import { questionResponsesKey } from '../chat/message-work-state'
 import { useCodexChatTranslate } from '../chat/chat-i18n'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
@@ -333,9 +333,7 @@ const stackBlocks = computed(() => (
     : indexedBlocks.value
 ))
 const visibleUserContent = computed(() => stripMessageContext(chatMessage.value.content))
-const copied = ref(false)
 const isEditing = ref(false)
-let copyResetTimeout: ReturnType<typeof setTimeout> | null = null
 
 const showActions = computed(() => (
   chatMessage.value.type !== 'compaction' &&
@@ -427,17 +425,6 @@ function openImage(image: CodexMessageImage, context?: CodexMessageImageContext)
 
 async function copyMessage() {
   await copyMessageToClipboard(chatMessage.value.content, hostCapabilities)
-  copied.value = true
-  emit('copy-message', props.index)
-
-  if (copyResetTimeout) {
-    clearTimeout(copyResetTimeout)
-  }
-
-  copyResetTimeout = setTimeout(() => {
-    copied.value = false
-    copyResetTimeout = null
-  }, 1500)
 }
 
 function isVisibleAssistantBlock(block: RenderedMessageBlock) {
@@ -455,11 +442,6 @@ function isVisibleAssistantBlock(block: RenderedMessageBlock) {
     || block.type === 'work-group'
 }
 
-onBeforeUnmount(() => {
-  if (copyResetTimeout) {
-    clearTimeout(copyResetTimeout)
-  }
-})
 </script>
 
 <style scoped>

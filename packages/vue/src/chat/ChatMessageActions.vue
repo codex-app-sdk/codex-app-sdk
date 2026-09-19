@@ -12,15 +12,13 @@
     >
       {{ sentAtLabel }}
     </span>
-    <ChatIconButton
+    <ChatCopyButton
       v-if="showCopy"
+      :action="copyMessage"
+      :copied-label="t('chat.actions.copied')"
       :disabled="deleting"
-      :label="copied ? t('chat.actions.copied') : t('chat.actions.copy')"
-      @click="emit('copy')"
-    >
-      <CheckIcon v-if="copied" />
-      <CopyIcon v-else />
-    </ChatIconButton>
+      :label="t('chat.actions.copy')"
+    />
     <ChatIconButton
       v-if="message.role === 'user' && canEdit && showEdit"
       :disabled="deleting"
@@ -74,9 +72,10 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowForkIcon, CheckIcon, CopyIcon, Loader2Icon, PencilIcon, QuoteIcon, RotateClockwiseIcon, Trash2Icon } from '../icons/app-icons'
+import { ArrowForkIcon, Loader2Icon, PencilIcon, QuoteIcon, RotateClockwiseIcon, Trash2Icon } from '../icons/app-icons'
 import { computed } from 'vue'
 import { useCodexChatTranslate } from './chat-i18n'
+import ChatCopyButton from './ChatCopyButton.vue'
 import ChatIconButton from './ChatIconButton.vue'
 import { formatMessageSentAt, fullMessageSentAt } from './message-time'
 import type { CodexMessageActionsPresentation } from './contracts'
@@ -88,7 +87,7 @@ const props = withDefaults(defineProps<{
   canEdit?: boolean
   canFork?: boolean
   canRetry?: boolean
-  copied?: boolean
+  copyAction?: () => Promise<void> | void
   deleting?: boolean
   message: Message
   mutationDisabled?: boolean
@@ -120,6 +119,11 @@ const showQuote = computed(() => props.presentation?.quote !== false)
 const showRetry = computed(() => props.presentation?.retry !== false)
 const sentAtLabel = computed(() => props.message.createdAt ? formatMessageSentAt(props.message.createdAt) : '')
 const sentAtTitle = computed(() => props.message.createdAt ? fullMessageSentAt(props.message.createdAt) : undefined)
+
+async function copyMessage() {
+  await props.copyAction?.()
+  emit('copy')
+}
 </script>
 
 <style scoped>

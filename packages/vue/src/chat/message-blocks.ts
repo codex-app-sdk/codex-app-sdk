@@ -350,7 +350,7 @@ export function hasExplicitAssistantWorkPhases(message: Message) {
 export function isAssistantWorkBlock(block: MessageBlock, answeredClientRequestIds?: ReadonlySet<string>) {
   if (block.type === 'question') return block.historical === true || answeredClientRequestIds?.has(block.request.id) === true
   if (block.type === 'reasoning' || block.type === 'tool' || block.type === 'tool-group') return true
-  if (block.type === 'media') return block.phase !== 'final_answer'
+  if (block.type === 'media') return false
   return 'phase' in block && block.phase === 'commentary'
 }
 

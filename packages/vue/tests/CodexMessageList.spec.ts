@@ -627,7 +627,7 @@ describe('CodexMessageList', () => {
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
   });
 
-  it('keeps generated media in order while active and folds it with completed work', async () => {
+  it('keeps generated media in order and visible outside completed work folds', async () => {
     const activeMessage: SurfaceMessage = {
       id: 'assistant-image-turn',
       role: 'assistant',
@@ -654,13 +654,18 @@ describe('CodexMessageList', () => {
     });
 
     const media = wrapper.get('.chat-media-block').element;
-    const laterCommentary = wrapper.findAll('.chat-message-block--text')
+    const textBlocks = wrapper.findAll('.chat-message-block--text');
+    const earlierCommentary = textBlocks
+      .find((block) => block.text().includes('Generating the image.'))?.element;
+    const laterCommentary = textBlocks
       .find((block) => block.text().includes('Checking the generated result.'))?.element;
 
+    expect(earlierCommentary).toBeDefined();
     expect(laterCommentary).toBeDefined();
+    expect(earlierCommentary!.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(media.compareDocumentPosition(laterCommentary!) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(wrapper.findAll('.chat-work-group__header')).toHaveLength(1);
 
     await wrapper.setProps({
       activeTurnId: null,
@@ -676,15 +681,9 @@ describe('CodexMessageList', () => {
     });
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
-    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
-      .not.toContain('chat-fold--open');
+    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')).toBeNull();
+    expect(wrapper.get('.chat-media-block').isVisible()).toBe(true);
     expect(wrapper.text()).toContain('The image is ready.');
-
-    await wrapper.get('.chat-work-group__header').trigger('click');
-
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
-    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
-      .toContain('chat-fold--open');
   });
 
   it('does not render an empty row for a hidden tool segment in an active turn', () => {

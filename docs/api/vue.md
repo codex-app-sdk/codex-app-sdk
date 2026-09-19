@@ -312,8 +312,9 @@ task-owned HTML paths are not conversation files. Controlled panes receive
 and it never degrades visualization clicks to `openLink`.
 
 `CodexMediaBlock` owns its generated-image footer actions: fullscreen delegates
-to the same overridable image-opening contract, while download uses browser
-download behavior without entering the conversation-link routing path.
+to the same overridable image-opening contract, copy writes the rendered image
+blob to the browser clipboard and shows a brief check confirmation, and download
+uses browser download behavior without entering the conversation-link routing path.
 
 `CodexMessageImageContext.intent` distinguishes the semantic action:
 `open` comes from clicking the inline image, while `fullscreen` comes from the
@@ -407,9 +408,10 @@ rendering key. The default behavior is identity.
 `CodexMessageList` projects adjacent messages with that identity into one
 logical turn. Steering messages remain in chronological order, while all
 assistant commentary, reasoning-aware tool groups, and generated media share
-one `Working` / `Done` disclosure. The latest reasoning summary labels only the
-currently active tool group; normal assistant text removes that transient label.
-Generated media retains its chronological position among those work blocks. A transform that returns a `CodexChatMessage` should retain
+one logical turn. Commentary and tool groups share the `Working` / `Done`
+disclosure, while generated media remains visible outside that fold in its
+chronological position. The latest reasoning summary labels only the currently
+active tool group; normal assistant text removes that transient label. A transform that returns a `CodexChatMessage` should retain
 `turnId` for that behavior. A tool-only active segment is treated as structured
 work before the first phased text arrives; unphased messages containing
 ordinary text retain the flat rendering path.
