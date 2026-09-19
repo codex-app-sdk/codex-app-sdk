@@ -189,12 +189,14 @@ describe('composer search ranking', () => {
     expect(filterComposerSkills(skills, '').map((entry) => entry.name)).toStrictEqual(['alpha', 'beta']);
   });
 
-  it('finds command and skill triggers only at valid prompt boundaries', () => {
-    expect(findActiveCommandSlash('please /review', 14)).toStrictEqual({
-      end: 14,
+  it('finds command slashes only at the start and skill triggers at valid boundaries', () => {
+    expect(findActiveCommandSlash('/review', 7)).toStrictEqual({
+      end: 7,
       query: 'review',
-      start: 7,
+      start: 0,
     });
+    expect(findActiveCommandSlash(' /review', 8)).toBeNull();
+    expect(findActiveCommandSlash('please /review', 14)).toBeNull();
     expect(findActiveCommandSlash('email@example/test', 18)).toBeNull();
     expect(findActiveCommandSlash('plain text', 10)).toBeNull();
     expect(findActiveCommandSlash('/review later', 13)).toBeNull();

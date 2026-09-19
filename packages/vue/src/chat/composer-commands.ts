@@ -9,18 +9,11 @@ export type ActiveCommandSlash = {
 
 export function findActiveCommandSlash(value: string, caretPosition: number): ActiveCommandSlash | null {
   const safeCaret = Math.max(0, Math.min(caretPosition, value.length));
+  if (safeCaret === 0 || value[0] !== '/') {
+    return null;
+  }
   const beforeCaret = value.slice(0, safeCaret);
-  const start = beforeCaret.lastIndexOf('/');
-  if (start < 0) {
-    return null;
-  }
-
-  const previous = start > 0 ? beforeCaret[start - 1] : '';
-  if (previous && /[\w.%+-]/.test(previous)) {
-    return null;
-  }
-
-  const query = beforeCaret.slice(start + 1);
+  const query = beforeCaret.slice(1);
   if (/[\s/$]/.test(query)) {
     return null;
   }
@@ -28,7 +21,7 @@ export function findActiveCommandSlash(value: string, caretPosition: number): Ac
   return {
     end: safeCaret,
     query,
-    start,
+    start: 0,
   };
 }
 
