@@ -242,6 +242,14 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
+    id: 'goal-composer',
+    name: 'Goal composer',
+    summary: 'Pending command chip and required objective',
+    title: 'Set a conversation goal',
+    description: 'Type /goal, choose Goal, enter an objective, and submit the canonical command.',
+    messages: [],
+  },
+  {
     id: 'message-selection',
     name: 'Message selection',
     summary: 'Opt-in selected text and host composer context',
@@ -259,93 +267,88 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
-    id: 'async-question',
-    name: 'Async question',
-    summary: 'A non-blocking question from an agent message',
-    title: 'Codex needs a decision',
-    description: 'The question remains actionable after the turn that asked it has completed.',
+    id: 'async-questions',
+    name: 'Async questions',
+    summary: 'Suggested answers and direct free text',
+    title: 'Codex needs user input',
+    description: 'Compare non-blocking questions with suggested answers and an immediately focused text field.',
     activeTurnId: null,
     turns: [{
       id: 'async-question-turn', status: 'completed', error: null, willRetry: false,
       startedAt: '2026-08-01T12:00:00Z', completedAt: '2026-08-01T12:00:01Z', durationMs: 1_000,
     }],
-    messages: [{
-      id: 'async-question-message',
-      role: 'assistant',
-      status: 'complete',
-      turnId: 'async-question-turn',
-      parts: [
-        { type: 'text', text: 'I can continue once you choose a framework.', phase: 'final_answer' },
-        {
+    messages: [
+      {
+        id: 'async-question-message',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'async-question-turn',
+        parts: [
+          { type: 'text', text: 'I can continue once you choose a framework.', phase: 'final_answer' },
+          {
+            type: 'question',
+            request: {
+              id: 'async-question:lab-agent-question',
+              kind: 'ask_user',
+              conversationId: 'async-questions',
+              turnId: 'async-question-turn',
+              itemId: 'lab-agent-question',
+              payload: {
+                request: {
+                  itemId: 'lab-agent-question',
+                  delivery: 'async',
+                  blocking: false,
+                  questions: [{
+                    id: '["request_user_input_async","lab-agent-question",0]',
+                    header: 'Framework',
+                    question: 'Which framework should I use?',
+                    isOther: true,
+                    isSecret: false,
+                    options: [
+                      { label: 'Vue', description: 'Use the SDK component package' },
+                      { label: 'React', description: 'Use a custom renderer' },
+                    ],
+                  }],
+                },
+              },
+            },
+          },
+        ],
+      },
+      {
+        id: 'async-free-text-message',
+        role: 'assistant',
+        status: 'complete',
+        turnId: 'async-free-text-turn',
+        parts: [
+          { type: 'text', text: 'Checking the context before continuing.', phase: 'commentary' },
+          { type: 'text', text: 'What should I know before continuing?' }, {
           type: 'question',
           request: {
-            id: 'async-question:lab-agent-question',
+            id: 'async-question:lab-free-text-question',
             kind: 'ask_user',
-            conversationId: 'async-question',
-            turnId: 'async-question-turn',
-            itemId: 'lab-agent-question',
+            conversationId: 'async-questions',
+            turnId: 'async-free-text-turn',
+            itemId: 'lab-free-text-question',
             payload: {
               request: {
-                itemId: 'lab-agent-question',
+                itemId: 'lab-free-text-question',
                 delivery: 'async',
                 blocking: false,
                 questions: [{
-                  id: '["request_user_input_async","lab-agent-question",0]',
-                  header: 'Framework',
-                  question: 'Which framework should I use?',
+                  id: '["request_user_input_async","lab-free-text-question",0]',
+                  header: 'What should I know before continuing?',
+                  question: 'What should I know before continuing?',
                   isOther: true,
                   isSecret: false,
-                  options: [
-                    { label: 'Vue', description: 'Use the SDK component package' },
-                    { label: 'React', description: 'Use a custom renderer' },
-                  ],
+                  options: null,
                 }],
               },
             },
           },
-        },
-      ],
-    }],
-  },
-  {
-    id: 'async-free-text',
-    name: 'Async free text',
-    summary: 'A non-blocking question with no suggested answers',
-    title: 'Codex needs some context',
-    description: 'Text-only questions open directly into a focused answer field.',
-    messages: [{
-      id: 'async-free-text-message',
-      role: 'assistant',
-      status: 'complete',
-      turnId: 'async-free-text-turn',
-      parts: [
-        { type: 'text', text: 'Checking the context before continuing.', phase: 'commentary' },
-        { type: 'text', text: 'What should I know before continuing?' }, {
-        type: 'question',
-        request: {
-          id: 'async-question:lab-free-text-question',
-          kind: 'ask_user',
-          conversationId: 'async-free-text',
-          turnId: 'async-free-text-turn',
-          itemId: 'lab-free-text-question',
-          payload: {
-            request: {
-              itemId: 'lab-free-text-question',
-              delivery: 'async',
-              blocking: false,
-              questions: [{
-                id: '["request_user_input_async","lab-free-text-question",0]',
-                header: 'What should I know before continuing?',
-                question: 'What should I know before continuing?',
-                isOther: true,
-                isSecret: false,
-                options: null,
-              }],
-            },
-          },
-        },
-      }, { type: 'text', text: 'Ready for your answer.', phase: 'final_answer' }],
-    }],
+        }, { type: 'text', text: 'Ready for your answer.', phase: 'final_answer' }],
+      },
+    ],
   },
   {
     id: 'busy',
@@ -456,11 +459,11 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
-    id: 'completed-steered-turn',
-    name: 'Completed steered turn',
-    summary: 'Collapsed work and steer details',
-    title: 'Turn completed',
-    description: 'Only the shared disclosure and final answer remain until the reader opens the turn details.',
+    id: 'completed-turns',
+    name: 'Completed turns',
+    summary: 'With and without a final answer',
+    title: 'Completed turn comparison',
+    description: 'Compare a collapsed turn with a final answer against work that remains direct when no summary exists.',
     messages: [
       { id: 'completed-turn-work', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
         { type: 'tool', id: 'completed-turn-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
@@ -480,15 +483,6 @@ const scenarios: [Scenario, ...Scenario[]] = [
         { type: 'text', text: 'Checked the final layout.', phase: 'commentary' },
         { type: 'text', text: 'The completed turn is compact.', phase: 'final_answer' },
       ] },
-    ],
-  },
-  {
-    id: 'completed-turn-without-summary',
-    name: 'Completed without summary',
-    summary: 'Completed work shown directly',
-    title: 'Turn completed without a final answer',
-    description: 'Completed commentary and tools remain visible without a Done disclosure.',
-    messages: [
       { id: 'no-summary-work', role: 'assistant', status: 'complete', turnId: 'no-summary-turn', parts: [
         { type: 'tool', id: 'no-summary-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
         { type: 'text', text: 'Finished the verification.', phase: 'commentary' },

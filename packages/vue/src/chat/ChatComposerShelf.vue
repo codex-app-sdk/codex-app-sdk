@@ -18,11 +18,14 @@
       @clear="$emit('clearGoal')"
       @edit="$emit('editGoal')"
     />
+    <div v-if="showActions" class="chat-composer-shelf__actions">
+      <slot name="actions" :disabled="effectiveDisabled" />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { Comment, Fragment, Text, computed, type VNode } from 'vue';
 import type { CodexComposerShelfPresentation, ThreadGoal, TurnGitDiff } from './contracts';
 import ChatGoal from './ChatGoal.vue';
 import ChatQueuedPrompts from './ChatQueuedPrompts.vue';
@@ -31,11 +34,16 @@ import type { QueuedChatPrompt } from './queued-prompts';
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
+  disabled?: boolean;
   goal: ThreadGoal | null;
   presentation?: CodexComposerShelfPresentation;
   queuedPrompts: readonly QueuedChatPrompt[];
   queuedPromptEditDisabled?: boolean;
   turnGitDiff?: TurnGitDiff | null;
+}>();
+
+const slots = defineSlots<{
+  actions(props: { disabled: boolean }): unknown;
 }>();
 
 defineEmits<{
@@ -58,7 +66,28 @@ const showQueuedPrompts = computed(() => (
 const visibleTurnGitDiff = computed(() => (
   props.presentation?.turnGitDiff === false ? null : props.turnGitDiff ?? null
 ));
-const visible = computed(() => showGoal.value || showQueuedPrompts.value || Boolean(visibleTurnGitDiff.value));
+const effectiveDisabled = computed(() => props.disabled ?? false);
+const showActions = computed(() => hasSlotContent(slots.actions?.({ disabled: effectiveDisabled.value })));
+const visible = computed(() => (
+  showGoal.value
+  || showQueuedPrompts.value
+  || Boolean(visibleTurnGitDiff.value)
+  || showActions.value
+));
+
+function hasSlotContent(content: unknown): boolean {
+  const nodes = Array.isArray(content) ? content : [content];
+  return nodes.some((node) => {
+    if (node === null || node === undefined || typeof node === 'boolean') return false;
+    if (typeof node === 'string' || typeof node === 'number') return String(node).trim().length > 0;
+    if (typeof node !== 'object' || !('type' in node)) return true;
+    const vnode = node as VNode;
+    if (vnode.type === Comment) return false;
+    if (vnode.type === Text) return String(vnode.children ?? '').trim().length > 0;
+    if (vnode.type === Fragment) return hasSlotContent(vnode.children);
+    return true;
+  });
+}
 </script>
 
 <style scoped>
@@ -75,6 +104,24 @@ const visible = computed(() => showGoal.value || showQueuedPrompts.value || Bool
       border-top-right-radius: 0;
     }
   }
+}
+
+.chat-composer-shelf__actions {
+  width: 100%;
+  min-height: var(--space-16);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border: 0.5px solid var(--color-border);
+  border-bottom: 0;
+  background: var(--color-surface-lowest);
+  color: var(--color-text-muted);
+}
+
+.chat-composer-shelf__actions:first-child {
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
 }
 
 

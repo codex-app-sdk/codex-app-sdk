@@ -1340,7 +1340,7 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('');
   });
 
-  it('submits Codex goal from the slash command menu without showing a slash prefix', async () => {
+  it('collects a required goal objective in a removable composer mode before submission', async () => {
     const wrapper = mountComposer({
       commands: codexCommands,
       skills,
@@ -1355,8 +1355,37 @@ describe('ChatComposer', () => {
 
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect(wrapper.emitted('send')).toStrictEqual([['/goal']]);
+    expect(wrapper.emitted('send')).toBeUndefined();
     expect(editorValue(wrapper)).toBe('');
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
+    expect(wrapper.findComponent(ChatRichTextEditor).props('placeholder')).toBe('Describe the goal');
+    expect(wrapper.get('.chat-composer__send').attributes('disabled')).toBeDefined();
+    await wrapper.setProps({ hasAttachments: true });
+    expect(wrapper.get('.chat-composer__send').attributes('disabled')).toBeDefined();
+
+    const controlledState = wrapper.emitted('update:composerState')?.at(-1)?.[0] as CodexComposerState;
+    expect(controlledState).toStrictEqual({
+      text: '', selectionStart: 0, selectionEnd: 0, activeCommandId: 'codex.goal',
+    });
+    await wrapper.setProps({ composerState: controlledState });
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
+
+    await setEditorValue(wrapper, 'Keep this draft');
+    await wrapper.get('[aria-label="Remove Goal command"]').trigger('click');
+    expect(editorValue(wrapper)).toBe('Keep this draft');
+    expect(wrapper.find('[aria-label="Active composer modes"]').exists()).toBe(false);
+    expect(wrapper.findComponent(ChatRichTextEditor).props('placeholder')).toBe('Ask for follow-up changes');
+
+    await setEditorValue(wrapper, '/goa');
+    await editor(wrapper).trigger('keyup');
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
+
+    await setEditorValue(wrapper, 'Ship the SDK');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.emitted('send')).toStrictEqual([['/goal Ship the SDK']]);
+    expect(editorValue(wrapper)).toBe('');
+    expect(wrapper.find('[aria-label="Remove Goal command"]').exists()).toBe(false);
   });
 
   it('keeps slash suggestions limited to commands', async () => {

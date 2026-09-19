@@ -12,13 +12,13 @@ html, body, #app { width: 100%; min-width: 900px; height: 100%; margin: 0; }
 button, select { font: inherit; }
 
 .lab { display: grid; width: 100%; height: 100%; grid-template-columns: 280px minmax(0, 1fr); background: var(--color-shell-main, #fff); color: var(--color-text, #171717); }
-.lab__sidebar { display: flex; min-height: 0; flex-direction: column; gap: 28px; padding: 28px 20px; border-right: 1px solid var(--color-border, #ddd); background: var(--color-shell-sidebar, #f4f4f4); }
+.lab__sidebar { display: flex; min-height: 0; overflow: hidden; flex-direction: column; gap: 28px; padding: 28px 20px; border-right: 1px solid var(--color-border, #ddd); background: var(--color-shell-sidebar, #f4f4f4); }
 .lab__eyebrow { margin: 0 0 6px; color: var(--color-primary, #1b4fb2); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .lab h1, .lab h2 { margin: 0; letter-spacing: -.025em; }
 .lab h1 { font-size: 24px; }
 .lab h2 { font-size: 22px; }
 .lab__intro, .lab__header p { color: var(--color-text-muted, #666); line-height: 1.45; }
-.lab nav { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 6px; }
+.lab nav { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .lab nav button { display: flex; flex-direction: column; gap: 4px; padding: 11px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left; }
 .lab nav button:hover, .lab__scenario--active { background: var(--color-surface-high, #e8e8e8) !important; }
 .lab nav span { color: var(--color-text-muted, #666); font-size: 12px; line-height: 1.35; }

@@ -18,6 +18,28 @@ The editor renders rich chips while preserving plain Codex prompt text:
 replace them with private editor markup. File suggestions require a host-supplied
 file catalog, normally backed by a conversation with a working directory.
 
+Commands normally insert or submit their slash text. A command can instead
+declare a pending composer mode when it needs arguments before submission:
+
+```ts
+const commands = [{
+  id: 'host.deploy',
+  name: 'deploy',
+  displayName: 'Deploy',
+  composerMode: {
+    label: 'Deploy',
+    placeholder: 'Describe the deployment',
+  },
+}];
+```
+
+Selecting that command removes the slash query, shows a removable mode chip,
+and keeps Send disabled until the user enters text. Submission prepends the
+canonical slash name, for example `/deploy staging`. The built-in `/goal`
+command uses this contract so the objective is collected before a complete
+`/goal Ship the SDK` command is submitted. Typing the complete command manually
+remains valid.
+
 ```vue
 <CodexComposer
   :commands="commands"
@@ -135,6 +157,7 @@ export type CodexComposerState = {
   text: string;
   selectionStart: number;
   selectionEnd: number;
+  activeCommandId?: string | null;
 };
 ```
 
@@ -148,7 +171,9 @@ export type CodexComposerState = {
 The component emits updates for canonical text changes and selection-only caret
 changes. Incoming selections are clamped to the text length and restored when
 the conversation changes. Switching `conversationKey` does not emit an
-unsolicited empty draft.
+unsolicited empty draft. `activeCommandId` preserves a pending composer-mode
+command across controlled echoes and conversation switches; keep the referenced
+command in the supplied command catalog while restoring that state.
 
 `modelValue` / `update:modelValue` remains available as a text-only compatibility
 contract. When both contracts are supplied, `composerState` is authoritative.

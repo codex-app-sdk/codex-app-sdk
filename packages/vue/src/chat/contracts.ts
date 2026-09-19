@@ -64,6 +64,10 @@ export type CodexCommandSummary = {
   description?: string;
   slashName?: string;
   submitOnSelect?: boolean;
+  composerMode?: {
+    label?: string;
+    placeholder?: string;
+  };
   providerMetadata?: Record<string, unknown>;
 };
 

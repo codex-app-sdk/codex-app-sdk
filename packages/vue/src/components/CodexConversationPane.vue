@@ -104,6 +104,7 @@
           <slot name="before-composer" />
           <ChatComposerShelf
             class="codex-conversation-pane__composer-shelf"
+            :disabled="effectiveDisabled"
             :goal="effectiveGoal"
             :presentation="effectivePresentation.shelf"
             :queued-prompts="effectiveQueuedPrompts"
@@ -114,7 +115,11 @@
             @edit-queued-prompt="editQueuedPrompt"
             @edit-goal="editGoal"
             @steer-queued-prompt="steerQueuedPrompt"
-          />
+          >
+            <template v-if="$slots['composer-shelf-actions']" #actions="scope">
+              <slot name="composer-shelf-actions" v-bind="scope" />
+            </template>
+          </ChatComposerShelf>
           <CodexComposer
             :key="effectiveConversationKey ?? 'no-conversation'"
             ref="composer"
@@ -414,6 +419,7 @@ defineSlots<{
     index: number;
   }): unknown;
   'composer-context'(props: { disabled: boolean }): unknown;
+  'composer-shelf-actions'(props: { disabled: boolean }): unknown;
   empty(props: { description: string; title: string }): unknown;
   'menu-icon'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
   'menu-item'(props: { item: CodexComposerMenuItem<Payload> }): unknown;
@@ -775,6 +781,7 @@ const started = computed(() => (
 
 watch(() => props.modelValue, () => {
   if (effectiveController.value || props.composerState) return;
+  if (props.modelValue === localDraft.value) return;
   localDraft.value = props.modelValue;
   localComposerState.value = {
     text: props.modelValue,
@@ -1037,7 +1044,13 @@ function quoteMessage(index: number): void {
 
 function editGoal(): void {
   if (!effectiveGoal.value?.objective.trim()) return;
-  updateDraft(`/goal ${effectiveGoal.value.objective}`);
+  const objective = effectiveGoal.value.objective;
+  updateComposerState({
+    text: objective,
+    selectionStart: objective.length,
+    selectionEnd: objective.length,
+    activeCommandId: 'codex.goal',
+  });
   if (dispatchControllerAction('editGoal')) return;
   if (effectiveController.value) return;
   emit('editGoal');

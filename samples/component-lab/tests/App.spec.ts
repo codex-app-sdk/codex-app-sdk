@@ -11,14 +11,14 @@ describe('component lab', () => {
     vi.useFakeTimers();
     const wrapper = mount(App);
     const scenarioButton = wrapper.findAll('nav button')
-      .find((button) => button.text().includes('Async question'));
+      .find((button) => button.text().includes('Async questions'));
     expect(scenarioButton).toBeDefined();
     await scenarioButton!.trigger('click');
 
     expect(wrapper.text()).toContain('Which framework should I use?');
-    expect(wrapper.find('.chat-work-group').exists()).toBe(false);
     const vueOption = wrapper.findAll('button').find((button) => button.text().includes('Vue'));
     expect(vueOption).toBeDefined();
+    expect(vueOption!.element.closest('.chat-fold')).toBeNull();
     await vueOption!.trigger('click');
     const send = wrapper.findAll('button').find((button) => button.text() === 'Send');
     expect(send).toBeDefined();
@@ -27,24 +27,29 @@ describe('component lab', () => {
     expect(wrapper.text()).toContain('Answered: Vue');
     await vi.advanceTimersByTimeAsync(300);
     expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Vue');
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
-    expect(wrapper.get('.chat-work-group__header').attributes()).toHaveProperty('disabled');
+    const workingGroup = wrapper.findAll('.chat-work-group')
+      .find((group) => group.find('.chat-work-group__title').text() === 'Working');
+    expect(workingGroup).toBeDefined();
+    expect(workingGroup!.get('.chat-work-group__header').attributes()).toHaveProperty('disabled');
     expect(wrapper.text()).toContain('Mock response:');
   });
   it('shows text-only asynchronous questions as an immediately focused field', async () => {
     const wrapper = mount(App, { attachTo: document.body });
     const scenarioButton = wrapper.findAll('nav button')
-      .find((button) => button.text().includes('Async free text'));
+      .find((button) => button.text().includes('Async questions'));
     expect(scenarioButton).toBeDefined();
     await scenarioButton!.trigger('click');
 
     const input = wrapper.get<HTMLTextAreaElement>('.chat-tool-user-input__other-input--direct');
     expect(wrapper.text().split('What should I know before continuing?')).toHaveLength(2);
-    expect(wrapper.find('.chat-tool-user-input__tag').exists()).toBe(false);
-    expect(wrapper.find('.chat-tool-user-input__option--other').exists()).toBe(false);
+    const questionCard = wrapper.findAll('.chat-tool-user-input')
+      .find((card) => card.find('.chat-tool-user-input__other-input--direct').exists());
+    expect(questionCard).toBeDefined();
+    expect(questionCard!.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(questionCard!.find('.chat-tool-user-input__option--other').exists()).toBe(false);
     await vi.waitFor(() => expect(document.activeElement).toBe(input.element));
     await input.setValue('Preserve the existing API.');
-    await wrapper.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
+    await questionCard!.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
 
     expect(wrapper.text()).toContain('Answered: Preserve the existing API.');
     wrapper.unmount();
@@ -108,6 +113,38 @@ describe('component lab', () => {
     expect(wrapper.find('.lab__composer-context-card').exists()).toBe(false);
     expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Selected message context:');
     expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('clear separation');
+  });
+
+  it('demonstrates the pending Goal command from selection through submission', async () => {
+    const wrapper = mount(App, { attachTo: document.body });
+    const scenarioButton = wrapper.findAll('nav button')
+      .find((button) => button.text().includes('Goal composer'));
+    expect(scenarioButton).toBeDefined();
+    await scenarioButton!.trigger('click');
+
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = '/goa';
+    await editor.trigger('input');
+    const range = document.createRange();
+    range.selectNodeContents(editor.element);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    await editor.trigger('keyup');
+    await wrapper.get('.chat-composer-slash-menu__item').trigger('mousedown');
+
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
+    expect(editor.attributes('data-placeholder')).toBe('Describe the goal');
+    expect(wrapper.get('button[aria-label="Send prompt"]').attributes()).toHaveProperty('disabled');
+
+    editor.element.textContent = 'Ship the component lab';
+    await editor.trigger('input');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('/goal Ship the component lab');
+    expect(wrapper.find('[aria-label="Active composer modes"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 
   it('renders every tool action icon and label in the tool gallery', async () => {
@@ -274,14 +311,14 @@ describe('component lab', () => {
   it('keeps generated media visible while completed steer and work-only rows stay folded', async () => {
     const wrapper = mount(App);
     const scenarioButton = wrapper.findAll('nav button')
-      .find((button) => button.text().includes('Completed steered turn'));
+      .find((button) => button.text().includes('Completed turns'));
     expect(scenarioButton).toBeDefined();
     await scenarioButton!.trigger('click');
 
     expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
       .toStrictEqual(['Done · View details']);
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
-    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(4);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
     expect(wrapper.text()).toContain('The completed turn is compact.');
     expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')).toBeNull();
@@ -291,7 +328,7 @@ describe('component lab', () => {
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
-    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(3);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(5);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
     expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')).toBeNull();
     expect(wrapper.get('.chat-media-block').isVisible()).toBe(true);
@@ -300,22 +337,26 @@ describe('component lab', () => {
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
-    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(4);
   });
 
   it('shows completed work without a disclosure when there is no summary', async () => {
     const wrapper = mount(App);
     const scenarioButton = wrapper.findAll('nav button')
-      .find((button) => button.text().includes('Completed without summary'));
+      .find((button) => button.text().includes('Completed turns'));
     expect(scenarioButton).toBeDefined();
     await scenarioButton!.trigger('click');
 
-    expect(wrapper.find('.chat-work-group__header').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-work-group__header')).toHaveLength(1);
     expect(wrapper.text()).toContain('Finished the verification.');
     expect(wrapper.text()).toContain('The docs are current.');
     expect(wrapper.text()).not.toContain('Also check the docs.');
-    expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
-    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(0);
+    const noSummaryTurn = wrapper.findAll('.codex-message-turn')
+      .find((turn) => turn.text().includes('Finished the verification.'));
+    expect(noSummaryTurn).toBeDefined();
+    expect(noSummaryTurn!.find('.chat-work-group__header').exists()).toBe(false);
+    expect(noSummaryTurn!.findAll('.chat-message--steer-below')).toHaveLength(0);
+    expect(noSummaryTurn!.findAll('.chat-message__actions')).toHaveLength(0);
   });
 
   it('submits multiline prompts without a backend', async () => {

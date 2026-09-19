@@ -5,6 +5,7 @@ import { h, nextTick, reactive, ref, type Component } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CodexConversationPane,
+  codexCommands,
   createCodexConversationPaneController,
   CodexMessage,
   CodexMessageList,
@@ -619,7 +620,8 @@ describe('CodexConversationPane', () => {
 
     await wrapper.get('[aria-label="Edit goal"]').trigger('click');
 
-    expect(composerValue(wrapper)).toBe('/goal Ship the release');
+    expect(composerValue(wrapper)).toBe('Ship the release');
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
     expect(wrapper.emitted('editGoal')).toStrictEqual([[]]);
   });
 
@@ -632,7 +634,11 @@ describe('CodexConversationPane', () => {
     const wrapper = mount(CodexConversationPane, {
       props: {
         controller: createCodexConversationPaneController({
-          state: { identity: { conversationKey: 'goal-controller', messages }, thread: { goal } },
+          state: {
+            identity: { conversationKey: 'goal-controller', messages },
+            thread: { goal },
+            catalogs: { commands: codexCommands },
+          },
           actions: { editGoal },
         }),
       },
@@ -641,20 +647,26 @@ describe('CodexConversationPane', () => {
     await wrapper.get('[aria-label="Edit goal"]').trigger('click');
     await flushPromises();
 
-    expect(composerValue(wrapper)).toBe('/goal Harden controller routing');
+    expect(composerValue(wrapper)).toBe('Harden controller routing');
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
     expect(editGoal).toHaveBeenCalledOnce();
     expect(wrapper.emitted('editGoal')).toBeUndefined();
 
     const noAction = mount(CodexConversationPane, {
       props: {
         controller: createCodexConversationPaneController({
-          state: { identity: { conversationKey: 'goal-controller-no-action', messages }, thread: { goal } },
+          state: {
+            identity: { conversationKey: 'goal-controller-no-action', messages },
+            thread: { goal },
+            catalogs: { commands: codexCommands },
+          },
           actions: {},
         }),
       },
     });
     await noAction.get('[aria-label="Edit goal"]').trigger('click');
-    expect(composerValue(noAction)).toBe('/goal Harden controller routing');
+    expect(composerValue(noAction)).toBe('Harden controller routing');
+    expect(noAction.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
     expect(noAction.emitted('editGoal')).toBeUndefined();
   });
 
@@ -3039,6 +3051,7 @@ describe('CodexConversationPane', () => {
           id: 'approval-slot', kind: 'permissions', conversationId: 'thread-1', itemId: 'item-1',
           title: 'Permissions',
         }],
+        disabled: true,
         menuItems: [{ id: 'custom', type: 'custom', label: 'Custom' }],
         messages,
         modelValue: '',
@@ -3048,6 +3061,11 @@ describe('CodexConversationPane', () => {
         message: '<div class="message-slot">Message slot</div>',
         'composer-after-input': '<div class="input-slot">Input slot</div>',
         'composer-after': '<div class="after-slot">After slot</div>',
+        'composer-shelf-actions': ({ disabled }: { disabled: boolean }) => h(
+          'button',
+          { class: 'shelf-action-slot', disabled },
+          'Shelf action',
+        ),
         'after-composer': '<div class="footer-slot">Footer slot</div>',
       },
     });
@@ -3055,7 +3073,17 @@ describe('CodexConversationPane', () => {
     expect(wrapper.get('.message-slot').text()).toBe('Message slot');
     expect(wrapper.get('.input-slot').text()).toBe('Input slot');
     expect(wrapper.get('.after-slot').text()).toBe('After slot');
+    expect(wrapper.get<HTMLButtonElement>('.shelf-action-slot').element.disabled).toBe(true);
     expect(wrapper.get('.footer-slot').text()).toBe('Footer slot');
+  });
+
+  it('does not mount an empty composer shelf when a host shelf slot has no content', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages: [], modelValue: '' },
+      slots: { 'composer-shelf-actions': () => null },
+    });
+
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
   });
 
   it('makes history loading authoritative over a previously rendered transcript', async () => {

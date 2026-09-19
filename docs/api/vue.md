@@ -181,6 +181,7 @@ type CodexComposerState = {
   text: string;
   selectionStart: number;
   selectionEnd: number;
+  activeCommandId?: string | null;
 };
 ```
 
@@ -188,7 +189,20 @@ type CodexComposerState = {
 `update:composerState` continuously for text and selection-only changes. When
 `composerState` and `modelValue` are both supplied, `composerState` is
 authoritative. Changing `conversationKey` restores the incoming state without
-emitting an intermediate empty value.
+emitting an intermediate empty value. `activeCommandId` identifies an active
+command whose `CodexCommandSummary.composerMode` supplies the visible chip label
+and placeholder. Submitting serializes `/<slashName-or-name> <text>` and clears
+the active command; removing its chip preserves the current text.
+
+```ts
+type CodexCommandSummary = {
+  // existing identity and description fields
+  composerMode?: {
+    label?: string;
+    placeholder?: string;
+  };
+};
+```
 
 ### Controlled attachments and steering
 
@@ -261,6 +275,13 @@ remain outside the SDK. `hasComposerContext` enables Send with no typed prompt;
 a context-only controlled submit receives an empty string so the host can
 serialize the cards. `CodexComposer` exposes the lower-level equivalent as
 `hasExternalContent`. Neither API modifies renderer attachments.
+
+`CodexConversationPane` provides `composer-shelf-actions` for host-owned
+controls in the shelf above the composer. It renders after the built-in turn
+diff, queued prompts, and active goal, and receives `{ disabled: boolean }`.
+The exported `CodexComposerShelf` exposes the same position as its `actions`
+slot with the same scope. Empty slot output does not mount an action row or
+shelf. Slot content does not alter SDK conversation state.
 
 ## Leaf components
 

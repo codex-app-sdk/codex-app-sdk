@@ -146,6 +146,15 @@ passes `prompt === ''` to `actions.submit`, and the host must serialize its
 context before transport. Native image/file attachment-only submissions keep
 the existing `(no user instructions)` prompt.
 
+Use `composer-shelf-actions` for compact host-owned controls that belong in the
+shelf above the composer rather than inside submitted context. The row renders
+after the SDK turn diff, queued prompts, and active goal, so it remains closest
+to the composer without replacing those sections. Its scope is
+`{ disabled: boolean }`; hosts should apply `disabled` to interactive controls.
+The exported `CodexComposerShelf` exposes the same row through its lower-level
+`actions` slot. When the slot renders no content, the SDK omits the row and does
+not leave an empty shelf above the composer.
+
 ## State groups
 
 | Group | Contents |
@@ -153,7 +162,7 @@ the existing `(no user instructions)` prompt.
 | `identity` | Conversation key, messages, busy/disabled state, and error |
 | `history` | Initial loading, older-page availability, and older-page loading |
 | `thread` | Approvals, answered requests, goal, queued prompts, git diff, and context usage |
-| `composer` | Text/selection state, attachments, placeholder, menus, model/reasoning/tier, approval preset, and plan mode |
+| `composer` | Text/selection/pending-command state, attachments, placeholder, menus, model/reasoning/tier, approval preset, and plan mode |
 | `catalogs` | Files, models, commands, skills, plugins, host mention groups, and catalog status |
 | `capabilities` | Which standard conversation behaviors the host exposes |
 | `policy` | Message-action, attachment, follow-up, and disabled policies |
@@ -163,6 +172,12 @@ an optional group or leaf when that capability is not present.
 The default composer shelf presents active, paused, and limited goals, but
 hides a goal once its status is `complete`; the terminal goal remains available
 to controller state and event consumers.
+
+The built-in `/goal` command first activates a removable Goal mode in the
+composer and requires an objective before submission. Controlled hosts persist
+that pending state through `composer.state.activeCommandId`; editing an existing
+goal restores its objective with the same Goal mode instead of exposing raw
+slash syntax in the editor.
 
 Use `composer.leadingMenuItems` for host actions that belong beside the built-in
 Codex controls. They render after Approval and before Plan mode. Existing

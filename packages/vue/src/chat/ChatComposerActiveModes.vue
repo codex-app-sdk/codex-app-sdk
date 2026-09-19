@@ -1,10 +1,10 @@
 <template>
   <div
-    v-if="planMode"
+    v-if="planMode || command"
     class="codex-chat-theme chat-composer__modes"
     aria-label="Active composer modes"
   >
-    <span class="chat-composer__mode chat-composer__mode__info">
+    <span v-if="planMode" class="chat-composer__mode chat-composer__mode__info">
       <ListDetailsIcon class="chat-composer__mode__icon" />
       <CircleXIcon
         class="chat-composer__mode__remove"
@@ -14,19 +14,32 @@
       />
       Plan
     </span>
+    <span v-if="command" class="chat-composer__mode chat-composer__mode__info">
+      <TargetArrowIcon class="chat-composer__mode__icon" />
+      <CircleXIcon
+        class="chat-composer__mode__remove"
+        :aria-label="`Remove ${command.composerMode?.label ?? command.displayName ?? command.name} command`"
+        role="button"
+        @click="emit('removeCommand')"
+      />
+      {{ command.composerMode?.label ?? command.displayName ?? command.name }}
+    </span>
   </div>
 </template>
 
 <script setup lang="ts">
-import { CircleXIcon, ListDetailsIcon } from '../icons/app-icons'
+import type { CodexCommandSummary } from './contracts'
+import { CircleXIcon, ListDetailsIcon, TargetArrowIcon } from '../icons/app-icons'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   planMode: boolean
+  command?: CodexCommandSummary | null
 }>()
 
 const emit = defineEmits<{
   disablePlanMode: []
+  removeCommand: []
 }>()
 // Stryker restore all
 </script>

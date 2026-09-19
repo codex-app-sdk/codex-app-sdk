@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { mount } from '@vue/test-utils';
-import { defineComponent, h } from 'vue';
+import { defineComponent, h, nextTick, ref } from 'vue';
 import { describe, expect, it } from 'vitest';
 import ChatComposerShelf from '../../src/chat/ChatComposerShelf.vue';
 import ChatQueuedPrompts from '../../src/chat/ChatQueuedPrompts.vue';
@@ -220,9 +220,10 @@ describe('ported id8 chat components', () => {
     expect(wrapper.emitted('delete')).toStrictEqual([['prompt-1']]);
   });
 
-  it('stacks queued prompts above the active goal', async () => {
+  it('stacks built-in sections before a disabled-aware host action row', async () => {
     const wrapper = mount(ChatComposerShelf, {
       props: {
+        disabled: true,
         queuedPrompts: [{ id: 'prompt-1', text: 'Run the tests after this turn' }],
         goal: {
           threadId: 'thread-1',
@@ -235,11 +236,20 @@ describe('ported id8 chat components', () => {
           updatedAt: 0,
         },
       },
+      slots: {
+        actions: ({ disabled }: { disabled: boolean }) => h(
+          'button',
+          { class: 'host-shelf-action', disabled },
+          'Delegate',
+        ),
+      },
     });
 
     const shelfItems = wrapper.findAll('.chat-composer-shelf > *');
     expect(shelfItems[0]?.classes()).toContain('chat-queued-prompts');
     expect(shelfItems[1]?.classes()).toContain('chat-goal');
+    expect(shelfItems[2]?.classes()).toContain('chat-composer-shelf__actions');
+    expect(wrapper.get<HTMLButtonElement>('.host-shelf-action').element.disabled).toBe(true);
     expect(wrapper.text()).toContain('Run the tests after this turn');
     expect(wrapper.text()).toContain('Ship the goal surface');
 
@@ -252,6 +262,32 @@ describe('ported id8 chat components', () => {
     expect(wrapper.emitted('editQueuedPrompt')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('clearGoal')).toStrictEqual([[]]);
     expect(wrapper.emitted('editGoal')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ goal: null, queuedPrompts: [] });
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(true);
+    expect(wrapper.findAll('.chat-composer-shelf > *')).toHaveLength(1);
+    expect(wrapper.get('.host-shelf-action').text()).toBe('Delegate');
+  });
+
+  it('mounts the host action row only while its slot has visible content', async () => {
+    const showAction = ref(false);
+    const Host = defineComponent(() => () => h(ChatComposerShelf, {
+      goal: null,
+      queuedPrompts: [],
+    }, {
+      actions: () => showAction.value ? h('button', 'Delegate') : null,
+    }));
+    const wrapper = mount(Host);
+
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+
+    showAction.value = true;
+    await nextTick();
+    expect(wrapper.get('.chat-composer-shelf__actions').text()).toBe('Delegate');
+
+    showAction.value = false;
+    await nextTick();
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
   });
 
   it('hides a completed goal from the composer shelf', () => {

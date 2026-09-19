@@ -50,7 +50,7 @@
         ref="editorEl"
         v-model="prompt"
         class="chat-composer__input"
-        :placeholder="placeholder"
+        :placeholder="effectivePlaceholder"
         :disabled="disabled && !isSending"
         :files="files"
         :mention-groups="mentionGroups"
@@ -95,7 +95,9 @@
         <slot name="before-meta" />
         <ChatComposerActiveModes
           :plan-mode="effectiveCodexCapabilities.planMode && Boolean(planMode)"
+          :command="activeCommand"
           @disable-plan-mode="$emit('update:planMode', false)"
+          @remove-command="removeActiveCommand"
         />
       </div>
       <div class="chat-composer__meta-trailing">
@@ -230,6 +232,7 @@ const emit = defineEmits<{
 const hostCapabilities = useCodexHostCapabilities();
 
 const prompt = ref('');
+const activeCommandId = ref<string | null>(null);
 const dictatedInput = ref(false);
 const editorEl = ref<CodexRichTextEditorExpose | null>(null);
 const caretPosition = ref(0);
@@ -249,16 +252,19 @@ let lastEmittedComposerState: CodexComposerState | null = null;
 let composerRestoreRevision = 0;
 const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCapabilities);
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
+const activeCommand = computed(() => (
+  (props.commands ?? codexCommands).find((command) => command.id === activeCommandId.value) ?? null
+));
+const effectivePlaceholder = computed(() => activeCommand.value?.composerMode?.placeholder ?? props.placeholder);
 const voiceVisible = computed(() => (
   effectivePresentation.value.composer.voice
   && Boolean(props.transcribeAudio || hostCapabilities?.capabilities.transcription)
 ));
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
-const canSend = computed(() => Boolean((
-  hasPrompt.value
-  || props.hasAttachments
-  || props.hasExternalContent
+const canSend = computed(() => Boolean((activeCommand.value
+  ? hasPrompt.value
+  : hasPrompt.value || props.hasAttachments || props.hasExternalContent
 ) && !props.disabled));
 const canContinueInterruptedTurn = computed(() => Boolean(
   props.canContinueInterruptedTurn
@@ -356,6 +362,10 @@ const {
   plugins: () => props.plugins ?? [],
   mentionGroups: () => props.mentionGroups ?? [],
   isSending: () => props.isSending,
+  onCommandActivated: (command) => {
+    activeCommandId.value = command.id;
+    emitComposerState();
+  },
   onCommandSubmitted: (command) => {
     rememberSubmittedPrompt(command);
     emit('send', command);
@@ -424,11 +434,17 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   if (!canSend.value || (intent === 'steer' && !trimmed)) {
     return;
   }
-  const submittedPrompt = trimmed || (props.hasAttachments ? '(no user instructions)' : '');
+  const slashCommand = activeCommand.value
+    ? `/${activeCommand.value.slashName ?? activeCommand.value.name}`
+    : null;
+  const submittedPrompt = slashCommand && trimmed
+    ? `${slashCommand} ${trimmed}`
+    : trimmed || (props.hasAttachments ? '(no user instructions)' : '');
   const submissionOptions = dictatedInput.value ? { inputMethod: 'dictated' as const } : undefined;
   if (trimmed) rememberSubmittedPrompt(submittedPrompt);
 
   prompt.value = '';
+  activeCommandId.value = null;
   dictatedInput.value = false;
   selectionStart.value = 0;
   selectionEnd.value = 0;
@@ -472,8 +488,15 @@ function setComposerText(value: string): void {
   restoreComposerState({ text: value, selectionStart: value.length, selectionEnd: value.length });
 }
 
+function removeActiveCommand(): void {
+  activeCommandId.value = null;
+  emitComposerState();
+  editorEl.value?.focusEnd();
+}
+
 function restoreComposerState(state: CodexComposerState): void {
   const normalized = normalizeCodexComposerState(state);
+  activeCommandId.value = normalized.activeCommandId ?? null;
   if (!sameComposerState(normalized, lastEmittedComposerState)) exitPromptHistory();
   const revision = ++composerRestoreRevision;
   const currentSelection = editorEl.value?.getSelectionRange();
@@ -518,7 +541,8 @@ function sameComposerState(left: CodexComposerState, right: CodexComposerState |
   return Boolean(right
     && left.text === right.text
     && left.selectionStart === right.selectionStart
-    && left.selectionEnd === right.selectionEnd);
+    && left.selectionEnd === right.selectionEnd
+    && (left.activeCommandId ?? null) === (right.activeCommandId ?? null));
 }
 
 function handleEditorKeydown(event: KeyboardEvent): void {
@@ -610,6 +634,7 @@ function emitComposerState(): void {
     text: prompt.value,
     selectionStart: selectionStart.value,
     selectionEnd: selectionEnd.value,
+    activeCommandId: activeCommandId.value,
   });
   if (sameComposerState(state, lastEmittedComposerState)) return;
   lastEmittedComposerState = state;

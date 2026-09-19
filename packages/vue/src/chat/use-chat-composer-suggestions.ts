@@ -28,6 +28,7 @@ type ChatComposerSuggestionOptions<Payload = unknown> = {
     group: CodexComposerMentionGroup<Payload>,
   ) => void
   isSending: () => boolean
+  onCommandActivated?: (command: CodexCommandSummary) => void
   onCommandSubmitted: (prompt: string) => void
   onTextInserted: (caretPosition: number) => void
   prompt: Ref<string>
@@ -253,6 +254,14 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     }
 
     const slashCommand = `/${command.slashName ?? command.name}`
+    if (command.composerMode) {
+      options.prompt.value = `${options.prompt.value.slice(0, mention.start)}${options.prompt.value.slice(mention.end)}`
+      options.caretPosition.value = mention.start
+      close()
+      options.onCommandActivated?.(command)
+      options.onTextInserted(mention.start)
+      return
+    }
     if (command.submitOnSelect) {
       options.prompt.value = ''
       options.caretPosition.value = 0
