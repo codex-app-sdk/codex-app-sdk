@@ -90,6 +90,7 @@ export default defineConfig({
             { text: 'Samples', link: '/guide/samples' },
             { text: 'Troubleshooting', link: '/guide/troubleshooting' },
             { text: 'Development', link: '/guide/development' },
+            { text: 'Testing', link: '/guide/testing' },
           ],
         },
       ],

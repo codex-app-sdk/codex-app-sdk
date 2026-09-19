@@ -174,23 +174,9 @@ published version fails instead of overwriting it.
 
 ## Architectural test philosophy
 
-Tests should prove risky boundaries:
-
-- app-server behavior through the strict, schema-typed
-  `MockCodexAppServer`, driving real `CodexAppServerClient` and `CodexSurface`
-  instances rather than mocking SDK controllers;
-- complete protocol request shapes and event ordering;
-- main/renderer policy separation;
-- cleanup of every IPC handler and transport listener;
-- concurrent conversation identity;
-- restored/live message parity;
-- auth lifecycle transitions;
-- keyboard and interaction behavior in reusable components;
-- package export and scoped-style completeness.
-
-Avoid shallow coverage padding and brittle product-name scans. Do not unit-test
-manifest text, npm script strings, or implementation source. Exercise the
-behavior instead; keep release invariants in executable release validation.
+Follow the [testing policy](./testing.md) whenever tests are added, changed,
+reviewed, or removed. It defines the value gate, app-server mock boundary,
+structural-check rules, and completion criteria.
 
 ## Mutation testing
 
