@@ -271,7 +271,7 @@ describe('component lab', () => {
     expect(wrapper.text()).toContain('Continuation started without a new prompt');
   });
 
-  it('removes completed steer and work-only rows until turn details are opened', async () => {
+  it('keeps generated media visible while completed steer and work-only rows stay folded', async () => {
     const wrapper = mount(App);
     const scenarioButton = wrapper.findAll('nav button')
       .find((button) => button.text().includes('Completed steered turn'));
@@ -284,8 +284,8 @@ describe('component lab', () => {
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
     expect(wrapper.text()).toContain('The completed turn is compact.');
-    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
-      .not.toContain('chat-fold--open');
+    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')).toBeNull();
+    expect(wrapper.get('.chat-media-block').isVisible()).toBe(true);
 
     await wrapper.get('.chat-work-group__header').trigger('click');
 
@@ -293,8 +293,8 @@ describe('component lab', () => {
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(3);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
-    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')?.classList)
-      .toContain('chat-fold--open');
+    expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')).toBeNull();
+    expect(wrapper.get('.chat-media-block').isVisible()).toBe(true);
 
     await wrapper.get('.chat-work-group__header').trigger('click');
 

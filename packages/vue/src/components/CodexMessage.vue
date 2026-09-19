@@ -299,10 +299,10 @@ const blocks = computed(() => groupAssistantWorkBlocks(
   groupWork.value,
   props.answeredClientRequestIds,
 ))
-const workOnlyAssistant = computed(() => (
+const assistantWithoutMessageActions = computed(() => (
   chatMessage.value.role === 'assistant'
   && blocks.value.length > 0
-  && blocks.value.every((block) => block.type === 'work-group')
+  && blocks.value.every((block) => block.type === 'work-group' || block.type === 'media')
 ))
 const hideCollapsedTurnDetail = computed(() => {
   if (
@@ -338,7 +338,7 @@ const isEditing = ref(false)
 const showActions = computed(() => (
   chatMessage.value.type !== 'compaction' &&
   chatMessage.value.type !== 'steer' &&
-  !workOnlyAssistant.value &&
+  !assistantWithoutMessageActions.value &&
   !isEditing.value
 ))
 const reserveActionSlot = computed(() => (
