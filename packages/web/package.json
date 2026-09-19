@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/web",
-  "version": "0.1.0",
+  "version": "0.12.2",
   "description": "Framework-neutral WebSocket bindings for browser-based Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
@@ -45,7 +45,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "0.1.0"
+    "@codex-app-sdk/core": "0.12.2"
   },
   "engines": {
     "node": ">=22"

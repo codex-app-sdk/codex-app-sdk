@@ -150,6 +150,14 @@ The five scoped SDK workspaces publish privately to GitHub Packages. Their
 package manifests pin `https://npm.pkg.github.com` as the registry and link each
 package to this repository so package permissions follow repository access.
 
+All five packages release in lockstep. While the SDK is pre-1.0, versions use
+`0.x.y`: increment `x` for a significant new capability generation, such as a
+new supported host architecture, conversation-state model, or authentication
+workflow; increment `y` for a compatible minor feature or bug-fix release.
+Tests, documentation, internal refactors, and publishing infrastructure do not
+require a package version by themselves. The first published baseline is
+`0.12.2`, reconstructed from the repository's feature history.
+
 Publishing is intentionally CI-owned. Update all five package versions and
 their internal dependency versions together, commit the generated lockfile,
 let CI pass, then run the **Publish private packages** workflow on `main`. The

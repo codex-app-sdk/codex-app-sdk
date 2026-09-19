@@ -15,10 +15,10 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/backend": "0.1.0",
-    "@codex-app-sdk/core": "0.1.0",
-    "@codex-app-sdk/electron": "0.1.0",
-    "@codex-app-sdk/vue": "0.1.0",
+    "@codex-app-sdk/backend": "0.12.2",
+    "@codex-app-sdk/core": "0.12.2",
+    "@codex-app-sdk/electron": "0.12.2",
+    "@codex-app-sdk/vue": "0.12.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "vue": "^3.5.0",
     "zod": "^4.4.3"

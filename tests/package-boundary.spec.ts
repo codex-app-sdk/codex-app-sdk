@@ -72,9 +72,15 @@ describe('package boundary', () => {
   });
 
   it('gives every SDK package owned source, tests, and quality gates', async () => {
+    const rootManifest = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
+      version: string;
+    };
+    const publishedSdkPackages = new Set(sdkPackages.map((name) => `@codex-app-sdk/${name}`));
+
     for (const packageName of sdkPackages) {
       const workspaceRoot = path.join(packageRoot, 'packages', packageName);
       const manifest = JSON.parse(await readFile(path.join(workspaceRoot, 'package.json'), 'utf8')) as {
+        dependencies?: Record<string, string>;
         name?: string;
         publishConfig?: Record<string, string>;
         repository?: {
@@ -83,6 +89,7 @@ describe('package boundary', () => {
           url?: string;
         };
         scripts?: Record<string, string>;
+        version?: string;
       };
       const source = await sourceFiles(path.join(workspaceRoot, 'src'));
       const tests = await sourceFiles(path.join(workspaceRoot, 'tests'));
@@ -99,6 +106,12 @@ describe('package boundary', () => {
       }));
       expect(manifest.scripts?.check, `${packageName} coverage gate`).toContain('test:coverage');
       expect(manifest.name, `${packageName} package scope`).toBe(`@codex-app-sdk/${packageName}`);
+      expect(manifest.version, `${packageName} release version`).toBe(rootManifest.version);
+      for (const [dependency, version] of Object.entries(manifest.dependencies ?? {})) {
+        if (publishedSdkPackages.has(dependency)) {
+          expect(version, `${packageName} dependency on ${dependency}`).toBe(rootManifest.version);
+        }
+      }
       expect(manifest.publishConfig, `${packageName} private registry`).toStrictEqual({
         access: 'restricted',
         registry: 'https://npm.pkg.github.com',
@@ -153,6 +166,9 @@ describe('package boundary', () => {
 
   it('keeps the component lab browser-only and on explicit renderer packages', async () => {
     const labRoot = path.join(packageRoot, 'samples/component-lab');
+    const sdkManifest = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
+      version: string;
+    };
     const manifest = JSON.parse(await readFile(path.join(labRoot, 'package.json'), 'utf8')) as {
       dependencies: Record<string, string>;
     };
@@ -166,14 +182,17 @@ describe('package boundary', () => {
     }
 
     expect(manifest.dependencies).toEqual({
-      '@codex-app-sdk/core': '0.1.0',
-      '@codex-app-sdk/vue': '0.1.0',
+      '@codex-app-sdk/core': sdkManifest.version,
+      '@codex-app-sdk/vue': sdkManifest.version,
       vue: '^3.5.0',
     });
     expect(compatibilityImports).toStrictEqual([]);
   });
 
   it('keeps the web transport independent from HTTP frameworks and WebSocket implementations', async () => {
+    const sdkManifest = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')) as {
+      version: string;
+    };
     const files = await sourceFiles(path.join(packageRoot, 'packages/web/src'));
     const violations: string[] = [];
     for (const file of files) {
@@ -188,7 +207,7 @@ describe('package boundary', () => {
     )) as { dependencies?: Record<string, string> };
 
     expect(violations).toStrictEqual([]);
-    expect(manifest.dependencies).toEqual({ '@codex-app-sdk/core': '0.1.0' });
+    expect(manifest.dependencies).toEqual({ '@codex-app-sdk/core': sdkManifest.version });
   });
 
   it('builds Electron samples against the explicit modular packages', async () => {
