@@ -557,8 +557,9 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 
 .chat-tool-user-input__option-label {
   font-size: var(--font-size-14);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-20);
+  outline: none;
 }
 
 .chat-tool-user-input__recommended {
@@ -598,8 +599,8 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 .chat-tool-user-input__other-input {
   width: 100%;
   min-width: 0;
-  margin-top: var(--space-1);
   resize: vertical;
+  margin-top: -2px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
@@ -607,11 +608,12 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
+  line-height: var(--line-height-18);
+  outline: none;
 }
 
-.chat-tool-user-input__other-input:focus {
-  outline: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+.chat-tool-user-input__other-input:focus-visible {
+  outline: none !important;
 }
 
 .chat-tool-user-input__other-input--direct {
