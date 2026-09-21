@@ -25,7 +25,7 @@
         class="codex-conversation-pane__messages"
         :actions-disabled="effectiveActionsDisabled"
         :active-turn-id="effectiveActiveTurnId"
-        :answered-client-request-ids="effectiveAnsweredClientRequestIds"
+        :answered-client-request-ids="displayAnsweredClientRequestIds"
         :aria-label="ariaLabel"
         :busy="effectiveTranscriptBusy"
         :can-delete-turn="effectiveCanDeleteTurn"
@@ -36,6 +36,7 @@
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
         :has-older-messages="effectiveHasOlderHistory"
+        :hidden-client-request-ids="pendingQuestionRequestIds"
         :render-strategy="effectiveRenderStrategy"
         :loading-older-messages="effectiveLoadingOlderHistory"
         :initial-message-batch-size="initialMessageBatchSize"
@@ -101,6 +102,15 @@
               </slot>
             </template>
           </div>
+          <ChatAsyncUserInputRequest
+            v-if="activeQuestionRequest"
+            :key="activeQuestionRequest.id"
+            class="codex-conversation-pane__question-composer"
+            :answered-client-request-ids="displayAnsweredClientRequestIds"
+            :request="activeQuestionRequest"
+            @client-response="respondToClientRequest"
+          />
+          <template v-else>
           <slot name="before-composer" />
           <ChatComposerShelf
             class="codex-conversation-pane__composer-shelf"
@@ -224,6 +234,7 @@
             <template v-if="$slots['composer-after']" #after><slot name="composer-after" /></template>
           </CodexComposer>
           <slot name="after-composer" />
+          </template>
         </footer>
       </template>
     </CodexWorkbenchLayout>
@@ -231,7 +242,7 @@
 </template>
 
 <script setup lang="ts" generic="Payload = unknown">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, provide, ref, shallowReactive, watch } from 'vue';
 import type {
   CodexConversationRenderStrategy,
   CodexRendererAttachment,
@@ -239,6 +250,7 @@ import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfacePlugin,
+  CodexSurfaceClientRequest,
   CodexSurfaceTurn,
   SurfaceMessage,
   CodexRendererSendMessageOptions,
@@ -299,7 +311,9 @@ import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../cha
 import { normalizeCodexComposerState } from '../composer-state';
 import { useConversationEscapeInterrupt } from '../chat/use-conversation-escape-interrupt';
 import { X as XIcon } from '../icons/app-icons';
+import ChatAsyncUserInputRequest from '../chat/ChatAsyncUserInputRequest.vue';
 import ChatComposerShelf from '../chat/ChatComposerShelf.vue';
+import { questionResponsesKey } from '../chat/message-work-state';
 import CodexComposer from './CodexComposer.vue';
 import CodexApprovalPrompt from './CodexApprovalPrompt.vue';
 import CodexConversationHistoryLoader from './CodexConversationHistoryLoader.vue';
@@ -500,6 +514,8 @@ const emit = defineEmits<{
 // Stryker restore all
 
 const hostCapabilities = useCodexHostCapabilities();
+const questionResponses = shallowReactive(new Map<string, ClientRequestResponse['payload']>());
+provide(questionResponsesKey, questionResponses);
 
 const composer = ref<{ focus(): void } | null>(null);
 const paneElement = ref<HTMLElement | null>(null);
@@ -595,6 +611,32 @@ const effectivePromptHistory = computed(() => mergePromptHistories(
 const effectiveAnsweredClientRequestIds = computed(() => controlledValue(
   (state) => state.thread?.answeredClientRequestIds,
   () => props.answeredClientRequestIds ?? props.surface?.answeredClientRequestIds,
+));
+const displayAnsweredClientRequestIds = computed<ReadonlySet<string>>(() => new Set([
+  ...(effectiveAnsweredClientRequestIds.value ?? []),
+  ...questionResponses.keys(),
+]));
+const pendingQuestionRequests = computed(() => {
+  const requests: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>[] = [];
+  const seen = new Set<string>();
+  for (const message of effectiveMessages.value) {
+    for (const part of chatMessageFromInput(message).parts ?? []) {
+      if (
+        part.type !== 'question'
+        || part.historical === true
+        || part.request.payload.request.questions.length === 0
+        || seen.has(part.request.id)
+        || displayAnsweredClientRequestIds.value.has(part.request.id)
+      ) continue;
+      seen.add(part.request.id);
+      requests.push(part.request);
+    }
+  }
+  return requests;
+});
+const activeQuestionRequest = computed(() => pendingQuestionRequests.value[0]);
+const pendingQuestionRequestIds = computed<ReadonlySet<string>>(() => new Set(
+  pendingQuestionRequests.value.map((request) => request.id),
 ));
 const effectiveApprovals = computed(() => controlledValue(
   (state) => state.thread?.approvals ?? [],
@@ -1570,6 +1612,10 @@ defineExpose({ focusComposer });
 
 .codex-conversation-pane__composer {
   width: 100%;
+  margin: 0 auto var(--space-4);
+}
+
+.codex-conversation-pane__question-composer {
   margin: 0 auto var(--space-4);
 }
 

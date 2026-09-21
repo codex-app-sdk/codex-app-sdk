@@ -204,6 +204,7 @@ const props = withDefaults(defineProps<{
   canRetryTurn?: boolean
   deletingTurn?: boolean
   followUpsDisabled?: boolean
+  hiddenClientRequestIds?: ReadonlySet<string>
   index?: number
   message: Message | SurfaceMessage
   mentionGroups?: readonly CodexComposerMentionGroup[]
@@ -282,7 +283,8 @@ const effectivePresentation = computed(() => resolveCodexConversationPresentatio
 provide(questionResponsesKey, inject(questionResponsesKey, undefined) ?? shallowReactive(new Map()))
 const allBlocks = computed(() => computeMessageBlocks(chatMessage.value))
 const visibleBlocks = computed(() => allBlocks.value.filter((block) => (
-  effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group')
+  (block.type !== 'question' || !props.hiddenClientRequestIds?.has(block.request.id))
+  && (effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group'))
 )))
 const groupWork = computed(() => {
   const state = workTurnState.value

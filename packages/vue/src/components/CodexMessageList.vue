@@ -42,6 +42,7 @@
                 :can-retry-turn="canRetryTurn && isTerminalTurn(group.turnId)"
                 :deleting-turn="group.turnId === deletingTurnId"
                 :follow-ups-disabled="followUpsDisabled"
+                :hidden-client-request-ids="hiddenClientRequestIds"
                 :index="entry.index"
                 :message="entry.message"
                 :mention-groups="mentionGroups"
@@ -88,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowReactive, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowReactive, watch } from 'vue'
 import { questionResponsesKey } from '../chat/message-work-state'
 import type {
   CodexConversationRenderStrategy,
@@ -126,6 +127,7 @@ const props = withDefaults(defineProps<{
   emptyLabel?: string
   followUpsDisabled?: boolean
   hasOlderMessages?: boolean
+  hiddenClientRequestIds?: ReadonlySet<string>
   renderStrategy?: CodexConversationRenderStrategy
   /** @deprecated Use renderStrategy instead. */
   lazyMessages?: boolean
@@ -208,7 +210,8 @@ const thinkingPlaceholder: SurfaceMessage = {
   status: 'streaming',
   parts: [],
 }
-const questionResponses = shallowReactive(new Map<string, ClientRequestResponse['payload']>())
+const questionResponses = inject(questionResponsesKey, undefined)
+  ?? shallowReactive(new Map<string, ClientRequestResponse['payload']>())
 provide(questionResponsesKey, questionResponses)
 watch(() => props.messages, (messages) => {
   const answers: Record<string, { answers: string[] }> = {}

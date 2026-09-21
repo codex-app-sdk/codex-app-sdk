@@ -796,7 +796,7 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    await wrapper.findAll('.chat-tool-user-input__button').at(-1)?.trigger('click');
+    await wrapper.get('[aria-label="Cancel question"]').trigger('click');
 
     expect(wrapper.emitted('client-response')).toStrictEqual([
       [

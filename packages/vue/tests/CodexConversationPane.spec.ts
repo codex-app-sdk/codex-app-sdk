@@ -48,6 +48,77 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
+  it('replaces the composer with the oldest unanswered question and restores it after responding', async () => {
+    const questionMessage: SurfaceMessage = {
+      id: 'assistant-question',
+      role: 'assistant',
+      status: 'complete',
+      turnId: 'turn-question',
+      parts: [{
+        type: 'question',
+        request: {
+          id: 'request-framework',
+          kind: 'ask_user',
+          conversationId: 'thread-question',
+          turnId: 'turn-question',
+          itemId: 'item-framework',
+          payload: {
+            request: {
+              itemId: 'item-framework',
+              delivery: 'async',
+              blocking: false,
+              questions: [{
+                id: 'framework',
+                header: 'Framework',
+                question: 'Which framework should I use?',
+                isOther: true,
+                isSecret: false,
+                options: [
+                  { label: 'Vue', description: 'Use the SDK component package.' },
+                  { label: 'React', description: 'Use a custom renderer.' },
+                ],
+              }],
+            },
+          },
+        },
+      }],
+    };
+    const wrapper = mount(CodexConversationPane, {
+      props: {
+        goal: {
+          threadId: 'thread-question',
+          objective: 'Choose a framework',
+          status: 'active',
+          tokenBudget: null,
+          tokensUsed: 0,
+          timeUsedSeconds: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        messages: [questionMessage],
+        modelValue: '',
+      },
+    });
+
+    const footer = wrapper.get('.codex-conversation-pane__footer');
+    expect(footer.text()).toContain('Which framework should I use?');
+    expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    expect(wrapper.findComponent(ChatComposerShelf).exists()).toBe(false);
+
+    await footer.findAll('button').find((button) => button.text().includes('Vue'))!.trigger('click');
+    await footer.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
+    await nextTick();
+
+    expect(wrapper.emitted('clientResponse')).toStrictEqual([[
+      { id: 'request-framework', payload: { answers: { framework: { answers: ['Vue'] } } } },
+    ]]);
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(true);
+    expect(wrapper.findComponent(ChatComposerShelf).exists()).toBe(true);
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
+  });
+
   it('forwards opt-in message selections and host-owned composer context', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: {

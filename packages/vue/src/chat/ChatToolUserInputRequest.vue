@@ -45,20 +45,31 @@
           >{{ currentQuestion.header }}</span>
           <span class="chat-tool-user-input__question">{{ currentQuestion.question }}</span>
         </div>
-        <div
-          v-if="questions.length > 1"
-          class="chat-tool-user-input__progress"
-          aria-label="Question progress"
-        >
-          <span
-            v-for="(_, index) in questions"
-            :key="index"
-            class="chat-tool-user-input__progress-dot"
-            :class="{ 'chat-tool-user-input__progress-dot--active': index === currentIndex }"
-          />
-          <span class="chat-tool-user-input__index">
-            {{ currentIndex + 1 }} / {{ questions.length }}
-          </span>
+        <div class="chat-tool-user-input__header-actions">
+          <div
+            v-if="questions.length > 1"
+            class="chat-tool-user-input__progress"
+            aria-label="Question progress"
+          >
+            <span
+              v-for="(_, index) in questions"
+              :key="index"
+              class="chat-tool-user-input__progress-dot"
+              :class="{ 'chat-tool-user-input__progress-dot--active': index === currentIndex }"
+            />
+            <span class="chat-tool-user-input__index">
+              {{ currentIndex + 1 }} / {{ questions.length }}
+            </span>
+          </div>
+          <button
+            class="chat-tool-user-input__dismiss"
+            type="button"
+            aria-label="Cancel question"
+            title="Cancel question"
+            @click="cancel"
+          >
+            <X :size="17" />
+          </button>
         </div>
       </header>
 
@@ -86,6 +97,10 @@
             type="button"
             @click="toggleOption(currentQuestion, option.label)"
           >
+            <span class="chat-tool-user-input__check">
+              <Check v-if="isSelected(currentQuestion.id, option.label)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
+              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
+            </span>
             <span class="chat-tool-user-input__option-copy">
               <span class="chat-tool-user-input__option-heading">
                 <span class="chat-tool-user-input__option-label">{{ displayOptionLabel(option.label) }}</span>
@@ -106,6 +121,10 @@
             @keydown.enter.prevent="toggleOther(currentQuestion)"
             @keydown.space.prevent="toggleOther(currentQuestion)"
           >
+            <span class="chat-tool-user-input__check">
+              <Check v-if="isOtherSelected(currentQuestion.id)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
+              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
+            </span>
             <span class="chat-tool-user-input__option-copy">
               <span class="chat-tool-user-input__option-label">Other</span>
             </span>
@@ -142,9 +161,6 @@
         >
           Back
         </button>
-        <button class="chat-tool-user-input__button" type="button" @click="cancel">
-          Cancel
-        </button>
       </footer>
     </template>
   </section>
@@ -153,7 +169,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import type { AskUserAnswers, AskUserQuestion } from './contracts'
-import { SquareCheck, SquareDashed, SquareX } from '../icons/app-icons'
+import { Check, Circle, SquareCheck, SquareDashed, SquareX, X } from '../icons/app-icons'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
@@ -225,22 +241,22 @@ function isFreeTextOnly(question: AskUserQuestion) {
   return question.options === null
 }
 
+const recommendedSuffix = /\s*\(recommended\)\s*$/i
+
+function displayOptionLabel(label: string) {
+  return label.replace(recommendedSuffix, '').trim() || label
+}
+
+function isRecommendedOption(label: string) {
+  return recommendedSuffix.test(label)
+}
+
 function isSelected(questionId: string, label: string) {
   return selections[questionId]?.includes(label) ?? false
 }
 
 function isOtherSelected(questionId: string) {
   return otherSelected[questionId] ?? false
-}
-
-const recommendedSuffix = /\s*\(Recommended\)\s*$/i
-
-function isRecommendedOption(label: string) {
-  return recommendedSuffix.test(label)
-}
-
-function displayOptionLabel(label: string) {
-  return label.replace(recommendedSuffix, '').trim() || label
 }
 
 function toggleOption(question: AskUserQuestion, label: string) {
@@ -388,16 +404,25 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  width: min(100%, 46rem);
-  container-type: inline-size;
+  gap: var(--space-4);
+  width: 100%;
+  max-height: min(70vh, 38rem);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
   color: var(--color-text);
 }
 
 .chat-tool-user-input--resolved {
   width: 100%;
+  max-height: none;
+  overflow: visible;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -419,15 +444,13 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__heading {
-  gap: var(--space-3);
+  flex: 1 1 auto;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .chat-tool-user-input__options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
-  gap: var(--space-3);
+  gap: var(--space-1);
 }
 
 .chat-tool-user-input__summary {
@@ -457,11 +480,37 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   line-height: var(--line-height-16);
 }
 
+.chat-tool-user-input__header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.chat-tool-user-input__dismiss {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.chat-tool-user-input__dismiss:hover {
+  background: var(--color-surface-base);
+  color: var(--color-text);
+}
+
 .chat-tool-user-input__question {
   min-width: 0;
-  font-size: var(--font-size-15);
+  font-size: var(--font-size-16);
   font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-20);
+  line-height: var(--line-height-24);
 }
 
 .chat-tool-user-input__progress {
@@ -498,10 +547,11 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   align-items: flex-start;
   gap: var(--space-4);
   width: 100%;
-  border: 1px solid var(--color-border);
+  box-sizing: border-box;
+  border: 0;
   border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-6);
-  background: var(--color-surface-lowest);
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
@@ -520,31 +570,44 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__option {
-  box-sizing: border-box;
-  min-width: 0;
-  min-height: 94px;
-  height: 100%;
-  padding: var(--space-4);
   cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .chat-tool-user-input__option:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-border));
+  background: var(--color-surface-base);
 }
 
 .chat-tool-user-input__option--selected {
-  border-color: color-mix(in srgb, var(--color-primary) 58%, var(--color-border));
-  background: color-mix(in srgb, var(--color-primary-container) 66%, var(--color-surface-lowest));
+  background: color-mix(in srgb, var(--color-primary-container) 50%, var(--color-surface-base));
+}
+
+.chat-tool-user-input__check {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 20px;
+}
+
+.chat-tool-user-input__icon {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.chat-tool-user-input__icon--checked {
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  padding: var(--space-2);
+  stroke-width: var(--space-3);
 }
 
 .chat-tool-user-input__option-copy {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -557,19 +620,18 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 
 .chat-tool-user-input__option-label {
   font-size: var(--font-size-14);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: var(--line-height-20);
-  outline: none;
 }
 
 .chat-tool-user-input__recommended {
   border-radius: var(--radius-full);
-  padding: 1px var(--space-2);
-  background: color-mix(in srgb, var(--color-primary-container) 70%, transparent);
-  color: var(--color-primary);
-  font-size: var(--font-size-11);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-16);
+  padding: 0 var(--space-3);
+  background: var(--color-surface-base);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-20);
 }
 
 .chat-tool-user-input__option-description,
@@ -577,7 +639,6 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   min-width: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
 }
 
 .chat-tool-user-input__answer-label {
@@ -593,14 +654,17 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__option--other {
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
 }
 
 .chat-tool-user-input__other-input {
+  grid-column: 2;
   width: 100%;
   min-width: 0;
-  resize: vertical;
   margin-top: -2px;
+  resize: vertical;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
@@ -608,12 +672,11 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-14);
-  line-height: var(--line-height-18);
-  outline: none;
+  line-height: var(--line-height-20);
 }
 
-.chat-tool-user-input__other-input:focus-visible {
-  outline: none !important;
+.chat-tool-user-input__other-input:focus {
+  outline: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
 }
 
 .chat-tool-user-input__other-input--direct {
@@ -625,15 +688,16 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 
 .chat-tool-user-input__button {
-  min-height: 28px;
-  border: 0;
+  min-height: 32px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 0 var(--space-4);
-  background: transparent;
+  padding: 0 var(--space-6);
+  background: var(--color-surface-base);
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-13);
@@ -647,33 +711,37 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__button--primary:not(:disabled) {
+  border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-on-primary);
 }
 
-.chat-tool-user-input__other-input:focus-visible,
 .chat-tool-user-input__option:focus-visible,
+.chat-tool-user-input__dismiss:focus-visible,
 .chat-tool-user-input__button:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: var(--space-1);
 }
 
-@container (max-width: 34rem) {
+@container (max-width: 32rem) {
   .chat-tool-user-input__header {
-    flex-direction: column;
     gap: var(--space-3);
   }
 
-  .chat-tool-user-input__options {
-    grid-template-columns: minmax(0, 1fr);
+  .chat-tool-user-input__question {
+    font-size: var(--font-size-15);
+    line-height: var(--line-height-20);
+  }
+
+  .chat-tool-user-input__option {
+    padding: var(--space-3);
   }
 
   .chat-tool-user-input__actions {
-    align-items: stretch;
-  }
-
-  .chat-tool-user-input__button {
-    flex: 1 1 auto;
+    position: sticky;
+    bottom: 0;
+    padding-top: var(--space-2);
+    background: var(--color-surface-lowest);
   }
 }
 </style>

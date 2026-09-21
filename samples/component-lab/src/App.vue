@@ -50,6 +50,7 @@
 
       <div class="lab__frame">
         <CodexConversationPane
+          :key="`${selected.id}:${resetRevision}`"
           v-model="draft"
           :active-turn-id="mockActiveTurnId"
           :answered-client-request-ids="answeredClientRequestIds"
@@ -298,55 +299,32 @@ const scenarios: [Scenario, ...Scenario[]] = [
                   itemId: 'lab-agent-question',
                   delivery: 'async',
                   blocking: false,
-                  questions: [{
-                    id: '["request_user_input_async","lab-agent-question",0]',
-                    header: 'Framework',
-                    question: 'Which framework should I use?',
-                    isOther: true,
-                    isSecret: false,
-                    options: [
-                      { label: 'Vue', description: 'Use the SDK component package' },
-                      { label: 'React', description: 'Use a custom renderer' },
-                    ],
-                  }],
+                  questions: [
+                    {
+                      id: '["request_user_input_async","lab-agent-question",0]',
+                      header: 'Framework',
+                      question: 'Which framework should I use?',
+                      isOther: true,
+                      isSecret: false,
+                      options: [
+                        { label: 'Vue', description: 'Use the SDK component package' },
+                        { label: 'React', description: 'Use a custom renderer' },
+                      ],
+                    },
+                    {
+                      id: '["request_user_input_async","lab-agent-question",1]',
+                      header: 'Context',
+                      question: 'What should I know before continuing?',
+                      isOther: true,
+                      isSecret: false,
+                      options: null,
+                    },
+                  ],
                 },
               },
             },
           },
         ],
-      },
-      {
-        id: 'async-free-text-message',
-        role: 'assistant',
-        status: 'complete',
-        turnId: 'async-free-text-turn',
-        parts: [
-          { type: 'text', text: 'Checking the context before continuing.', phase: 'commentary' },
-          { type: 'text', text: 'What should I know before continuing?' }, {
-          type: 'question',
-          request: {
-            id: 'async-question:lab-free-text-question',
-            kind: 'ask_user',
-            conversationId: 'async-questions',
-            turnId: 'async-free-text-turn',
-            itemId: 'lab-free-text-question',
-            payload: {
-              request: {
-                itemId: 'lab-free-text-question',
-                delivery: 'async',
-                blocking: false,
-                questions: [{
-                  id: '["request_user_input_async","lab-free-text-question",0]',
-                  header: 'What should I know before continuing?',
-                  question: 'What should I know before continuing?',
-                  isOther: true,
-                  isSecret: false,
-                  options: null,
-                }],
-              },
-            },
-          },
-        }, { type: 'text', text: 'Ready for your answer.', phase: 'final_answer' }],
       },
     ],
   },
@@ -518,6 +496,7 @@ const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
 const selectedMessageText = ref<CodexMessageTextSelection | null>(null);
 const selectedMessageContexts = ref<CodexMessageTextSelection[]>([]);
 const resetConfirmed = ref(false);
+const resetRevision = ref(0);
 const selected = computed<Scenario>(() => scenarios.find((scenario) => scenario.id === selectedId.value) ?? scenarios[0]);
 const selectionActionStyle = computed(() => selectedMessageText.value ? {
   left: `${selectedMessageText.value.anchor.x}px`,
@@ -530,6 +509,7 @@ let resetFeedbackTimer: number | undefined;
 watch(selected, () => resetScenario(false), { immediate: true });
 
 function resetScenario(confirmReset = true): void {
+  resetRevision.value += 1;
   clearMockStream();
   clearResetFeedback();
   draft.value = '';

@@ -16,17 +16,20 @@ describe('component lab', () => {
     await scenarioButton!.trigger('click');
 
     expect(wrapper.text()).toContain('Which framework should I use?');
+    expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(false);
     const vueOption = wrapper.findAll('button').find((button) => button.text().includes('Vue'));
     expect(vueOption).toBeDefined();
     expect(vueOption!.element.closest('.chat-fold')).toBeNull();
     await vueOption!.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Next')!.trigger('click');
+    await wrapper.get<HTMLTextAreaElement>('.chat-tool-user-input__other-input--direct').setValue('Preserve the existing API.');
     const send = wrapper.findAll('button').find((button) => button.text() === 'Send');
     expect(send).toBeDefined();
     await send!.trigger('click');
 
-    expect(wrapper.text()).toContain('Answered: Vue');
+    expect(wrapper.text()).toContain('Answered: Vue, Preserve the existing API.');
     await vi.advanceTimersByTimeAsync(300);
-    expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Vue');
+    expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Vue, Preserve the existing API.');
     const workingGroup = wrapper.findAll('.chat-work-group')
       .find((group) => group.find('.chat-work-group__title').text() === 'Working');
     expect(workingGroup).toBeDefined();
@@ -40,18 +43,23 @@ describe('component lab', () => {
     expect(scenarioButton).toBeDefined();
     await scenarioButton!.trigger('click');
 
+    const vueOption = wrapper.findAll('button').find((button) => button.text().includes('Vue'));
+    expect(vueOption).toBeDefined();
+    await vueOption!.trigger('click');
+    await wrapper.findAll('button').find((button) => button.text() === 'Next')!.trigger('click');
+
     const input = wrapper.get<HTMLTextAreaElement>('.chat-tool-user-input__other-input--direct');
     expect(wrapper.text().split('What should I know before continuing?')).toHaveLength(2);
     const questionCard = wrapper.findAll('.chat-tool-user-input')
       .find((card) => card.find('.chat-tool-user-input__other-input--direct').exists());
     expect(questionCard).toBeDefined();
-    expect(questionCard!.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(questionCard!.get('.chat-tool-user-input__tag').text()).toBe('Context');
     expect(questionCard!.find('.chat-tool-user-input__option--other').exists()).toBe(false);
     await vi.waitFor(() => expect(document.activeElement).toBe(input.element));
     await input.setValue('Preserve the existing API.');
     await questionCard!.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
 
-    expect(wrapper.text()).toContain('Answered: Preserve the existing API.');
+    expect(wrapper.text()).toContain('Answered: Vue, Preserve the existing API.');
     wrapper.unmount();
   });
   it('renders a dense multi-turn fixture with mentions, attachments, tools, and steering', async () => {

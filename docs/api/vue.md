@@ -141,7 +141,7 @@ one gesture is dispatched exactly once.
 | `CodexMessageList` | Conversation message collection |
 | `CodexScrollToBottom` | Reusable circular control for returning to the latest messages |
 | `CodexMessage` | One message with blocks, status, thinking, and actions |
-| `CodexAsyncUserInputRequest` | Non-blocking app-server question embedded in an agent message |
+| `CodexAsyncUserInputRequest` | Non-blocking app-server question renderer used by messages and the pane footer |
 | `CodexApprovalPrompt` | Command, file-change, and permission approval UI |
 | `CodexWorkbenchLayout` | Measured sticky header/content/footer layout |
 | `CodexConversationHistoryLoader` | Restored-history loading treatment |
@@ -150,20 +150,24 @@ one gesture is dispatched exactly once.
 `focus()`.
 
 `CodexConversationPane` renders both blocking tool questions and asynchronous
-agent-message questions with the same answer controls. Surface-bound panes send
-responses through `respondToClientRequest()` automatically. Controlled panes
-dispatch `actions.clientResponse`; keep `thread.answeredClientRequestIds`
-current so resolved questions render consistently. The component lab's
-**Async question** scenario exercises this complete controlled flow. Questions
-whose `options` value is `null` render an immediately focused free-text field;
-the **Async free text** scenario covers that state. Question cards omit a header
-that repeats the question, and an immediately preceding text part that exactly
-matches a structured question is not rendered twice. Distinct introductory text
-and short question labels remain visible. Answered questions stack their label
-above the answer, with wrapping and line breaks preserved.
-Pending asynchronous questions stay outside collapsed turn details so they can
-still be answered. Once their ID is in `answeredClientRequestIds` (answered or
-cancelled), they fold into the turn's work details.
+agent-message questions with the same answer controls. The oldest unanswered
+question temporarily replaces the shelf and composer in the pane footer, so it
+stays visible without duplicating the app's primary input surface. Additional
+questions wait in request order. After answer or cancel, the resolved summary
+returns to its transcript position and the next question—or the normal
+composer—takes over. Surface-bound panes send responses through
+`respondToClientRequest()` automatically. Controlled panes dispatch
+`actions.clientResponse`; keep `thread.answeredClientRequestIds` current so
+resolved questions render consistently. The component lab's **Async questions**
+scenario exercises this complete controlled flow, including the queued
+free-text question. Questions whose `options` value is `null` render an
+immediately focused free-text field. Question cards omit a header that repeats
+the question, and an immediately preceding text part that exactly matches a
+structured question is not rendered twice. Distinct introductory text and
+short question labels remain visible. Answered questions stack their label
+above the answer, with wrapping and line breaks preserved. Once their ID is in
+`answeredClientRequestIds` (answered or cancelled), they fold into the turn's
+work details.
 Submitted answers survive disclosure remounts. Rehydrated surface user messages
 carry structured `metadata.asyncQuestionAnswers`, keyed by question ID, so the
 message list can restore answers alongside their original questions.
