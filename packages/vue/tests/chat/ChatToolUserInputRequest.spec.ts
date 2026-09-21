@@ -282,6 +282,38 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
 });
 
 describe('ChatToolUserInputRequest interactions', () => {
+  it('shows every choice explanation and separates a recommendation from the answer label', async () => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      props: {
+        toolCall: requestTool([{
+          ...firstQuestion,
+          isOther: false,
+          options: [
+            { label: 'README.md (Recommended)', description: 'Start with the project overview.' },
+            { label: 'package.json', description: 'Inspect package scripts and dependencies.' },
+          ],
+        }]),
+      },
+    });
+    const options = wrapper.findAll<HTMLButtonElement>('.chat-tool-user-input__option');
+
+    expect(options.map((option) => option.get('.chat-tool-user-input__option-description').text())).toStrictEqual([
+      'Start with the project overview.',
+      'Inspect package scripts and dependencies.',
+    ]);
+    expect(options[0]!.get('.chat-tool-user-input__option-label').text()).toBe('README.md');
+    expect(options[0]!.get('.chat-tool-user-input__recommended').text()).toBe('Recommended');
+    expect(options[0]!.attributes('aria-label')).toBe('README.md (Recommended)');
+
+    await options[0]!.trigger('click');
+    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
+
+    expect(wrapper.emitted('client-response')?.[0]?.[0]).toStrictEqual({
+      id: 'request-1',
+      payload: { answers: { target: { answers: ['README.md (Recommended)'] } } },
+    });
+  });
+
   it('toggles a single option and submits the exact selected answer', async () => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: { toolCall: requestTool([firstQuestion]) },
@@ -291,14 +323,18 @@ describe('ChatToolUserInputRequest interactions', () => {
 
     expect(primary.element.disabled).toBe(true);
     expect(options[0]!.classes()).not.toContain('chat-tool-user-input__option--selected');
+    expect(options[0]!.attributes('aria-pressed')).toBe('false');
+    expect(options[0]!.find('svg').exists()).toBe(false);
 
     await options[0]!.trigger('click');
     expect(options[0]!.classes()).toContain('chat-tool-user-input__option--selected');
-    expect(options[0]!.find('.chat-tool-user-input__icon--checked').exists()).toBe(true);
+    expect(options[0]!.attributes('aria-pressed')).toBe('true');
+    expect(options[0]!.find('svg').exists()).toBe(false);
     expect(primary.element.disabled).toBe(false);
 
     await options[0]!.trigger('click');
     expect(options[0]!.classes()).not.toContain('chat-tool-user-input__option--selected');
+    expect(options[0]!.attributes('aria-pressed')).toBe('false');
     expect(primary.element.disabled).toBe(true);
 
     await options[1]!.trigger('click');

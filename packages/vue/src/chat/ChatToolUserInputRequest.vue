@@ -80,17 +80,17 @@
             v-for="option in currentQuestion.options ?? []"
             :key="option.label"
             :aria-label="option.label"
+            :aria-pressed="isSelected(currentQuestion.id, option.label)"
             class="chat-tool-user-input__option"
             :class="{ 'chat-tool-user-input__option--selected': isSelected(currentQuestion.id, option.label) }"
             type="button"
             @click="toggleOption(currentQuestion, option.label)"
           >
-            <span class="chat-tool-user-input__check">
-              <Check v-if="isSelected(currentQuestion.id, option.label)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
-              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
-            </span>
             <span class="chat-tool-user-input__option-copy">
-              <span class="chat-tool-user-input__option-label">{{ option.label }}</span>
+              <span class="chat-tool-user-input__option-heading">
+                <span class="chat-tool-user-input__option-label">{{ displayOptionLabel(option.label) }}</span>
+                <span v-if="isRecommendedOption(option.label)" class="chat-tool-user-input__recommended">Recommended</span>
+              </span>
               <span v-if="option.description" class="chat-tool-user-input__option-description">{{ option.description }}</span>
             </span>
           </button>
@@ -100,15 +100,12 @@
             class="chat-tool-user-input__option chat-tool-user-input__option--other"
             :class="{ 'chat-tool-user-input__option--selected': isOtherSelected(currentQuestion.id) }"
             role="button"
+            :aria-pressed="isOtherSelected(currentQuestion.id)"
             tabindex="0"
             @click="toggleOther(currentQuestion)"
             @keydown.enter.prevent="toggleOther(currentQuestion)"
             @keydown.space.prevent="toggleOther(currentQuestion)"
           >
-            <span class="chat-tool-user-input__check">
-              <Check v-if="isOtherSelected(currentQuestion.id)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
-              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
-            </span>
             <span class="chat-tool-user-input__option-copy">
               <span class="chat-tool-user-input__option-label">Other</span>
             </span>
@@ -156,7 +153,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import type { AskUserAnswers, AskUserQuestion } from './contracts'
-import { Check, Circle, SquareCheck, SquareDashed, SquareX } from '../icons/app-icons'
+import { SquareCheck, SquareDashed, SquareX } from '../icons/app-icons'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
@@ -234,6 +231,16 @@ function isSelected(questionId: string, label: string) {
 
 function isOtherSelected(questionId: string) {
   return otherSelected[questionId] ?? false
+}
+
+const recommendedSuffix = /\s*\(Recommended\)\s*$/i
+
+function isRecommendedOption(label: string) {
+  return recommendedSuffix.test(label)
+}
+
+function displayOptionLabel(label: string) {
+  return label.replace(recommendedSuffix, '').trim() || label
 }
 
 function toggleOption(question: AskUserQuestion, label: string) {
@@ -384,11 +391,8 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  width: min(100%, 42rem);
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-lowest);
+  width: min(100%, 46rem);
+  container-type: inline-size;
   color: var(--color-text);
 }
 
@@ -415,11 +419,14 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__heading {
-  gap: var(--space-8);
+  gap: var(--space-3);
   min-width: 0;
 }
 
 .chat-tool-user-input__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: var(--space-3);
 }
 
@@ -513,6 +520,11 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__option {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 94px;
+  height: 100%;
+  padding: var(--space-4);
   cursor: pointer;
   transition:
     border-color 0.15s ease,
@@ -528,33 +540,19 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   background: color-mix(in srgb, var(--color-primary-container) 66%, var(--color-surface-lowest));
 }
 
-.chat-tool-user-input__check {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 20px;
-}
-
-.chat-tool-user-input__icon {
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-}
-
-.chat-tool-user-input__icon--checked {
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  padding: var(--space-2);
-  stroke-width: var(--space-3);
-}
-
 .chat-tool-user-input__option-copy {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  gap: var(--space-2);
   min-width: 0;
+}
+
+.chat-tool-user-input__option-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .chat-tool-user-input__option-label {
@@ -563,11 +561,22 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   line-height: var(--line-height-20);
 }
 
+.chat-tool-user-input__recommended {
+  border-radius: var(--radius-full);
+  padding: 1px var(--space-2);
+  background: color-mix(in srgb, var(--color-primary-container) 70%, transparent);
+  color: var(--color-primary);
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-16);
+}
+
 .chat-tool-user-input__option-description,
 .chat-tool-user-input__answer-value {
   min-width: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-14);
+  line-height: var(--line-height-20);
 }
 
 .chat-tool-user-input__answer-label {
@@ -583,13 +592,10 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__option--other {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: start;
+  flex-direction: column;
 }
 
 .chat-tool-user-input__other-input {
-  grid-column: 2;
   width: 100%;
   min-width: 0;
   margin-top: var(--space-1);
@@ -621,11 +627,11 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__button {
-  min-height: 32px;
-  border: 1px solid var(--color-border);
+  min-height: 28px;
+  border: 0;
   border-radius: var(--radius-md);
-  padding: 0 var(--space-6);
-  background: var(--color-surface-base);
+  padding: 0 var(--space-4);
+  background: transparent;
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-13);
@@ -639,25 +645,25 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input__button--primary:not(:disabled) {
-  border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-on-primary);
 }
 
-.chat-tool-user-input__input:focus-visible,
+.chat-tool-user-input__other-input:focus-visible,
 .chat-tool-user-input__option:focus-visible,
 .chat-tool-user-input__button:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: var(--space-1);
 }
 
-@media (max-width: 520px) {
-  .chat-tool-user-input {
-    padding: var(--space-6);
-  }
-
+@container (max-width: 34rem) {
   .chat-tool-user-input__header {
     flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .chat-tool-user-input__options {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .chat-tool-user-input__actions {
