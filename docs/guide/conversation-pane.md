@@ -53,6 +53,10 @@ const state: CodexConversationPaneState = {
     get loading() { return history.value.loading; },
     get loadingOlder() { return history.value.loadingOlder; },
   },
+  thread: {
+    get clientRequests() { return clientRequests.value; },
+    get answeredClientRequestIds() { return answeredClientRequestIds.value; },
+  },
   composer: {
     get state() { return drafts.value[activeConversationId.value]; },
     get attachments() { return attachments.value[activeConversationId.value]; },
@@ -110,6 +114,30 @@ export const paneController = createCodexConversationPaneController({
 The adapter is intentionally a controlled-view boundary. It does not create a
 `CodexSurface`, fetch history, clone messages, or own application state.
 
+## Questions in the composer
+
+When the app-server provides a structured question, the pane shows that question
+once; its fallback agent-message text is not shown separately. Other assistant
+messages in the turn remain visible.
+
+Blocking tool questions and async agent-message questions use the same composer
+replacement and answer controls. A surface-bound pane reads blocking requests
+from its SDK snapshot. A controlled pane should pass the provider's pending
+requests through `thread.clientRequests` and route `actions.clientResponse`;
+the pane hides the active tool card from the transcript and retains the answered
+tool summary afterward. The standalone `clientRequests` prop provides the same
+input outside controller mode.
+
+While a turn is running, an unanswered async question replaces the composer.
+When that turn finishes, the composer returns with a **Pending question** button
+beside its action menu. Click the label to answer, or hover over the leading
+question icon to reveal a cancel control. Sending or steering a prompt
+dismisses the button instead; the question stays in the
+historical transcript, but it does not reappear when the next turn starts or
+after reloading the conversation. Controlled hosts should provide turn status
+and messages through the pane controller so this transition follows the
+provider's state.
+
 ## Host-owned message selection and composer context
 
 Hosts can opt into text selection from rendered chat messages without moving
@@ -161,7 +189,7 @@ not leave an empty shelf above the composer.
 | --- | --- |
 | `identity` | Conversation key, messages, busy/disabled state, and error |
 | `history` | Initial loading, older-page availability, and older-page loading |
-| `thread` | Approvals, answered requests, goal, queued prompts, git diff, and context usage |
+| `thread` | Approvals, pending and answered requests, goal, queued prompts, git diff, and context usage |
 | `composer` | Text/selection/pending-command state, attachments, placeholder, menus, model/reasoning/tier, approval preset, and plan mode |
 | `catalogs` | Files, models, commands, skills, plugins, host mention groups, and catalog status |
 | `capabilities` | Which standard conversation behaviors the host exposes |

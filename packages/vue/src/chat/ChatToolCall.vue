@@ -154,7 +154,10 @@ const isUserInputRequest = computed(() => (
   statusDescriptor.value?.source === 'codex' &&
   statusDescriptor.value.action === 'ask_user_question' &&
   typeof confirmationParams.value.requestId === 'string' &&
-  props.toolCall.state === 'running'
+  (props.toolCall.state === 'running' || (
+    typeof props.toolCall.result === 'object' && props.toolCall.result !== null
+    && 'answers' in props.toolCall.result
+  ))
 ))
 const titleParts = computed(() => {
   if (toolPresentation.value?.title !== undefined) {

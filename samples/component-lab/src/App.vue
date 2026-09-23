@@ -37,15 +37,22 @@
           <h2>{{ selected.title }}</h2>
           <p>{{ selected.description }}</p>
         </div>
-        <button
-          type="button"
-          class="lab__reset"
-          :class="{ 'lab__reset--confirmed': resetConfirmed }"
-          aria-live="polite"
-          @click="resetScenario()"
-        >
-          {{ resetConfirmed ? 'Reset complete' : 'Reset scenario' }}
-        </button>
+        <div class="lab__header-actions">
+          <button
+            v-if="selected.id === 'async-questions' && mockActiveTurnId"
+            type="button"
+            @click="completeAsyncQuestionTurn"
+          >Complete turn</button>
+          <button
+            type="button"
+            class="lab__reset"
+            :class="{ 'lab__reset--confirmed': resetConfirmed }"
+            aria-live="polite"
+            @click="resetScenario()"
+          >
+            {{ resetConfirmed ? 'Reset complete' : 'Reset scenario' }}
+          </button>
+        </div>
       </header>
 
       <div class="lab__frame">
@@ -55,6 +62,7 @@
           :active-turn-id="mockActiveTurnId"
           :answered-client-request-ids="answeredClientRequestIds"
           :busy="mockBusy"
+          :client-requests="clientRequests"
           :context-usage="selected.contextUsage"
           :conversation-key="selected.id"
           :empty-description="selected.description"
@@ -138,7 +146,7 @@ import {
   type SurfaceMessagePart,
   type TurnGitDiff,
 } from '@codex-app-sdk/vue';
-import type { CodexSurfacePlugin, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
+import type { CodexSurfaceClientRequest, CodexSurfacePlugin, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
 
 type Scenario = {
   id: string;
@@ -147,6 +155,7 @@ type Scenario = {
   title: string;
   description: string;
   messages: SurfaceMessage[];
+  clientRequests?: CodexSurfaceClientRequest[];
   activeTurnId?: string | null;
   turns?: readonly CodexSurfaceTurn[];
   busy?: boolean;
@@ -268,24 +277,70 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
+    id: 'blocking-question',
+    name: 'Blocking question',
+    summary: 'Tool question replaces the composer',
+    title: 'Codex needs an answer',
+    description: 'A blocking app-server tool request should never squeeze into the transcript.',
+    activeTurnId: 'blocking-question-turn',
+    busy: true,
+    turns: [{
+      id: 'blocking-question-turn', status: 'inProgress', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:00:00Z', completedAt: null, durationMs: null,
+    }],
+    clientRequests: [{
+      id: 'lab-blocking-request', kind: 'ask_user', conversationId: 'blocking-question',
+      turnId: 'blocking-question-turn', itemId: 'lab-blocking-tool',
+      payload: { request: { itemId: 'lab-blocking-tool', delivery: 'tool', blocking: true,
+        questions: [{ id: 'layout', header: 'UI check',
+          question: 'Does this blocking question replace the composer?',
+          isOther: false, isSecret: false,
+          options: [
+            { label: 'Yes', description: 'The question appears once in the full-width composer area.' },
+            { label: 'No', description: 'An inline card or the normal prompt composer is still visible.' },
+          ],
+        }],
+      } },
+    }],
+    messages: [{
+      id: 'blocking-question-message', role: 'assistant', status: 'streaming',
+      turnId: 'blocking-question-turn',
+      parts: [
+        { type: 'text', text: 'Please check the question layout before I continue.', phase: 'commentary' },
+        { type: 'tool', id: 'lab-blocking-tool', kind: 'generic', title: 'ask_user_question',
+          status: 'running', statusText: JSON.stringify({ source: 'codex', action: 'ask_user_question',
+            phase: 'running', params: { requestId: 'lab-blocking-request', questions: [{
+              id: 'layout', header: 'UI check', question: 'Does this blocking question replace the composer?',
+              isOther: false, isSecret: false, options: [
+                { label: 'Yes', description: 'The question appears once in the full-width composer area.' },
+                { label: 'No', description: 'An inline card or the normal prompt composer is still visible.' },
+              ],
+            }] },
+          }), metadata: { requestId: 'lab-blocking-request' },
+        },
+      ],
+    }],
+  },
+  {
     id: 'async-questions',
     name: 'Async questions',
     summary: 'Suggested answers and direct free text',
     title: 'Codex needs user input',
     description: 'Compare non-blocking questions with suggested answers and an immediately focused text field.',
-    activeTurnId: null,
+    activeTurnId: 'async-question-turn',
+    busy: true,
     turns: [{
-      id: 'async-question-turn', status: 'completed', error: null, willRetry: false,
-      startedAt: '2026-08-01T12:00:00Z', completedAt: '2026-08-01T12:00:01Z', durationMs: 1_000,
+      id: 'async-question-turn', status: 'inProgress', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:00:00Z', completedAt: null, durationMs: null,
     }],
     messages: [
       {
         id: 'async-question-message',
         role: 'assistant',
-        status: 'complete',
+        status: 'streaming',
         turnId: 'async-question-turn',
         parts: [
-          { type: 'text', text: 'I can continue once you choose a framework.', phase: 'final_answer' },
+          { type: 'text', text: 'I can continue once you choose a framework.', phase: 'commentary' },
           {
             type: 'question',
             request: {
@@ -492,6 +547,7 @@ const messages = ref<SurfaceMessage[]>([]);
 const mockBusy = ref(false);
 const mockActiveTurnId = ref<string | null>(null);
 const mockTurns = ref<readonly CodexSurfaceTurn[]>([]);
+const clientRequests = ref<CodexSurfaceClientRequest[]>([]);
 const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
 const selectedMessageText = ref<CodexMessageTextSelection | null>(null);
 const selectedMessageContexts = ref<CodexMessageTextSelection[]>([]);
@@ -517,6 +573,7 @@ function resetScenario(confirmReset = true): void {
   mockBusy.value = selected.value.busy ?? false;
   mockActiveTurnId.value = selected.value.activeTurnId ?? null;
   mockTurns.value = [...(selected.value.turns ?? [])];
+  clientRequests.value = [...(selected.value.clientRequests ?? [])];
   answeredClientRequestIds.value = new Set();
   selectedMessageText.value = null;
   selectedMessageContexts.value = [];
@@ -563,6 +620,20 @@ function continueInterruptedTurn(): void {
   activity.value = 'Interrupted turn continued';
 }
 
+function completeAsyncQuestionTurn(): void {
+  const turnId = mockActiveTurnId.value;
+  if (selected.value.id !== 'async-questions' || !turnId) return;
+  mockTurns.value = mockTurns.value.map((turn) => turn.id === turnId
+    ? { ...turn, status: 'completed', completedAt: new Date().toISOString(), durationMs: 1_000 }
+    : turn);
+  messages.value = messages.value.map((message) => message.turnId === turnId
+    ? { ...message, status: 'complete' }
+    : message);
+  mockActiveTurnId.value = null;
+  mockBusy.value = false;
+  activity.value = 'Turn completed; question moved to the composer chip';
+}
+
 function showResetFeedback(): void {
   resetConfirmed.value = true;
   resetFeedbackTimer = window.setTimeout(clearResetFeedback, 2_500);
@@ -576,6 +647,21 @@ function clearResetFeedback(): void {
 
 function respondToClientRequest(response: ClientRequestResponse): void {
   answeredClientRequestIds.value = new Set([...answeredClientRequestIds.value, response.id]);
+  if (selected.value.id === 'blocking-question') {
+    const answers = response.payload?.answers ?? {};
+    clientRequests.value = clientRequests.value.filter((request) => request.id !== response.id);
+    messages.value = messages.value.map((message) => ({ ...message, status: 'complete',
+      parts: message.parts.map((part) => part.type === 'tool' && part.id === 'lab-blocking-tool'
+        ? { ...part, status: 'completed', output: { answers } } as SurfaceMessagePart
+        : part),
+    }));
+    mockTurns.value = mockTurns.value.map((turn) => ({ ...turn, status: 'completed',
+      completedAt: new Date().toISOString(), durationMs: 1_000 }));
+    mockActiveTurnId.value = null;
+    mockBusy.value = false;
+    activity.value = 'Blocking question answered';
+    return;
+  }
   const requestTurnId = messages.value.flatMap((message) => message.parts)
     .flatMap((part) => part.type === 'question' && part.request.id === response.id
       ? [part.request.turnId]
@@ -586,19 +672,30 @@ function respondToClientRequest(response: ClientRequestResponse): void {
     .flatMap((answer) => answer.answers)
     .filter(Boolean)
     .join(', ');
+  const answeringActiveTurn = Boolean(requestTurnId && mockActiveTurnId.value === requestTurnId);
+  const answerTurnId = answeringActiveTurn && requestTurnId
+    ? requestTurnId
+    : `mock-answer-turn-${messages.value.length}`;
   if (answerText) {
+    if (!answeringActiveTurn) {
+      mockTurns.value = [...mockTurns.value, {
+        id: answerTurnId, status: 'inProgress', error: null, willRetry: false,
+        startedAt: new Date().toISOString(), completedAt: null, durationMs: null,
+      }];
+      mockActiveTurnId.value = answerTurnId;
+    }
     messages.value.push({
       id: `mock-answer-${messages.value.length}`,
-      kind: requestTurnId ? 'steer' : undefined,
+      kind: answeringActiveTurn ? 'steer' : undefined,
       role: 'user',
       status: 'complete',
-      turnId: requestTurnId,
+      turnId: answerTurnId,
       createdAt: new Date().toISOString(),
       parts: [{ type: 'text', text: answerText }],
     });
   }
   activity.value = answerText ? `Answered: ${answerText}` : 'Question dismissed';
-  if (answerText && requestTurnId) startMockStream(requestTurnId);
+  if (answerText) startMockStream(answerTurnId);
 }
 
 function startBusyToolCompletion(): void {
@@ -777,7 +874,15 @@ function startMockStream(turnId?: string): void {
         status: index === chunks.length - 1 ? 'complete' : 'streaming',
         parts: [{ type: 'text', text, phase: index === chunks.length - 1 ? 'final_answer' : 'commentary' }],
       };
-      if (index === chunks.length - 1) mockBusy.value = false;
+      if (index === chunks.length - 1) {
+        mockBusy.value = false;
+        if (turnId) {
+          mockActiveTurnId.value = null;
+          mockTurns.value = mockTurns.value.map((turn) => turn.id === turnId
+            ? { ...turn, status: 'completed', completedAt: new Date().toISOString(), durationMs: 1_000 }
+            : turn);
+        }
+      }
       activity.value = index === chunks.length - 1 ? 'Mock stream completed' : 'Streaming mock response…';
     }, 300 * (index + 1));
     streamTimers.add(timer);

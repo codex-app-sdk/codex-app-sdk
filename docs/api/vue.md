@@ -37,7 +37,7 @@ type CodexConversationPaneController<Payload = unknown> = {
 const paneState = computed(() => ({
     identity: { conversationKey, activeTurnId, turns, messages, busy, disabled, error },
     history: { hasOlder, loading, loadingOlder },
-    thread: { approvals, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
+    thread: { approvals, clientRequests, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
     composer: { state, attachments, placeholder, leadingMenuItems, menuItems, modelMenuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
     catalogs: { files, models, commands, skills, plugins, mentionGroups, modelCatalogStatus, skillCatalogStatus },
     capabilities,
@@ -141,7 +141,7 @@ one gesture is dispatched exactly once.
 | `CodexMessageList` | Conversation message collection |
 | `CodexScrollToBottom` | Reusable circular control for returning to the latest messages |
 | `CodexMessage` | One message with blocks, status, thinking, and actions |
-| `CodexAsyncUserInputRequest` | Non-blocking app-server question renderer used by messages and the pane footer |
+| `CodexQuestionRequest` | App-server question renderer used by messages and the pane footer |
 | `CodexApprovalPrompt` | Command, file-change, and permission approval UI |
 | `CodexWorkbenchLayout` | Measured sticky header/content/footer layout |
 | `CodexConversationHistoryLoader` | Restored-history loading treatment |
@@ -150,17 +150,23 @@ one gesture is dispatched exactly once.
 `focus()`.
 
 `CodexConversationPane` renders both blocking tool questions and asynchronous
-agent-message questions with the same answer controls. The oldest unanswered
-question temporarily replaces the shelf and composer in the pane footer, so it
-stays visible without duplicating the app's primary input surface. Additional
-questions wait in request order. After answer or cancel, the resolved summary
-returns to its transcript position and the next question—or the normal
-composer—takes over. Surface-bound panes send responses through
+agent-message questions with the same answer controls. A pending question replaces the
+shelf and composer while its turn is running. Surface-bound panes read blocking
+requests from the SDK snapshot; controlled panes pass them through as
+`thread.clientRequests` (or the standalone `clientRequests` prop). The active
+blocking tool card is hidden in the transcript while the question is in the
+composer; its answered summary remains in history. When an async question's turn
+ends, the composer returns with a **Pending question** button beside its action
+menu; clicking the label reopens the question, while its leading icon changes
+to a cancel control on hover. Answering or cancelling removes that
+button. Sending or steering a prompt also dismisses it, including after the
+conversation is reloaded. Additional questions remain available in request
+order. The historical agent message is not deleted. Surface-bound panes send responses through
 `respondToClientRequest()` automatically. Controlled panes dispatch
 `actions.clientResponse`; keep `thread.answeredClientRequestIds` current so
-resolved questions render consistently. The component lab's **Async questions**
-scenario exercises this complete controlled flow, including the queued
-free-text question. Questions whose `options` value is `null` render an
+resolved questions render consistently. The component lab's **Blocking question**
+and **Async questions** scenarios exercise both presentation paths, including
+the queued free-text question. Questions whose `options` value is `null` render an
 immediately focused free-text field. Question cards omit a header that repeats
 the question, and an immediately preceding text part that exactly matches a
 structured question is not rendered twice. Distinct introductory text and

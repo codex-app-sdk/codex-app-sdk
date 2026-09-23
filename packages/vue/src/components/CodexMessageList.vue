@@ -567,8 +567,8 @@ function requestOlderMessages(): void {
 }
 
 function isWithinTopPrefetchRange(): boolean {
-  const target = scrollElement.value!
-  return target.scrollTop <= target.clientHeight
+  const target = scrollElement.value
+  return target !== null && target.scrollTop <= target.clientHeight
 }
 
 async function loadOlderMessages(): Promise<void> {

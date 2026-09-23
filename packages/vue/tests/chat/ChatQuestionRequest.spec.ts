@@ -2,10 +2,10 @@
 
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import ChatAsyncUserInputRequest from '../../src/chat/ChatAsyncUserInputRequest.vue'
+import ChatQuestionRequest from '../../src/chat/ChatQuestionRequest.vue'
 import { questionResponsesKey } from '../../src/chat/message-work-state'
 
-describe('ChatAsyncUserInputRequest', () => {
+describe('ChatQuestionRequest', () => {
   it('renders a surface request and forwards its answer', async () => {
     const request = {
       id: 'async-question:agent-question',
@@ -29,13 +29,15 @@ describe('ChatAsyncUserInputRequest', () => {
         },
       },
     }
-    const history = mount(ChatAsyncUserInputRequest, { props: { request, historical: true } })
-    expect(history.text()).toContain('Previous user question')
+    const history = mount(ChatQuestionRequest, { props: { request, historical: true } })
     expect(history.text()).toContain('Which framework?')
+    expect(history.text()).not.toContain('Previous user question')
+    expect(history.find('.chat-tool-call__title').exists()).toBe(false)
+    expect(history.get('.chat-tool-user-input').classes()).toContain('chat-tool-user-input--resolved')
     expect(history.find('textarea, button').exists()).toBe(false)
     history.unmount()
 
-    const answeredHistory = mount(ChatAsyncUserInputRequest, {
+    const answeredHistory = mount(ChatQuestionRequest, {
       props: { request, historical: true },
       global: { provide: { [questionResponsesKey as symbol]: new Map([
         [request.id, { answers: { 'question-1': { answers: ['Vue'] } } }],
@@ -46,7 +48,7 @@ describe('ChatAsyncUserInputRequest', () => {
     expect(answeredHistory.find('textarea, button').exists()).toBe(false)
     answeredHistory.unmount()
 
-    const wrapper = mount(ChatAsyncUserInputRequest, { props: { request } })
+    const wrapper = mount(ChatQuestionRequest, { props: { request } })
 
     await wrapper.get('[aria-label="Vue"]').trigger('click')
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click')

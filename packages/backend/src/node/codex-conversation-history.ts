@@ -148,10 +148,11 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
 
     if (item.type === 'agentMessage') {
       const text = typeof item.text === 'string' ? item.text : '';
+      const questionPart = codexItemToQuestionPart(threadId, turn.id, item, true);
       const proposedPlan = item.phase === 'final_answer'
         ? extractProposedPlanDocument(text)
         : null;
-      if (proposedPlan) {
+      if (proposedPlan && !questionPart) {
         if (proposedPlan.visibleText) {
           sawAssistantActivity = true;
           assistantParts.push({
@@ -161,7 +162,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
             ...(item.phase ? { phase: item.phase } : {}),
           });
         }
-      } else if (text) {
+      } else if (text && !questionPart) {
         sawAssistantActivity = true;
         assistantParts.push({
           type: 'text',
@@ -170,7 +171,6 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
           ...(item.phase ? { phase: item.phase } : {}),
         });
       }
-      const questionPart = codexItemToQuestionPart(threadId, turn.id, item, true);
       if (questionPart) {
         sawAssistantActivity = true;
         assistantParts.push(questionPart);
@@ -258,7 +258,7 @@ export function codexItemToSurfaceMessage(
       ? codexItemToQuestionPart(threadId, turn.id, item, true)
       : null;
     const parts: SurfaceMessagePart[] = [
-      ...(proposedPlan?.visibleText || (!proposedPlan && text) ? [{
+      ...(!questionPart && (proposedPlan?.visibleText || (!proposedPlan && text)) ? [{
         type: 'text' as const,
         text: proposedPlan?.visibleText ?? text,
         itemId: item.id,

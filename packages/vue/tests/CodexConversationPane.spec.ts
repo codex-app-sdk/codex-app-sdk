@@ -18,7 +18,7 @@ import {
   type CodexSurfaceController,
   type SurfaceMessage,
 } from '../src';
-import type { CodexSurfaceSnapshot, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
+import type { CodexSurfaceClientRequest, CodexSurfaceSnapshot, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
 import type { Message } from '../src/chat/types';
 import ChatComposerShelf from '../src/chat/ChatComposerShelf.vue';
 import CodexComposer from '../src/components/CodexComposer.vue';
@@ -29,6 +29,47 @@ const messages: SurfaceMessage[] = [{
   status: 'complete',
   parts: [{ type: 'text', text: 'Ready to build' }],
 }];
+
+const asyncQuestionMessage: SurfaceMessage = {
+  id: 'assistant-question', role: 'assistant', status: 'complete', turnId: 'turn-question',
+  parts: [{ type: 'question', request: {
+    id: 'request-framework', kind: 'ask_user', conversationId: 'thread-question',
+    turnId: 'turn-question', itemId: 'item-framework',
+    payload: { request: { itemId: 'item-framework', delivery: 'async', blocking: false,
+      questions: [{ id: 'framework', header: 'Framework', question: 'Which framework should I use?',
+        isOther: true, isSecret: false,
+        options: [{ label: 'Vue', description: 'Use the SDK component package.' },
+          { label: 'React', description: 'Use a custom renderer.' }],
+      }],
+    } },
+  } }],
+};
+
+const runningQuestionTurn: CodexSurfaceTurn = {
+  id: 'turn-question', status: 'inProgress', error: null, willRetry: false,
+  startedAt: null, completedAt: null, durationMs: null,
+};
+
+const blockingQuestion: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> = {
+  id: 'request-blocking', kind: 'ask_user', conversationId: 'thread-question',
+  turnId: 'turn-question', itemId: 'item-blocking',
+  payload: { request: { itemId: 'item-blocking', delivery: 'tool', blocking: true,
+    questions: [{ id: 'framework', header: 'Framework', question: 'Which framework should I use?',
+      isOther: false, isSecret: false,
+      options: [{ label: 'Vue', description: 'Use the SDK component package.' }],
+    }],
+  } },
+};
+
+const blockingQuestionMessage: SurfaceMessage = {
+  id: 'assistant-blocking', role: 'assistant', status: 'streaming', turnId: 'turn-question',
+  parts: [{ type: 'tool', id: 'item-blocking', kind: 'generic', title: 'ask_user_question',
+    status: 'running', statusText: JSON.stringify({ source: 'codex', action: 'ask_user_question',
+      phase: 'running', params: { requestId: blockingQuestion.id,
+        questions: blockingQuestion.payload.request.questions } }),
+    metadata: { requestId: blockingQuestion.id },
+  }],
+};
 
 const routingApproval = {
   id: 'routing-approval',
@@ -48,43 +89,64 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
-  it('replaces the composer with the oldest unanswered question and restores it after responding', async () => {
-    const questionMessage: SurfaceMessage = {
-      id: 'assistant-question',
-      role: 'assistant',
-      status: 'complete',
-      turnId: 'turn-question',
-      parts: [{
-        type: 'question',
-        request: {
-          id: 'request-framework',
-          kind: 'ask_user',
-          conversationId: 'thread-question',
-          turnId: 'turn-question',
-          itemId: 'item-framework',
-          payload: {
-            request: {
-              itemId: 'item-framework',
-              delivery: 'async',
-              blocking: false,
-              questions: [{
-                id: 'framework',
-                header: 'Framework',
-                question: 'Which framework should I use?',
-                isOther: true,
-                isSecret: false,
-                options: [
-                  { label: 'Vue', description: 'Use the SDK component package.' },
-                  { label: 'React', description: 'Use a custom renderer.' },
-                ],
-              }],
-            },
-          },
-        },
-      }],
-    };
+  it('replaces the composer with a blocking question and restores its tool summary after answering', async () => {
+    const wrapper = mount(CodexConversationPane, { props: {
+      activeTurnId: 'turn-question', busy: true,
+      clientRequests: [blockingQuestion], messages: [blockingQuestionMessage],
+      turns: [runningQuestionTurn],
+    } });
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    expect(wrapper.get('.codex-conversation-pane__footer').text()).toContain('Which framework should I use?');
+    expect(wrapper.get('.codex-conversation-pane__footer').text()).toContain('Use the SDK component package.');
+    expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
+
+    await wrapper.get('.codex-conversation-pane__footer button[aria-label="Vue"]').trigger('click');
+    await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
+    expect(wrapper.emitted('clientResponse')).toStrictEqual([[
+      { id: blockingQuestion.id, payload: { answers: { framework: { answers: ['Vue'] } } } },
+    ]]);
+    expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
+
+    await wrapper.setProps({ clientRequests: [], activeTurnId: null, busy: false,
+      turns: [{ ...runningQuestionTurn, status: 'completed',
+        completedAt: '2026-09-23T00:00:00Z', durationMs: 1_000 }],
+      messages: [{ ...blockingQuestionMessage,
+      status: 'complete', parts: [{ ...blockingQuestionMessage.parts[0], status: 'completed',
+        output: { answers: { framework: { answers: ['Vue'] } } } }],
+    }] as SurfaceMessage[] });
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(true);
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
+  });
+
+  it('uses controlled pending requests for the same composer question and response path', async () => {
+    const clientResponse = vi.fn();
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: { conversationKey: 'thread-question', activeTurnId: 'turn-question',
+          turns: [runningQuestionTurn], messages: [blockingQuestionMessage], busy: true },
+        thread: { clientRequests: [blockingQuestion] },
+      },
+      actions: { clientResponse },
+    });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    expect(wrapper.get('.codex-conversation-pane__footer').text()).toContain('Which framework should I use?');
+    expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
+    await wrapper.get('.codex-conversation-pane__footer button[aria-label="Vue"]').trigger('click');
+    await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
+
+    expect(clientResponse).toHaveBeenCalledWith({
+      id: blockingQuestion.id, payload: { answers: { framework: { answers: ['Vue'] } } },
+    });
+    expect(wrapper.emitted('clientResponse')).toBeUndefined();
+  });
+
+  it('moves an async question from the composer to a chip when its turn completes, then reopens it', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: {
+        activeTurnId: 'turn-question',
         goal: {
           threadId: 'thread-question',
           objective: 'Choose a framework',
@@ -95,8 +157,9 @@ describe('CodexConversationPane', () => {
           createdAt: 1,
           updatedAt: 1,
         },
-        messages: [questionMessage],
+        messages: [asyncQuestionMessage],
         modelValue: '',
+        turns: [runningQuestionTurn],
       },
     });
 
@@ -105,6 +168,17 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
     expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
     expect(wrapper.findComponent(ChatComposerShelf).exists()).toBe(false);
+
+    await wrapper.setProps({ activeTurnId: null, turns: [{ ...runningQuestionTurn,
+      status: 'completed', completedAt: '2026-09-23T00:00:00Z', durationMs: 1_000,
+    }] });
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(true);
+    expect(wrapper.get('button[aria-label="Pending question"]').text()).toContain('Pending question');
+    expect(footer.find('.chat-tool-user-input').exists()).toBe(false);
+
+    await wrapper.get('button[aria-label="Pending question"]').trigger('click');
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    expect(footer.text()).toContain('Which framework should I use?');
 
     await footer.findAll('button').find((button) => button.text().includes('Vue'))!.trigger('click');
     await footer.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
@@ -117,6 +191,68 @@ describe('CodexConversationPane', () => {
     expect(wrapper.findComponent(ChatComposerShelf).exists()).toBe(true);
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
+  });
+
+  it('clears a completed-turn question when canceled or superseded by a normal prompt', async () => {
+    const completedTurn = { ...runningQuestionTurn, status: 'completed' as const,
+      completedAt: '2026-09-23T00:00:00Z', durationMs: 1_000 };
+    const wrapper = mount(CodexConversationPane, { props: {
+      conversationKey: 'thread-question', messages: [asyncQuestionMessage], turns: [completedTurn],
+    } });
+    const chip = () => wrapper.find('button[aria-label="Pending question"]');
+    expect(chip().exists()).toBe(true);
+    await wrapper.get('button[aria-label="Cancel pending question"]').trigger('click');
+    expect(chip().exists()).toBe(false);
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(true);
+    expect(wrapper.emitted('clientResponse')).toStrictEqual([[
+      { id: 'request-framework', payload: { answers: {}, cancelled: true } },
+    ]]);
+
+    const reopened = mount(CodexConversationPane, { props: {
+      conversationKey: 'thread-question', messages: [asyncQuestionMessage], turns: [completedTurn],
+    } });
+    await reopened.get('button[aria-label="Pending question"]').trigger('click');
+    await reopened.get('button[aria-label="Cancel question"]').trigger('click');
+    expect(reopened.find('button[aria-label="Pending question"]').exists()).toBe(false);
+
+    const promptWrapper = mount(CodexConversationPane, { props: {
+      conversationKey: 'thread-question', messages: [asyncQuestionMessage], turns: [completedTurn],
+    } });
+    expect(promptWrapper.find('button[aria-label="Pending question"]').exists()).toBe(true);
+    await setComposerText(promptWrapper, 'Proceed without my answer');
+    await promptWrapper.get('button[aria-label="Send prompt"]').trigger('click');
+    expect(promptWrapper.emitted('submit')).toStrictEqual([['Proceed without my answer']]);
+    expect(promptWrapper.find('button[aria-label="Pending question"]').exists()).toBe(false);
+    expect(promptWrapper.get('.codex-conversation-pane__messages').text()).toContain('Which framework should I use?');
+    expect(promptWrapper.get('.codex-conversation-pane__messages').text()).not.toContain('Previous user question');
+
+    const subsequentMessages: SurfaceMessage[] = [asyncQuestionMessage,
+      { id: 'next-user', role: 'user', status: 'complete', turnId: 'next-turn',
+        parts: [{ type: 'text', text: 'Proceed without my answer' }] },
+      { id: 'next-assistant', role: 'assistant', status: 'streaming', turnId: 'next-turn',
+        parts: [{ type: 'text', text: 'Working', phase: 'commentary' }] },
+    ];
+    await promptWrapper.setProps({ messages: subsequentMessages, turns: [completedTurn,
+      { ...runningQuestionTurn, id: 'next-turn' }], activeTurnId: 'next-turn' });
+    expect(promptWrapper.find('button[aria-label="Pending question"]').exists()).toBe(false);
+
+    const reloaded = mount(CodexConversationPane, { props: {
+      conversationKey: 'thread-question', messages: subsequentMessages, turns: [completedTurn,
+        { ...runningQuestionTurn, id: 'next-turn' }], activeTurnId: 'next-turn',
+    } });
+    expect(reloaded.find('button[aria-label="Pending question"]').exists()).toBe(false);
+    expect(reloaded.get('.codex-conversation-pane__messages').text()).toContain('Which framework should I use?');
+
+    const steerWrapper = mount(CodexConversationPane, { props: {
+      activeTurnId: 'next-turn', busy: true, conversationKey: 'thread-question',
+      messages: [asyncQuestionMessage], turns: [completedTurn,
+        { ...runningQuestionTurn, id: 'next-turn' }],
+    } });
+    expect(steerWrapper.find('button[aria-label="Pending question"]').exists()).toBe(true);
+    await setComposerText(steerWrapper, 'Continue this way');
+    await composerEditor(steerWrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+    expect(steerWrapper.emitted('steer')).toStrictEqual([['Continue this way']]);
+    expect(steerWrapper.find('button[aria-label="Pending question"]').exists()).toBe(false);
   });
 
   it('forwards opt-in message selections and host-owned composer context', async () => {

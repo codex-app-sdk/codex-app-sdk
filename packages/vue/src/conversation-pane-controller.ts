@@ -24,6 +24,7 @@ import type {
   CodexSurfaceApproval,
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
+  CodexSurfaceClientRequest,
   CodexSurfacePlugin,
   CodexSurfaceTurn,
   CodexRendererSendMessageOptions,
@@ -50,6 +51,7 @@ export type CodexConversationPaneHistoryState = {
 export type CodexConversationPaneThreadState = {
   approvals?: readonly CodexSurfaceApproval[];
   answeredClientRequestIds?: ReadonlySet<string>;
+  clientRequests?: readonly CodexSurfaceClientRequest[];
   goal?: ThreadGoal | null;
   queuedPrompts?: readonly QueuedChatPrompt[];
   turnGitDiff?: TurnGitDiff | null;

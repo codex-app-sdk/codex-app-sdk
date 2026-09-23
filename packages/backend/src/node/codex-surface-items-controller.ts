@@ -358,19 +358,20 @@ export class CodexSurfaceItemsController {
         .find((part): part is Extract<SurfaceMessage['parts'][number], { type: 'text' }> => (
           part.type === 'text' && part.itemId === params.item.id
         ))?.text ?? '';
-      let messages = upsertAssistantText(
-        runtime.messages, params.threadId, params.turnId, params.item.id, text, phase,
-      );
       const questionPart = params.item.type === 'agentMessage'
         ? codexItemToQuestionPart(params.threadId, params.turnId, params.item)
         : null;
+      const visibleText = questionPart ? '' : text;
+      let messages = questionPart
+        ? removeAssistantText(runtime.messages, params.threadId, params.turnId, params.item.id)
+        : upsertAssistantText(runtime.messages, params.threadId, params.turnId, params.item.id, text, phase);
       if (questionPart) {
         messages = upsertAssistantQuestionPart(
           messages, params.threadId, params.turnId, questionPart,
         );
       }
       this.host.patchRuntime(params.threadId, { messages });
-      if (!text && !questionPart) return;
+      if (!visibleText && !questionPart) return;
       const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
       if (message && !previousMessageIds.has(message.id)) {
         this.host.emitEvent('notification', {
@@ -382,9 +383,9 @@ export class CodexSurfaceItemsController {
           type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
           payload: { message: structuredClone(message) },
         });
-      } else if (message && text !== previousText) {
-        if (text.startsWith(previousText)) {
-          const delta = text.slice(previousText.length);
+      } else if (message && visibleText !== previousText) {
+        if (visibleText.startsWith(previousText)) {
+          const delta = visibleText.slice(previousText.length);
           if (delta) this.host.emitEvent('notification', {
             type: 'message.delta', conversationId: params.threadId, turnId: params.turnId,
             payload: {

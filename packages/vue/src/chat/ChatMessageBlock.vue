@@ -36,7 +36,7 @@
   <slot v-else-if="block.type === 'media'" name="media" :block="block" :media="block.media">
     <ChatMediaBlock :media="block.media" :open-image="openImage" />
   </slot>
-  <ChatAsyncUserInputRequest
+  <ChatQuestionRequest
     v-else-if="block.type === 'question'"
     :historical="block.historical"
     :answered-client-request-ids="answeredClientRequestIds"
@@ -113,7 +113,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount } from 'vue'
 import ChatAttachmentBlock from './ChatAttachmentBlock.vue'
-import ChatAsyncUserInputRequest from './ChatAsyncUserInputRequest.vue'
+import ChatQuestionRequest from './ChatQuestionRequest.vue'
 import ChatFollowUps from './ChatFollowUps.vue'
 import ChatMediaBlock from './ChatMediaBlock.vue'
 import ChatMermaidBlock from './ChatMermaidBlock.vue'

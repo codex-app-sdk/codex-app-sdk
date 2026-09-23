@@ -32,6 +32,7 @@ export {
   IconLoader2 as Loader2Icon,
   IconLogout as QuitIcon,
   IconMaximize as Maximize2,
+  IconMessageQuestion as MessageQuestionIcon,
   IconMicrophone as MicrophoneIcon,
   IconPaperclip as PaperclipIcon,
   IconPalette as PaletteIcon,

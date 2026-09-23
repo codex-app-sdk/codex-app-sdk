@@ -230,18 +230,18 @@ describe('codexThreadToSurfaceMessages', () => {
     const turn = {
       id: 'turn-question', status: 'completed', startedAt: 2,
     } as Pick<v2.Turn, 'id' | 'status' | 'startedAt'>;
-    const question = codexItemToSurfaceMessage('thread-question', turn, {
+    const questionItem: Extract<v2.ThreadItem, { type: 'agentMessage' }> = {
       type: 'agentMessage',
       id: 'agent-question',
-      text: 'Which framework should I use?',
+      text: 'Which framework should I use?\n- Vue\n- React',
       phase: 'final_answer',
       memoryCitation: null,
       delivery: 'async',
-      questions: null,
-    });
+      questions: [{ title: 'Which framework should I use?', options: ['Vue', 'React'] }],
+    };
+    const question = codexItemToSurfaceMessage('thread-question', turn, questionItem);
     expect(question).toMatchObject({
       parts: [
-        { type: 'text', text: 'Which framework should I use?' },
         {
           type: 'question',
           request: {
@@ -250,13 +250,25 @@ describe('codexThreadToSurfaceMessages', () => {
               request: {
                 delivery: 'async',
                 blocking: false,
-                questions: [{ id: 'agent-question', question: 'Which framework should I use?' }],
+                questions: [{ id: '["request_user_input_async","agent-question",0]', question: 'Which framework should I use?' }],
               },
             },
           },
         },
       ],
     });
+
+    const [history] = codexTurnToSurfaceMessages('thread-question', {
+      ...turn, completedAt: 3, items: [
+        { type: 'agentMessage', id: 'intro', text: 'I have one decision.', phase: 'commentary',
+          memoryCitation: null, delivery: null, questions: null },
+        questionItem,
+      ],
+    } as v2.Turn);
+    expect(history?.parts).toMatchObject([
+      { type: 'text', text: 'I have one decision.' },
+      { type: 'question', request: { id: 'async-question:agent-question' } },
+    ]);
 
     const answer = codexItemToSurfaceMessage('thread-question', turn, {
       type: 'userMessage',

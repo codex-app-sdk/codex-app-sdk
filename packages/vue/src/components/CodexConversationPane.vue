@@ -36,7 +36,7 @@
         :empty-label="emptyTitle"
         :follow-ups-disabled="effectiveFollowUpsDisabled"
         :has-older-messages="effectiveHasOlderHistory"
-        :hidden-client-request-ids="pendingQuestionRequestIds"
+        :hidden-client-request-ids="hiddenQuestionRequestIds"
         :render-strategy="effectiveRenderStrategy"
         :loading-older-messages="effectiveLoadingOlderHistory"
         :initial-message-batch-size="initialMessageBatchSize"
@@ -51,7 +51,7 @@
         :scroll-to-bottom-label="scrollToBottomLabel"
         :show-tool-details="showToolDetails"
         :skills="effectiveSkills"
-        :transform-message="transformMessage"
+        :transform-message="dismissedQuestionIds.size > 0 || activeBlockingQuestionItemIds.size > 0 ? transformTranscriptMessage : transformMessage"
         :turns="effectiveTurns"
         @cancel="cancel"
         @client-response="respondToClientRequest"
@@ -102,12 +102,12 @@
               </slot>
             </template>
           </div>
-          <ChatAsyncUserInputRequest
-            v-if="activeQuestionRequest"
-            :key="activeQuestionRequest.id"
+          <ChatQuestionRequest
+            v-if="expandedQuestionRequest"
+            :key="expandedQuestionRequest.id"
             class="codex-conversation-pane__question-composer"
             :answered-client-request-ids="displayAnsweredClientRequestIds"
-            :request="activeQuestionRequest"
+            :request="expandedQuestionRequest"
             @client-response="respondToClientRequest"
           />
           <template v-else>
@@ -184,6 +184,30 @@
             @update:reasoning-effort="updateReasoningEffort"
             @update:service-tier="updateServiceTier"
           >
+            <template #before-meta>
+              <span
+                v-if="pendingQuestionRequests.length > 0"
+                class="codex-conversation-pane__pending-question"
+              >
+                <button
+                  class="codex-conversation-pane__pending-question-cancel"
+                  type="button"
+                  aria-label="Cancel pending question"
+                  @click="cancelPendingQuestion(pendingQuestionRequests[0]!.id)"
+                >
+                  <MessageQuestionIcon class="codex-conversation-pane__pending-question-icon" aria-hidden="true" />
+                  <CircleXIcon class="codex-conversation-pane__pending-question-remove" aria-hidden="true" />
+                </button>
+                <button
+                  class="codex-conversation-pane__pending-question-open"
+                  type="button"
+                  :aria-label="pendingQuestionRequests.length === 1 ? 'Pending question' : `${pendingQuestionRequests.length} pending questions`"
+                  @click="openedQuestionId = pendingQuestionRequests[0]!.id"
+                >
+                  {{ pendingQuestionRequests.length === 1 ? 'Pending question' : `${pendingQuestionRequests.length} pending questions` }}
+                </button>
+              </span>
+            </template>
             <template #before>
               <div
                 v-if="selectedAttachments.length > 0"
@@ -263,7 +287,7 @@ import type {
   CodexConversationPaneState,
 } from '../conversation-pane-controller';
 import { resolveCodexConversationPaneValue } from '../conversation-pane-controller';
-import type { Message } from '../chat/types';
+import type { Message, MessageToolCall } from '../chat/types';
 import type { MessageBlock } from '../chat/message-blocks';
 import type {
   CodexMessageImage,
@@ -310,8 +334,8 @@ import type { CodexComposerState } from '../composer-state';
 import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom';
 import { normalizeCodexComposerState } from '../composer-state';
 import { useConversationEscapeInterrupt } from '../chat/use-conversation-escape-interrupt';
-import { X as XIcon } from '../icons/app-icons';
-import ChatAsyncUserInputRequest from '../chat/ChatAsyncUserInputRequest.vue';
+import { CircleXIcon, MessageQuestionIcon, X as XIcon } from '../icons/app-icons';
+import ChatQuestionRequest from '../chat/ChatQuestionRequest.vue';
 import ChatComposerShelf from '../chat/ChatComposerShelf.vue';
 import { questionResponsesKey } from '../chat/message-work-state';
 import CodexComposer from './CodexComposer.vue';
@@ -327,6 +351,7 @@ const props = withDefaults(defineProps<{
   activeTurnId?: string | null;
   answeredClientRequestIds?: ReadonlySet<string>;
   approvals?: readonly CodexSurfaceApproval[];
+  clientRequests?: readonly CodexSurfaceClientRequest[];
   approvalPresets?: readonly ApprovalPreset[];
   attachEnabled?: boolean;
   attachments?: readonly CodexHostAttachment[];
@@ -516,6 +541,8 @@ const emit = defineEmits<{
 const hostCapabilities = useCodexHostCapabilities();
 const questionResponses = shallowReactive(new Map<string, ClientRequestResponse['payload']>());
 provide(questionResponsesKey, questionResponses);
+const openedQuestionId = ref<string | null>(null);
+const locallyDismissedQuestionIds = ref<ReadonlySet<string>>(new Set());
 
 const composer = ref<{ focus(): void } | null>(null);
 const paneElement = ref<HTMLElement | null>(null);
@@ -616,9 +643,44 @@ const displayAnsweredClientRequestIds = computed<ReadonlySet<string>>(() => new 
   ...(effectiveAnsweredClientRequestIds.value ?? []),
   ...questionResponses.keys(),
 ]));
+const effectiveClientRequests = computed<readonly CodexSurfaceClientRequest[]>(() => controlledValue(
+  (state) => state.thread?.clientRequests ?? [],
+  () => props.clientRequests ?? surfaceState.value?.clientRequests ?? [],
+));
+const supersededQuestionIds = computed<ReadonlySet<string>>(() => {
+  const ids = new Set<string>();
+  const turns = new Map((effectiveTurns.value ?? []).map((turn, index) => [turn.id, index]));
+  const messages = authoritativeMessages.value.map(chatMessageFromInput);
+  for (const [questionIndex, message] of messages.entries()) {
+    for (const part of message.parts ?? []) {
+      if (part.type !== 'question' || part.request.payload.request.delivery !== 'async') continue;
+      const questionTurnId = part.request.turnId ?? message.turnId;
+      const questionTurnIndex = questionTurnId ? turns.get(questionTurnId) : undefined;
+      if (messages.some((candidate, userIndex) => {
+        if (candidate.role !== 'user') return false;
+        const userTurnIndex = candidate.turnId ? turns.get(candidate.turnId) : undefined;
+        if (questionTurnIndex !== undefined && userTurnIndex !== undefined
+          && userTurnIndex !== questionTurnIndex) return userTurnIndex > questionTurnIndex;
+        return userIndex > questionIndex;
+      })) ids.add(part.request.id);
+    }
+  }
+  return ids;
+});
+const dismissedQuestionIds = computed<ReadonlySet<string>>(() => new Set([
+  ...locallyDismissedQuestionIds.value,
+  ...supersededQuestionIds.value,
+]));
 const pendingQuestionRequests = computed(() => {
   const requests: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>[] = [];
   const seen = new Set<string>();
+  for (const request of effectiveClientRequests.value) {
+    if (request.kind !== 'ask_user' || request.payload.request.delivery !== 'tool'
+      || request.payload.request.questions.length === 0
+      || displayAnsweredClientRequestIds.value.has(request.id)) continue;
+    seen.add(request.id);
+    requests.push(request);
+  }
   for (const message of effectiveMessages.value) {
     for (const part of chatMessageFromInput(message).parts ?? []) {
       if (
@@ -627,6 +689,7 @@ const pendingQuestionRequests = computed(() => {
         || part.request.payload.request.questions.length === 0
         || seen.has(part.request.id)
         || displayAnsweredClientRequestIds.value.has(part.request.id)
+        || dismissedQuestionIds.value.has(part.request.id)
       ) continue;
       seen.add(part.request.id);
       requests.push(part.request);
@@ -634,10 +697,43 @@ const pendingQuestionRequests = computed(() => {
   }
   return requests;
 });
-const activeQuestionRequest = computed(() => pendingQuestionRequests.value[0]);
-const pendingQuestionRequestIds = computed<ReadonlySet<string>>(() => new Set(
+const expandedQuestionRequest = computed(() => (
+  pendingQuestionRequests.value.find((request) => request.payload.request.delivery === 'tool')
+  ?? pendingQuestionRequests.value.find((request) => request.id === openedQuestionId.value)
+  ?? pendingQuestionRequests.value.find((request) => {
+    if (request.payload.request.delivery !== 'async') return true;
+    const turn = effectiveTurns.value?.find((candidate) => candidate.id === request.turnId);
+    return turn ? turn.status === 'inProgress' : request.turnId === effectiveActiveTurnId.value;
+  })
+));
+const hiddenQuestionRequestIds = computed<ReadonlySet<string>>(() => new Set(
   pendingQuestionRequests.value.map((request) => request.id),
 ));
+const activeBlockingQuestionItemIds = computed<ReadonlySet<string>>(() => new Set(
+  effectiveClientRequests.value
+    .filter((request) => request.kind === 'ask_user' && request.payload.request.delivery === 'tool')
+    .map((request) => request.itemId),
+));
+function transformTranscriptMessage(message: Message | SurfaceMessage, index: number): Message | SurfaceMessage {
+  const transformed = props.transformMessage?.(message, index) ?? message;
+  const chatMessage = chatMessageFromInput(transformed);
+  const isHiddenTool = (toolCall: MessageToolCall) => activeBlockingQuestionItemIds.value.has(toolCall.itemId ?? toolCall.id);
+  if (!chatMessage.parts?.some((part) => (
+    (part.type === 'question' && dismissedQuestionIds.value.has(part.request.id))
+    || (part.type === 'tool' && isHiddenTool(part.toolCall))
+  )) && !chatMessage.toolCalls?.some(isHiddenTool)) return transformed;
+  return {
+    ...chatMessage,
+    parts: chatMessage.parts?.filter((part) => (
+      part.type !== 'tool' || !isHiddenTool(part.toolCall)
+    )).map((part) => (
+      part.type === 'question' && dismissedQuestionIds.value.has(part.request.id)
+        ? { ...part, historical: true }
+        : part
+    )),
+    toolCalls: chatMessage.toolCalls?.filter((toolCall) => !isHiddenTool(toolCall)),
+  };
+}
 const effectiveApprovals = computed(() => controlledValue(
   (state) => state.thread?.approvals ?? [],
   () => props.approvals ?? surfaceState.value?.approvals ?? [],
@@ -848,6 +944,8 @@ watch(effectiveAttachEnabled, (enabled) => {
 });
 
 watch(effectiveConversationKey, (conversationKey, previousConversationKey) => {
+  openedQuestionId.value = null;
+  locallyDismissedQuestionIds.value = new Set();
   const pending = pendingControlledSubmission.value;
   if (pending) {
     if (
@@ -988,13 +1086,17 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
     return;
   }
   const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
+  const previousDismissedQuestions = dismissPendingQuestions();
   if (effectiveController.value) {
     const controlledSubmit = effectiveControllerActions.value?.submit;
     if (controlledSubmit) {
       const optimisticMessageId = beginControlledSubmission(prompt, selectedAttachments.value);
       void runSurfaceAction(
         () => Promise.resolve(controlledSubmit(prompt, options)),
-        () => clearPendingControlledSubmission(optimisticMessageId),
+        () => {
+          clearPendingControlledSubmission(optimisticMessageId);
+          locallyDismissedQuestionIds.value = previousDismissedQuestions;
+        },
       );
     }
     replaceAttachments([]);
@@ -1003,9 +1105,33 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
   if (options) emit('submit', prompt, options);
   else emit('submit', prompt);
   if (props.surface) {
-    void runSurfaceAction(() => props.surface!.sendMessage(prompt, options));
+    void runSurfaceAction(
+      () => props.surface!.sendMessage(prompt, options),
+      () => { locallyDismissedQuestionIds.value = previousDismissedQuestions; },
+    );
   }
   replaceAttachments([]);
+}
+
+function dismissPendingQuestions(): ReadonlySet<string> {
+  const previous = locallyDismissedQuestionIds.value;
+  locallyDismissedQuestionIds.value = new Set([
+    ...previous,
+    ...pendingQuestionRequests.value
+      .filter((request) => request.payload.request.delivery === 'async')
+      .map((request) => request.id),
+  ]);
+  openedQuestionId.value = null;
+  return previous;
+}
+
+function cancelPendingQuestion(id: string): void {
+  if (!pendingQuestionRequests.value.some((request) => request.id === id)) return;
+  const response: ClientRequestResponse = { id, payload: { answers: {}, cancelled: true } };
+  questionResponses.set(id, response.payload);
+  locallyDismissedQuestionIds.value = new Set([...locallyDismissedQuestionIds.value, id]);
+  openedQuestionId.value = null;
+  respondToClientRequest(response);
 }
 
 function continueInterruptedTurn(): void {
@@ -1398,14 +1524,25 @@ function steer(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOp
     return;
   }
   const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
-  const dispatched = dispatchControllerAction('steer', prompt, options);
-  if (dispatched || effectiveController.value) {
+  if (effectiveController.value) {
+    const controlledSteer = effectiveControllerActions.value?.steer;
+    if (controlledSteer) {
+      const previousDismissedQuestions = dismissPendingQuestions();
+      void runSurfaceAction(
+        () => Promise.resolve(controlledSteer(prompt, options)),
+        () => { locallyDismissedQuestionIds.value = previousDismissedQuestions; },
+      );
+    }
     replaceAttachments([]);
     return;
   }
+  const previousDismissedQuestions = dismissPendingQuestions();
   if (options) emit('steer', prompt, options);
   else emit('steer', prompt);
-  if (props.surface) void runSurfaceAction(() => props.surface!.steerMessage(prompt, options));
+  if (props.surface) void runSurfaceAction(
+    () => props.surface!.steerMessage(prompt, options),
+    () => { locallyDismissedQuestionIds.value = previousDismissedQuestions; },
+  );
   replaceAttachments([]);
 }
 
@@ -1617,6 +1754,65 @@ defineExpose({ focusComposer });
 
 .codex-conversation-pane__question-composer {
   margin: 0 auto var(--space-4);
+}
+
+.codex-conversation-pane__pending-question {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-1);
+  overflow: hidden;
+  min-height: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-2);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-13);
+  white-space: nowrap;
+}
+
+.codex-conversation-pane__pending-question button {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.codex-conversation-pane__pending-question-open {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.codex-conversation-pane__pending-question-cancel svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.codex-conversation-pane__pending-question-remove {
+  display: none;
+}
+
+.codex-conversation-pane__pending-question:hover .codex-conversation-pane__pending-question-icon,
+.codex-conversation-pane__pending-question-cancel:focus-visible .codex-conversation-pane__pending-question-icon {
+  display: none;
+}
+
+.codex-conversation-pane__pending-question:hover .codex-conversation-pane__pending-question-remove,
+.codex-conversation-pane__pending-question-cancel:focus-visible .codex-conversation-pane__pending-question-remove {
+  display: inline;
+}
+
+.codex-conversation-pane__pending-question button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .codex-conversation-pane__attachments {

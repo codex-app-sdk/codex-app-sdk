@@ -11,7 +11,7 @@
   <section
     v-else
     class="codex-chat-theme chat-tool-user-input"
-    :class="{ 'chat-tool-user-input--resolved': cancelled || answered }"
+    :class="{ 'chat-tool-user-input--resolved': cancelled || answered || historical }"
   >
     <div v-if="cancelled" class="chat-tool-user-input__summary chat-tool-user-input__summary--muted">
       <ChatToolCallTitle title="Cancelled user question" :icon="SquareX" />
@@ -29,12 +29,11 @@
       </div>
     </div>
 
-    <div v-else-if="historical" class="chat-tool-user-input__summary">
-      <ChatToolCallTitle title="Previous user question" :icon="SquareDashed" />
-      <div v-for="question in questions" :key="question.id" class="chat-tool-user-input__answer">
-        <span class="chat-tool-user-input__answer-label">{{ question.question }}</span>
-      </div>
-    </div>
+    <template v-else-if="historical">
+      <p v-for="question in questions" :key="question.id" class="chat-tool-user-input__historical-question">
+        {{ question.question }}
+      </p>
+    </template>
 
     <template v-else-if="currentQuestion">
       <header class="chat-tool-user-input__header">
@@ -420,6 +419,7 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 .chat-tool-user-input--resolved {
+  container-type: normal;
   width: 100%;
   max-height: none;
   overflow: visible;
@@ -427,6 +427,12 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.chat-tool-user-input__historical-question {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .chat-tool-user-input__header {

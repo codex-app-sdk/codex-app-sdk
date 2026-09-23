@@ -82,7 +82,7 @@ describe('CodexSurface', () => {
         threadId: 'thread-existing',
         turnId: 'turn-question',
         itemId: 'agent-question',
-        delta: 'I need one decision before continuing.',
+        delta: 'Which framework should I use?',
       });
     events.length = 0;
 
@@ -93,7 +93,7 @@ describe('CodexSurface', () => {
         item: {
           type: 'agentMessage',
           id: 'agent-question',
-          text: 'I need one decision before continuing.',
+          text: 'Which framework should I use?\n- Vue\n- React',
           phase: null,
           memoryCitation: null,
           delivery: 'async',
@@ -133,13 +133,7 @@ describe('CodexSurface', () => {
         expect.anything(),
         expect.objectContaining({
           id: 'assistant-turn-question',
-          parts: [
-            expect.objectContaining({
-              type: 'text',
-              text: 'I need one decision before continuing.',
-            }),
-            { type: 'question', request },
-          ],
+          parts: [{ type: 'question', request }],
         }),
       ],
     });
@@ -149,7 +143,7 @@ describe('CodexSurface', () => {
       turnId: 'turn-question',
       payload: {
         message: expect.objectContaining({
-          parts: expect.arrayContaining([{ type: 'question', request }]),
+          parts: [{ type: 'question', request }],
         }),
       },
     }));

@@ -90,7 +90,7 @@ describe('ChatToolCall', () => {
     }
   });
 
-  it('routes only active Codex ask-user requests with string ids to question cards', () => {
+  it('routes pending and answered Codex ask-user requests with string ids to question cards', () => {
     const request = tool({
       done: false,
       state: 'running',
@@ -102,6 +102,14 @@ describe('ChatToolCall', () => {
     const active = mountTool(request);
     expect(active.find('.chat-message__thinking').exists()).toBe(true);
     expect(active.find('.chat-tool-call').exists()).toBe(false);
+
+    const answered = mountTool(tool({ ...request, done: true, state: 'completed',
+      status: descriptor('codex', 'ask_user_question', { requestId: 'question-1',
+        questions: [{ id: 'framework', header: 'Framework', question: 'Which framework?',
+          isOther: false, isSecret: false, options: [{ label: 'Vue' }] }] }),
+      result: { answers: { framework: { answers: ['Vue'] } } } }));
+    expect(answered.get('.chat-tool-user-input__summary--answered').text()).toContain('Answered user question');
+    expect(answered.find('.chat-tool-call').exists()).toBe(false);
 
     const ordinaryCases = [
       tool({ ...request, status: descriptor('other', 'ask_user_question', { requestId: 'question-1' }) }),
