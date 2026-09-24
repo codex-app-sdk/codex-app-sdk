@@ -194,6 +194,7 @@ export type {
   CodexMessageTextSelectionAnchor,
 } from './chat/message-text-selection';
 export type { ChatMessageInput as CodexMessageInput } from './chat/renderer-message-adapter';
+export type { CodexToolVisibility } from './chat/tool-visibility';
 export type { CodexChatTranslate } from './chat/chat-i18n';
 export type { QueuedChatPrompt as CodexQueuedPromptData } from './chat/queued-prompts';
 export type {

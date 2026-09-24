@@ -498,6 +498,52 @@ describe('CodexMessageList', () => {
     expect(idle.text()).toContain('Checking.');
   });
 
+  it('does not show stale progress on a completed earlier turn during or after a later turn', async () => {
+    const previousAssistant: SurfaceMessage = {
+      id: 'previous-assistant', role: 'assistant', status: 'streaming', turnId: 'turn-previous',
+      parts: [
+        { type: 'text', text: 'Checking the earlier request.', phase: 'commentary' },
+        { type: 'text', text: 'Earlier answer.', phase: 'final_answer' },
+      ],
+    };
+    const wrapper = mount(CodexMessageList, {
+      props: {
+        activeTurnId: 'turn-later',
+        busy: true,
+        messages: [
+          previousAssistant,
+          {
+            id: 'later-assistant', role: 'assistant', status: 'streaming', turnId: 'turn-later',
+            parts: [{ type: 'text', text: 'Following up.', phase: 'commentary' }],
+          },
+        ],
+        turns: [turnLifecycle('turn-previous', 'completed'), turnLifecycle('turn-later', 'inProgress')],
+      },
+    });
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Done · View details', 'Working']);
+    expect(wrapper.findAll('.chat-message__stream-dot')).toHaveLength(1);
+
+    await wrapper.setProps({
+      activeTurnId: null,
+      busy: false,
+      messages: [
+        previousAssistant,
+        {
+          id: 'later-assistant', role: 'assistant', status: 'complete', turnId: 'turn-later',
+          parts: [{ type: 'text', text: 'Later answer.', phase: 'final_answer' }],
+        },
+      ],
+      turns: [turnLifecycle('turn-previous', 'completed'), turnLifecycle('turn-later', 'completed')],
+    });
+
+    expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
+      .toStrictEqual(['Done · View details']);
+    expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Later answer.');
+  });
+
   it('reopens a completed turn when an async answer resumes assistant streaming', async () => {
     const completedMessages: SurfaceMessage[] = [{
       id: 'assistant-before-async-answer',
@@ -713,6 +759,53 @@ describe('CodexMessageList', () => {
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(1);
     expect(wrapper.findAll('.chat-message__actions')).toHaveLength(0);
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
+  });
+
+  it('filters host-hidden tools before streaming and restored work is grouped', async () => {
+    const hiddenOnly: SurfaceMessage = {
+      id: 'internal-only', role: 'assistant', status: 'streaming', turnId: 'turn-tools',
+      parts: [{ type: 'tool', id: 'internal-1', title: 'host.internal', status: 'completed' }],
+    };
+    const mixed: SurfaceMessage = {
+      id: 'mixed', role: 'assistant', status: 'streaming', turnId: 'turn-tools',
+      parts: [
+        { type: 'text', text: 'Checking the result.', phase: 'commentary' },
+        { type: 'tool', id: 'internal-2', title: 'host.internal', status: 'completed' },
+        { type: 'tool', id: 'visible-1', title: 'shell', status: 'completed' },
+        { type: 'tool', id: 'visible-2', title: 'read_file', status: 'completed' },
+      ],
+    };
+    const wrapper = mount(CodexMessageList, { props: {
+      activeTurnId: 'turn-tools', busy: true,
+      messages: [hiddenOnly, mixed],
+      toolVisibility: (toolCall) => toolCall.function !== 'host.internal',
+      turns: [turnLifecycle('turn-tools', 'inProgress')],
+    } });
+
+    expect(wrapper.findAll('.codex-message-list__entry')).toHaveLength(1);
+    expect(wrapper.get('.chat-work-group').text()).toContain('2 actions done');
+    expect(wrapper.text()).toContain('Checking the result.');
+    expect(wrapper.text()).toContain('shell');
+    expect(wrapper.text()).not.toContain('host.internal');
+
+    wrapper.unmount();
+    const restored = mount(CodexMessageList, { props: {
+      activeTurnId: null, busy: false,
+      messages: [
+        { ...hiddenOnly, status: 'complete' },
+        { ...mixed, status: 'complete', parts: [
+          ...mixed.parts, { type: 'text', text: 'The result is ready.', phase: 'final_answer' },
+        ] },
+      ],
+      toolVisibility: (toolCall) => toolCall.function !== 'host.internal',
+      turns: [turnLifecycle('turn-tools', 'completed')],
+    } });
+
+    expect(restored.findAll('.codex-message-list__entry')).toHaveLength(1);
+    expect(restored.text()).toContain('The result is ready.');
+    await restored.get('.chat-work-group__header').trigger('click');
+    expect(restored.get('.chat-work-group').text()).toContain('2 actions done');
+    expect(restored.text()).not.toContain('host.internal');
   });
 
   it('shows completed work directly when a turn has no final answer', () => {

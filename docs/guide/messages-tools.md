@@ -149,6 +149,28 @@ Use `transformMessage` for data adaptation and `message-header` for additive
 presentation. Use the full `message` slot only when the host intentionally owns
 all rendering and action wiring.
 
+## Host-controlled tool visibility
+
+Pass `:tool-visibility="isToolVisible"` to `CodexConversationPane` or
+`CodexMessageList` to hide selected tool calls from the transcript without
+changing provider messages or events. The callback receives a
+`CodexMessageToolCall` and returns `true` to render it or `false` to hide it.
+If omitted, every tool remains visible. For example, a host can use the call's
+`function` or `metadata` to keep its own lifecycle tools out of chat:
+
+```ts
+import type { CodexToolVisibility } from '@codex-app-sdk/vue';
+
+const isToolVisible: CodexToolVisibility = (toolCall) =>
+  toolCall.metadata?.visibility !== 'internal';
+```
+
+The decision is applied after `transformMessage` but before work grouping and
+action counts, for both live and restored messages. Other text, media, and
+tools in the same message remain visible. A message containing only hidden
+tools leaves no empty row or work fold. This is presentation-only; the host
+still receives the complete provider transcript and tool results.
+
 ## Tool grouping
 
 Completed tool calls contribute to the `N actions done` counter. The group

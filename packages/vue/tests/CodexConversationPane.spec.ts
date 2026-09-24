@@ -3699,6 +3699,25 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('.chat-composer__send').exists()).toBe(true);
   });
 
+  it('applies host tool visibility to the pane transcript without losing adjacent text', () => {
+    const wrapper = mount(CodexConversationPane, { props: {
+      messages: [
+        { id: 'internal-only', role: 'assistant', status: 'complete', parts: [
+          { type: 'tool', id: 'internal-1', title: 'host.internal', status: 'completed' },
+        ] },
+        { id: 'mixed', role: 'assistant', content: 'Visible answer.<tool id="internal-2"></tool>',
+          toolCalls: [{ id: 'internal-2', function: 'host.internal', args: {}, result: null,
+            state: 'completed', done: true }],
+        },
+      ],
+      toolVisibility: (toolCall) => toolCall.function !== 'host.internal',
+    } });
+
+    expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(1);
+    expect(wrapper.text()).toContain('Visible answer.');
+    expect(wrapper.text()).not.toContain('host.internal');
+  });
+
   it('passes typed message tool and action slots through the whole pane', () => {
     const wrapper = mount(CodexConversationPane, {
       props: {

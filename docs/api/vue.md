@@ -582,6 +582,12 @@ skill name and path remain unchanged for prompt submission.
 surface tool part. MCP metadata includes `server`, `tool`, `pluginId`, and MCP
 app resource identity when supplied by app-server.
 
+`CodexConversationPane` and `CodexMessageList` accept
+`toolVisibility?: CodexToolVisibility`, where
+`CodexToolVisibility = (toolCall: CodexMessageToolCall) => boolean`. Return
+`false` to omit a tool from rendered messages and work counts; the default is
+visible. This does not alter snapshots, events, or tool execution.
+
 See the [Vue guide](/guide/vue),
 [conversation pane integration](/guide/conversation-pane),
 [composer guide](/guide/composer), [history guide](/guide/history),

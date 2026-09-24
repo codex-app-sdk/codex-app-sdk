@@ -51,6 +51,7 @@
         :scroll-to-bottom-label="scrollToBottomLabel"
         :show-tool-details="showToolDetails"
         :skills="effectiveSkills"
+        :tool-visibility="toolVisibility"
         :transform-message="dismissedQuestionIds.size > 0 || activeBlockingQuestionItemIds.size > 0 ? transformTranscriptMessage : transformMessage"
         :turns="effectiveTurns"
         @cancel="cancel"
@@ -288,6 +289,7 @@ import type {
 } from '../conversation-pane-controller';
 import { resolveCodexConversationPaneValue } from '../conversation-pane-controller';
 import type { Message, MessageToolCall } from '../chat/types';
+import type { CodexToolVisibility } from '../chat/tool-visibility';
 import type { MessageBlock } from '../chat/message-blocks';
 import type {
   CodexMessageImage,
@@ -417,6 +419,7 @@ const props = withDefaults(defineProps<{
   surface?: CodexSurfaceController;
   transformMessage?: (message: Message | SurfaceMessage, index: number) => Message | SurfaceMessage;
   transcribeAudio?: CodexChatTranscription;
+  toolVisibility?: CodexToolVisibility;
   turnGitDiff?: TurnGitDiff | null;
 }>(), {
   ariaLabel: 'Conversation',

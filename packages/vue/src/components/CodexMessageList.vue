@@ -30,7 +30,7 @@
               class="codex-message-list__entry"
               :data-codex-message-index="entry.index"
             >
-              <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(entry.message)" :index="entry.index" />
+              <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(displayMessage(entry.message, group.turnId))" :index="entry.index" />
               <CodexMessage
                 v-else
                 :actions-disabled="actionsDisabled"
@@ -44,7 +44,7 @@
                 :follow-ups-disabled="followUpsDisabled"
                 :hidden-client-request-ids="hiddenClientRequestIds"
                 :index="entry.index"
-                :message="entry.message"
+                :message="displayMessage(entry.message, group.turnId)"
                 :mention-groups="mentionGroups"
                 :open-image="openImage"
                 :plugins="plugins"
@@ -106,6 +106,7 @@ import type { CodexMessageImageOpenHandler } from '../chat/message-image'
 import type { CodexConversationVisualization } from '../chat/visualization'
 import type { CodexMessageTextSelection } from '../chat/message-text-selection'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
+import { filterVisibleMessageTools, type CodexToolVisibility } from '../chat/tool-visibility'
 import CodexMessage from './CodexMessage.vue'
 import CodexMessageTurn from './CodexMessageTurn.vue'
 import CodexScrollToBottom from './CodexScrollToBottom.vue'
@@ -145,6 +146,7 @@ const props = withDefaults(defineProps<{
   scrollToBottomLabel?: string
   showToolDetails?: boolean
   skills?: readonly CodexSurfaceSkill[]
+  toolVisibility?: CodexToolVisibility
   turns?: readonly CodexSurfaceTurn[]
 }>(), {
   ariaLabel: 'Conversation',
@@ -278,14 +280,12 @@ const visibleMessages = computed(() => effectiveRenderStrategy.value === 'lazy'
   ? props.messages.slice(renderStartIndex.value)
   : props.messages)
 const displayEntries = computed(() => {
-  const entries = visibleMessages.value.map((message, offset) => ({
-    index: effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset,
-    message: props.transformMessage?.(
-      message,
-      effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset,
-    ) ?? message,
-    key: message.id ?? (effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset),
-  }))
+  const entries = visibleMessages.value.flatMap((message, offset) => {
+    const index = effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset
+    const transformed = props.transformMessage?.(message, index) ?? message
+    const visible = filterVisibleMessageTools(transformed, props.toolVisibility)
+    return visible ? [{ index, message: visible, key: message.id ?? index }] : []
+  })
   if (props.busy && !hasStreamingAssistant.value) {
     const turnId = entries.length > 0
       ? chatMessageFromInput(entries.at(-1)!.message).turnId?.trim() || undefined
@@ -348,6 +348,17 @@ const turnStatusById = computed(() => new Map(
 function isTerminalTurn(turnId: string | undefined): boolean {
   if (!turnId || turnId === inferredActiveTurnId.value) return false
   return turnStatusById.value.get(turnId) !== 'inProgress'
+}
+
+function displayMessage(message: Message | SurfaceMessage, turnId: string | undefined): Message | SurfaceMessage {
+  const status = turnId ? turnStatusById.value.get(turnId) : undefined
+  if (!status || status === 'inProgress' || turnId === inferredActiveTurnId.value) return message
+  if ('content' in message) {
+    return message.streaming ? { ...message, streaming: false } : message
+  }
+  return message.status === 'streaming'
+    ? { ...message, status: 'complete' }
+    : message
 }
 
 function isForkableTurn(turnId: string | undefined): boolean {
