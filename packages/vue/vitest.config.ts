@@ -5,6 +5,7 @@ export default defineConfig({
   root: import.meta.dirname,
   plugins: [vue()],
   test: {
+    css: { include: [/src\/styles\.css/] },
     environment: 'node',
     include: ['tests/**/*.spec.ts'],
     pool: 'forks',

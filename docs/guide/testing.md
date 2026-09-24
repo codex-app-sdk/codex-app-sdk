@@ -11,6 +11,17 @@ For every test added or kept, identify:
 2. the externally observable contract that proves the regression;
 3. why an existing test does not already cover that risk.
 
+The test should survive an equivalent implementation, harmless rewording, or
+file move. Prefer a meaningful workflow or state transition over a call-through
+check; after a mutation, observe its result through a read, event, rendered
+state, persistence check, or cleanup. Do not repeat the same contract at every
+layer: give its detailed assertion to the closest owner and use only a distinct
+integration risk to justify another test.
+
+A test that still passes when the owner always returns one constant result does
+not prove its claimed behavior. Use table cases for distinct mappings, not to
+inflate the case count.
+
 Prove the test red under the defect, missing behavior, or an intentional
 mutation before accepting it green. If the value gate cannot be met, improve an
 existing test or remove the new one.
@@ -27,19 +38,26 @@ when relevant.
 The mock is a programmable fixture, not a second product. App-server internals
 outside its emitted protocol are not SDK contracts. Boundary call assertions
 are appropriate when the call is the public wire or host contract; SDK-internal
-call assertions should become observable-result assertions.
+call assertions should become observable-result assertions. Mock external
+boundaries, not SDK logic; when the full public payload is the contract, assert
+its complete shape rather than cherry-picking fields. Keep fixtures independent
+and clean up streams, processes, and subscriptions in `finally`.
 
 For Vue, interact through the public DOM and assert rendered or accessible
-state, emitted events, focus, and enabled actions. Use browser evidence for
-selection, clipboard, scrolling, layout, and other behavior JSDOM cannot prove.
+state, emitted events, focus, and enabled actions. For CSS behavior, mount the
+real component with production styles and assert computed behavior on its
+rendered elements; use a real browser for layout geometry or other behavior
+JSDOM cannot prove, such as selection, clipboard, and scrolling. Loading a
+stylesheet into the test document is setup, not an assertion on its source text.
 
 ## Put checks in the right tool
 
 Tests must never read committed implementation or configuration files to assert
 their text or source structure. This includes manifests, npm scripts, source
 files, imports, CSS, and filenames. Test observable behavior instead; enforce
-structural rules through executable compiler, lint, build, pack, or release
-validation.
+structural and security rules through executable compiler, lint, AST,
+dependency, build, pack, or release validation. There is no source-text test
+exception for architecture or security checks.
 
 The only file-content exception is output created by the system under test. A
 scaffolder may therefore assert the temporary `package.json` or source files it
