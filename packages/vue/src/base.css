@@ -33,6 +33,11 @@
   font: inherit;
 }
 
+.codex-chat-theme :where(button, [role='button'], [role='listbox'], .chat-icon-button),
+.codex-chat-theme:where(button, [role='button'], [role='listbox'], .chat-icon-button) {
+  user-select: none;
+}
+
 /* Shiki injects these local variables on highlighted spans. */
 /* stylelint-disable lyliya/value-no-unknown-custom-properties */
 .codex-markdown .shiki,

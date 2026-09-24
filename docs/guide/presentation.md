@@ -131,6 +131,9 @@ Host classes applied to `CodexConversationPane` land on its root element. Use
 those classes for semantic tokens and shell layout—not selectors into private
 component internals.
 
+Chat controls and menus do not select text during interaction. Message text
+remains selectable for quoting and copying.
+
 For app-owned message context, prefer the additive `message-header` slot over a
 full message replacement. For app-owned tool titles/icons, use the scoped tool
 presentation provider. See [Messages and tool calls](/guide/messages-tools).
