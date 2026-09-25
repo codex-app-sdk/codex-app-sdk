@@ -448,6 +448,33 @@ describe('ChatToolCall action icons', () => {
     ]]);
   });
 
+  it('shows skill names for SKILL.md reads without changing their file links', async () => {
+    const toolCall: MessageToolCall = {
+      args: {
+        commandActions: [
+          { type: 'read', path: '/skills/definition-of-done/SKILL.md' },
+          { type: 'read', path: '/skills/test-audit/SKILL.md' },
+        ],
+      },
+      done: true,
+      function: 'read skills',
+      id: 'read-skills',
+      result: undefined,
+      state: 'completed',
+      status: JSON.stringify({ action: 'read', phase: 'completed', source: 'codex' }),
+    };
+    const wrapper = mount(ChatToolCall, { props: { summaryOnly: true, toolCall } });
+
+    const targets = wrapper.findAll('.chat-tool-call__title-target--link');
+    expect(wrapper.get('.chat-tool-call__title-content').text()).toBe('Read Definition of Done Skill, Test Audit Skill');
+    expect(targets.map((target) => target.text())).toEqual(['Definition of Done', 'Test Audit']);
+
+    await targets[1]!.trigger('click');
+    expect(wrapper.emitted('open-link')).toEqual([[
+      { action: 'read', filepath: '/skills/test-audit/SKILL.md', href: '/skills/test-audit/SKILL.md', kind: 'file', path: '/skills/test-audit/SKILL.md' },
+    ]]);
+  });
+
   it('keeps SDK fallback presentation when an app returns an undefined icon', () => {
     const toolCall: MessageToolCall = {
       args: undefined,

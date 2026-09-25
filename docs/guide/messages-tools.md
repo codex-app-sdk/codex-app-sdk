@@ -232,6 +232,10 @@ fallback behavior. Only `{ icon: null }` explicitly suppresses the icon.
 Read, create, and edit tool titles show comma-separated basenames when canonical
 paths are available. Each filename is an independent target; the SDK never
 turns a multi-file title into one ambiguous clickable block.
+For reads of `<skill-name>/SKILL.md`, the title instead shows a human-readable
+name derived from the parent directory, such as `Read Definition of Done Skill`.
+Only the skill name is clickable; `Skill` is plain text. The link still opens
+the actual `SKILL.md` file.
 
 Clicking a file emits `openLink` with:
 
@@ -250,7 +254,8 @@ type FileLink = {
 };
 ```
 
-`filepath` is the canonical full path; the title only displays the basename.
+`filepath` is the canonical full path; the title displays the basename or the
+skill name for a `SKILL.md` read.
 Context IDs let a host open a turn-specific diff. The click does not toggle the
 tool disclosure. Targets are not underlined by default because the SDK cannot
 know whether the host has installed navigation behavior.

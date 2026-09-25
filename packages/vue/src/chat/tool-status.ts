@@ -23,6 +23,7 @@ export type CodexToolDisplayTargetPart = {
   label: string;
   link?: CodexConversationLink;
   separator?: string;
+  suffix?: string;
 };
 
 const toolTitlePresenters = new Set<CodexToolTitlePresenter>();
@@ -141,17 +142,18 @@ export function getToolDisplayTargetParts(
     return undefined;
   }
 
-  const targetValues = fileTargetValues(toolCall);
+  const targetValues = fileTargetValues(toolCall, descriptor.action);
   const targetTokens = targetValues.slice(0, 3);
   const filePaths = toolFilePaths(toolCall);
   if (!targetTokens.length || !filePaths.length) return undefined;
 
   const action = descriptor.action as CodexConversationFileAction;
   const parts = targetTokens.map((token, index) => {
-    const filePath = filePaths.find((candidate) => fileName(candidate) === fileName(token));
+    const filePath = filePaths.find((candidate) => displayFileName(candidate, descriptor.action) === token);
     const link = filePath ? codexConversationLinkFromHref(filePath) : undefined;
+    const isSkillRead = descriptor.action === 'read' && filePath?.split(/[\\/]/u).at(-1) === 'SKILL.md' && token.endsWith(' Skill');
     return {
-      label: token,
+      label: isSkillRead ? token.slice(0, -' Skill'.length) : token,
       ...(link?.kind === 'file' ? {
         link: {
           ...link,
@@ -163,6 +165,7 @@ export function getToolDisplayTargetParts(
         },
       } : {}),
       separator: index === 0 ? '' : ', ',
+      ...(isSkillRead ? { suffix: ' Skill' } : {}),
     } satisfies CodexToolDisplayTargetPart;
   });
 
@@ -201,13 +204,13 @@ function displayFileTarget(
   target: string,
 ): string {
   if (!['create', 'edit', 'read'].includes(descriptor.action)) return target;
-  const values = fileTargetValues(toolCall);
+  const values = fileTargetValues(toolCall, descriptor.action);
   if (values.length === 0) return target;
   if (values.length <= 3) return values.join(', ');
   return `${values.slice(0, 3).join(', ')} and ${values.length - 3} more`;
 }
 
-function fileTargetValues(toolCall: MessageToolCall): string[] {
+function fileTargetValues(toolCall: MessageToolCall, action: string): string[] {
   const args = isRecord(toolCall.args) ? toolCall.args : {};
   const values = [
     ...rawFileTargetValues(args.commandActions),
@@ -216,7 +219,20 @@ function fileTargetValues(toolCall: MessageToolCall): string[] {
     ...(typeof args.path === 'string' ? [args.path] : []),
     ...(typeof args.name === 'string' ? [args.name] : []),
   ];
-  return [...new Set(values.map((value) => fileName(value.trim())).filter(Boolean))];
+  return [...new Set(values.map((value) => displayFileName(value.trim(), action)).filter(Boolean))];
+}
+
+function displayFileName(value: string, action: string): string {
+  const segments = value.split(/[\\/]/u).filter(Boolean);
+  const name = segments.at(-1) ?? value;
+  const skillDirectory = action === 'read' && name === 'SKILL.md' ? segments.at(-2) : undefined;
+  if (!skillDirectory) return name;
+  const title = skillDirectory.split(/[-_\s]+/u).filter(Boolean).map((word, index) => (
+    index > 0 && /^(?:a|an|and|at|by|for|in|of|on|or|the|to)$/iu.test(word)
+      ? word.toLowerCase()
+      : `${word.charAt(0).toUpperCase()}${word.slice(1)}`
+  )).join(' ');
+  return `${title} Skill`;
 }
 
 function rawFileTargetValues(value: unknown): string[] {
@@ -256,10 +272,6 @@ function absolutePath(value: unknown): string | undefined {
 
 function joinPath(cwd: string, path: string): string {
   return `${cwd.replace(/[\\/]$/u, '')}/${path.replace(/^[\\/]+/u, '')}`;
-}
-
-function fileName(value: string): string {
-  return value.split(/[\\/]/u).filter(Boolean).at(-1) ?? value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

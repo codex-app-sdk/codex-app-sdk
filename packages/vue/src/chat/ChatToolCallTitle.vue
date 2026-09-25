@@ -24,7 +24,7 @@
               @click.stop.prevent="emit('open-link', part.link)"
               @keydown.enter.stop.prevent="emit('open-link', part.link)"
               @keydown.space.stop.prevent="emit('open-link', part.link)"
-            >{{ part.label }}</a><span v-else class="chat-tool-call__title-target">{{ part.label }}</span>
+            >{{ part.label }}</a><span v-else class="chat-tool-call__title-target">{{ part.label }}</span><span v-if="part.suffix">{{ part.suffix }}</span>
           </template>
         </template>
         <a
