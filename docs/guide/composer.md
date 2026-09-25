@@ -18,8 +18,11 @@ The editor renders rich chips while preserving plain Codex prompt text:
 replace them with private editor markup. File suggestions require a host-supplied
 file catalog, normally backed by a conversation with a working directory.
 
-Commands normally insert or submit their slash text. A command can instead
-declare a pending composer mode when it needs arguments before submission:
+Clicking a command inserts its slash text, or submits it when `submitOnSelect`
+is set. With the slash menu open, `Enter` executes the highlighted command;
+`Tab` only completes it, leaving the slash text in the editor for ordinary
+commands. A command can instead declare a pending composer mode when it needs
+arguments before submission:
 
 ```ts
 const commands = [{
@@ -33,8 +36,9 @@ const commands = [{
 }];
 ```
 
-Selecting that command removes the slash query, shows a removable mode chip,
-and keeps Send disabled until the user enters text. Submission prepends the
+Executing, completing, or clicking that command removes the slash query, shows
+a removable mode chip, and keeps Send disabled until the user enters text.
+Submission prepends the
 canonical slash name, for example `/deploy staging`. The built-in `/goal`
 command uses this contract so the objective is collected before a complete
 `/goal Ship the SDK` command is submitted. Typing the complete command manually
@@ -102,6 +106,9 @@ Controller-based panes supply the catalog through
 | Gesture | Result |
 | --- | --- |
 | `Enter` | Submit the current prompt |
+| `Up` / `Down` with a slash menu open | Highlight a command |
+| `Enter` with a slash menu open | Execute the highlighted command; commands requiring input activate their composer mode |
+| `Tab` with a slash menu open | Complete the highlighted command without submitting it; commands requiring input activate their composer mode |
 | `Shift+Enter` | Insert a newline at the current selection |
 | `Cmd/Ctrl+Enter` | Steer the active turn |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |

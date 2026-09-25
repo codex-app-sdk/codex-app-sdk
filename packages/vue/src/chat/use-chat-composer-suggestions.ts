@@ -169,7 +169,15 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
       return true
     }
 
-    if (handleMenuKeydown(event, slashMenuVisible.value, slashItemCount.value, activeSlashIndex, selectActiveSlashItem)) {
+    if (slashMenuVisible.value && slashItemCount.value > 0 && event.key === 'Tab'
+      && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault()
+      selectActiveSlashItem('complete')
+      return true
+    }
+
+    if (handleMenuKeydown(event, slashMenuVisible.value, slashItemCount.value, activeSlashIndex,
+      () => selectActiveSlashItem('execute'))) {
       return true
     }
 
@@ -248,6 +256,10 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   }
 
   function selectCommand(command: CodexCommandSummary): void {
+    handleCommand(command, 'default')
+  }
+
+  function handleCommand(command: CodexCommandSummary, action: 'default' | 'execute' | 'complete'): void {
     const mention = activeCommandSlash.value
     if (!mention || !options.editor.value) {
       return
@@ -262,7 +274,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
       options.onTextInserted(mention.start)
       return
     }
-    if (command.submitOnSelect) {
+    if (action === 'execute' || (action === 'default' && command.submitOnSelect)) {
       options.prompt.value = ''
       options.caretPosition.value = 0
       close()
@@ -272,10 +284,10 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     insert(`${slashCommand} `, mention.start, mention.end)
   }
 
-  function selectActiveSlashItem(): void {
+  function selectActiveSlashItem(action: 'execute' | 'complete'): void {
     const command = visibleSlashCommands.value[activeSlashIndex.value]
     if (command) {
-      selectCommand(command)
+      handleCommand(command, action)
       return
     }
     const skill = visibleSlashSkills.value[activeSlashIndex.value - visibleSlashCommands.value.length]

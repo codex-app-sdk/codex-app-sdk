@@ -1290,6 +1290,46 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('');
   });
 
+  it('executes a highlighted slash command with Enter and completes it with Tab', async () => {
+    const commands: CodexCommandSummary[] = [
+      { id: 'host.alpha', name: 'alpha' },
+      { id: 'host.beta', name: 'beta' },
+    ];
+    const execute = mountComposer({ commands });
+
+    await setEditorValue(execute, '/');
+    await editor(execute).trigger('keyup');
+    await editor(execute).trigger('keydown', { key: 'ArrowDown' });
+    await editor(execute).trigger('keydown', { key: 'Enter' });
+
+    expect(execute.emitted('send')).toStrictEqual([['/beta']]);
+    expect(editorValue(execute)).toBe('');
+
+    const complete = mountComposer({ commands });
+    await setEditorValue(complete, '/');
+    await editor(complete).trigger('keyup');
+    await editor(complete).trigger('keydown', { key: 'ArrowDown' });
+    await editor(complete).trigger('keydown', { key: 'Tab' });
+
+    expect(complete.emitted('send')).toBeUndefined();
+    expect(editorValue(complete)).toBe('/beta ');
+
+    const goal = mountComposer({ commands: codexCommands });
+    await setEditorValue(goal, '/goa');
+    await editor(goal).trigger('keyup');
+    await editor(goal).trigger('keydown', { key: 'Tab' });
+
+    expect(goal.emitted('send')).toBeUndefined();
+    expect(editorValue(goal)).toBe('');
+    expect(goal.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
+
+    await setEditorValue(goal, 'Ship the SDK');
+    await goal.get('form').trigger('submit');
+
+    expect(goal.emitted('send')).toStrictEqual([['/goal Ship the SDK']]);
+    expect(goal.find('[aria-label="Active composer modes"]').exists()).toBe(false);
+  });
+
   it('remembers a submitted slash command for prompt recall', async () => {
     const wrapper = mountComposer({ commands: codexCommands });
     await setEditorValue(wrapper, '/comp');

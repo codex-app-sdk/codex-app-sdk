@@ -407,7 +407,7 @@ describe('useChatComposerSuggestions', () => {
   it('ignores unrelated keys while a menu is visible', async () => {
     const state = setup('/comp');
     await nextTick();
-    const event = key('Tab');
+    const event = key('PageDown');
 
     expect(state.suggestions.handleKeydown(event)).toBe(false);
     expect(event.defaultPrevented).toBe(false);
