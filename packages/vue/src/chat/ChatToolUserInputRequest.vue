@@ -11,7 +11,10 @@
   <section
     v-else
     class="codex-chat-theme chat-tool-user-input"
-    :class="{ 'chat-tool-user-input--resolved': cancelled || answered || historical }"
+    :class="{
+      'chat-tool-user-input--resolved': cancelled || answered || historical,
+      'chat-tool-user-input--free-text': !cancelled && !answered && !historical && currentQuestion && isFreeTextOnly(currentQuestion),
+    }"
   >
     <div v-if="cancelled" class="chat-tool-user-input__summary chat-tool-user-input__summary--muted">
       <ChatToolCallTitle title="Cancelled user question" :icon="SquareX" />
@@ -80,7 +83,7 @@
           autofocus
           class="chat-tool-user-input__other-input chat-tool-user-input__other-input--direct"
           :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
-          rows="2"
+          rows="1"
           :type="currentQuestion.isSecret ? 'password' : 'text'"
           @keydown.stop
         />
@@ -145,20 +148,20 @@
 
       <footer class="chat-tool-user-input__actions">
         <button
-          class="chat-tool-user-input__button chat-tool-user-input__button--primary"
-          :disabled="!canProceed"
-          type="button"
-          @click="isLastQuestion ? submit() : next()"
-        >
-          {{ isLastQuestion ? 'Send' : 'Next' }}
-        </button>
-        <button
           v-if="currentIndex > 0"
           class="chat-tool-user-input__button"
           type="button"
           @click="back"
         >
           Back
+        </button>
+        <button
+          class="chat-tool-user-input__button chat-tool-user-input__button--primary"
+          :disabled="!canProceed"
+          type="button"
+          @click="isLastQuestion ? submit() : next()"
+        >
+          {{ isLastQuestion ? 'Send' : 'Next' }}
         </button>
       </footer>
     </template>
@@ -429,6 +432,41 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   background: transparent;
 }
 
+.chat-tool-user-input--free-text {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: var(--space-3);
+  row-gap: var(--space-4);
+}
+
+.chat-tool-user-input--free-text .chat-tool-user-input__header {
+  grid-column: 1 / -1;
+}
+
+.chat-tool-user-input--free-text .chat-tool-user-input__other-input--direct {
+  min-height: 38px;
+  max-height: 9rem;
+  box-sizing: border-box;
+  field-sizing: content;
+  overflow-y: auto;
+  resize: none;
+  border: 0;
+  padding: 9px 0;
+  background: transparent;
+}
+
+.chat-tool-user-input--free-text .chat-tool-user-input__other-input--direct:focus {
+  outline: none;
+}
+
+.chat-tool-user-input--free-text .chat-tool-user-input__actions {
+  grid-column: 2;
+  align-self: end;
+  padding: 0;
+  background: transparent;
+}
+
 .chat-tool-user-input__historical-question {
   margin: 0;
   overflow-wrap: anywhere;
@@ -451,7 +489,7 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 
 .chat-tool-user-input__heading {
   flex: 1 1 auto;
-  gap: var(--space-2);
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -748,6 +786,12 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
     bottom: 0;
     padding-top: var(--space-2);
     background: var(--color-surface-lowest);
+  }
+
+  .chat-tool-user-input--free-text .chat-tool-user-input__actions {
+    position: static;
+    padding: 0;
+    background: transparent;
   }
 }
 </style>

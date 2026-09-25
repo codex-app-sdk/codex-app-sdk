@@ -384,6 +384,35 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
+    id: 'single-text-question',
+    name: 'Single text question',
+    summary: 'Free text without a header or progress',
+    title: 'Codex needs user input',
+    description: 'A standalone text question uses the same card without the multi-question chrome.',
+    activeTurnId: 'single-text-turn',
+    busy: true,
+    turns: [{
+      id: 'single-text-turn', status: 'inProgress', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:00:00Z', completedAt: null, durationMs: null,
+    }],
+    messages: [{
+      id: 'single-text-message', role: 'assistant', status: 'streaming', turnId: 'single-text-turn',
+      parts: [{ type: 'question', request: {
+        id: 'lab-single-text-request', kind: 'ask_user', conversationId: 'single-text-question',
+        turnId: 'single-text-turn', itemId: 'lab-single-text-item',
+        payload: { request: {
+          itemId: 'lab-single-text-item', delivery: 'async', blocking: false,
+          questions: [{
+            id: 'lab-single-text-answer',
+            header: 'What should I know before continuing?',
+            question: 'What should I know before continuing?',
+            isOther: false, isSecret: false, options: null,
+          }],
+        } },
+      } }],
+    }],
+  },
+  {
     id: 'busy',
     name: 'Busy and queued',
     summary: 'Working state, queue, context, and diff shelf',
