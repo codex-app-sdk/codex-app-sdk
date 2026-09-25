@@ -136,13 +136,9 @@ const emit = defineEmits<{
   white-space: pre;
 }
 
-.chat-tool-call__title-target {
-  display: inline;
+.chat-tool-call__title-target--link {
   color: var(--color-secondary);
   font-weight: var(--font-weight-regular);
-}
-
-.chat-tool-call__title-target--link {
   cursor: pointer;
   text-decoration: none;
 }
