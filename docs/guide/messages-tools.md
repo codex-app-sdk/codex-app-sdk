@@ -168,7 +168,10 @@ const isToolVisible: CodexToolVisibility = (toolCall) =>
 The decision is applied after `transformMessage` but before work grouping and
 action counts, for both live and restored messages. Other text, media, and
 tools in the same message remain visible. A message containing only hidden
-tools leaves no empty row or work fold. This is presentation-only; the host
+tools leaves no empty row or work fold. While the turn is busy and no visible
+assistant segment remains, the activity indicator changes from `Thinking` to
+`Working` when a hidden tool starts; it remains visible until the next visible
+segment arrives. This is presentation-only; the host
 still receives the complete provider transcript and tool results.
 
 ## Tool grouping

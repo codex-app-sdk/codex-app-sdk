@@ -761,6 +761,42 @@ describe('CodexMessageList', () => {
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
   });
 
+  it('switches from thinking to working when a hidden-only tool starts', async () => {
+    const user: SurfaceMessage = {
+      id: 'user-before-hidden-tool', role: 'user', status: 'complete', turnId: 'turn-hidden-tool',
+      parts: [{ type: 'text', text: 'Please check this.' }],
+    };
+    const hiddenTool: SurfaceMessage = {
+      id: 'hidden-tool-segment', role: 'assistant', status: 'streaming', turnId: 'turn-hidden-tool',
+      parts: [{ type: 'tool', id: 'hidden-tool', title: 'host.internal', status: 'running' }],
+    };
+    const wrapper = mount(CodexMessageList, { props: {
+      activeTurnId: 'turn-hidden-tool', busy: true, messages: [user],
+      toolVisibility: (toolCall) => toolCall.function !== 'host.internal',
+      turns: [turnLifecycle('turn-hidden-tool', 'inProgress')],
+    } });
+
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+    await wrapper.setProps({ messages: [user, hiddenTool] });
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+    expect(wrapper.get('.chat-message__thinking').text()).toBe('Working');
+    expect(wrapper.text()).not.toContain('host.internal');
+
+    await wrapper.setProps({ busy: false, messages: [user, { ...hiddenTool, status: 'complete' }] });
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+
+    await wrapper.setProps({
+      activeTurnId: 'turn-next', busy: true, messages: [
+        user, { ...hiddenTool, status: 'complete' },
+        { id: 'next-prompt', role: 'user', status: 'complete', turnId: 'turn-next', parts: [
+          { type: 'text', text: 'One more thing.' },
+        ] },
+      ],
+      turns: [turnLifecycle('turn-next', 'inProgress')],
+    });
+    expect(wrapper.get('.chat-message__thinking').text()).toBe('Thinking');
+  });
+
   it('filters host-hidden tools before streaming and restored work is grouped', async () => {
     const hiddenOnly: SurfaceMessage = {
       id: 'internal-only', role: 'assistant', status: 'streaming', turnId: 'turn-tools',

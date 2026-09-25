@@ -33,6 +33,7 @@
               <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(displayMessage(entry.message, group.turnId))" :index="entry.index" />
               <CodexMessage
                 v-else
+                :activity-state="entry.activityState"
                 :actions-disabled="actionsDisabled"
                 :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
                 :answered-client-request-ids="answeredClientRequestIds"
@@ -268,25 +269,43 @@ let observedFirstMessage = messageIdentityAt(props.messages, 0)
 let observedLastMessage = messageIdentityAt(props.messages, props.messages.length - 1)
 const loadingOlderMessages = ref(false)
 let olderMessagesRequestPending = false
-const hasStreamingAssistant = computed(() => props.messages.some((message) => (
-  message.role === 'assistant' && (
-    'content' in message
-      ? message.streaming === true
-        || (message.type === 'compaction' && message.compactionStatus === 'running')
-      : message.status === 'streaming'
-  )
-)))
 const visibleMessages = computed(() => effectiveRenderStrategy.value === 'lazy'
   ? props.messages.slice(renderStartIndex.value)
   : props.messages)
-const displayEntries = computed(() => {
-  const entries = visibleMessages.value.flatMap((message, offset) => {
+type DisplayEntry = {
+  index: number
+  message: Message | SurfaceMessage
+  key: string | number
+  activityState?: 'working'
+}
+const displayEntries = computed<DisplayEntry[]>(() => {
+  let lastUserIndex = -1
+  for (let index = props.messages.length - 1; index >= 0; index--) {
+    if (props.messages[index]?.role !== 'user') continue
+    lastUserIndex = index
+    break
+  }
+  let hiddenCurrentTurnActivity = false
+  const entries: DisplayEntry[] = visibleMessages.value.flatMap((message, offset) => {
     const index = effectiveRenderStrategy.value === 'lazy' ? renderStartIndex.value + offset : offset
     const transformed = props.transformMessage?.(message, index) ?? message
     const visible = filterVisibleMessageTools(transformed, props.toolVisibility)
+    if (!visible && transformed.role === 'assistant' && (
+      props.activeTurnId
+        ? chatMessageFromInput(transformed).turnId === props.activeTurnId
+        : index > lastUserIndex
+    )) hiddenCurrentTurnActivity = true
     return visible ? [{ index, message: visible, key: message.id ?? index }] : []
   })
-  if (props.busy && !hasStreamingAssistant.value) {
+  const hasStreamingAssistant = entries.some(({ message }) => (
+    message.role === 'assistant' && (
+      'content' in message
+        ? message.streaming === true
+          || (message.type === 'compaction' && message.compactionStatus === 'running')
+        : message.status === 'streaming'
+    )
+  ))
+  if (props.busy && !hasStreamingAssistant) {
     const turnId = entries.length > 0
       ? chatMessageFromInput(entries.at(-1)!.message).turnId?.trim() || undefined
       : undefined
@@ -294,6 +313,7 @@ const displayEntries = computed(() => {
       index: props.messages.length,
       message: turnId ? { ...thinkingPlaceholder, turnId } : thinkingPlaceholder,
       key: thinkingPlaceholder.id,
+      ...(hiddenCurrentTurnActivity ? { activityState: 'working' } : {}),
     })
   }
   return entries

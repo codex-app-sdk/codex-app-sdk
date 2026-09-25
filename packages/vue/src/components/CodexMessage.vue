@@ -118,9 +118,9 @@
           <slot v-if="showThinkingIndicator" name="thinking" :index="index" :message="chatMessage">
             <span
               class="chat-message__thinking codex-text-shimmer"
-              data-label="Thinking"
+              :data-label="activityLabel"
             >
-              Thinking
+              {{ activityLabel }}
             </span>
           </slot>
           <slot v-else-if="showStreamingDot" name="status" :index="index" :message="chatMessage" status="streaming">
@@ -195,6 +195,7 @@ import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../cha
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
+  activityState?: 'working'
   actionsDisabled?: boolean
   actionsAlwaysVisible?: boolean
   answeredClientRequestIds?: ReadonlySet<string>
@@ -263,6 +264,7 @@ const emit = defineEmits<{
 const hostCapabilities = useCodexHostCapabilities()
 
 const t = useCodexChatTranslate()
+const activityLabel = computed(() => props.activityState === 'working' ? t('chat.work.working') : 'Thinking')
 const chatMessage = computed(() => chatMessageFromInput(props.message))
 const assistantWorkTurn = inject(assistantWorkTurnKey, undefined)
 provide(assistantWorkMessageIndexKey, computed(() => props.index))
