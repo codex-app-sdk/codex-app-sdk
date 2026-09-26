@@ -87,12 +87,11 @@ the normal submission path. Cmd+Enter invokes the same resume action while the
 composer is empty.
 
 `CodexConversationPane` and standalone `CodexComposer` accept
-`emptySendContinues?: boolean` (default `false`). When enabled and the composer
-has no text, attachments, host context, or active command, hovering over the
-muted Send button enables a normal submission of the literal `continue`
-prompt. `Cmd+Enter` does the same. This does not replace the interrupted-turn
-action above, the busy-turn interrupt, or empty `Cmd+Enter` steering of an
-existing queued prompt.
+`emptySendPrompt?: string` (default `''`). When set to non-whitespace text and
+the composer has no text, attachments, host context, or active command,
+hovering over the muted Send button enables a normal submission of that prompt.
+`Cmd+Enter` does the same unless it is steering an existing queued prompt. This
+does not replace the interrupted-turn action above or the busy-turn interrupt.
 
 When a controlled pane with no messages submits its first prompt, the pane
 renders an optimistic user row immediately. The row survives settlement of the

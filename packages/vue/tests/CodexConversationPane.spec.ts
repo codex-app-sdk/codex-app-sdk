@@ -1868,29 +1868,30 @@ describe('CodexConversationPane', () => {
     ]]);
   });
 
-  it('allows an opted-in empty composer to send continue by hover or Cmd Enter', async () => {
+  it('submits the configured fallback prompt from an empty composer by hover or Cmd Enter', async () => {
     const wrapper = mount(CodexConversationPane, { props: { messages, modelValue: '' } });
     const send = wrapper.get('button[aria-label="Send prompt"]');
+    const fallbackPrompt = 'Keep going from the previous context';
 
     expect(send.attributes('disabled')).toBeDefined();
     await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
     expect(wrapper.emitted('submit')).toBeUndefined();
 
-    await wrapper.setProps({ emptySendContinues: true });
-    expect(send.attributes('aria-label')).toBe('Send continue prompt');
+    await wrapper.setProps({ emptySendPrompt: fallbackPrompt });
+    expect(send.attributes('aria-label')).toBe('Send default prompt');
     expect(send.classes()).toContain('codex-composer-send-button--disabled');
     expect(send.attributes('aria-disabled')).toBe('true');
     await send.trigger('mouseenter');
     expect(send.classes()).not.toContain('codex-composer-send-button--disabled');
     expect(send.attributes('aria-disabled')).toBeUndefined();
     await send.trigger('click');
-    expect(wrapper.emitted('submit')).toStrictEqual([['continue']]);
+    expect(wrapper.emitted('submit')).toStrictEqual([[fallbackPrompt]]);
 
     await send.trigger('mouseleave');
     await send.trigger('click');
-    expect(wrapper.emitted('submit')).toStrictEqual([['continue']]);
+    expect(wrapper.emitted('submit')).toStrictEqual([[fallbackPrompt]]);
     await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
-    expect(wrapper.emitted('submit')).toStrictEqual([['continue'], ['continue']]);
+    expect(wrapper.emitted('submit')).toStrictEqual([[fallbackPrompt], [fallbackPrompt]]);
   });
 
   it('steers an attachment-only prompt through the composer while a turn is active', async () => {

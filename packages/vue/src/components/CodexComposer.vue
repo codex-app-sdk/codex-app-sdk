@@ -132,7 +132,7 @@
         <CodexComposerSendButton
           class="chat-composer__send"
           :disabled="sendButtonDisabled"
-          :hover-to-enable="canSubmitEmptyContinue"
+          :hover-to-enable="canSubmitEmptyPrompt"
           :busy="sendButtonLoading"
           :interrupt-armed="interruptArmed"
           :submit-label="sendButtonLabel"
@@ -181,7 +181,7 @@ const props = defineProps<{
   disabled: boolean;
   draft?: string;
   draftRevision?: number;
-  emptySendContinues?: boolean;
+  emptySendPrompt?: string;
   files?: readonly CodexFileSearchItem[];
   hasAttachments?: boolean;
   hasExternalContent?: boolean;
@@ -264,6 +264,7 @@ const voiceVisible = computed(() => (
 ));
 
 const hasPrompt = computed(() => Boolean(prompt.value.trim()));
+const emptySendPrompt = computed(() => props.emptySendPrompt?.trim() ?? '');
 const canSend = computed(() => Boolean((activeCommand.value
   ? hasPrompt.value
   : hasPrompt.value || props.hasAttachments || props.hasExternalContent
@@ -276,8 +277,8 @@ const canContinueInterruptedTurn = computed(() => Boolean(
   && !props.hasExternalContent
   && !props.disabled,
 ));
-const canSubmitEmptyContinue = computed(() => Boolean(
-  props.emptySendContinues
+const canSubmitEmptyPrompt = computed(() => Boolean(
+  emptySendPrompt.value
   && !props.isSending
   && !props.disabled
   && !hasPrompt.value
@@ -306,8 +307,8 @@ const sendButtonDisabled = computed(() => {
 const sendButtonLabel = computed(() => (
   canContinueInterruptedTurn.value
     ? 'Continue'
-    : canSubmitEmptyContinue.value
-      ? 'Send continue prompt'
+    : canSubmitEmptyPrompt.value
+      ? 'Send default prompt'
       : props.isSending ? 'Queue prompt' : 'Send prompt'
 ));
 const {
@@ -415,8 +416,8 @@ function submitPrompt(): void {
     emit('continueInterruptedTurn');
     return;
   }
-  if (canSubmitEmptyContinue.value) {
-    emit('send', 'continue');
+  if (canSubmitEmptyPrompt.value) {
+    emit('send', emptySendPrompt.value);
     return;
   }
   submitWithIntent('send');
@@ -604,7 +605,7 @@ function handleEditorKeydown(event: KeyboardEvent): void {
 
   event.preventDefault();
   if (event.metaKey && !event.ctrlKey && !event.altKey) {
-    if (canContinueInterruptedTurn.value || (canSubmitEmptyContinue.value && !props.queuedPromptId)) submitPrompt();
+    if (canContinueInterruptedTurn.value || (canSubmitEmptyPrompt.value && !props.queuedPromptId)) submitPrompt();
     else submitSteer();
     return;
   }
