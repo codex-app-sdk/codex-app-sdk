@@ -132,6 +132,7 @@
         <CodexComposerSendButton
           class="chat-composer__send"
           :disabled="sendButtonDisabled"
+          :hover-to-enable="canSubmitEmptyContinue"
           :busy="sendButtonLoading"
           :interrupt-armed="interruptArmed"
           :submit-label="sendButtonLabel"
@@ -180,6 +181,7 @@ const props = defineProps<{
   disabled: boolean;
   draft?: string;
   draftRevision?: number;
+  emptySendContinues?: boolean;
   files?: readonly CodexFileSearchItem[];
   hasAttachments?: boolean;
   hasExternalContent?: boolean;
@@ -274,6 +276,16 @@ const canContinueInterruptedTurn = computed(() => Boolean(
   && !props.hasExternalContent
   && !props.disabled,
 ));
+const canSubmitEmptyContinue = computed(() => Boolean(
+  props.emptySendContinues
+  && !props.isSending
+  && !props.disabled
+  && !hasPrompt.value
+  && !props.hasAttachments
+  && !props.hasExternalContent
+  && !activeCommand.value
+  && !canContinueInterruptedTurn.value,
+));
 let pendingTranscriptCaret: number | null = null;
 const canInterrupt = computed(() => Boolean(
   props.isSending
@@ -292,7 +304,11 @@ const sendButtonDisabled = computed(() => {
   return !canSend.value && !canInterrupt.value && !canContinueInterruptedTurn.value;
 });
 const sendButtonLabel = computed(() => (
-  canContinueInterruptedTurn.value ? 'Continue' : props.isSending ? 'Queue prompt' : 'Send prompt'
+  canContinueInterruptedTurn.value
+    ? 'Continue'
+    : canSubmitEmptyContinue.value
+      ? 'Send continue prompt'
+      : props.isSending ? 'Queue prompt' : 'Send prompt'
 ));
 const {
   buttonDisabled: voiceButtonDisabled,
@@ -399,6 +415,10 @@ function submitPrompt(): void {
     emit('continueInterruptedTurn');
     return;
   }
+  if (canSubmitEmptyContinue.value) {
+    emit('send', 'continue');
+    return;
+  }
   submitWithIntent('send');
 }
 
@@ -422,7 +442,7 @@ async function handleSendButtonClick(): Promise<void> {
 }
 
 function submitSteer(): void {
-  if (!prompt.value.trim() && props.queuedPromptId && !props.disabled) {
+  if (!prompt.value.trim() && props.queuedPromptId && !props.hasAttachments && !props.hasExternalContent && !props.disabled) {
     emit('steerQueuedPrompt', props.queuedPromptId);
     return;
   }
@@ -431,7 +451,7 @@ function submitSteer(): void {
 
 function submitWithIntent(intent: 'send' | 'steer'): void {
   const trimmed = prompt.value.trim();
-  if (!canSend.value || (intent === 'steer' && !trimmed)) {
+  if (!canSend.value || (intent === 'steer' && !trimmed && !props.hasAttachments)) {
     return;
   }
   const slashCommand = activeCommand.value
@@ -584,7 +604,8 @@ function handleEditorKeydown(event: KeyboardEvent): void {
 
   event.preventDefault();
   if (event.metaKey && !event.ctrlKey && !event.altKey) {
-    submitSteer();
+    if (canContinueInterruptedTurn.value || (canSubmitEmptyContinue.value && !props.queuedPromptId)) submitPrompt();
+    else submitSteer();
     return;
   }
 

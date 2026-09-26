@@ -1868,6 +1868,49 @@ describe('CodexConversationPane', () => {
     ]]);
   });
 
+  it('allows an opted-in empty composer to send continue by hover or Cmd Enter', async () => {
+    const wrapper = mount(CodexConversationPane, { props: { messages, modelValue: '' } });
+    const send = wrapper.get('button[aria-label="Send prompt"]');
+
+    expect(send.attributes('disabled')).toBeDefined();
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+    expect(wrapper.emitted('submit')).toBeUndefined();
+
+    await wrapper.setProps({ emptySendContinues: true });
+    expect(send.attributes('aria-label')).toBe('Send continue prompt');
+    expect(send.classes()).toContain('codex-composer-send-button--disabled');
+    expect(send.attributes('aria-disabled')).toBe('true');
+    await send.trigger('mouseenter');
+    expect(send.classes()).not.toContain('codex-composer-send-button--disabled');
+    expect(send.attributes('aria-disabled')).toBeUndefined();
+    await send.trigger('click');
+    expect(wrapper.emitted('submit')).toStrictEqual([['continue']]);
+
+    await send.trigger('mouseleave');
+    await send.trigger('click');
+    expect(wrapper.emitted('submit')).toStrictEqual([['continue']]);
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+    expect(wrapper.emitted('submit')).toStrictEqual([['continue'], ['continue']]);
+  });
+
+  it('steers an attachment-only prompt through the composer while a turn is active', async () => {
+    const attachment: CodexNativeAttachment = {
+      id: 'steer-image', type: 'image', reference: 'attachment:steer-image',
+      name: 'image.png', mimeType: 'image/png', size: 1,
+    };
+    const wrapper = mount(CodexConversationPane, {
+      props: { attachments: [attachment], busy: true, messages, modelValue: '' },
+    });
+
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+
+    expect(wrapper.emitted('steer')).toStrictEqual([[
+      '(no user instructions)',
+      { attachments: [{ type: 'image', reference: 'attachment:steer-image' }] },
+    ]]);
+    expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
+  });
+
   it('steers the first queued prompt from an empty Cmd Enter composer', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: {

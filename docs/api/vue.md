@@ -83,7 +83,16 @@ active, and the composer is empty, the stock composer changes Send to
 **Continue**. Activating it dispatches `actions.continueInterruptedTurn()`; it
 does not call `submit` or create an optimistic user row. Surface-bound panes
 call the equivalent SDK surface operation. A typed prompt or attachment keeps
-the normal submission path.
+the normal submission path. Cmd+Enter invokes the same resume action while the
+composer is empty.
+
+`CodexConversationPane` and standalone `CodexComposer` accept
+`emptySendContinues?: boolean` (default `false`). When enabled and the composer
+has no text, attachments, host context, or active command, hovering over the
+muted Send button enables a normal submission of the literal `continue`
+prompt. `Cmd+Enter` does the same. This does not replace the interrupted-turn
+action above, the busy-turn interrupt, or empty `Cmd+Enter` steering of an
+existing queued prompt.
 
 When a controlled pane with no messages submits its first prompt, the pane
 renders an optimistic user row immediately. The row survives settlement of the
@@ -250,12 +259,12 @@ filesystem path.
 
 `CodexComposer` accepts `hasAttachments` when the host owns the attachment
 queue. This enables submit with an otherwise empty prompt and emits the
-canonical `'(no user instructions)'` prompt. It also accepts
-`queuedPromptId`; when the composer is empty, Cmd/Ctrl+Enter emits
+canonical `'(no user instructions)'` prompt for send, queue, or steer. It also accepts
+`queuedPromptId`; when the composer is empty, Cmd+Enter emits
 `steerQueuedPrompt` for that queued item instead of submitting an empty steer.
 In `CodexConversationPane`, queued-prompt Edit loads the text into an empty
 composer. Enter dispatches `updateQueuedPrompt(promptId, prompt)`, while
-Cmd/Ctrl+Enter dispatches `steerQueuedPrompt(promptId, prompt)`.
+Cmd+Enter dispatches `steerQueuedPrompt(promptId, prompt)`.
 
 ### Host-owned message selection and composer context
 

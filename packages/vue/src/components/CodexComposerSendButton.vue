@@ -4,11 +4,15 @@
     :class="{
       'codex-composer-send-button--busy': busy || interruptArmed,
       'codex-composer-send-button--interrupt-armed': interruptArmed,
+      'codex-composer-send-button--disabled': disabled && !hoverActive,
     }"
     type="button"
-    :disabled="disabled"
+    :disabled="disabled && !hoverToEnable"
+    :aria-disabled="disabled && hoverToEnable && !hoverActive ? 'true' : undefined"
     :aria-label="interruptArmed ? interruptArmedLabel : busy ? interruptLabel : submitLabel"
-    @click="emit('click')"
+    @mouseenter="hovered = true"
+    @mouseleave="hovered = false"
+    @click="handleClick"
   >
     <PlayerPlayFilledIcon v-if="!busy && !interruptArmed" aria-hidden="true" :size="16" />
     <svg
@@ -35,12 +39,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue';
 import { PlayerPlayFilledIcon } from '../icons/app-icons';
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   busy?: boolean;
   disabled?: boolean;
+  hoverToEnable?: boolean;
   interruptArmed?: boolean;
   interruptArmedLabel?: string;
   interruptLabel?: string;
@@ -48,6 +54,7 @@ withDefaults(defineProps<{
 }>(), {
   busy: false,
   disabled: false,
+  hoverToEnable: false,
   interruptArmed: false,
   interruptArmedLabel: 'Press Escape again or click to stop generation',
   interruptLabel: 'Interrupt',
@@ -58,6 +65,14 @@ const emit = defineEmits<{
   click: [];
 }>();
 // Stryker restore all
+
+const hovered = ref(false);
+const hoverActive = computed(() => props.hoverToEnable && hovered.value);
+
+function handleClick(): void {
+  if (props.disabled && !hoverActive.value) return;
+  emit('click');
+}
 </script>
 
 <style scoped>
@@ -86,7 +101,8 @@ const emit = defineEmits<{
   transform: scale(0.94);
 }
 
-.codex-composer-send-button:disabled {
+.codex-composer-send-button:disabled,
+.codex-composer-send-button--disabled {
   cursor: not-allowed;
   opacity: 0.4;
 }

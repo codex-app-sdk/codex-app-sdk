@@ -128,6 +128,9 @@ describe('ChatComposer', () => {
 
     expect(wrapper.emitted('continueInterruptedTurn')).toStrictEqual([[]]);
     expect(wrapper.emitted('send')).toBeUndefined();
+
+    await editor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+    expect(wrapper.emitted('continueInterruptedTurn')).toStrictEqual([[], []]);
   });
 
   it('submits attachment-only work instead of interrupting while Codex is working', async () => {
@@ -463,7 +466,7 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('steer')).toBeUndefined();
   });
 
-  it('does not steer an empty, disabled, or attachment-only composer', async () => {
+  it('steers an attachment-only composer but not an empty or disabled one', async () => {
     const empty = mountComposer();
     const disabled = mountComposer({ disabled: true, queuedPromptId: 'queued-1' });
     const attachments = mountComposer({ hasAttachments: true });
@@ -472,10 +475,12 @@ describe('ChatComposer', () => {
     await editor(disabled).trigger('keydown', { key: 'Enter', metaKey: true });
     await editor(attachments).trigger('keydown', { key: 'Enter', metaKey: true });
 
-    for (const wrapper of [empty, disabled, attachments]) {
+    for (const wrapper of [empty, disabled]) {
       expect(wrapper.emitted('steer')).toBeUndefined();
       expect(wrapper.emitted('steerQueuedPrompt')).toBeUndefined();
     }
+    expect(attachments.emitted('steer')).toStrictEqual([['(no user instructions)']]);
+    expect(attachments.emitted('steerQueuedPrompt')).toBeUndefined();
   });
 
   it('does not submit a disabled composer through its form', async () => {

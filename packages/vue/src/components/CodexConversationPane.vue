@@ -144,6 +144,7 @@
             :context-usage="effectiveContextUsage"
             :disabled="effectiveDisabled"
             :draft="localDraft"
+            :empty-send-continues="emptySendContinues"
             :files="effectiveFiles"
             :has-attachments="selectedAttachments.length > 0"
             :has-external-content="hasComposerContext"
@@ -371,6 +372,7 @@ const props = withDefaults(defineProps<{
   contextUsage?: CodexContextUsage | null;
   conversationKey?: string | number | null;
   disabled?: boolean;
+  emptySendContinues?: boolean;
   emptyDescription?: string;
   emptyTitle?: string;
   error?: string | null;

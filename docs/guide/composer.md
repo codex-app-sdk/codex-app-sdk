@@ -110,7 +110,7 @@ Controller-based panes supply the catalog through
 | `Enter` with a slash menu open | Execute the highlighted command; commands requiring input activate their composer mode |
 | `Tab` with a slash menu open | Complete the highlighted command without submitting it; commands requiring input activate their composer mode |
 | `Shift+Enter` | Insert a newline at the current selection |
-| `Cmd/Ctrl+Enter` | Steer the active turn |
+| `Cmd+Enter` | Steer the active turn; with `emptySendContinues` enabled and no composer content, send `continue` instead |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |
 | `Up` / `Down` in an empty composer | Navigate backward / forward through submitted prompts |
 | `Escape`, then `Escape` again within two seconds | Interrupt the active turn |
@@ -150,9 +150,17 @@ when loading asynchronously, `promptHistoryLoading`.
 When `queuedPromptId` is supplied and the composer is empty, `Cmd+Enter` emits
 `steerQueuedPrompt` for that queued item. It does not create an empty steer.
 
+Set `:empty-send-continues="true"` on `CodexConversationPane` (or
+`CodexComposer`) to opt into empty-composer continuation. With no text,
+attachments, host context, or active command, the muted Send button becomes
+available on hover; clicking it or pressing `Cmd+Enter`
+submits the literal prompt `continue`. The option is off by default. It does
+not override the dedicated interrupted-turn Continue action, an active-turn
+interrupt, or empty-composer `Cmd+Enter` on an existing queued prompt.
+
 `CodexConversationPane` also renders an Edit action for each queued prompt.
 Editing is disabled while the composer contains a draft. A normal submit saves
-the edited text in the same queue position; Cmd/Ctrl+Enter steers the edited
+the edited text in the same queue position; Cmd+Enter steers the edited
 text immediately and removes the queued item.
 
 ## Controlled text and selection
@@ -227,7 +235,9 @@ present, the composer submits the canonical prompt:
 ```
 
 This keeps the app-server turn contract explicit while allowing image- or
-file-only interaction.
+file-only interaction. Attachment-only prompts also work while a turn is busy:
+normal Send queues them, while `Cmd+Enter` steers them with the same sentinel
+and attachment references.
 
 ## Voice recording
 
