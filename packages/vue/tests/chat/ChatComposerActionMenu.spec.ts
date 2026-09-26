@@ -47,7 +47,7 @@ describe('ChatComposerActionMenu', () => {
     expect(approvalItems.map((item) => item.get('svg').attributes('class'))).toStrictEqual([
       expect.stringContaining('tabler-icon-hand-stop'),
       expect.stringContaining('tabler-icon-sparkles'),
-      expect.stringContaining('tabler-icon-shield-check'),
+      expect.stringContaining('codex-composer-menu-list__radio-check'),
     ]);
     await wrapper.findAll('[role="menuitemradio"]')[1]?.trigger('click');
 

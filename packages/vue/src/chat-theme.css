@@ -46,9 +46,9 @@
   --font-weight-xlight: 200;
   --font-weight-light: 300;
   --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  --font-weight-medium: 450;
+  --font-weight-semibold: 500;
+  --font-weight-bold: 600;
   --line-height-16: 16px;
   --line-height-18: 18px;
   --line-height-20: 20px;
@@ -64,10 +64,10 @@
   --chat-composer-line-height: var(--codex-composer-line-height, var(--line-height-24));
   --chat-menu-font-size: var(--codex-menu-font-size, var(--font-size-14));
   --chat-menu-description-font-size: var(--codex-menu-description-font-size, var(--font-size-12));
-  --chat-menu-line-height: var(--codex-menu-line-height, var(--line-height-18));
+  --chat-menu-line-height: var(--codex-menu-line-height, var(--line-height-20));
   --chat-composer-control-size: var(--codex-composer-control-size, var(--codex-composer-button-size, 36px));
   --chat-composer-compact-control-size: var(--codex-composer-compact-control-size, 28px);
-  --chat-menu-control-min-height: var(--codex-menu-control-min-height, 26px);
+  --chat-menu-control-min-height: var(--codex-menu-control-min-height, 28px);
   --chat-message-action-control-size: var(--codex-message-action-control-size, 24px);
 
   --space-1: 2px;

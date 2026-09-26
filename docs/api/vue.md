@@ -103,8 +103,8 @@ briefly clears during that handoff. The host must not insert a second
 renderer-only optimistic row or preserve a synthetic busy flag.
 
 `composer.leadingMenuItems` renders host actions after the built-in Approval
-item and before Plan mode. `composer.menuItems` remains the trailing extension
-point after Plan mode. The equivalent granular pane prop is
+item and before Plan and Goal modes. `composer.menuItems` remains the trailing
+extension point after those modes. The equivalent granular pane prop is
 `leading-menu-items`.
 
 `composer.modelMenuItems` renders host actions before the built-in Model,
@@ -210,7 +210,10 @@ authoritative. Changing `conversationKey` restores the incoming state without
 emitting an intermediate empty value. `activeCommandId` identifies an active
 command whose `CodexCommandSummary.composerMode` supplies the visible chip label
 and placeholder. Submitting serializes `/<slashName-or-name> <text>` and clears
-the active command; removing its chip preserves the current text.
+the active command; removing its chip preserves the current text. The built-in
+Goal mode can also be toggled in the + menu when goals and `codex.goal` are
+available. It uses the same `activeCommandId` state as `/goal`, and is mutually
+exclusive with Plan mode.
 
 ```ts
 type CodexCommandSummary = {

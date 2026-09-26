@@ -256,7 +256,7 @@ const scenarios: [Scenario, ...Scenario[]] = [
     name: 'Goal composer',
     summary: 'Pending command chip and required objective',
     title: 'Set a conversation goal',
-    description: 'Type /goal, choose Goal, enter an objective, and submit the canonical command.',
+    description: 'Choose Goal mode from + or type /goal, then enter an objective and submit the canonical command.',
     messages: [],
   },
   {

@@ -1014,6 +1014,37 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[true]]);
   });
 
+  it('switches between Goal and Plan through the composer menu without keeping both active', async () => {
+    const wrapper = mountComposer({ commands: codexCommands, planMode: true });
+
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+    const goalItem = wrapper.findAll('[role="menuitemcheckbox"]')
+      .find((item) => item.text().includes('Goal mode'))!;
+    expect(goalItem.attributes('aria-checked')).toBe('false');
+    await goalItem.trigger('click');
+
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
+    expect(wrapper.emitted('update:composerState')?.at(-1)?.[0]).toMatchObject({ activeCommandId: 'codex.goal' });
+
+    await wrapper.setProps({ planMode: false });
+    await wrapper.findAll('[role="menuitemcheckbox"]')
+      .find((item) => item.text().includes('Plan mode'))!.trigger('click');
+
+    expect(wrapper.emitted('update:planMode')?.at(-1)).toStrictEqual([true]);
+    expect((wrapper.emitted('update:composerState')?.at(-1)?.[0] as CodexComposerState).activeCommandId).toBeUndefined();
+    await wrapper.setProps({ planMode: true });
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Plan');
+
+    await wrapper.findAll('[role="menuitemcheckbox"]')
+      .find((item) => item.text().includes('Goal mode'))!.trigger('click');
+    await wrapper.setProps({ planMode: false });
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
+    await wrapper.findAll('[role="menuitemcheckbox"]')
+      .find((item) => item.text().includes('Goal mode'))!.trigger('click');
+    expect(wrapper.find('[aria-label="Active composer modes"]').exists()).toBe(false);
+  });
+
   it('toggles plan mode with Shift Tab and renders active mode chips', async () => {
     const wrapper = mountComposer({
       planMode: true,
@@ -1369,8 +1400,11 @@ describe('ChatComposer', () => {
   it('submits Codex plan from the slash command menu without showing a slash prefix', async () => {
     const wrapper = mountComposer({
       commands: codexCommands,
+      composerState: { text: '', selectionStart: 0, selectionEnd: 0, activeCommandId: 'codex.goal' },
       skills,
     });
+
+    expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
 
     await setEditorValue(wrapper, '/pla');
     await editor(wrapper).trigger('keyup');
@@ -1383,11 +1417,13 @@ describe('ChatComposer', () => {
 
     expect(wrapper.emitted('send')).toStrictEqual([['/plan']]);
     expect(editorValue(wrapper)).toBe('');
+    expect(wrapper.find('[aria-label="Active composer modes"]').exists()).toBe(false);
   });
 
   it('collects a required goal objective in a removable composer mode before submission', async () => {
     const wrapper = mountComposer({
       commands: codexCommands,
+      planMode: true,
       skills,
     });
 
@@ -1401,8 +1437,10 @@ describe('ChatComposer', () => {
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
     expect(wrapper.emitted('send')).toBeUndefined();
+    expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
     expect(editorValue(wrapper)).toBe('');
     expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
+    await wrapper.setProps({ planMode: false });
     expect(wrapper.findComponent(ChatRichTextEditor).props('placeholder')).toBe('Describe the goal');
     expect(wrapper.get('.chat-composer__send').attributes('disabled')).toBeDefined();
     await wrapper.setProps({ hasAttachments: true });

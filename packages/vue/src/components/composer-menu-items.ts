@@ -1,10 +1,10 @@
 import { defineComponent, h, nextTick, reactive, type Component, type PropType, type Slots, type VNode } from 'vue';
 import type {
   CodexComposerMenuItem,
-  CodexComposerMenuItemBase,
   CodexComposerMenuSelectableItem,
+  CodexComposerMenuSubmenuItem,
 } from '../composer-menu';
-import { ChevronRightIcon } from '../icons/app-icons';
+import { CheckIcon, ChevronRightIcon } from '../icons/app-icons';
 
 const CodexComposerMenuItems = defineComponent({
   name: 'CodexComposerMenuItems',
@@ -122,7 +122,7 @@ function renderItem(
       },
     }, [
       h('button', {
-        class: 'codex-composer-menu-list__item',
+        class: 'codex-composer-menu-list__item codex-composer-menu-list__item--submenu',
         type: 'button',
         role: 'menuitem',
         'aria-haspopup': 'menu',
@@ -142,7 +142,7 @@ function renderItem(
           });
         },
       }, [
-        ...renderContent(item, slots),
+        ...renderContent(item, slots).nodes,
         h(ChevronRightIcon, {
           class: 'codex-composer-menu-list__chevron',
           'aria-hidden': 'true',
@@ -167,10 +167,14 @@ function renderItem(
     ]);
   }
 
+  const content = renderContent(item, slots);
   return h('button', {
     key: item.id,
     class: [
       'codex-composer-menu-list__item',
+      item.type === 'checkbox' && item.accessory === 'switch'
+        ? 'codex-composer-menu-list__item--switch'
+        : null,
       (item.type === 'action' || item.type === 'custom') && item.danger
         ? 'codex-composer-menu-list__item--danger'
         : null,
@@ -182,7 +186,7 @@ function renderItem(
     tabindex: firstFocusable ? 0 : -1,
     onClick: () => select(item),
   }, [
-    ...renderContent(item, slots),
+    ...content.nodes,
     item.type === 'checkbox' && item.accessory === 'switch'
       ? h('span', {
         class: [
@@ -191,7 +195,7 @@ function renderItem(
         ],
         'aria-hidden': 'true',
       }, [h('span', { class: 'codex-composer-menu-list__switch-thumb' })])
-      : item.type === 'checkbox' || item.type === 'radio'
+      : item.type === 'checkbox' || (item.type === 'radio' && item.checked && !content.leadingRadioCheck)
         ? h('span', { class: 'codex-composer-menu-list__selection', 'aria-hidden': 'true' }, item.checked ? '✓' : '')
       : null,
   ]);
@@ -247,54 +251,71 @@ function focusItem(menu: HTMLElement | null, target: HTMLButtonElement | undefin
   target.focus();
 }
 
-function renderContent(item: CodexComposerMenuItemBase<unknown>, slots: Slots): Array<VNode | null> {
+function renderContent(
+  item: CodexComposerMenuSelectableItem<unknown> | CodexComposerMenuSubmenuItem<unknown>,
+  slots: Slots,
+): { nodes: Array<VNode | null>; leadingRadioCheck: boolean } {
   const customContent = slots.item?.({ item });
   if (customContent?.length) {
-    return customContent;
+    return { nodes: customContent, leadingRadioCheck: false };
   }
 
   const customIcon = slots.icon?.({ item });
-  const icon = customIcon?.length ? customIcon : ('leadingColor' in item && item.leadingColor
-    ? [h('span', {
+  const leadingRadioCheck = item.type === 'radio' && item.checked && !customIcon?.length;
+  let icon: VNode[];
+  if (customIcon?.length) {
+    icon = customIcon;
+  } else if (leadingRadioCheck) {
+    icon = [h(CheckIcon, {
+      class: 'codex-composer-menu-list__icon codex-composer-menu-list__radio-check',
+      'aria-hidden': 'true',
+    })];
+  } else if ('leadingColor' in item && item.leadingColor) {
+    icon = [h('span', {
       class: 'codex-composer-menu-list__color-dot',
       style: { backgroundColor: item.leadingColor },
       'aria-hidden': 'true',
-    })]
-    : item.icon
-    ? [h(item.icon as Component, { class: 'codex-composer-menu-list__icon', 'aria-hidden': 'true' })]
-    : [h('span', {
+    })];
+  } else if (item.icon) {
+    icon = [h(item.icon as Component, { class: 'codex-composer-menu-list__icon', 'aria-hidden': 'true' })];
+  } else {
+    icon = [h('span', {
       class: 'codex-composer-menu-list__icon codex-composer-menu-list__icon--empty',
       'aria-hidden': 'true',
-    })]);
+    })];
+  }
 
-  return [
-    ...icon,
-    h('span', { class: 'codex-composer-menu-list__copy' }, [
-      h('span', { class: 'codex-composer-menu-list__label' }, item.label),
-      item.description
-        ? h('span', { class: 'codex-composer-menu-list__description' }, ` • ${item.description}`)
+  return {
+    nodes: [
+      ...icon,
+      h('span', { class: 'codex-composer-menu-list__copy' }, [
+        h('span', { class: 'codex-composer-menu-list__label' }, item.label),
+        item.description
+          ? h('span', { class: 'codex-composer-menu-list__description' }, ` • ${item.description}`)
+          : null,
+      ]),
+      item.value || item.valueIcon
+        ? h('span', { class: 'codex-composer-menu-list__value' }, [
+          item.value
+            ? h('span', {
+              class: item.valueAppearance === 'badge'
+                ? 'codex-composer-menu-list__value-badge'
+                : undefined,
+            }, item.value)
+            : null,
+          item.valueIcon
+            ? h(item.valueIcon as Component, {
+              class: 'codex-composer-menu-list__value-icon',
+              title: item.valueIconLabel,
+              'aria-label': item.valueIconLabel,
+              'aria-hidden': item.valueIconLabel ? undefined : 'true',
+            })
+            : null,
+        ])
         : null,
-    ]),
-    item.value || item.valueIcon
-      ? h('span', { class: 'codex-composer-menu-list__value' }, [
-        item.value
-          ? h('span', {
-            class: item.valueAppearance === 'badge'
-              ? 'codex-composer-menu-list__value-badge'
-              : undefined,
-          }, item.value)
-          : null,
-        item.valueIcon
-          ? h(item.valueIcon as Component, {
-            class: 'codex-composer-menu-list__value-icon',
-            title: item.valueIconLabel,
-            'aria-label': item.valueIconLabel,
-            'aria-hidden': item.valueIconLabel ? undefined : 'true',
-          })
-          : null,
-      ])
-      : null,
-  ];
+    ],
+    leadingRadioCheck,
+  };
 }
 
 function itemRole(item: CodexComposerMenuSelectableItem<unknown>): 'menuitem' | 'menuitemcheckbox' | 'menuitemradio' {

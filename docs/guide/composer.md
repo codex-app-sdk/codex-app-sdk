@@ -44,6 +44,13 @@ command uses this contract so the objective is collected before a complete
 `/goal Ship the SDK` command is submitted. Typing the complete command manually
 remains valid.
 
+The + menu exposes Goal mode beside Plan mode when goals are supported and the
+built-in `codex.goal` command is available. It activates the same pending
+objective as `/goal`; selecting it again removes the mode without clearing the
+draft. Goal and Plan are mutually exclusive: activating either one turns off
+the other, including when Goal is selected through slash suggestions or Plan
+is toggled with Shift+Tab.
+
 ```vue
 <CodexComposer
   :commands="commands"

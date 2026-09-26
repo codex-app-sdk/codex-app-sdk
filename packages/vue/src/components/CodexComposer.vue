@@ -81,22 +81,25 @@
           :items="menuItems"
           :approval-preset="approvalPreset"
           :approval-presets="effectiveCodexCapabilities.approvalPresets ?? []"
-          :plan-mode="planMode"
+          :goal-mode="goalMode"
+          :plan-mode="effectivePlanMode"
           :show-approval-menu="effectiveCodexCapabilities.approvals && Boolean(approvalPreset) && (effectiveCodexCapabilities.approvalPresets?.length ?? 0) > 0"
+          :show-goal-mode="effectiveCodexCapabilities.goals && Boolean(goalCommand)"
           :show-plan-mode="effectiveCodexCapabilities.planMode"
           @attach="$emit('attach')"
           @select="$emit('menuSelect', $event)"
           @select-approval-preset="$emit('selectApprovalPreset', $event)"
-          @update:plan-mode="$emit('update:planMode', $event)"
+          @update:goal-mode="updateGoalMode"
+          @update:plan-mode="updatePlanMode"
         >
           <template v-if="$slots['menu-icon']" #icon="scope"><slot name="menu-icon" v-bind="scope" /></template>
           <template v-if="$slots['menu-item']" #item="scope"><slot name="menu-item" v-bind="scope" /></template>
         </ChatComposerActionMenu>
         <slot name="before-meta" />
         <ChatComposerActiveModes
-          :plan-mode="effectiveCodexCapabilities.planMode && Boolean(planMode)"
+          :plan-mode="effectivePlanMode"
           :command="activeCommand"
-          @disable-plan-mode="$emit('update:planMode', false)"
+          @disable-plan-mode="updatePlanMode(false)"
           @remove-command="removeActiveCommand"
         />
       </div>
@@ -257,6 +260,11 @@ const effectivePresentation = computed(() => resolveCodexConversationPresentatio
 const activeCommand = computed(() => (
   (props.commands ?? codexCommands).find((command) => command.id === activeCommandId.value) ?? null
 ));
+const goalCommand = computed(() => (
+  (props.commands ?? codexCommands).find((command) => command.id === 'codex.goal' && command.composerMode) ?? null
+));
+const goalMode = computed(() => Boolean(goalCommand.value && activeCommandId.value === goalCommand.value.id));
+const effectivePlanMode = computed(() => Boolean(effectiveCodexCapabilities.value.planMode && props.planMode && !goalMode.value));
 const effectivePlaceholder = computed(() => activeCommand.value?.composerMode?.placeholder ?? props.placeholder);
 const voiceVisible = computed(() => (
   effectivePresentation.value.composer.voice
@@ -380,10 +388,10 @@ const {
   mentionGroups: () => props.mentionGroups ?? [],
   isSending: () => props.isSending,
   onCommandActivated: (command) => {
-    activeCommandId.value = command.id;
-    emitComposerState();
+    activateComposerCommand(command);
   },
   onCommandSubmitted: (command) => {
+    if (command === '/plan' && goalMode.value) clearActiveCommand();
     rememberSubmittedPrompt(command);
     emit('send', command);
   },
@@ -510,9 +518,33 @@ function setComposerText(value: string): void {
 }
 
 function removeActiveCommand(): void {
+  clearActiveCommand();
+  editorEl.value?.focusEnd();
+}
+
+function clearActiveCommand(): void {
   activeCommandId.value = null;
   emitComposerState();
-  editorEl.value?.focusEnd();
+}
+
+function activateComposerCommand(command: CodexCommandSummary): void {
+  if (command.id === goalCommand.value?.id && props.planMode) emit('update:planMode', false);
+  activeCommandId.value = command.id;
+  emitComposerState();
+}
+
+function updateGoalMode(enabled: boolean): void {
+  if (enabled) {
+    if (!goalCommand.value) return;
+    activateComposerCommand(goalCommand.value);
+  } else if (goalMode.value) {
+    clearActiveCommand();
+  }
+}
+
+function updatePlanMode(enabled: boolean): void {
+  if (enabled && goalMode.value) clearActiveCommand();
+  emit('update:planMode', enabled);
 }
 
 function restoreComposerState(state: CodexComposerState): void {
@@ -588,7 +620,7 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   if (event.key === 'Tab' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     if (effectiveCodexCapabilities.value.planMode) {
-      emit('update:planMode', !props.planMode);
+      updatePlanMode(!effectivePlanMode.value);
     }
     return;
   }

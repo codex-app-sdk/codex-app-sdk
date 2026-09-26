@@ -131,6 +131,17 @@ Host classes applied to `CodexConversationPane` land on its root element. Use
 those classes for semantic tokens and shell layout—not selectors into private
 component internals.
 
+Built-in menus and composer pickers use 4px outer padding, 4px/8px item
+padding, a 28px minimum row height, 0.125px block margin per row, and a 6px gap
+between a leading icon and its label. Standard menu rows use a 20px text line
+height, yielding a natural 28px row height. Switch rows use 2px vertical
+padding. Menu labels use
+`--font-weight-medium` (450 by default); semibold and bold default to 500 and
+600.
+Selected radio menu options show a leading check in place of their glyph;
+unselected option glyphs remain muted. The model selector instead marks its
+current choice with a subtle row background, without a visible check.
+
 Chat controls and menus do not select text during interaction. Message text
 remains selectable for quoting and copying.
 

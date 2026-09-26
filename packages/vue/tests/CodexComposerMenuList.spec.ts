@@ -129,7 +129,8 @@ describe('CodexComposerMenuList', () => {
       { id: 'custom', type: 'custom', label: 'Custom', danger: true, icon: Icon },
       { id: 'check', type: 'checkbox', label: 'Check', checked: false },
       { id: 'switch-off', type: 'checkbox', label: 'Switch off', accessory: 'switch', checked: false },
-      { id: 'radio', type: 'radio', label: 'Radio', checked: true },
+      { id: 'radio', type: 'radio', label: 'Radio', checked: true, icon: Icon },
+      { id: 'radio-alternate', type: 'radio', label: 'Alternate', checked: false, icon: Icon },
       {
         id: 'wide',
         type: 'submenu',
@@ -180,8 +181,11 @@ describe('CodexComposerMenuList', () => {
     expect(button('Check').get('.codex-composer-menu-list__selection').text()).toBe('');
     expect(button('Radio').attributes('role')).toBe('menuitemradio');
     expect(button('Radio').attributes('aria-checked')).toBe('true');
-    expect(button('Radio').get('.codex-composer-menu-list__selection').text()).toBe('✓');
-    expect(button('Radio').get('.codex-composer-menu-list__selection').attributes('aria-hidden')).toBe('true');
+    expect(button('Radio').get(':scope > svg').attributes('aria-hidden')).toBe('true');
+    expect(button('Radio').find('[data-icon="custom"]').exists()).toBe(false);
+    expect(button('Radio').find('.codex-composer-menu-list__selection').exists()).toBe(false);
+    expect(button('Alternate').get('[data-icon="custom"]').attributes('aria-hidden')).toBe('true');
+    expect(button('Alternate').find('.codex-composer-menu-list__selection').exists()).toBe(false);
     expect(button('Switch off').get('.codex-composer-menu-list__switch').classes())
       .not.toContain('codex-composer-menu-list__switch--checked');
     expect(button('Switch off').get('.codex-composer-menu-list__switch').attributes('aria-hidden')).toBe('true');

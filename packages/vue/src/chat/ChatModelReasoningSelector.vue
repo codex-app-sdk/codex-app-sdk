@@ -335,21 +335,21 @@ function wrapHostMenuItems(
   color: var(--color-text);
 }
 
-:deep(.chat-model-selector__menu .codex-composer-menu-list__item) {
-  gap: var(--space-3);
-  min-height: var(--space-16);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
 :deep(.chat-model-selector__menu .codex-composer-menu-list__icon--empty) {
   display: none;
 }
 
-:deep(.chat-model-selector__menu .codex-composer-menu-list__item[aria-checked="true"] .codex-composer-menu-list__label) {
-  font-weight: var(--font-weight-semibold);
+:deep(.chat-model-selector__menu [role="menuitemradio"][aria-checked="true"]) {
+  background: var(--color-surface-low);
+}
+
+:deep(.chat-model-selector__menu [role="menuitemradio"] .codex-composer-menu-list__radio-check),
+:deep(.chat-model-selector__menu [role="menuitemradio"] .codex-composer-menu-list__selection) {
+  display: none;
+}
+
+:deep(.chat-model-selector__menu .codex-composer-menu-list__heading) {
+  padding-left: var(--space-4);
 }
 
 @media (max-width: 720px) {

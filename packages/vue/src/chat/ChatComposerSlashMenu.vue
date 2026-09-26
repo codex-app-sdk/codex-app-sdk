@@ -116,7 +116,7 @@ watch(
 }
 
 .chat-composer-slash-menu__section {
-  padding: var(--space-3) var(--space-4) var(--space-1);
+  padding: var(--space-2) var(--space-4) var(--space-2) calc(var(--space-4) + var(--icon-md) + var(--space-3));
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-medium);
@@ -130,7 +130,9 @@ watch(
   gap: var(--space-3);
   width: 100%;
   min-width: 0;
-  padding: var(--space-3) var(--space-4);
+  min-height: var(--chat-menu-control-min-height);
+  margin-block: 0.125px;
+  padding: var(--space-2) var(--space-4);
   border: 0;
   border-radius: var(--radius-lg);
   background: transparent;
@@ -153,7 +155,16 @@ watch(
   width: var(--icon-md);
   height: var(--icon-md);
   flex: 0 0 var(--icon-md);
-  color: var(--color-text-muted);
+}
+
+.chat-composer-slash-menu__icon svg {
+  opacity: 0.5;
+  stroke-width: 2px;
+}
+
+.chat-composer-slash-menu__item--active .chat-composer-slash-menu__icon svg {
+  opacity: 1;
+  stroke-width: 2.5px;
 }
 
 .chat-composer-slash-menu__main {

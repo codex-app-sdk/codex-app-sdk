@@ -36,7 +36,7 @@ import type {
   CodexComposerMenuItem,
   CodexComposerMenuSelectableItem,
 } from '../composer-menu';
-import { HandStopIcon, ListDetailsIcon, PaperclipIcon, PlusIcon, ShieldCheckIcon, Sparkles } from '../icons/app-icons';
+import { HandStopIcon, ListDetailsIcon, PaperclipIcon, PlusIcon, ShieldCheckIcon, Sparkles, TargetArrowIcon } from '../icons/app-icons';
 
 type ComposerMenuAction = { kind: 'approval'; preset: ApprovalPreset };
 
@@ -48,8 +48,10 @@ const props = withDefaults(defineProps<{
   items?: readonly CodexComposerMenuItem<Payload>[];
   approvalPreset?: ApprovalPreset | null;
   approvalPresets?: readonly ApprovalPreset[];
+  goalMode?: boolean;
   planMode: boolean;
   showApprovalMenu?: boolean;
+  showGoalMode?: boolean;
   showPlanMode?: boolean;
 }>(), {
   attachEnabled: false,
@@ -58,8 +60,10 @@ const props = withDefaults(defineProps<{
   items: () => [],
   approvalPreset: null,
   approvalPresets: () => [],
+  goalMode: false,
   planMode: false,
   showApprovalMenu: false,
+  showGoalMode: false,
   showPlanMode: true,
 });
 
@@ -67,6 +71,7 @@ const emit = defineEmits<{
   attach: [];
   select: [item: CodexComposerMenuSelectableItem<Payload>];
   selectApprovalPreset: [preset: ApprovalPreset];
+  'update:goalMode': [enabled: boolean];
   'update:planMode': [enabled: boolean];
 }>();
 // Stryker restore all
@@ -107,6 +112,17 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
     });
   }
 
+  if (props.showGoalMode) {
+    items.push({
+      id: 'goal-mode',
+      type: 'checkbox',
+      label: 'Goal mode',
+      accessory: 'switch',
+      checked: props.goalMode,
+      icon: TargetArrowIcon,
+    });
+  }
+
   items.push(...props.items);
 
   if (props.attachEnabled) {
@@ -138,6 +154,10 @@ function selectMenuItem(item: CodexComposerMenuSelectableItem<ComposerMenuAction
   const action = item.payload;
   if (item.id === 'plan-mode') {
     emit('update:planMode', !props.planMode);
+    return;
+  }
+  if (item.id === 'goal-mode') {
+    emit('update:goalMode', !props.goalMode);
     return;
   }
   if (item.id.startsWith('approval:') && isComposerMenuAction(action) && action.kind === 'approval') {

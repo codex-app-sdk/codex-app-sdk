@@ -205,11 +205,13 @@ The built-in `/goal` command first activates a removable Goal mode in the
 composer and requires an objective before submission. Controlled hosts persist
 that pending state through `composer.state.activeCommandId`; editing an existing
 goal restores its objective with the same Goal mode instead of exposing raw
-slash syntax in the editor.
+slash syntax in the editor. The + menu also toggles this pending Goal mode
+when the `codex.goal` command and goals capability are available. Activating
+Goal clears Plan mode, and activating Plan removes the pending Goal mode.
 
 Use `composer.leadingMenuItems` for host actions that belong beside the built-in
-Codex controls. They render after Approval and before Plan mode. Existing
-`composer.menuItems` remain after Plan mode; both collections use
+Codex controls. They render after Approval and before Plan and Goal modes.
+Existing `composer.menuItems` remain after those modes; both collections use
 `CodexComposerMenuItem` and dispatch through `actions.menuSelect`.
 Use `composer.modelMenuItems` for host-owned presets or actions that belong
 inside the model selector. They render before the SDK-owned Model, Reasoning,
