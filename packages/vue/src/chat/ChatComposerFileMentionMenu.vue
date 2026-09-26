@@ -93,12 +93,11 @@ watch(
 }
 
 .chat-composer-file-menu__section {
-  padding: var(--space-2) var(--space-4) var(--space-2) calc(var(--space-4) + var(--icon-md) + var(--space-3));
+  padding: var(--space-2) var(--space-4);
   color: var(--color-text-muted);
-  font-size: var(--font-size-12);
+  font-size: var(--codex-composer-menu-heading-font-size, 13px);
   font-weight: var(--font-weight-medium);
-  line-height: normal;
-  text-transform: uppercase;
+  line-height: 18px;
 }
 
 .chat-composer-file-menu__item {
@@ -131,11 +130,6 @@ watch(
   flex: 0 0 var(--icon-md);
   opacity: 0.5;
   stroke-width: 2px;
-}
-
-.chat-composer-file-menu__item--active .chat-composer-file-menu__icon {
-  opacity: 1;
-  stroke-width: 2.5px;
 }
 
 .chat-composer-file-menu__name {
