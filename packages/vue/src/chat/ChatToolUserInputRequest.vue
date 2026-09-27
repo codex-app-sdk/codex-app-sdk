@@ -318,7 +318,7 @@ function hasAnswerFor(question: AskUserQuestion) {
 
 function onAnswerKeydown(event: KeyboardEvent) {
   event.stopPropagation()
-  if (event.key !== 'Enter' || !event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+  if (event.key !== 'Enter' || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
     return
   }
 

@@ -283,7 +283,7 @@ describe('ChatToolUserInputRequest interactions', () => {
   it.each([
     { mode: 'direct', question: { ...firstQuestion, options: null } },
     { mode: 'Other', question: firstQuestion },
-  ])('submits a non-empty $mode answer with Cmd+Enter', async ({ mode, question }) => {
+  ])('submits a non-empty $mode answer with Enter and reserves Shift+Enter for a newline', async ({ mode, question }) => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: { toolCall: requestTool([question]) },
     });
@@ -293,14 +293,21 @@ describe('ChatToolUserInputRequest interactions', () => {
 
     const input = wrapper.get('textarea');
     await input.setValue('   ');
-    await input.trigger('keydown', { key: 'Enter', metaKey: true });
-    expect(wrapper.emitted('client-response')).toBeUndefined();
-
-    await input.setValue('  custom answer  ');
     await input.trigger('keydown', { key: 'Enter' });
     expect(wrapper.emitted('client-response')).toBeUndefined();
 
-    await input.trigger('keydown', { key: 'Enter', metaKey: true });
+    await input.setValue('  custom answer  ');
+    const newline = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true });
+    input.element.dispatchEvent(newline);
+    expect(newline.defaultPrevented).toBe(false);
+    expect(wrapper.emitted('client-response')).toBeUndefined();
+
+    const composing = new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true });
+    input.element.dispatchEvent(composing);
+    expect(composing.defaultPrevented).toBe(false);
+    expect(wrapper.emitted('client-response')).toBeUndefined();
+
+    await input.trigger('keydown', { key: 'Enter' });
     expect(wrapper.emitted('client-response')).toStrictEqual([[
       {
         id: 'request-1',
