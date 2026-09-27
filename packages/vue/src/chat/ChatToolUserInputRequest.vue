@@ -85,7 +85,7 @@
           :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
           rows="1"
           :type="currentQuestion.isSecret ? 'password' : 'text'"
-          @keydown.stop
+          @keydown="onAnswerKeydown"
         />
 
         <template v-else>
@@ -140,7 +140,7 @@
               @click.stop
               @focus="selectOther(currentQuestion)"
               @input="selectOther(currentQuestion)"
-              @keydown.stop
+              @keydown="onAnswerKeydown"
             />
           </div>
         </template>
@@ -159,7 +159,7 @@
           class="chat-tool-user-input__button chat-tool-user-input__button--primary"
           :disabled="!canProceed"
           type="button"
-          @click="isLastQuestion ? submit() : next()"
+          @click="proceed"
         >
           {{ isLastQuestion ? 'Send' : 'Next' }}
         </button>
@@ -314,6 +314,26 @@ function hasAnswerFor(question: AskUserQuestion) {
   return (selections[question.id]?.length ?? 0) > 0 || (
     (isFreeTextOnly(question) || otherSelected[question.id]) && !!otherTexts[question.id]?.trim()
   )
+}
+
+function onAnswerKeydown(event: KeyboardEvent) {
+  event.stopPropagation()
+  if (event.key !== 'Enter' || !event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return
+  }
+
+  event.preventDefault()
+  if (currentQuestion.value && otherTexts[currentQuestion.value.id]?.trim()) {
+    proceed()
+  }
+}
+
+function proceed() {
+  if (isLastQuestion.value) {
+    submit()
+  } else {
+    next()
+  }
 }
 
 function next() {

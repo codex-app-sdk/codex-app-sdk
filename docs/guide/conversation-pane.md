@@ -127,6 +127,8 @@ requests through `thread.clientRequests` and route `actions.clientResponse`;
 the pane hides the active tool card from the transcript and retains the answered
 tool summary afterward. The standalone `clientRequests` prop provides the same
 input outside controller mode.
+In a direct-answer or Other text field, `Cmd+Enter` advances or sends the answer
+when its text is nonblank; Enter alone inserts a newline.
 
 While a turn is running, an unanswered async question replaces the composer.
 When that turn finishes, the composer returns with a **Pending question** button

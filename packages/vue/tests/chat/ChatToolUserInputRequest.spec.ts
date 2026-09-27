@@ -280,6 +280,35 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
 });
 
 describe('ChatToolUserInputRequest interactions', () => {
+  it.each([
+    { mode: 'direct', question: { ...firstQuestion, options: null } },
+    { mode: 'Other', question: firstQuestion },
+  ])('submits a non-empty $mode answer with Cmd+Enter', async ({ mode, question }) => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      props: { toolCall: requestTool([question]) },
+    });
+    if (mode === 'Other') {
+      await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
+    }
+
+    const input = wrapper.get('textarea');
+    await input.setValue('   ');
+    await input.trigger('keydown', { key: 'Enter', metaKey: true });
+    expect(wrapper.emitted('client-response')).toBeUndefined();
+
+    await input.setValue('  custom answer  ');
+    await input.trigger('keydown', { key: 'Enter' });
+    expect(wrapper.emitted('client-response')).toBeUndefined();
+
+    await input.trigger('keydown', { key: 'Enter', metaKey: true });
+    expect(wrapper.emitted('client-response')).toStrictEqual([[
+      {
+        id: 'request-1',
+        payload: { answers: { target: { answers: ['custom answer'] } } },
+      },
+    ]]);
+  });
+
   it('shows every choice explanation and separates a recommendation from the answer label', async () => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: {
