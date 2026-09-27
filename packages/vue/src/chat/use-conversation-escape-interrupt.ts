@@ -63,6 +63,7 @@ export function useConversationEscapeInterrupt(options: ConversationEscapeInterr
     ) return;
 
     const root = options.root.value;
+    if (!root?.isConnected) return;
     const focusedInside = Boolean(root && document.activeElement && root.contains(document.activeElement));
     const generatingPanes = document.querySelectorAll('[data-codex-generating="true"]');
     if (!focusedInside && generatingPanes.length !== 1) return;

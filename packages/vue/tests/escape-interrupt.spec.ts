@@ -207,6 +207,28 @@ describe('conversation Escape interruption', () => {
     second.unmount()
   })
 
+  it('ignores an Escape listener whose pane root is detached', async () => {
+    const detached = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { busy: true, messages: [] },
+    })
+    detached.element.remove()
+    const active = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { busy: true, messages: [] },
+    })
+
+    ;(active.get('[role="textbox"]').element as HTMLElement).focus()
+    const event = pressEscape()
+    await active.vm.$nextTick()
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(active.get('.chat-composer__send').classes())
+      .toContain('codex-composer-send-button--interrupt-armed')
+    detached.unmount()
+    active.unmount()
+  })
+
   it('cancels armed timeout and document listener during unmount', () => {
     vi.useFakeTimers()
     const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout')
