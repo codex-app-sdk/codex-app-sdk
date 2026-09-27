@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "check": "npm run lint && npm test && npm run build",
+    "check": "npm run lint && npm test && npm run test:browser && npm run build",
     "dev": "vite",
     "lint": "npm run typecheck",
     "test": "vitest run",
+    "test:browser": "node tests/scroll.browser.mjs",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {

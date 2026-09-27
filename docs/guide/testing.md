@@ -50,6 +50,10 @@ rendered elements; use a real browser for layout geometry or other behavior
 JSDOM cannot prove, such as selection, clipboard, and scrolling. Loading a
 stylesheet into the test document is setup, not an assertion on its source text.
 
+Run the component lab's scrolling regression with `npm run test:browser -w
+@codex-app-sdk/component-lab`. Install its Chromium runtime once with
+`npx playwright install chromium` (or `--with-deps chromium` on Linux CI).
+
 ## Put checks in the right tool
 
 Tests must never read committed implementation or configuration files to assert

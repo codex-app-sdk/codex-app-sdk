@@ -2626,39 +2626,6 @@ describe('CodexMessageList', () => {
     expect(clearTimeout).toHaveBeenCalledWith(73);
   });
 
-  it('coalesces repeated transcript observations into one queued scroll', async () => {
-    let mutationCallback: MutationCallback = () => undefined;
-    let frame: FrameRequestCallback = () => undefined;
-    vi.stubGlobal('MutationObserver', class MockMutationObserver {
-      disconnect(): void {}
-      observe(): void {}
-      takeRecords = (): MutationRecord[] => [];
-
-      constructor(callback: MutationCallback) {
-        mutationCallback = callback;
-      }
-    });
-    vi.stubGlobal('ResizeObserver', undefined);
-    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
-      frame = callback;
-      return requestAnimationFrame.mock.calls.length;
-    });
-    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
-    const wrapper = mount(CodexMessageList, { props: { messages } });
-    await flushPromises();
-
-    expect(requestAnimationFrame).toHaveBeenCalledOnce();
-    mutationCallback([], {} as MutationObserver);
-    mutationCallback([], {} as MutationObserver);
-    expect(requestAnimationFrame).toHaveBeenCalledOnce();
-
-    frame(0);
-    mutationCallback([], {} as MutationObserver);
-    mutationCallback([], {} as MutationObserver);
-    expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
-    wrapper.unmount();
-  });
-
   it('exposes scroll-to-bottom only through a real parent component ref', async () => {
     const list = ref<{ scrollToBottom: () => void } | null>(null);
     const Parent = defineComponent({
@@ -2672,62 +2639,6 @@ describe('CodexMessageList', () => {
     expect(Object.keys(list.value ?? {})).toStrictEqual(['scrollToBottom']);
     list.value!.scrollToBottom();
     expect(scrollEl.scrollTop).toBe(640);
-  });
-
-  it('observes transcript mutations only while stuck to the bottom and disconnects on unmount', async () => {
-    const observers: Array<{
-      callback: MutationCallback;
-      disconnect: ReturnType<typeof vi.fn>;
-      observe: ReturnType<typeof vi.fn>;
-      takeRecords: () => MutationRecord[];
-    }> = [];
-    vi.stubGlobal('MutationObserver', class MockMutationObserver {
-      callback: MutationCallback;
-      disconnect = vi.fn();
-      observe = vi.fn();
-      takeRecords = (): MutationRecord[] => [];
-
-      constructor(callback: MutationCallback) {
-        this.callback = callback;
-        observers.push(this);
-      }
-    });
-    vi.stubGlobal('ResizeObserver', undefined);
-    vi.stubGlobal('requestAnimationFrame', undefined);
-    const wrapper = mount(CodexMessageList, {
-      props: { messages },
-      attachTo: document.body,
-    });
-    const scrollEl = wrapper.get('.message-list').element as HTMLElement;
-    let scrollHeight = 300;
-    Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
-    Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
-    await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    const content = wrapper.get('.codex-message-list__content').element;
-    const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === content));
-    expect(observer).toBeDefined();
-    expect(observer!.observe).toHaveBeenCalledWith(content, {
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
-
-    scrollHeight = 900;
-    observer!.callback([], observer as unknown as MutationObserver);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(scrollEl.scrollTop).toBe(900);
-
-    scrollEl.scrollTop = 100;
-    await wrapper.get('.message-list').trigger('scroll');
-    scrollHeight = 1_200;
-    observer!.callback([], observer as unknown as MutationObserver);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(scrollEl.scrollTop).toBe(100);
-
-    wrapper.unmount();
-    expect(observer!.disconnect).toHaveBeenCalledOnce();
   });
 
   it('keeps the transcript stuck to the bottom when a streaming row changes', async () => {

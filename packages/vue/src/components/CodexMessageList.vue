@@ -81,7 +81,7 @@
       </div>
     </div>
     <CodexScrollToBottom
-      v-if="!stickToBottom"
+      v-if="overflown"
       class="codex-message-list__scroll-to-bottom"
       :label="scrollToBottomLabel"
       @click="scrollToBottom"
@@ -396,10 +396,11 @@ function shouldKeepAssistantActionsVisible(index: number): boolean {
 }
 
 const scrollElement = ref<HTMLElement | null>(null)
-const stickToBottom = ref(true)
-let contentObserver: MutationObserver | null = null
+const tail = ref(true)
+const overflown = ref(false)
 let contentResizeObserver: ResizeObserver | null = null
 let scrollFrame: number | ReturnType<typeof setTimeout> | null = null
+let lastScrollTop = 0
 let pointerSelecting = false
 let lastTextSelection: CodexMessageTextSelection | null = null
 
@@ -409,15 +410,10 @@ onMounted(async () => {
   await nextTick()
   scrollToBottom()
   const content = scrollElement.value?.querySelector('.codex-message-list__content')
-  if (content && typeof MutationObserver !== 'undefined') {
-    contentObserver = new MutationObserver(() => {
-      if (stickToBottom.value) queueScrollToBottom()
-    })
-    contentObserver.observe(content, { childList: true, characterData: true, subtree: true })
-  }
   if (content && typeof ResizeObserver !== 'undefined') {
     contentResizeObserver = new ResizeObserver(() => {
-      if (stickToBottom.value) queueScrollToBottom()
+      if (tail.value) queueScrollToBottom()
+      else updateOverflow()
     })
     contentResizeObserver.observe(content)
   }
@@ -434,7 +430,7 @@ watch(() => props.messages.length, async (nextLength) => {
     ? reconcileMessageWindow(nextLength, previousLength)
     : false
   observeMessageBounds()
-  const shouldScroll = !revealedPrependedMessages && isAtBottom()
+  const shouldScroll = !revealedPrependedMessages && tail.value && isAtBottom()
   await nextTick()
   if (revealedPrependedMessages && target) {
     target.scrollTop = previousTop + target.scrollHeight - previousHeight
@@ -442,6 +438,15 @@ watch(() => props.messages.length, async (nextLength) => {
     scrollToBottom()
   }
 })
+
+watch(
+  [() => props.resetKey, () => props.messages.length, () => props.messages.at(-1)] as const,
+  ([conversationKey, length, message], [previousConversationKey, previousLength, previousMessage]) => {
+    if (conversationKey !== previousConversationKey || length !== previousLength || !message || !previousMessage) return
+    if (message.id && previousMessage.id && message.id !== previousMessage.id) return
+    onNewChunk()
+  },
+)
 
 watch(() => props.messageTextSelection, (enabled) => {
   if (!enabled) clearMessageTextSelection()
@@ -468,13 +473,14 @@ watch(() => props.resetKey, async (nextKey, previousKey) => {
     : initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value))
   loadingOlderMessages.value = false
   olderMessagesRequestPending = false
-  stickToBottom.value = restoredState?.stickToBottom ?? true
+  setTail(restoredState?.stickToBottom ?? true)
   observeMessageBounds()
   await nextTick()
   if (restoredState && target) {
     target.scrollTop = restoredState.stickToBottom
       ? target.scrollHeight
       : restoredState.scrollTop
+    updateOverflow()
   } else {
     scrollToBottom()
   }
@@ -489,18 +495,34 @@ watch(() => [effectiveRenderStrategy.value, effectiveInitialMessageBatchSize.val
     setRenderStartIndex(initialRenderStart(props.messages, effectiveInitialMessageBatchSize.value))
     observeMessageBounds()
     await nextTick()
-    if (stickToBottom.value) scrollToBottom()
+    if (tail.value) scrollToBottom()
   }
 })
 
 function handleScroll(): void {
   clearMessageTextSelection()
-  updateStickiness()
+  const target = scrollElement.value
+  const scrolledUp = target !== null && target.scrollTop < lastScrollTop
+  if (target) lastScrollTop = target.scrollTop
+  updateOverflow()
+  if (!overflown.value) setTail(true)
+  else if (scrolledUp) setTail(false)
   if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange() && renderStartIndex.value <= 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
     requestOlderMessages()
   } else if (effectiveRenderStrategy.value === 'lazy' && isWithinTopPrefetchRange()) {
     void loadOlderMessages()
   }
+}
+
+function onNewChunk(): void {
+  if (tail.value) queueScrollToBottom()
+  else void nextTick(updateOverflow)
+}
+
+function handleViewportClick(event: MouseEvent): void {
+  const target = event.target
+  if (!(target instanceof Element) || !target.closest('.chat-work-group__header')) return
+  setTail(false)
 }
 
 function handleSelectionPointerDown(): void {
@@ -581,14 +603,6 @@ function sameTextSelection(
     && left.anchor.y === right.anchor.y
     && left.anchor.width === right.anchor.width
     && left.anchor.height === right.anchor.height)
-}
-
-function handleViewportClick(event: MouseEvent): void {
-  const target = event.target
-  if (!(target instanceof Element) || !target.closest('.chat-work-group__header')) return
-  if (!stickToBottom.value) return
-  stickToBottom.value = false
-  emit('stickiness-change', false)
 }
 
 function requestOlderMessages(): void {
@@ -703,19 +717,22 @@ function turnAlignedStart(messages: readonly (Message | SurfaceMessage)[], candi
   return start
 }
 
-function updateStickiness(): void {
-  const next = isAtBottom()
-  if (stickToBottom.value !== next) {
-    stickToBottom.value = next
+function setTail(next: boolean): void {
+  if (tail.value !== next) {
+    tail.value = next
     emit('stickiness-change', next)
   }
+}
+
+function updateOverflow(): void {
+  overflown.value = !isAtBottom()
 }
 
 function isAtBottom(): boolean {
   const target = scrollElement.value
   return target
     ? target.scrollHeight - target.scrollTop - target.clientHeight <= props.bottomThreshold
-    : stickToBottom.value
+    : tail.value
 }
 
 function scrollToBottom(): void {
@@ -723,17 +740,16 @@ function scrollToBottom(): void {
     return
   }
   scrollElement.value.scrollTop = scrollElement.value.scrollHeight
-  if (!stickToBottom.value) {
-    stickToBottom.value = true
-    emit('stickiness-change', true)
-  }
+  lastScrollTop = scrollElement.value.scrollTop
+  setTail(true)
+  updateOverflow()
 }
 
 function queueScrollToBottom(): void {
   if (scrollFrame !== null) return
   const callback = () => {
     scrollFrame = null
-    if (stickToBottom.value) scrollToBottom()
+    if (tail.value) scrollToBottom()
   }
   scrollFrame = typeof requestAnimationFrame === 'function'
     ? requestAnimationFrame(callback)
@@ -743,8 +759,6 @@ function queueScrollToBottom(): void {
 onBeforeUnmount(() => {
   document.removeEventListener('pointerup', handleSelectionPointerUp)
   document.removeEventListener('selectionchange', handleDocumentSelectionChange)
-  contentObserver?.disconnect()
-  contentObserver = null
   contentResizeObserver?.disconnect()
   contentResizeObserver = null
   if (scrollFrame !== null) {

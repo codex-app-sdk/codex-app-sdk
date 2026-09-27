@@ -22,6 +22,7 @@
     >
       <CodexMessageList
         v-if="started"
+        ref="messageList"
         class="codex-conversation-pane__messages"
         :actions-disabled="effectiveActionsDisabled"
         :active-turn-id="effectiveActiveTurnId"
@@ -268,7 +269,7 @@
 </template>
 
 <script setup lang="ts" generic="Payload = unknown">
-import { computed, onMounted, provide, ref, shallowReactive, watch } from 'vue';
+import { computed, nextTick, onMounted, provide, ref, shallowReactive, watch } from 'vue';
 import type {
   CodexConversationRenderStrategy,
   CodexRendererAttachment,
@@ -550,6 +551,7 @@ const openedQuestionId = ref<string | null>(null);
 const locallyDismissedQuestionIds = ref<ReadonlySet<string>>(new Set());
 
 const composer = ref<{ focus(): void } | null>(null);
+const messageList = ref<{ scrollToBottom(): void } | null>(null);
 const paneElement = ref<HTMLElement | null>(null);
 const effectiveController = computed(() => resolveCodexConversationPaneValue(props.controller));
 const effectiveControllerState = computed<CodexConversationPaneState | undefined>(() => {
@@ -1092,6 +1094,8 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
   }
   const options = sendOptionsForAttachments(selectedAttachments.value, composerOptions);
   const previousDismissedQuestions = dismissPendingQuestions();
+  messageList.value?.scrollToBottom();
+  void nextTick(() => messageList.value?.scrollToBottom());
   if (effectiveController.value) {
     const controlledSubmit = effectiveControllerActions.value?.submit;
     if (controlledSubmit) {

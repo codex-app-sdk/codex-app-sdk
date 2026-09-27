@@ -117,7 +117,9 @@ upward navigation reveals the next batch.
 
 When the user is already reading older content, the list preserves the visible
 scroll position rather than jumping to the latest message. New tail messages
-only auto-follow when the list was already at the bottom.
+only auto-follow when tailing is active. Submitting a prompt enables tailing;
+each incoming message update follows the bottom until the user scrolls away.
+The scroll-to-bottom control reflects actual overflow and re-enables tailing.
 
 ## Transform only visible messages
 

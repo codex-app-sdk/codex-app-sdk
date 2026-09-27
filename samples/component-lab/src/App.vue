@@ -252,6 +252,23 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
+    id: 'long-history',
+    name: 'Long history',
+    summary: 'Submit and stream from a deep transcript',
+    title: 'Long conversation',
+    description: 'Scroll away from the tail, submit a prompt, and verify that the streamed response stays visible.',
+    messages: Array.from({ length: 48 }, (_, index): SurfaceMessage[] => [
+      {
+        id: `history-user-${index}`, role: 'user', status: 'complete',
+        parts: [{ type: 'text', text: `Earlier question ${index + 1}: explain the current state and next step.` }],
+      },
+      {
+        id: `history-answer-${index}`, role: 'assistant', status: 'complete',
+        parts: [{ type: 'text', phase: 'final_answer', text: `Earlier answer ${index + 1}: the work is progressing. This response gives the transcript enough height to exercise real scrolling.` }],
+      },
+    ]).flat(),
+  },
+  {
     id: 'goal-composer',
     name: 'Goal composer',
     summary: 'Pending command chip and required objective',
@@ -893,7 +910,7 @@ function startMockStream(turnId?: string): void {
   chunks.forEach((chunk, index) => {
     const timer = window.setTimeout(() => {
       streamTimers.delete(timer);
-      text += chunk;
+      text += selected.value.id === 'long-history' ? chunk.repeat(40) : chunk;
       const messageIndex = messages.value.findIndex((message) => message.id === id);
       if (messageIndex < 0) return;
       const currentMessage = messages.value[messageIndex];
