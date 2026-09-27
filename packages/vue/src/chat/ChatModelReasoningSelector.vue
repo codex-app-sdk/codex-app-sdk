@@ -348,6 +348,10 @@ function wrapHostMenuItems(
   display: none;
 }
 
+:deep(.chat-model-selector__menu .codex-composer-menu-list__submenu-list .codex-composer-menu-list__item) {
+  font-size: var(--codex-composer-model-submenu-font-size, var(--font-size-13));
+}
+
 :deep(.chat-model-selector__menu .codex-composer-menu-list__heading) {
   padding-left: var(--space-4);
 }
