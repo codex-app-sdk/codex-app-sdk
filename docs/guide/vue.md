@@ -144,6 +144,8 @@ the SDK body, attachments, tools, or actions:
 Model, reasoning, service-tier, skill, plugin, and approval controls are driven by the
 surface catalogs. The pane does not invent model IDs, reasoning efforts, or
 permission presets.
+Selecting a model closes the Model submenu while leaving the selector open to
+adjust Reasoning or Fast mode.
 
 When the selected model advertises a `priority` or `fast` service tier, the
 model menu includes a Fast mode toggle below Reasoning. The toggle emits

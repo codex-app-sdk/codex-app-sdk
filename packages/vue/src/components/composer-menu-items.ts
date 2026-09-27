@@ -153,7 +153,10 @@ function renderItem(
           item.items,
           item.label,
           slots,
-          select,
+          (selected) => {
+            if (selected.type === 'radio') openSubmenus.delete(item.id);
+            select(selected);
+          },
           openSubmenus,
           [
             'codex-composer-menu-list codex-composer-menu-list__submenu-list',

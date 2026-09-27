@@ -137,6 +137,7 @@ describe('ChatModelReasoningSelector', () => {
     expect(modelChoices).toHaveLength(2);
     await modelChoices[0]!.trigger('click');
     expect(wrapper.find('.chat-model-selector__menu').exists()).toBe(true);
+    expect(wrapper.get('[data-submenu-id="model"]').classes()).not.toContain('codex-composer-menu-list__submenu--open');
     await wrapper.get('[data-submenu-id="reasoning"] > button').trigger('click');
     await wrapper.findAll('[data-submenu-id="reasoning"] [role="menuitemradio"]')[0]!.trigger('click');
 
