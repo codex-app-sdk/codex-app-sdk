@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/vue",
-  "version": "0.12.4",
+  "version": "0.12.5",
   "description": "Vue conversation components and composables for Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
@@ -37,7 +37,7 @@
     "typecheck": "vue-tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "0.12.4",
+    "@codex-app-sdk/core": "0.12.5",
     "@shikijs/langs": "^4.2.0",
     "@shikijs/themes": "^4.2.0",
     "@tabler/icons-vue": "^3.44.0",
