@@ -446,7 +446,9 @@ function createCustomMentionChip(
 }
 
 function unmountChipHosts(): void {
-  for (const chip of editor.value!.querySelectorAll('.chat-rich-text-editor__chip-token-host')) {
+  // A parent update can remove this editor before its post-render ref is assigned.
+  if (!editor.value) return;
+  for (const chip of editor.value.querySelectorAll('.chat-rich-text-editor__chip-token-host')) {
     render(null, chip as HTMLElement);
   }
 }
