@@ -271,18 +271,21 @@ function setCaret(position: number, options: { focus?: boolean } = {}): void {
 function setSelection(start: number, end: number, options: { focus?: boolean } = {}): void {
   const element = editor.value;
   if (!element) return;
+  const shouldUpdateDocumentSelection = options.focus !== false || document.activeElement === element;
   if (options.focus !== false) element.focus();
   const length = readText().length;
   const nextStart = Math.max(0, Math.min(start, length));
   const nextEnd = Math.max(nextStart, Math.min(end, length));
-  const startTarget = domPositionForCanonicalOffset(element, nextStart);
-  const endTarget = domPositionForCanonicalOffset(element, nextEnd);
-  const range = document.createRange();
-  range.setStart(startTarget.node, startTarget.offset);
-  range.setEnd(endTarget.node, endTarget.offset);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
+  if (shouldUpdateDocumentSelection) {
+    const startTarget = domPositionForCanonicalOffset(element, nextStart);
+    const endTarget = domPositionForCanonicalOffset(element, nextEnd);
+    const range = document.createRange();
+    range.setStart(startTarget.node, startTarget.offset);
+    range.setEnd(endTarget.node, endTarget.offset);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
   caretPosition.value = nextEnd;
   emit('caret-change', { end: nextEnd, start: nextStart, valid: true });
 }

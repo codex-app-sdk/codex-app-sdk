@@ -28,6 +28,7 @@ describe('controlled composer caret', () => {
     await nextTick();
 
     const editor = wrapper.get<HTMLElement>('[role="textbox"]').element;
+    editor.focus();
     const existingTextNode = editor.childNodes[1];
     const range = document.createRange();
     range.setStart(editor, 0);

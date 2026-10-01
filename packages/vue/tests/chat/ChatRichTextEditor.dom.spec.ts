@@ -97,6 +97,7 @@ describe('ChatRichTextEditor DOM contract', () => {
     const nestedText = document.createTextNode('B');
     nested.append(nestedText);
     editor.replaceChildren(text, pluginHost, lineBreak, nested);
+    (editor as HTMLElement).focus();
     const selection = window.getSelection()!;
     const richEditor = api(wrapper);
 
@@ -130,6 +131,7 @@ describe('ChatRichTextEditor DOM contract', () => {
       props: { modelValue: 'abcd' },
     });
     const richEditor = api(wrapper);
+    (wrapper.get('[role="textbox"]').element as HTMLElement).focus();
 
     richEditor.setSelection(-2, 10, { focus: false });
     expect(richEditor.getSelectionRange()).toStrictEqual({ end: 4, start: 0, valid: true });
@@ -397,7 +399,7 @@ describe('ChatRichTextEditor DOM contract', () => {
 
     await wrapper.setProps({ modelValue: 'abcdefgh' });
 
-    expect(richEditor.getSelectionRange()).toStrictEqual({ end: 1, start: 1, valid: true });
+    expect(richEditor.getSelectionRange()).toStrictEqual({ end: 1, start: 1, valid: false });
     expect(document.activeElement).toBe(outside);
     richEditor.setText('manual', 2, { focus: false });
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['manual']);
@@ -564,6 +566,7 @@ describe('ChatRichTextEditor DOM contract', () => {
     shortElement.textContent = 'A';
     const followingText = document.createTextNode('B');
     editor.replaceChildren(shortElement, followingText);
+    (editor as HTMLElement).focus();
     api(wrapper).setCaret(2, { focus: false });
     const selection = window.getSelection()!;
     expect([selection.anchorNode, selection.anchorOffset]).toStrictEqual([followingText, 1]);

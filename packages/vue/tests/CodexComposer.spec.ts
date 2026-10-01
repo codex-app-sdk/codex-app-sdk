@@ -633,6 +633,7 @@ describe('ChatComposer', () => {
     const wrapper = mountComposer({
       composerState: { text: 'short', selectionStart: -10, selectionEnd: 99 },
     }, { attachTo: document.body });
+    (editor(wrapper).element as HTMLElement).focus();
     await nextTick();
     await nextTick();
 
@@ -648,6 +649,7 @@ describe('ChatComposer', () => {
     const wrapper = mountComposer({
       composerState: { text: 'abc', selectionStart: 1, selectionEnd: 1 },
     }, { attachTo: document.body });
+    (editor(wrapper).element as HTMLElement).focus();
     await nextTick();
     await nextTick();
 
@@ -675,6 +677,7 @@ describe('ChatComposer', () => {
   it('reacts to in-place changes inside externally controlled state', async () => {
     const composerState = reactive({ text: 'controlled', selectionStart: 4, selectionEnd: 4 });
     const wrapper = mountComposer({ composerState }, { attachTo: document.body });
+    (editor(wrapper).element as HTMLElement).focus();
     await nextTick();
     await nextTick();
 
