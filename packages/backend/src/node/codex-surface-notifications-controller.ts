@@ -424,6 +424,22 @@ export class CodexSurfaceNotificationsController {
           payload: { item: structuredClone(notification.params.item) as CodexSurfaceJsonValue },
         });
         return;
+      case 'thread/realtime/item/started':
+      case 'thread/realtime/item/completed':
+        this.host.emitEvent('notification', {
+          type: notification.method === 'thread/realtime/item/started'
+            ? 'realtime.itemStarted' : 'realtime.itemCompleted',
+          conversationId: notification.params.threadId,
+          payload: { item: structuredClone(notification.params.item) as CodexSurfaceJsonValue },
+        });
+        return;
+      case 'thread/realtime/item/transcript/delta':
+        this.host.emitEvent('notification', {
+          type: 'realtime.itemTranscriptDelta',
+          conversationId: notification.params.threadId,
+          payload: { itemId: notification.params.itemId, delta: notification.params.delta },
+        });
+        return;
       case 'thread/realtime/transcript/delta':
         this.host.emitEvent('notification', {
           type: 'realtime.transcriptDelta',

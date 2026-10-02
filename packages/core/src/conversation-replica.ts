@@ -248,6 +248,9 @@ function applyConversationEvent(
     case 'subagent.activity':
     case 'realtime.started':
     case 'realtime.itemAdded':
+    case 'realtime.itemStarted':
+    case 'realtime.itemCompleted':
+    case 'realtime.itemTranscriptDelta':
     case 'realtime.transcriptDelta':
     case 'realtime.transcriptCompleted':
     case 'realtime.audioDelta':

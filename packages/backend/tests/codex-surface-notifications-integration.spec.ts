@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type ServerNotification, type ServerRequest } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
+import { invokeCodexSurfaceBridgeOperation } from '@codex-app-sdk/core/surface-bridge';
 import { MockCodexAppServer, createSurface, lastRequest, lastResponse, requestsFor, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
@@ -298,7 +299,7 @@ describe('CodexSurface', () => {
 
     const session = await conversation.startRealtime({
       outputModality: 'audio',
-      version: 'v2',
+      version: 'v3',
       voice: 'marin',
       includeStartupContext: true,
       flushTranscriptTailOnSessionEnd: true,
@@ -307,7 +308,7 @@ describe('CodexSurface', () => {
       params: {
         threadId: 'thread-existing',
         outputModality: 'audio',
-        version: 'v2',
+        version: 'v3',
         voice: 'marin',
         includeStartupContext: true,
         flushTranscriptTailOnSessionEnd: true,
@@ -342,7 +343,7 @@ describe('CodexSurface', () => {
       params: { threadId: 'thread-existing', text: 'I am checking the tests' },
     });
 
-    transport.emitNotification('thread/realtime/started', { threadId: 'thread-existing', realtimeSessionId: 'rtc_123', version: 'v2' });
+    transport.emitNotification('thread/realtime/started', { threadId: 'thread-existing', realtimeSessionId: 'rtc_123', version: 'v3' });
     transport.emitNotification('thread/realtime/transcript/delta', { threadId: 'thread-existing', role: 'user', delta: 'check the' });
     transport.emitNotification('thread/realtime/transcript/done', { threadId: 'thread-existing', role: 'user', text: 'check the tests' });
     transport.emitNotification('thread/realtime/outputAudio/delta', {
@@ -446,6 +447,53 @@ describe('CodexSurface', () => {
       numChannels: 1,
     })).rejects.toThrow('must be sent through its negotiated media track');
     await session.stop();
+  });
+
+  it('negotiates renderer live chat and forwards its canonical transcript on the specified thread', async () => {
+    const { surface, transport } = createSurface('thread/realtime/start', 'thread/realtime/stop');
+    try {
+      await surface.connect();
+      const events: CodexSurfaceEvent[] = [];
+      surface.onEvent((event) => { if (event.type.startsWith('realtime.')) events.push(event); });
+      const start = invokeCodexSurfaceBridgeOperation(surface, 'startLiveChat', ['thread-other', {
+        sdp: 'offer', voice: 'marin', prompt: null, includeStartupContext: true, flushTranscriptTailOnSessionEnd: true,
+      }]);
+      await vi.waitFor(() => expect(requestsFor(transport, 'thread/realtime/start')).toHaveLength(1));
+      expect(lastRequest(transport, 'thread/realtime/start')).toEqual(expect.objectContaining({ params: {
+        threadId: 'thread-other', outputModality: 'audio', version: 'v3', transport: { type: 'webrtc', sdp: 'offer' },
+        voice: 'marin', prompt: null, includeStartupContext: true, flushTranscriptTailOnSessionEnd: true,
+      } }));
+      transport.emitNotification('thread/realtime/sdp', { threadId: 'thread-other', sdp: 'answer' });
+      await expect(start).resolves.toEqual({ sdp: 'answer' });
+      events.length = 0;
+      const item = { type: 'transcriptSegment' as const, id: 'item-1', realtimeSessionId: 'session-1', role: 'user' as const, text: '' };
+      transport.emitNotification('thread/realtime/item/started', { threadId: 'thread-other', item });
+      transport.emitNotification('thread/realtime/item/transcript/delta', { threadId: 'thread-other', itemId: 'item-1', delta: 'Hello' });
+      transport.emitNotification('thread/realtime/item/completed', { threadId: 'thread-other', item: { ...item, text: 'Hello!' } });
+      expect(events.map(({ type, payload, ...event }) => ({ type, payload, conversationId: 'conversationId' in event ? event.conversationId : null }))).toEqual([
+        { type: 'realtime.itemStarted', conversationId: 'thread-other', payload: { item } },
+        { type: 'realtime.itemTranscriptDelta', conversationId: 'thread-other', payload: { itemId: 'item-1', delta: 'Hello' } },
+        { type: 'realtime.itemCompleted', conversationId: 'thread-other', payload: { item: { ...item, text: 'Hello!' } } },
+      ]);
+      await invokeCodexSurfaceBridgeOperation(surface, 'stopLiveChat', ['thread-other']);
+      expect(lastRequest(transport, 'thread/realtime/stop')).toEqual(expect.objectContaining({ params: { threadId: 'thread-other' } }));
+    } finally { await surface.close(); }
+  });
+
+  it('rejects live chat promptly when signaling fails before the start response', async () => {
+    const transport = new MockCodexAppServer({ 'thread/realtime/start': () => new Promise(() => undefined) });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    try {
+      await surface.connect();
+      let failure: string | undefined;
+      const start = surface.startLiveChat('thread-existing', { sdp: 'offer' }).catch((error: unknown) => {
+        failure = error instanceof Error ? error.message : String(error);
+      });
+      await vi.waitFor(() => expect(requestsFor(transport, 'thread/realtime/start')).toHaveLength(1));
+      transport.emitNotification('thread/realtime/error', { threadId: 'thread-existing', message: 'Voice unavailable' });
+      await vi.waitFor(() => expect(failure).toBe('Voice unavailable'), { timeout: 200 });
+      await start;
+    } finally { await surface.close(); }
   });
 
   it('projects remote-control status changes as a host event', async () => {

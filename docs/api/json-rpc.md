@@ -23,7 +23,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Client → app-server requests | 162 | 48 | 0 | 0 | 114 |
-| App-server → client notifications | 83 | 39 | 0 | 30 | 14 |
+| App-server → client notifications | 83 | 42 | 0 | 30 | 11 |
 | App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
 ## Client → app-server requests
@@ -127,7 +127,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `thread/realtime/appendAudio` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
 | `thread/realtime/appendText` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
 | `thread/realtime/appendSpeech` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
-| `thread/realtime/stop` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts` |
+| `thread/realtime/stop` | High-level SDK | `packages/backend/src/node/codex-surface-realtime-session.ts`<br>`packages/backend/src/node/codex-surface.ts` |
 | `thread/timeline/list` | Typed client only | — |
 | `thread/realtime/listVoices` | Typed client only | — |
 | `review/start` | High-level SDK | `packages/backend/src/node/codex-surface-turn-actions-controller.ts` |
@@ -268,9 +268,9 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `fuzzyFileSearch/sessionCompleted` | Intentionally ignored | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `thread/realtime/started` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `thread/realtime/itemAdded` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
-| `thread/realtime/item/started` | Typed client only | — |
-| `thread/realtime/item/transcript/delta` | Typed client only | — |
-| `thread/realtime/item/completed` | Typed client only | — |
+| `thread/realtime/item/started` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
+| `thread/realtime/item/transcript/delta` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
+| `thread/realtime/item/completed` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `thread/realtime/transcript/delta` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `thread/realtime/transcript/done` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `thread/realtime/outputAudio/delta` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |

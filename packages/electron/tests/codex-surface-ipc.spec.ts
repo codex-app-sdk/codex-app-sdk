@@ -115,6 +115,8 @@ describe('Codex surface Electron bridge', () => {
       selectConversation: vi.fn(async () => snapshot),
       sendMessage: vi.fn(async () => snapshot),
       startReview: vi.fn(async () => snapshot),
+      startLiveChat: vi.fn(async () => ({ sdp: 'remote-answer' })),
+      stopLiveChat: vi.fn(async () => undefined),
       startChatGptDeviceCodeLogin: vi.fn(async () => ({
         loginId: 'device-login-1',
         verificationUrl: 'https://auth.example.test/device',
@@ -139,6 +141,18 @@ describe('Codex surface Electron bridge', () => {
     };
 
     const dispose = registerCodexSurfaceIpc(main, sender, surface, { resolveAttachment });
+    const liveApi = createCodexSurfaceRendererApi({
+      invoke: (channel, ...args) => main.call(channel, ...args),
+      on() {}, off() {},
+    });
+    await expect(liveApi.startLiveChat!('thread-voice', { sdp: 'offer', version: 'v3' })).resolves.toEqual({ sdp: 'remote-answer' });
+    expect(surface.startLiveChat).toHaveBeenCalledWith('thread-voice', { sdp: 'offer', version: 'v3' });
+    await liveApi.stopLiveChat!('thread-voice');
+    expect(surface.stopLiveChat).toHaveBeenCalledWith('thread-voice');
+    Reflect.deleteProperty(surface, 'startLiveChat');
+    Reflect.deleteProperty(surface, 'stopLiveChat');
+    await expect(liveApi.startLiveChat!('thread-voice', { sdp: 'offer' })).rejects.toThrow('Live chat is not available.');
+    await expect(liveApi.stopLiveChat!('thread-voice')).rejects.toThrow('Live chat is not available.');
     expect([...main.handlers.keys()].sort()).toStrictEqual([
       'codex-surface:archive-conversation',
       'codex-surface:cancel-login',
@@ -171,9 +185,11 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:set-goal',
       'codex-surface:start-chatgpt-device-code-login',
       'codex-surface:start-chatgpt-login',
+      'codex-surface:start-live-chat',
       'codex-surface:start-review',
       'codex-surface:steer-message',
       'codex-surface:steer-queued-prompt',
+      'codex-surface:stop-live-chat',
       'codex-surface:unarchive-conversation',
       'codex-surface:update-conversation-settings',
       'codex-surface:update-queued-prompt',

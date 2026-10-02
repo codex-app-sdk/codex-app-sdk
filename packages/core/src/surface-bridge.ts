@@ -19,6 +19,7 @@ import type {
   ListCodexModelsOptions,
   SendCodexMessageOptions,
   StartCodexReviewOptions,
+  StartCodexLiveChatOptions,
   UpdateCodexConversationSettings,
 } from './surface';
 
@@ -243,12 +244,14 @@ export const codexSurfaceBridgeOperations = [
   'resolveApproval', 'retryTurn', 'selectConversation', 'sendMessage', 'setGoal',
   'startChatGptDeviceCodeLogin', 'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
   'unarchiveConversation', 'updateConversationSettings', 'updateQueuedPrompt',
+  'startLiveChat', 'stopLiveChat',
 ] as const satisfies readonly CodexSurfaceBridgeOperation[];
 
 const operationSet = new Set<string>(codexSurfaceBridgeOperations);
 export const codexSurfaceBridgeArities: Readonly<
   Record<CodexSurfaceBridgeOperation, readonly [minimum: number, maximum: number]>
 > = {
+  startLiveChat: [2, 2], stopLiveChat: [1, 1],
   archiveConversation: [1, 1], cancelLogin: [0, 1], clearGoal: [0, 0],
   compactConversation: [0, 0], connect: [0, 0], continueInterruptedTurn: [0, 0], createConversation: [0, 1],
   deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
@@ -330,6 +333,10 @@ async function invokeValidated(
   options: CodexSurfaceBridgeInvokeOptions,
 ): Promise<unknown> {
   switch (operation) {
+    case 'startLiveChat': return target.startLiveChat(
+      nonEmptyString(args[0], 'Conversation id'), liveChatOptions(args[1]),
+    );
+    case 'stopLiveChat': return target.stopLiveChat(nonEmptyString(args[0], 'Conversation id'));
     case 'archiveConversation': return target.archiveConversation(nonEmptyString(args[0], 'Conversation id'));
     case 'cancelLogin': return target.cancelLogin(optionalString(args[0], 'Login id'));
     case 'clearGoal': return target.clearGoal();
@@ -383,6 +390,30 @@ async function invokeValidated(
       nonEmptyString(args[0], 'Queued prompt id'), nonEmptyString(args[1], 'Queued prompt'),
     );
   }
+}
+
+function liveChatOptions(value: unknown): StartCodexLiveChatOptions {
+  const record = plainObject(value, 'Live chat options');
+  onlyKeys(record, ['sdp', 'version', 'voice', 'model', 'prompt', 'includeStartupContext', 'flushTranscriptTailOnSessionEnd'], 'Live chat options');
+  const result: StartCodexLiveChatOptions = { sdp: nonEmptyString(record.sdp, 'SDP offer') };
+  if (record.version !== undefined) {
+    if (record.version !== 'v1' && record.version !== 'v2' && record.version !== 'v3') throw new TypeError('Invalid realtime version');
+    result.version = record.version;
+  }
+  for (const key of ['voice', 'model'] as const) {
+    if (record[key] !== undefined) result[key] = nonEmptyString(record[key], key);
+  }
+  if (record.prompt !== undefined) {
+    if (record.prompt !== null && typeof record.prompt !== 'string') throw new TypeError('Prompt must be a string or null');
+    result.prompt = record.prompt;
+  }
+  for (const key of ['includeStartupContext', 'flushTranscriptTailOnSessionEnd'] as const) {
+    if (record[key] !== undefined) {
+      if (typeof record[key] !== 'boolean') throw new TypeError(`${key} must be a boolean`);
+      result[key] = record[key];
+    }
+  }
+  return result;
 }
 
 function conversationOptions(value: unknown): CreateCodexRendererConversationOptions | undefined {

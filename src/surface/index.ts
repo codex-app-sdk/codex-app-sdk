@@ -70,6 +70,7 @@ export type {
   ListCodexModelsOptions,
   SendCodexMessageOptions,
   StartCodexRealtimeOptions,
+  StartCodexLiveChatOptions,
   StartCodexReviewOptions,
   SurfaceMessage,
   SurfaceMessageAttachment,

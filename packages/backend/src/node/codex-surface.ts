@@ -24,6 +24,7 @@ import type {
   ListCodexModelsOptions,
   SendCodexMessageOptions,
   StartCodexRealtimeOptions,
+  StartCodexLiveChatOptions,
   StartCodexReviewOptions,
   SurfaceMessage,
   UpdateCodexConversationSettings,
@@ -825,6 +826,24 @@ export class CodexSurface {
     });
     this.conversationHandles.set(id, handle);
     return handle;
+  }
+
+  async startLiveChat(
+    conversationId: string,
+    options: StartCodexLiveChatOptions,
+  ): Promise<{ sdp: string }> {
+    const { sdp, ...settings } = options;
+    const session = await this.startRealtimeForThread(conversationId, {
+      ...settings,
+      version: settings.version ?? 'v3',
+      outputModality: 'audio',
+      transport: { type: 'webrtc', sdp },
+    });
+    return { sdp: session.remoteSdp! };
+  }
+
+  async stopLiveChat(conversationId: string): Promise<void> {
+    await this.client.request('thread/realtime/stop', { threadId: conversationId });
   }
 
   private startRealtimeForThread(

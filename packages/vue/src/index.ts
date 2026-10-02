@@ -209,6 +209,7 @@ export type {
   SurfaceMessageToolPart,
 } from './types';
 export { useCodexSurface, type CodexSurfaceController } from './use-codex-surface';
+export { useCodexLiveChat, type CodexLiveChatOptions, type CodexLiveChatStatus, type CodexLiveChatTranscript } from './use-codex-live-chat';
 export { applyCodexTheme, type CodexThemeMode, type CodexThemeOptions } from './codex-theme';
 export {
   codexConversationLinkFromHref,

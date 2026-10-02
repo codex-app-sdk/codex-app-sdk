@@ -634,6 +634,11 @@ export type StartCodexRealtimeOptions = {
   transport?: CodexRealtimeTransport;
 };
 
+/** Browser live-chat signaling. Media is carried by WebRTC, not the SDK bridge. */
+export type StartCodexLiveChatOptions = Omit<StartCodexRealtimeOptions, 'transport' | 'outputModality'> & {
+  sdp: string;
+};
+
 type CodexSurfaceEventEnvelope<Type extends string, Payload> = {
   readonly seq: number;
   readonly occurredAt: string;
@@ -749,6 +754,16 @@ export type CodexSurfaceEvent =
   }>
   | CodexConversationEventEnvelope<'realtime.itemAdded', {
     item: CodexSurfaceJsonValue;
+  }>
+  | CodexConversationEventEnvelope<'realtime.itemStarted', {
+    item: CodexSurfaceJsonValue;
+  }>
+  | CodexConversationEventEnvelope<'realtime.itemCompleted', {
+    item: CodexSurfaceJsonValue;
+  }>
+  | CodexConversationEventEnvelope<'realtime.itemTranscriptDelta', {
+    itemId: string;
+    delta: string;
   }>
   | CodexConversationEventEnvelope<'realtime.transcriptDelta', {
     role: string;
@@ -973,6 +988,8 @@ export type UpdateCodexConversationSettings = {
 };
 
 export type CodexSurfaceApi = {
+  startLiveChat?(conversationId: string, options: StartCodexLiveChatOptions): Promise<{ sdp: string }>;
+  stopLiveChat?(conversationId: string): Promise<void>;
   connect(): Promise<CodexSurfaceSnapshot>;
   refreshAccount(): Promise<CodexSurfaceSnapshot>;
   startChatGptLogin(): Promise<CodexSurfaceChatGptLogin>;

@@ -21,6 +21,7 @@ import type {
   ListCodexModelsOptions,
   CodexRendererSendMessageOptions,
   StartCodexReviewOptions,
+  StartCodexLiveChatOptions,
   UpdateCodexConversationSettings,
 } from '@codex-app-sdk/core/surface';
 import {
@@ -67,6 +68,8 @@ const channels = {
   selectConversation: 'codex-surface:select-conversation',
   sendMessage: 'codex-surface:send-message',
   startReview: 'codex-surface:start-review',
+  startLiveChat: 'codex-surface:start-live-chat',
+  stopLiveChat: 'codex-surface:stop-live-chat',
   startChatGptDeviceCodeLogin: 'codex-surface:start-chatgpt-device-code-login',
   startChatGptLogin: 'codex-surface:start-chatgpt-login',
   steerMessage: 'codex-surface:steer-message',
@@ -117,6 +120,8 @@ type SurfaceRequests = {
   [channels.selectConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.sendMessage]: IpcRequest<[prompt: string, options?: CodexRendererSendMessageOptions], CodexSurfaceSnapshot>;
   [channels.startReview]: IpcRequest<[options?: StartCodexReviewOptions], CodexSurfaceSnapshot>;
+  [channels.startLiveChat]: IpcRequest<[conversationId: string, options: StartCodexLiveChatOptions], { sdp: string }>;
+  [channels.stopLiveChat]: IpcRequest<[conversationId: string], void>;
   [channels.startChatGptDeviceCodeLogin]: IpcRequest<[], CodexSurfaceChatGptDeviceCodeLogin>;
   [channels.startChatGptLogin]: IpcRequest<[], CodexSurfaceChatGptLogin>;
   [channels.steerMessage]: IpcRequest<[
@@ -136,16 +141,21 @@ type SurfaceEvents = {
 
 export type { CodexSurfaceRendererApi } from '@codex-app-sdk/core/surface';
 
+type OptionalSurfaceOperation = 'loadOlderConversationHistory' | 'startLiveChat' | 'stopLiveChat';
+
 export function registerCodexSurfaceIpc(
   port: IpcMainPort,
   sender: IpcEventSender,
-  surface: Omit<CodexSurfaceBridgeTarget, 'loadOlderConversationHistory'>
-    & Partial<Pick<CodexSurfaceBridgeTarget, 'loadOlderConversationHistory'>>,
+  surface: Omit<CodexSurfaceBridgeTarget, OptionalSurfaceOperation>
+    & Partial<Pick<CodexSurfaceBridgeTarget, OptionalSurfaceOperation>>,
   options: CodexSurfaceIpcOptions = {},
 ): () => void {
   const invoke = <Name extends CodexSurfaceBridgeOperation>(name: Name, args: readonly unknown[]) => {
     if (name === 'loadOlderConversationHistory' && !surface.loadOlderConversationHistory) {
       return Promise.reject(new Error('Conversation history paging is not available.'));
+    }
+    if ((name === 'startLiveChat' || name === 'stopLiveChat') && !surface[name]) {
+      return Promise.reject(new Error('Live chat is not available.'));
     }
     return invokeCodexSurfaceBridgeOperation(
       surface as CodexSurfaceBridgeTarget,
@@ -190,6 +200,8 @@ export function registerCodexSurfaceIpc(
     [channels.selectConversation]: (_event, ...args) => invoke('selectConversation', args),
     [channels.sendMessage]: (_event, ...args) => invoke('sendMessage', args),
     [channels.startReview]: (_event, ...args) => invoke('startReview', args),
+    [channels.startLiveChat]: (_event, ...args) => invoke('startLiveChat', args),
+    [channels.stopLiveChat]: (_event, ...args) => invoke('stopLiveChat', args),
     [channels.startChatGptDeviceCodeLogin]: (_event, ...args) => invoke('startChatGptDeviceCodeLogin', args),
     [channels.startChatGptLogin]: (_event, ...args) => invoke('startChatGptLogin', args),
     [channels.steerMessage]: (_event, ...args) => invoke('steerMessage', args),
@@ -244,6 +256,8 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     selectConversation: (conversationId) => renderer.invoke(channels.selectConversation, conversationId),
     sendMessage: (prompt, options) => renderer.invoke(channels.sendMessage, prompt, options),
     startReview: (options) => renderer.invoke(channels.startReview, options),
+    startLiveChat: (conversationId, options) => renderer.invoke(channels.startLiveChat, conversationId, options),
+    stopLiveChat: (conversationId) => renderer.invoke(channels.stopLiveChat, conversationId),
     startChatGptDeviceCodeLogin: () => renderer.invoke(channels.startChatGptDeviceCodeLogin),
     startChatGptLogin: () => renderer.invoke(channels.startChatGptLogin),
     steerMessage: (prompt, options) => renderer.invoke(channels.steerMessage, prompt, options),

@@ -48,6 +48,7 @@ describe('Codex surface bridge', () => {
       respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryTurn: [1, 1],
       selectConversation: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
       startChatGptDeviceCodeLogin: [0, 0], startChatGptLogin: [0, 0],
+      startLiveChat: [2, 2], stopLiveChat: [1, 1],
       startReview: [0, 1], steerMessage: [1, 2],
       steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1], updateConversationSettings: [1, 1],
       updateQueuedPrompt: [2, 2],
@@ -132,6 +133,8 @@ describe('Codex surface bridge', () => {
         }],
       },
       { operation: 'setGoal', args: ['Ship it', 500] },
+      { operation: 'startLiveChat', args: ['thread', { sdp: 'offer', version: 'v3', model: 'realtime', voice: 'marin', prompt: '', includeStartupContext: false, flushTranscriptTailOnSessionEnd: true }] },
+      { operation: 'stopLiveChat', args: ['thread'] },
       { operation: 'startChatGptDeviceCodeLogin', args: [] },
       { operation: 'startChatGptLogin', args: [] },
       { operation: 'startReview', args: [{ target: { type: 'custom', instructions: 'Focus on errors' } }] },
@@ -145,7 +148,7 @@ describe('Codex surface bridge', () => {
       { operation: 'updateQueuedPrompt', args: ['queued-1', 'Edited queue item'] },
     ];
 
-    expect(cases.map(({ operation }) => operation)).toStrictEqual([...codexSurfaceBridgeOperations]);
+    expect(cases.map(({ operation }) => operation).sort()).toStrictEqual([...codexSurfaceBridgeOperations].sort());
     for (const { operation, args, expected = args } of cases) {
       await expect(invokeCodexSurfaceBridgeOperation(target, operation, args, { resolveAttachment }))
         .resolves.toStrictEqual({ operation });
@@ -280,6 +283,11 @@ describe('Codex surface bridge', () => {
   });
 
   it.each([
+    ['startLiveChat', ['thread', { sdp: '' }], 'SDP offer must be a non-empty string'],
+    ['startLiveChat', ['thread', { sdp: 'offer', version: 'v4' }], 'Invalid realtime version'],
+    ['startLiveChat', ['thread', { sdp: 'offer', includeStartupContext: 'yes' }], 'includeStartupContext must be a boolean'],
+    ['startLiveChat', ['thread', { sdp: 'offer', prompt: 42 }], 'Prompt must be a string or null'],
+    ['startLiveChat', ['thread', { sdp: 'offer', cwd: '/tmp' }], 'Live chat options contains unsupported property "cwd"'],
     ['archiveConversation', [' '], 'Conversation id must be a non-empty string'],
     ['createConversation', [null], 'Conversation options must be an object'],
     ['createConversation', [{ unknown: true }], 'Conversation options contains unsupported property "unknown"'],

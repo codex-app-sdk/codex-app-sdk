@@ -126,7 +126,7 @@ For a production-style build followed by the Node server, use
 The fixed demo user is not production authentication. Replace the two named
 host seams with the website's session lookup and per-user backend/process pool.
 
-## Component lab: mocked visual scenarios
+## Component lab: visual scenarios and live chat
 
 Run it from the repository root:
 
@@ -134,12 +134,25 @@ Run it from the repository root:
 npm run dev:lab
 ```
 
-The browser-only component lab uses deterministic mock data instead of
+The component lab normally uses deterministic mock data instead of
 app-server. It provides selectable states for rich mentions, middle-of-text
 multiline editing, steering, tool calls, attachments, streaming responses, busy
 and queued work, context usage, turn diffs, empty conversations, errors, and
 light/dark/system themes. Use it to inspect SDK rendering and interactions
 without Codex authentication or Electron.
+
+The opt-in **Live chat** scenario uses the installed Codex CLI and its existing
+login. Choose **Create lab conversation**, then **Start live chat** and grant
+microphone permission. It creates a read-only conversation and negotiates
+WebRTC realtime V3; no separate API key is needed with a supported ChatGPT
+account. The live transcript appears above the normal conversation pane.
+Mute, stop, reset, and scenario changes clean up browser media. The new
+conversation remains in Codex history.
+
+This scenario requires realtime access and the Vite development server; the
+signaling endpoint is local, same-origin, and absent from the static build.
+See [`useCodexLiveChat`](../api/vue#usecodexlivechat-options) for the reusable
+SDK API. Dictation in the regular composer remains a separate feature.
 
 ## Choose a starting point
 

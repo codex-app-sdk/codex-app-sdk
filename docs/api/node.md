@@ -410,7 +410,7 @@ const unsubscribe = realtime.onEvent((event) => {
 });
 
 await realtime.appendAudio({
-  data: pcm16leBase64,
+  data: pcm16leBytes, // Uint8Array; the SDK encodes it for app-server
   sampleRate: 24_000,
   numChannels: 1,
 });
@@ -431,6 +431,31 @@ version such as `v1`. The returned session's `remoteSdp` is the answer to apply
 with `setRemoteDescription()`; audio then travels over the WebRTC media track.
 Realtime is an experimental Codex protocol and may change between CLI
 versions.
+
+Realtime versions `v1`, `v2`, and `v3` are accepted. V3 canonical timeline
+notifications are exposed as `realtime.itemStarted`,
+`realtime.itemTranscriptDelta` (`itemId`, `delta`), and
+`realtime.itemCompleted`. Item payloads retain the upstream JSON shape.
+
+For browser hosts, `CodexSurface` also exposes a renderer-safe signaling pair
+through both the Electron and web bridges:
+
+```ts
+const { sdp } = await surface.startLiveChat(conversationId, {
+  sdp: browserOffer,
+  // version defaults to 'v3'; output modality is always 'audio'.
+  voice: 'marin',
+});
+await surface.stopLiveChat(conversationId);
+```
+
+`StartCodexLiveChatOptions` accepts the realtime settings above except
+`transport` and `outputModality`, plus the required SDP offer. It always uses
+WebRTC. The explicit conversation ID keeps signaling independent of the
+currently selected thread. No credentials or raw audio cross this API.
+The Vue [`useCodexLiveChat`](./vue#usecodexlivechat-options) composable handles
+the browser media lifecycle. Only one live session should own a given thread
+at a time; stop it before starting another owner.
 
 ## Runtime utilities
 

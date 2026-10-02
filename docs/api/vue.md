@@ -23,6 +23,54 @@ current Vue effect scope.
 `steerMessage(prompt, options?)` accepts `CodexRendererSendMessageOptions`,
 including opaque-reference attachments, just like `sendMessage`.
 
+### `useCodexLiveChat(options)`
+
+Experimental bidirectional voice for an existing conversation. The composable
+owns browser microphone capture, a WebRTC peer, remote audio playback, and the
+live transcript. Signaling uses the same renderer API as the conversation;
+audio does not travel through Electron IPC or the web bridge.
+
+```ts
+import { useCodexLiveChat } from '@codex-app-sdk/vue';
+
+const { status, error, muted, transcript, start, stop, setMuted } = useCodexLiveChat({
+  surface: api, // Electron preload API or createCodexWebSurfaceClient()
+  conversationId,
+  session: { voice: 'marin' }, // optional; defaults to realtime V3
+});
+
+// Call from a user gesture; the browser asks for microphone permission.
+await start();
+setMuted(true);
+await stop();
+```
+
+- `status` is a readonly ref: `idle`, `connecting`, `connected`, `stopping`, or
+  `error`. `start()` resolves after SDP negotiation; `connected` means WebRTC
+  has actually connected.
+- `error` is a readonly `string | null` ref. Start/stop failures also reject
+  their promises; catch these in UI event handlers.
+- `muted` controls the microphone track only. Remote audio keeps playing.
+- `transcript` contains `{ id, role, text, complete }` rows. V3 canonical item
+  events update rows by identity; legacy transcript events are also supported.
+  These rows are session-local, not a persisted conversation-history API.
+- `session` accepts `StartCodexLiveChatOptions` except `sdp`: optional `version`,
+  `voice`, `model`, `prompt`, `includeStartupContext`, and
+  `flushTranscriptTailOnSessionEnd`.
+
+Create one instance per conversation and dispose/remount it when switching
+conversations. Scope disposal stops capture and playback, closes the peer,
+unsubscribes, and requests session stop. Repeated start/stop calls are
+coalesced. A late microphone grant or SDP answer after cancellation cannot
+reopen the session. Connection failures/timeouts release local media.
+
+Requires browser WebRTC, microphone permission in a secure context (localhost
+works), and a Codex CLI/account with realtime access. The surface must implement
+`startLiveChat`/`stopLiveChat`; older custom hosts fail with an explicit error.
+Realtime is experimental and account/CLI availability can differ. The component
+lab's **Live chat** scenario demonstrates this alongside a normal conversation
+pane using the local Codex login.
+
 ### Controlled pane controller
 
 `createCodexConversationPaneController()` creates a thin adapter for hosts that

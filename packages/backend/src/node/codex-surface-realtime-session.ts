@@ -25,7 +25,7 @@ export async function startCodexRealtimeSession(
     throw new TypeError(`Invalid realtime output modality '${String(outputModality)}'`);
   }
   const version = options.version;
-  if (version !== undefined && version !== 'v1' && version !== 'v2') {
+  if (version !== undefined && version !== 'v1' && version !== 'v2' && version !== 'v3') {
     throw new TypeError(`Invalid realtime version '${String(version)}'`);
   }
   const model = normalizedOptionalRealtimeString(options.model, 'model');
@@ -38,8 +38,9 @@ export async function startCodexRealtimeSession(
     throw new TypeError('WebRTC realtime transport requires a non-empty SDP offer');
   }
   const answer = transport.type === 'webrtc' ? deferredRealtimeSdp(onConversationEvent) : null;
+  let remoteSdp: string | null;
   try {
-    await client.request('thread/realtime/start', {
+    const [, sdp] = await Promise.all([client.request('thread/realtime/start', {
       threadId,
       outputModality,
       ...(model ? { model } : {}),
@@ -55,12 +56,12 @@ export async function startCodexRealtimeSession(
       transport: transport.type === 'webrtc'
         ? { type: 'webrtc', sdp: transport.sdp }
         : { type: 'websocket' },
-    });
+    }), answer?.promise ?? Promise.resolve(null)]);
+    remoteSdp = sdp;
   } catch (error) {
     answer?.cancel();
     throw error;
   }
-  const remoteSdp = answer ? await answer.promise : null;
 
   let stopped = false;
   const requireActive = (): void => {

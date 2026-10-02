@@ -4,7 +4,7 @@
       <div>
         <p class="lab__eyebrow">Codex App SDK</p>
         <h1>Component lab</h1>
-        <p class="lab__intro">Mocked conversation states for visual and interaction testing.</p>
+        <p class="lab__intro">Conversation fixtures and an opt-in live chat lab.</p>
       </div>
 
       <nav aria-label="Scenarios">
@@ -56,7 +56,9 @@
       </header>
 
       <div class="lab__frame">
+        <LiveChatLab v-if="selected.id === 'live-chat'" :key="resetRevision" />
         <CodexConversationPane
+          v-else
           :key="`${selected.id}:${resetRevision}`"
           v-model="draft"
           :active-turn-id="mockActiveTurnId"
@@ -128,6 +130,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue';
+import LiveChatLab from './LiveChatLab.vue';
 import {
   CodexConversationPane,
   provideCodexToolPresentation,
@@ -252,6 +255,43 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
+    id: 'completed-turns',
+    name: 'Completed turns',
+    summary: 'With and without a final answer',
+    title: 'Completed turn comparison',
+    description: 'Compare a collapsed turn with a final answer against work that remains direct when no summary exists.',
+    messages: [
+      { id: 'completed-turn-work', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'tool', id: 'completed-turn-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
+        { type: 'text', text: 'Started the verification.', phase: 'commentary' },
+        { type: 'media', itemId: 'completed-turn-preview', media: { url: '/attachment-preview.svg', title: 'Generated turn preview', mimeType: 'image/svg+xml' } },
+      ] },
+      { id: 'completed-turn-steer-one', kind: 'steer', role: 'user', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Check the shared disclosure too.' },
+      ] },
+      { id: 'completed-turn-work-two', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Verified the disclosure behavior.', phase: 'commentary' },
+      ] },
+      { id: 'completed-turn-steer-two', kind: 'steer', role: 'user', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Remove empty rows when done.' },
+      ] },
+      { id: 'completed-turn-answer', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
+        { type: 'text', text: 'Checked the final layout.', phase: 'commentary' },
+        { type: 'text', text: 'The completed turn is compact.', phase: 'final_answer' },
+      ] },
+      { id: 'no-summary-work', role: 'assistant', status: 'complete', turnId: 'no-summary-turn', parts: [
+        { type: 'tool', id: 'no-summary-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
+        { type: 'text', text: 'Finished the verification.', phase: 'commentary' },
+      ] },
+      { id: 'no-summary-steer', kind: 'steer', role: 'user', status: 'complete', turnId: 'no-summary-turn', parts: [
+        { type: 'text', text: 'Also check the docs.' },
+      ] },
+      { id: 'no-summary-work-two', role: 'assistant', status: 'complete', turnId: 'no-summary-turn', parts: [
+        { type: 'text', text: 'The docs are current.', phase: 'commentary' },
+      ] },
+    ],
+  },
+  {
     id: 'long-history',
     name: 'Long history',
     summary: 'Submit and stream from a deep transcript',
@@ -269,14 +309,6 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ]).flat(),
   },
   {
-    id: 'goal-composer',
-    name: 'Goal composer',
-    summary: 'Pending command chip and required objective',
-    title: 'Set a conversation goal',
-    description: 'Choose Goal mode from + or type /goal, then enter an objective and submit the canonical command.',
-    messages: [],
-  },
-  {
     id: 'message-selection',
     name: 'Message selection',
     summary: 'Opt-in selected text and host composer context',
@@ -292,6 +324,43 @@ const scenarios: [Scenario, ...Scenario[]] = [
         parts: [{ type: 'text', text: 'The strongest part is the clear separation between reusable SDK mechanics and product-owned annotation behavior.', phase: 'final_answer' }],
       },
     ],
+  },
+  {
+    id: 'goal-composer',
+    name: 'Goal composer',
+    summary: 'Pending command chip and required objective',
+    title: 'Set a conversation goal',
+    description: 'Choose Goal mode from + or type /goal, then enter an objective and submit the canonical command.',
+    messages: [],
+  },
+  {
+    id: 'single-text-question',
+    name: 'Single text question',
+    summary: 'Free text without a header or progress',
+    title: 'Codex needs user input',
+    description: 'A standalone text question uses the same card without the multi-question chrome.',
+    activeTurnId: 'single-text-turn',
+    busy: true,
+    turns: [{
+      id: 'single-text-turn', status: 'inProgress', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:00:00Z', completedAt: null, durationMs: null,
+    }],
+    messages: [{
+      id: 'single-text-message', role: 'assistant', status: 'streaming', turnId: 'single-text-turn',
+      parts: [{ type: 'question', request: {
+        id: 'lab-single-text-request', kind: 'ask_user', conversationId: 'single-text-question',
+        turnId: 'single-text-turn', itemId: 'lab-single-text-item',
+        payload: { request: {
+          itemId: 'lab-single-text-item', delivery: 'async', blocking: false,
+          questions: [{
+            id: 'lab-single-text-answer',
+            header: 'What should I know before continuing?',
+            question: 'What should I know before continuing?',
+            isOther: false, isSecret: false, options: null,
+          }],
+        } },
+      } }],
+    }],
   },
   {
     id: 'blocking-question',
@@ -401,32 +470,53 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
-    id: 'single-text-question',
-    name: 'Single text question',
-    summary: 'Free text without a header or progress',
-    title: 'Codex needs user input',
-    description: 'A standalone text question uses the same card without the multi-question chrome.',
-    activeTurnId: 'single-text-turn',
-    busy: true,
+    id: 'tool-icons',
+    name: 'Tool icon gallery',
+    summary: 'Codex actions, a host override, and the generic fallback',
+    title: 'Tool call icons and descriptions',
+    description: 'Expand the tool group to compare every supported action icon and its completed label.',
+    messages: [
+      {
+        id: 'tool-icons-user', role: 'user', status: 'complete', createdAt: '2026-08-01T12:05:00Z', parts: [
+          { type: 'text', text: 'Exercise every tool call presentation.' },
+        ],
+      },
+      {
+        id: 'tool-icons-assistant', role: 'assistant', status: 'complete', createdAt: '2026-08-01T12:05:01Z', parts: [
+          { type: 'tool', id: 'tool-create', title: 'create file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'create', phase: 'completed', params: { target: 'src/vue/chat/ToolGallery.vue' } }) },
+          { type: 'tool', id: 'tool-delete', title: 'delete file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'delete', phase: 'completed', params: { target: 'src/vue/chat/LegacyTool.vue' } }) },
+          { type: 'tool', id: 'tool-edit', title: 'edit file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'edit', phase: 'completed', params: { target: 'src/vue/chat/ChatToolCall.vue', addedLines: 12, removedLines: 3 } }) },
+          { type: 'tool', id: 'tool-explore-gallery', title: 'explore files', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'explore', phase: 'completed', params: { target: 'src/vue/chat' } }) },
+          { type: 'tool', id: 'tool-list', title: 'list files', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'list', phase: 'completed', params: { target: 'src/vue/chat' } }) },
+          { type: 'tool', id: 'tool-plan', title: 'update plan', kind: 'plan', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'plan', phase: 'completed', params: { operation: 'update' } }) },
+          { type: 'tool', id: 'tool-read', title: 'read file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'read', phase: 'completed', params: { target: 'README.md' } }) },
+          { type: 'tool', id: 'tool-run', title: 'run command', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: '/bin/bash -lc "npm test && npm run typecheck && npm run build"' } }) },
+          { type: 'tool', id: 'tool-search', title: 'search source', kind: 'search', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'search', phase: 'completed', params: { target: 'registerCodexToolTitlePresenter' } }) },
+          { type: 'tool', id: 'tool-browser', title: 'codex_claw.browser_open', kind: 'mcp', status: 'completed', statusText: 'completed', metadata: { server: 'codex_claw', tool: 'browser_open' } },
+          { type: 'tool', id: 'tool-generic', title: 'Claw status sync', kind: 'generic', status: 'completed', statusText: 'Claw synchronization complete' },
+          { type: 'text', text: 'Known Codex actions use SDK icons, the app-owned browser tool uses a provided icon, and unknown tools use the generic tool icon.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'reasoning-activity',
+    name: 'Reasoning activity',
+    summary: 'Live reasoning titles become plain action counts',
+    title: 'Reasoning-aware tool group',
+    description: 'The latest app-server reasoning summary titles the active tool group, then disappears when commentary resumes.',
+    activeTurnId: 'reasoning-activity-turn',
     turns: [{
-      id: 'single-text-turn', status: 'inProgress', error: null, willRetry: false,
-      startedAt: '2026-08-01T12:00:00Z', completedAt: null, durationMs: null,
+      id: 'reasoning-activity-turn', status: 'inProgress', error: null, willRetry: false,
+      startedAt: '2026-08-01T12:04:00Z', completedAt: null, durationMs: null,
     }],
+    busy: true,
     messages: [{
-      id: 'single-text-message', role: 'assistant', status: 'streaming', turnId: 'single-text-turn',
-      parts: [{ type: 'question', request: {
-        id: 'lab-single-text-request', kind: 'ask_user', conversationId: 'single-text-question',
-        turnId: 'single-text-turn', itemId: 'lab-single-text-item',
-        payload: { request: {
-          itemId: 'lab-single-text-item', delivery: 'async', blocking: false,
-          questions: [{
-            id: 'lab-single-text-answer',
-            header: 'What should I know before continuing?',
-            question: 'What should I know before continuing?',
-            isOther: false, isSecret: false, options: null,
-          }],
-        } },
-      } }],
+      id: 'reasoning-activity-assistant',
+      role: 'assistant',
+      status: 'streaming',
+      turnId: 'reasoning-activity-turn',
+      parts: reasoningActivityParts('planning'),
     }],
   },
   {
@@ -469,26 +559,6 @@ const scenarios: [Scenario, ...Scenario[]] = [
     ],
   },
   {
-    id: 'reasoning-activity',
-    name: 'Reasoning activity',
-    summary: 'Live reasoning titles become plain action counts',
-    title: 'Reasoning-aware tool group',
-    description: 'The latest app-server reasoning summary titles the active tool group, then disappears when commentary resumes.',
-    activeTurnId: 'reasoning-activity-turn',
-    turns: [{
-      id: 'reasoning-activity-turn', status: 'inProgress', error: null, willRetry: false,
-      startedAt: '2026-08-01T12:04:00Z', completedAt: null, durationMs: null,
-    }],
-    busy: true,
-    messages: [{
-      id: 'reasoning-activity-assistant',
-      role: 'assistant',
-      status: 'streaming',
-      turnId: 'reasoning-activity-turn',
-      parts: reasoningActivityParts('planning'),
-    }],
-  },
-  {
     id: 'interrupted-turn',
     name: 'Interrupted turn',
     summary: 'Stopped work that can continue after restart',
@@ -508,73 +578,6 @@ const scenarios: [Scenario, ...Scenario[]] = [
     }],
   },
   {
-    id: 'tool-icons',
-    name: 'Tool icon gallery',
-    summary: 'Codex actions, a host override, and the generic fallback',
-    title: 'Tool call icons and descriptions',
-    description: 'Expand the tool group to compare every supported action icon and its completed label.',
-    messages: [
-      {
-        id: 'tool-icons-user', role: 'user', status: 'complete', createdAt: '2026-08-01T12:05:00Z', parts: [
-          { type: 'text', text: 'Exercise every tool call presentation.' },
-        ],
-      },
-      {
-        id: 'tool-icons-assistant', role: 'assistant', status: 'complete', createdAt: '2026-08-01T12:05:01Z', parts: [
-          { type: 'tool', id: 'tool-create', title: 'create file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'create', phase: 'completed', params: { target: 'src/vue/chat/ToolGallery.vue' } }) },
-          { type: 'tool', id: 'tool-delete', title: 'delete file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'delete', phase: 'completed', params: { target: 'src/vue/chat/LegacyTool.vue' } }) },
-          { type: 'tool', id: 'tool-edit', title: 'edit file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'edit', phase: 'completed', params: { target: 'src/vue/chat/ChatToolCall.vue', addedLines: 12, removedLines: 3 } }) },
-          { type: 'tool', id: 'tool-explore-gallery', title: 'explore files', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'explore', phase: 'completed', params: { target: 'src/vue/chat' } }) },
-          { type: 'tool', id: 'tool-list', title: 'list files', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'list', phase: 'completed', params: { target: 'src/vue/chat' } }) },
-          { type: 'tool', id: 'tool-plan', title: 'update plan', kind: 'plan', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'plan', phase: 'completed', params: { operation: 'update' } }) },
-          { type: 'tool', id: 'tool-read', title: 'read file', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'read', phase: 'completed', params: { target: 'README.md' } }) },
-          { type: 'tool', id: 'tool-run', title: 'run command', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: '/bin/bash -lc "npm test && npm run typecheck && npm run build"' } }) },
-          { type: 'tool', id: 'tool-search', title: 'search source', kind: 'search', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'search', phase: 'completed', params: { target: 'registerCodexToolTitlePresenter' } }) },
-          { type: 'tool', id: 'tool-browser', title: 'codex_claw.browser_open', kind: 'mcp', status: 'completed', statusText: 'completed', metadata: { server: 'codex_claw', tool: 'browser_open' } },
-          { type: 'tool', id: 'tool-generic', title: 'Claw status sync', kind: 'generic', status: 'completed', statusText: 'Claw synchronization complete' },
-          { type: 'text', text: 'Known Codex actions use SDK icons, the app-owned browser tool uses a provided icon, and unknown tools use the generic tool icon.' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'completed-turns',
-    name: 'Completed turns',
-    summary: 'With and without a final answer',
-    title: 'Completed turn comparison',
-    description: 'Compare a collapsed turn with a final answer against work that remains direct when no summary exists.',
-    messages: [
-      { id: 'completed-turn-work', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
-        { type: 'tool', id: 'completed-turn-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
-        { type: 'text', text: 'Started the verification.', phase: 'commentary' },
-        { type: 'media', itemId: 'completed-turn-preview', media: { url: '/attachment-preview.svg', title: 'Generated turn preview', mimeType: 'image/svg+xml' } },
-      ] },
-      { id: 'completed-turn-steer-one', kind: 'steer', role: 'user', status: 'complete', turnId: 'completed-turn', parts: [
-        { type: 'text', text: 'Check the shared disclosure too.' },
-      ] },
-      { id: 'completed-turn-work-two', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
-        { type: 'text', text: 'Verified the disclosure behavior.', phase: 'commentary' },
-      ] },
-      { id: 'completed-turn-steer-two', kind: 'steer', role: 'user', status: 'complete', turnId: 'completed-turn', parts: [
-        { type: 'text', text: 'Remove empty rows when done.' },
-      ] },
-      { id: 'completed-turn-answer', role: 'assistant', status: 'complete', turnId: 'completed-turn', parts: [
-        { type: 'text', text: 'Checked the final layout.', phase: 'commentary' },
-        { type: 'text', text: 'The completed turn is compact.', phase: 'final_answer' },
-      ] },
-      { id: 'no-summary-work', role: 'assistant', status: 'complete', turnId: 'no-summary-turn', parts: [
-        { type: 'tool', id: 'no-summary-tool', title: 'npm test', kind: 'command', status: 'completed', statusText: JSON.stringify({ source: 'codex', action: 'run', phase: 'completed', params: { target: 'npm test' } }) },
-        { type: 'text', text: 'Finished the verification.', phase: 'commentary' },
-      ] },
-      { id: 'no-summary-steer', kind: 'steer', role: 'user', status: 'complete', turnId: 'no-summary-turn', parts: [
-        { type: 'text', text: 'Also check the docs.' },
-      ] },
-      { id: 'no-summary-work-two', role: 'assistant', status: 'complete', turnId: 'no-summary-turn', parts: [
-        { type: 'text', text: 'The docs are current.', phase: 'commentary' },
-      ] },
-    ],
-  },
-  {
     id: 'empty',
     name: 'Empty and error',
     summary: 'Hero copy and recoverable error banner',
@@ -583,9 +586,17 @@ const scenarios: [Scenario, ...Scenario[]] = [
     error: 'Mock connection lost. The composer remains available for recovery testing.',
     messages: [],
   },
+  {
+    id: 'live-chat',
+    name: 'Live chat',
+    summary: 'Real microphone and Codex realtime V3',
+    title: 'Bidirectional voice',
+    description: 'WebRTC audio, live transcripts, and the normal conversation in one lab.',
+    messages: [],
+  },
 ];
 
-const selectedId = ref(scenarios[0].id);
+const selectedId = ref('conversation');
 const theme = ref<'light' | 'dark' | 'system'>('light');
 const draft = ref('');
 const activity = ref('Ready');
