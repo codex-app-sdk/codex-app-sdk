@@ -15,7 +15,7 @@ import {
   surfacePlugin,
   surfaceSkills,
 } from './codex-surface-catalog';
-import { surfaceRateLimits } from './codex-surface-data';
+import { reuseUnchangedItems, surfaceRateLimits } from './codex-surface-data';
 import type { SurfaceEventInput } from './codex-surface-events';
 import {
   approvalPresetsForProfiles,
@@ -304,9 +304,9 @@ export class CodexSurfaceCatalogController {
           if (!summaries.has(plugin.id)) summaries.set(plugin.id, plugin);
         }
       }
-      const plugins = await Promise.all(
+      const plugins = reuseUnchangedItems(this.host.getState().plugins, await Promise.all(
         [...summaries.values()].map((plugin) => surfacePlugin(plugin, (path) => this.iconDataUrl(path))),
-      );
+      ));
       if (this.host.isClosed() || this.host.authenticationBlocksBootstrap()) return;
       this.host.patch({ plugins, pluginCatalogStatus: 'loaded' });
       this.host.emitEvent('action', {

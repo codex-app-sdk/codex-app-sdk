@@ -10,7 +10,7 @@ import {
   preserveHistoricalAttachmentPreviews,
 } from './codex-conversation-history';
 import { normalizedConversationId, errorMessage } from './codex-surface-prompts';
-import { threadToSummary, upsertConversation } from './codex-surface-data';
+import { reuseUnchangedItems, threadToSummary, upsertConversation } from './codex-surface-data';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
 import { surfaceTurn } from './codex-surface-events';
 
@@ -72,7 +72,10 @@ export class CodexSurfaceConversationsController {
   }
 
   async load(): Promise<CodexSurfaceSnapshot> {
-    const conversations = await this.requestConversations({ limit: this.conversationLimit });
+    const conversations = reuseUnchangedItems(
+      this.host.getState().conversations,
+      await this.requestConversations({ limit: this.conversationLimit }),
+    );
     this.host.patch({ conversations });
     this.host.schedulePluginRefresh(true);
     for (const summary of conversations) this.host.emitSummaryUpserted(summary, 'listed', 'action');
@@ -277,6 +280,9 @@ export class CodexSurfaceConversationsController {
     options: ListCodexConversationsOptions = {},
   ): Promise<CodexConversationSummary[]> {
     const conversations: CodexConversationSummary[] = [];
+    // Paging is sorted by update time, so a thread updated mid-listing can
+    // appear on two pages; keep its first, most recent position.
+    const seenIds = new Set<string>();
     const totalLimit = options.limit === undefined
       ? Number.POSITIVE_INFINITY
       : Math.max(0, Math.floor(options.limit));
@@ -295,7 +301,11 @@ export class CodexSurfaceConversationsController {
           : { cwd: typeof options.cwd === 'string' ? options.cwd : [...options.cwd] }),
         ...(options.searchTerm === undefined ? {} : { searchTerm: options.searchTerm }),
       });
-      conversations.push(...response.data.map((thread) => this.summaryWithKnownTurnCount(thread)));
+      for (const thread of response.data) {
+        if (seenIds.has(thread.id)) continue;
+        seenIds.add(thread.id);
+        conversations.push(this.summaryWithKnownTurnCount(thread));
+      }
       cursor = response.nextCursor;
     } while (cursor);
     return conversations;

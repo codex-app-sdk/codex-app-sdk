@@ -20,6 +20,8 @@
   each probe is bounded by `shellTimeoutMs` (default 5 s), and results are
   cached per process. Closing a transport while it starts no longer leaves an
   orphaned app-server.
+- A conversation updated while the list was being paged no longer appears
+  twice in `conversations`.
 
 ### Performance
 
@@ -31,6 +33,8 @@
   snapshots otherwise; the web protocol stays at version 1.
   `useCodexSurface` mirrors patches so unchanged messages keep their identity,
   and Markdown is parsed only when a block's text changes.
+- Refreshing the conversation list or plugin catalog keeps unchanged entries,
+  so a refresh that finds nothing new sends no state change.
 
 ## 0.13.0
 

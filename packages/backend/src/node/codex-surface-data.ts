@@ -1,5 +1,6 @@
 import { basename, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import type { v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
@@ -37,6 +38,21 @@ export function threadToSummary(thread: v2.Thread): CodexConversationSummary {
     createdAt: new Date(thread.createdAt * 1000).toISOString(),
     updatedAt: new Date((thread.recencyAt ?? thread.updatedAt) * 1000).toISOString(),
   };
+}
+
+/**
+ * Reuses previous items that a refresh left unchanged, and the previous list
+ * itself when nothing changed, so state patches carry only real changes.
+ */
+export function reuseUnchangedItems<Item extends { id: string }>(previous: Item[], next: Item[]): Item[] {
+  const previousById = new Map(previous.map((item) => [item.id, item]));
+  const merged = next.map((item) => {
+    const existing = previousById.get(item.id);
+    return existing && isDeepStrictEqual(existing, item) ? existing : item;
+  });
+  return merged.length === previous.length && merged.every((item, index) => item === previous[index])
+    ? previous
+    : merged;
 }
 
 export function upsertConversation(
