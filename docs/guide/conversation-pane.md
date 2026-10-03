@@ -136,8 +136,10 @@ transcript tool `itemId`; the host retains ownership of executing the decision.
 Both flows retain the unfinished prompt, attachments, pending command mode and
 caret selection. Resolving or cancelling a request never submits or clears the
 draft. Once no expanded request remains, the composer returns; focus returns to
-its saved selection if the resolved request still had focus. Try **Requests and
-drafts** in the component lab with a draft and attachment already entered.
+its saved selection if the resolved request still had focus. Try **Approvals &
+questions** in the component lab with a draft and attachment already entered.
+Use its controls to choose native/tool approval, question format, single or
+multi-step questions, and blocking or async delivery.
 
 When the app-server provides a structured question, the pane shows that question
 once; its fallback agent-message text is not shown separately. Other assistant
@@ -150,6 +152,10 @@ requests through `thread.clientRequests` and route `actions.clientResponse`;
 the pane hides the active tool card from the transcript and retains the answered
 tool summary afterward. The standalone `clientRequests` prop provides the same
 input outside controller mode.
+When a question offers Other, its one-line text field is visible beside the
+label immediately. Focusing or typing in it selects Other automatically; the
+field expands for multiline answers. Single-choice questions deselect the
+previous option, while multiple-choice questions retain the other selections.
 In a direct-answer or Other text field, Enter advances or sends the answer
 when its text is nonblank; Shift+Enter inserts a newline.
 

@@ -237,10 +237,14 @@ conversation is reloaded. Additional questions remain available in request
 order. The historical agent message is not deleted. Surface-bound panes send responses through
 `respondToClientRequest()` automatically. Controlled panes dispatch
 `actions.clientResponse`; keep `thread.answeredClientRequestIds` current so
-resolved questions render consistently. The component lab's **Blocking question**
-and **Async questions** scenarios exercise both presentation paths, including
-the queued free-text question. Questions whose `options` value is `null` render an
-immediately focused free-text field. Question cards omit a header that repeats
+resolved questions render consistently. The component lab's **Approvals & questions**
+scenario covers native/tool approvals, choices or free text, single or multi-step
+questions, and blocking or async delivery. **Complete turn** exposes the async
+pending-question chip. Questions whose `options` value is `null` render an
+immediately focused free-text field. Questions with `isOther: true` and options
+show an always-visible, initially one-line field beside Other. Focusing or typing
+in it selects Other, preserving any other selections only for `multiSelect`
+questions. Question cards omit a header that repeats
 the question, and an immediately preceding text part that exactly matches a
 structured question is not rendered twice. Distinct introductory text and
 short question labels remain visible. Answered questions stack their label

@@ -5,31 +5,35 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App.vue';
 import type { CodexMessageTextSelection } from '@codex-app-sdk/vue';
 
+async function openQuestionLab(wrapper: ReturnType<typeof mount>, delivery = 'async', format = 'choices', steps = 'multiple') {
+  await wrapper.findAll('nav button').find((button) => button.text().includes('Approvals & questions'))!.trigger('click');
+  await wrapper.get('select[aria-label="Question delivery"]').setValue(delivery);
+  await wrapper.get('select[aria-label="Question format"]').setValue(format);
+  await wrapper.get('select[aria-label="Question steps"]').setValue(steps);
+  await wrapper.findAll('button').find((button) => button.text() === 'Ask question')!.trigger('click');
+}
+
 describe('component lab', () => {
   afterEach(() => vi.useRealTimers());
   it('shows a blocking tool question in place of the composer, then keeps its answered summary', async () => {
     const wrapper = mount(App);
-    await wrapper.findAll('nav button')
-      .find((button) => button.text().includes('Blocking question'))!.trigger('click');
+    await openQuestionLab(wrapper, 'tool', 'choices', 'single');
 
     const footer = wrapper.get('.codex-conversation-pane__footer');
-    expect(footer.text()).toContain('Does this blocking question replace the composer?');
+    expect(footer.text()).toContain('Which framework should I use?');
     expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(false);
     expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
 
-    await footer.get('button[aria-label="Yes"]').trigger('click');
+    await footer.get('button[aria-label="Vue"]').trigger('click');
     await footer.get('.chat-tool-user-input__button--primary').trigger('click');
     expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(true);
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
-    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Yes');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
   });
   it('exercises an asynchronous agent question through the controlled pane', async () => {
     vi.useFakeTimers();
     const wrapper = mount(App);
-    const scenarioButton = wrapper.findAll('nav button')
-      .find((button) => button.text().includes('Async questions'));
-    expect(scenarioButton).toBeDefined();
-    await scenarioButton!.trigger('click');
+    await openQuestionLab(wrapper);
 
     expect(wrapper.text()).toContain('Which framework should I use?');
     expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(false);
@@ -48,37 +52,26 @@ describe('component lab', () => {
     await send!.trigger('click');
 
     expect(wrapper.text()).toContain('Answered: Vue, Preserve the existing API.');
-    await vi.advanceTimersByTimeAsync(300);
     expect(wrapper.findAll('.chat-message--user').at(-1)?.text()).toContain('Vue, Preserve the existing API.');
     expect(wrapper.find('button[aria-label="Pending question"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Mock response:');
   });
   it('shows text-only asynchronous questions as an immediately focused field', async () => {
     const wrapper = mount(App, { attachTo: document.body });
-    const scenarioButton = wrapper.findAll('nav button')
-      .find((button) => button.text().includes('Async questions'));
-    expect(scenarioButton).toBeDefined();
-    await scenarioButton!.trigger('click');
-    await wrapper.findAll('button').find((button) => button.text() === 'Complete turn')!.trigger('click');
-    await wrapper.get('button[aria-label="Pending question"]').trigger('click');
-
-    const vueOption = wrapper.findAll('button').find((button) => button.text().includes('Vue'));
-    expect(vueOption).toBeDefined();
-    await vueOption!.trigger('click');
-    await wrapper.findAll('button').find((button) => button.text() === 'Next')!.trigger('click');
+    await openQuestionLab(wrapper, 'async', 'text', 'single');
 
     const input = wrapper.get<HTMLTextAreaElement>('.chat-tool-user-input__other-input--direct');
     expect(wrapper.text().split('What should I know before continuing?')).toHaveLength(2);
     const questionCard = wrapper.findAll('.chat-tool-user-input')
       .find((card) => card.find('.chat-tool-user-input__other-input--direct').exists());
     expect(questionCard).toBeDefined();
-    expect(questionCard!.get('.chat-tool-user-input__tag').text()).toBe('Context');
+    expect(questionCard!.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(questionCard!.find('[aria-label="Question progress"]').exists()).toBe(false);
     expect(questionCard!.find('.chat-tool-user-input__option--other').exists()).toBe(false);
     await vi.waitFor(() => expect(document.activeElement).toBe(input.element));
     await input.setValue('Preserve the existing API.');
     await questionCard!.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
 
-    expect(wrapper.text()).toContain('Answered: Vue, Preserve the existing API.');
+    expect(wrapper.text()).toContain('Answered: Preserve the existing API.');
     wrapper.unmount();
   });
   it('renders a dense multi-turn fixture with mentions, attachments, tools, and steering', async () => {

@@ -13,7 +13,7 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
   await page.goto(server.resolvedUrls.local[0]);
-  await page.getByRole('button', { name: 'Requests and drafts', exact: false }).click();
+  await page.getByRole('button', { name: 'Approvals & questions', exact: false }).click();
   const editor = page.locator('.chat-rich-text-editor');
   await editor.fill('/goal');
   await editor.press('Tab');
@@ -25,6 +25,7 @@ try {
     element.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer }));
   });
   await page.getByRole('button', { name: 'Remove notes.txt', exact: true }).waitFor();
+  await page.getByRole('combobox', { name: 'Question format' }).selectOption('text');
 
   for (const [trigger, cancel] of [
     ['Request approval', false], ['Request approval', true],
@@ -38,7 +39,12 @@ try {
     await editor.press('ArrowRight');
     await editor.press('ArrowRight');
     await editor.press('ArrowRight');
-    await page.getByRole('button', { name: trigger, exact: true }).click();
+    if (trigger.startsWith('Ask')) {
+      await page.getByRole('combobox', { name: 'Question delivery' }).selectOption(trigger === 'Ask blocking' ? 'tool' : 'async');
+      await page.getByRole('button', { name: 'Ask question', exact: true }).click();
+    } else {
+      await page.getByRole('button', { name: trigger === 'Command approval' ? 'Native approval' : 'Tool confirmation', exact: true }).click();
+    }
     assert.equal(await editor.count(), 0, `${trigger} must replace the composer`);
     const footer = page.locator('.codex-conversation-pane__footer');
     const bounds = await footer.boundingBox();
@@ -71,7 +77,29 @@ try {
     assert.equal(await editor.innerText(), 'My Xunfinished prompt', `${trigger} must restore the caret`);
     await editor.press('Backspace');
   }
-  console.log('Approvals and questions replace the composer and restore its draft, attachments and caret in Chromium.');
+  await page.getByRole('combobox', { name: 'Question format' }).selectOption('choices');
+  await page.getByRole('combobox', { name: 'Question steps' }).selectOption('multiple');
+  await page.getByRole('button', { name: 'Ask question', exact: true }).click();
+  const other = page.locator('.chat-tool-user-input__option--other');
+  const otherInput = other.locator('textarea');
+  assert(await otherInput.isVisible(), 'Other must be editable without first selecting its row');
+  const labelBounds = await other.locator('.chat-tool-user-input__option-label').boundingBox();
+  const inputBounds = await otherInput.boundingBox();
+  assert(labelBounds && inputBounds && inputBounds.x > labelBounds.x + labelBounds.width
+    && inputBounds.height <= 36, 'Other starts with a compact inline one-line field');
+  await page.getByRole('button', { name: 'Vue', exact: true }).click();
+  await otherInput.click();
+  assert.equal(await page.getByRole('button', { name: 'Vue', exact: true }).getAttribute('aria-pressed'), 'false');
+  assert.equal(await other.getAttribute('aria-pressed'), 'true');
+  await otherInput.pressSequentially('Svelte');
+  await otherInput.press('Shift+Enter');
+  await otherInput.pressSequentially('With TypeScript');
+  assert((await otherInput.boundingBox()).height > inputBounds.height, 'Other expands for a multiline answer');
+  await otherInput.press('Enter');
+  await page.locator('.chat-tool-user-input__other-input--direct').fill('Keep it simple');
+  await page.locator('.chat-tool-user-input__other-input--direct').press('Enter');
+  assert.match(await page.locator('output[aria-live]').innerText(), /Answered: Svelte\s+With TypeScript, Keep it simple/);
+  console.log('Requests preserve drafts; Other supports direct focus, inline entry, multiline growth and submission in Chromium.');
 } finally {
   await browser?.close();
   await server.close();

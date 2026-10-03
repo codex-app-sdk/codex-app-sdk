@@ -131,11 +131,11 @@
               <span class="chat-tool-user-input__option-label">Other</span>
             </span>
             <textarea
-              v-if="isOtherSelected(currentQuestion.id)"
               v-model="otherTexts[currentQuestion.id]"
               class="chat-tool-user-input__other-input"
+              aria-label="Other answer"
               :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
-              rows="2"
+              rows="1"
               :type="currentQuestion.isSecret ? 'password' : 'text'"
               @click.stop
               @focus="selectOther(currentQuestion)"
@@ -705,8 +705,17 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 
 .chat-tool-user-input__option--other {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 18px auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.chat-tool-user-input__option--other .chat-tool-user-input__other-input {
+  grid-column: 3;
+  margin-top: 0;
+  box-sizing: border-box;
+  field-sizing: content;
+  max-height: 9rem;
+  resize: none;
 }
 
 .chat-tool-user-input__other-input {

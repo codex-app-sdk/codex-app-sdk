@@ -392,7 +392,7 @@ describe('ChatToolUserInputRequest interactions', () => {
     const primary = wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary');
 
     await option.trigger('click');
-    await other.trigger('keydown', { key: 'Enter' });
+    await wrapper.get('textarea').trigger('focus');
     expect(option.classes()).not.toContain('chat-tool-user-input__option--selected');
     expect(other.classes()).toContain('chat-tool-user-input__option--selected');
     expect(primary.element.disabled).toBe(true);
@@ -401,14 +401,14 @@ describe('ChatToolUserInputRequest interactions', () => {
     expect(primary.element.disabled).toBe(false);
 
     await other.trigger('keydown', { key: ' ' });
-    expect(wrapper.find('textarea').exists()).toBe(false);
+    expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
     expect(primary.element.disabled).toBe(true);
 
     await other.trigger('click');
     expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
     await wrapper.get('textarea').setValue('ignored after option selection');
     await option.trigger('click');
-    expect(wrapper.find('textarea').exists()).toBe(false);
+    expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
     expect(option.classes()).toContain('chat-tool-user-input__option--selected');
   });
 
@@ -425,7 +425,8 @@ describe('ChatToolUserInputRequest interactions', () => {
     expect(options[0]!.classes()).not.toContain('chat-tool-user-input__option--selected');
     expect(options[1]!.classes()).toContain('chat-tool-user-input__option--selected');
 
-    await other.trigger('click');
+    await wrapper.get('textarea').trigger('focus');
+    expect(other.attributes('aria-pressed')).toBe('true');
     await wrapper.get('textarea').setValue('  Documentation  ');
     expect(options[1]!.classes()).toContain('chat-tool-user-input__option--selected');
 
