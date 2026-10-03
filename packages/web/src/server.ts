@@ -56,6 +56,33 @@ export type CodexNodeWebSocketLike = {
   on(event: 'error', listener: (error: unknown) => void): unknown;
 };
 
+/** The header subset of a Node `IncomingMessage` (or equivalent) needed to check a WebSocket upgrade. */
+export type CodexWebSocketUpgradeRequest = {
+  headers: Readonly<Record<string, string | readonly string[] | undefined>>;
+};
+
+/**
+ * Returns true only when a WebSocket upgrade carries exactly one `Origin`
+ * header matching one of `allowedOrigins`. Browsers do not apply the
+ * same-origin policy to WebSockets, so a host that skips this check lets any
+ * website the user visits drive its Codex surface. Requests without an
+ * `Origin` header are rejected.
+ */
+export function isAllowedCodexWebSocketOrigin(
+  request: CodexWebSocketUpgradeRequest,
+  allowedOrigins: readonly string[],
+): boolean {
+  const origin = request.headers.origin;
+  if (typeof origin !== 'string') return false;
+  const requestOrigin = normalizedOrigin(origin);
+  if (!requestOrigin) return false;
+  return allowedOrigins.some((allowedOrigin) => {
+    const allowed = normalizedOrigin(allowedOrigin);
+    if (!allowed) throw new TypeError(`Invalid allowed Codex WebSocket origin: ${allowedOrigin}`);
+    return allowed === requestOrigin;
+  });
+}
+
 /**
  * Binds an established socket to a required host authorization callback.
  * HTTP upgrades, cookies, user lookup, runner pooling, and Express integration stay host-owned.
@@ -301,6 +328,15 @@ function nodeSocketListener(
     if (removable.off) removable.off(event, listener);
     else removable.removeListener?.(event, listener);
   };
+}
+
+function normalizedOrigin(value: string): string | null {
+  try {
+    const { origin } = new URL(value.trim());
+    return origin === 'null' ? null : origin;
+  } catch {
+    return null;
+  }
 }
 
 function socketReason(value: unknown): string | undefined {

@@ -106,6 +106,7 @@ test('creates a thin Express web target against the modular packages', async (t)
   assert.match(app, /@create="surface\.createConversation\(\)"/);
   assert.doesNotMatch(app, /JSON\.parse|requestId|addEventListener/);
   assert.match(server, /bindCodexWebSocket/);
+  assert.match(server, /isAllowedCodexWebSocketOrigin\(request, allowedOrigins\)/);
   assert.match(server, /authenticateSiteRequest/);
   assert.match(server, /acquireCodexSession/);
   assert.match(server, /autoSelectFirstConversation: false/);

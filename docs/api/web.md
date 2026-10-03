@@ -74,6 +74,14 @@ with `4400`. Initialization or response failures close with `1011`.
 `release()` receives `authorization_failed`, `server_closed`, `socket_closed`,
 or `surface_failed`, plus relevant close/error context.
 
+### `isAllowedCodexWebSocketOrigin(request, allowedOrigins)`
+
+Returns true only when the upgrade request carries exactly one `Origin` header
+that matches one of `allowedOrigins` after URL normalization. Call it before
+accepting an upgrade; browsers let any website open a WebSocket to your server.
+Missing, opaque (`null`), and malformed origins are rejected, and a malformed
+entry in `allowedOrigins` throws.
+
 ### `createCodexNodeWebSocketPort(socket)`
 
 Adapts the small EventEmitter-style subset implemented by `ws`. The package

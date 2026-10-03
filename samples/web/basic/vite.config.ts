@@ -4,6 +4,7 @@ import { defineConfig } from 'vite';
 import { sdkSourceAliases, sdkSourceModuleIds, sdkSourceRoot } from '../../vite.sdk-aliases';
 
 const serverPort = Number(process.env.PORT ?? 3000);
+const devServerPort = Number(process.env.VITE_PORT ?? 5173);
 
 export default defineConfig(({ command }) => {
   const useSdkSources = command === 'serve';
@@ -20,6 +21,9 @@ export default defineConfig(({ command }) => {
     },
     server: {
       host: '127.0.0.1',
+      // The backend allows WebSocket upgrades only from this origin.
+      port: devServerPort,
+      strictPort: true,
       fs: { allow: [sdkSourceRoot] },
       proxy: {
         '/codex': {

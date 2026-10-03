@@ -7,12 +7,18 @@ import { createCodexAppBackend } from '@codex-app-sdk/backend';
 import {
   bindCodexWebSocket,
   createCodexNodeWebSocketPort,
+  isAllowedCodexWebSocketOrigin,
 } from '@codex-app-sdk/web/server';
 
 type SiteUser = { id: string };
 type WebSessionContext = { request: IncomingMessage; siteUser: SiteUser };
 
 const port = Number(process.env.PORT ?? 3000);
+// Browsers let any website open a WebSocket to this server, so only pages
+// served from these origins may drive Codex. Set ALLOWED_ORIGINS
+// (comma-separated) to the public origin when deploying.
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean)
+  ?? [`http://127.0.0.1:${port}`, `http://localhost:${port}`];
 const clientDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../client');
 const app = express();
 const httpServer = createServer(app);
@@ -26,8 +32,12 @@ app.get('/', (_request, response) => response.sendFile(path.join(clientDirectory
 
 httpServer.on('upgrade', (request, socket, head) => {
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+  if (pathname !== '/codex' || !isAllowedCodexWebSocketOrigin(request, allowedOrigins)) {
+    socket.destroy();
+    return;
+  }
   const siteUser = authenticateSiteRequest(request);
-  if (pathname !== '/codex' || !siteUser) {
+  if (!siteUser) {
     socket.destroy();
     return;
   }

@@ -78,6 +78,22 @@ denied. Before binding, validate the upgrade path, website session, expected
 origin/CSRF policy, account state, and connection quota. Never accept a browser
 supplied user ID as authority for selecting a surface.
 
+Browsers do not apply the same-origin policy to WebSockets: any page the user
+visits can open a socket to a local or intranet Codex server and drive it. Reject
+upgrades from unexpected origins before calling `handleUpgrade`:
+
+```ts
+import { isAllowedCodexWebSocketOrigin } from '@codex-app-sdk/web/server';
+
+if (!isAllowedCodexWebSocketOrigin(request, ['https://app.example.com'])) {
+  socket.destroy();
+  return;
+}
+```
+
+Requests without an `Origin` header are rejected. The scaffolded web target and
+the web sample apply this check, configurable through `ALLOWED_ORIGINS`.
+
 Use stable isolated `codexHome` directories when credentials should persist per
 user. The website owns encrypted storage, process pooling, eviction, deployment
 routing, and tenancy; the SDK lease only connects one authorized socket to one

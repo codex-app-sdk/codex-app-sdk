@@ -7,6 +7,7 @@ import { createCodexAppBackend } from '@codex-app-sdk/backend';
 import {
   bindCodexWebSocket,
   createCodexNodeWebSocketPort,
+  isAllowedCodexWebSocketOrigin,
 } from '@codex-app-sdk/web/server';
 
 type SiteUser = { id: string };
@@ -16,6 +17,11 @@ type WebSessionContext = {
 };
 
 const port = Number(process.env.PORT ?? 3000);
+const devServerPort = Number(process.env.VITE_PORT ?? 5173);
+// Browsers let any website open a WebSocket to this server, so only the built
+// client and the Vite dev server (which proxies /codex) may drive Codex.
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean)
+  ?? [port, devServerPort].flatMap((origin) => [`http://127.0.0.1:${origin}`, `http://localhost:${origin}`]);
 const clientDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../client');
 const app = express();
 const httpServer = createServer(app);
@@ -32,8 +38,12 @@ app.get('/', (_request, response) => response.sendFile(path.join(clientDirectory
 
 httpServer.on('upgrade', (request, socket, head) => {
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+  if (pathname !== '/codex' || !isAllowedCodexWebSocketOrigin(request, allowedOrigins)) {
+    socket.destroy();
+    return;
+  }
   const siteUser = authenticateSiteRequest(request);
-  if (pathname !== '/codex' || !siteUser) {
+  if (!siteUser) {
     socket.destroy();
     return;
   }

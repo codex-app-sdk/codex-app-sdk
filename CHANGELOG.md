@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `isAllowedCodexWebSocketOrigin()` rejects WebSocket upgrades from unexpected
+  origins. The scaffolded web target and the web sample now apply it, so other
+  websites can no longer drive a locally running Codex server.
+
 ## 0.13.0
 
 First public npm release of all six `@codex-app-sdk` packages. Earlier versions

@@ -13,11 +13,13 @@ export {
 export {
   bindCodexWebSocket,
   createCodexNodeWebSocketPort,
+  isAllowedCodexWebSocketOrigin,
   type BindCodexWebSocketOptions,
   type CodexWebSocketBinding,
   type CodexNodeWebSocketLike,
   type CodexWebSocketSessionLease,
   type CodexWebSocketSessionRelease,
+  type CodexWebSocketUpgradeRequest,
 } from './server';
 export {
   codexWebSocketProtocolVersion,
