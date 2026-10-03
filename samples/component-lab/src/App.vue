@@ -38,6 +38,12 @@
           <p>{{ selected.description }}</p>
         </div>
         <div class="lab__header-actions">
+          <template v-if="selected.id === 'requests-and-drafts'">
+            <button type="button" @click="requestApproval">Request approval</button>
+            <button type="button" @click="requestCommandApproval">Command approval</button>
+            <button type="button" @click="requestQuestion('tool')">Ask blocking</button>
+            <button type="button" @click="requestQuestion('async')">Ask async</button>
+          </template>
           <button
             v-if="selected.id === 'async-questions' && mockActiveTurnId"
             type="button"
@@ -63,6 +69,7 @@
           v-model="draft"
           :active-turn-id="mockActiveTurnId"
           :answered-client-request-ids="answeredClientRequestIds"
+          :approvals="approvals"
           :busy="mockBusy"
           :client-requests="clientRequests"
           :context-usage="selected.contextUsage"
@@ -87,6 +94,7 @@
           :transcribe-audio="transcribeAudio"
           @interrupt="activity = 'Interrupt requested'"
           @client-response="respondToClientRequest"
+          @resolve-approval="resolveApproval"
           @continue-interrupted-turn="continueInterruptedTurn"
           @message-text-selection-change="selectedMessageText = $event"
           @submit="submitPrompt"
@@ -149,7 +157,7 @@ import {
   type SurfaceMessagePart,
   type TurnGitDiff,
 } from '@codex-app-sdk/vue';
-import type { CodexSurfaceClientRequest, CodexSurfacePlugin, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
+import type { CodexSurfaceApproval, CodexSurfaceApprovalDecision, CodexSurfaceClientRequest, CodexSurfacePlugin, CodexSurfaceTurn } from '@codex-app-sdk/core/surface';
 
 type Scenario = {
   id: string;
@@ -332,6 +340,17 @@ const scenarios: [Scenario, ...Scenario[]] = [
     title: 'Set a conversation goal',
     description: 'Choose Goal mode from + or type /goal, then enter an objective and submit the canonical command.',
     messages: [],
+  },
+  {
+    id: 'requests-and-drafts',
+    name: 'Requests and drafts',
+    summary: 'Approval and question interruptions',
+    title: 'Preserve an unfinished prompt',
+    description: 'Type a draft, attach a file, then request approval or ask a question. Resolve it to return to the same draft.',
+    messages: Array.from({ length: 30 }, (_, index) => ({
+      id: `request-history-${index}`, role: 'assistant' as const, status: 'complete' as const,
+      parts: [{ type: 'text' as const, text: `Earlier result ${index + 1}. Requests stay in the composer area even when reading old messages.` }],
+    })),
   },
   {
     id: 'single-text-question',
@@ -605,6 +624,8 @@ const mockBusy = ref(false);
 const mockActiveTurnId = ref<string | null>(null);
 const mockTurns = ref<readonly CodexSurfaceTurn[]>([]);
 const clientRequests = ref<CodexSurfaceClientRequest[]>([]);
+const approvals = ref<CodexSurfaceApproval[]>([]);
+let requestSequence = 0;
 const answeredClientRequestIds = ref<ReadonlySet<string>>(new Set());
 const selectedMessageText = ref<CodexMessageTextSelection | null>(null);
 const selectedMessageContexts = ref<CodexMessageTextSelection[]>([]);
@@ -631,6 +652,7 @@ function resetScenario(confirmReset = true): void {
   mockActiveTurnId.value = selected.value.activeTurnId ?? null;
   mockTurns.value = [...(selected.value.turns ?? [])];
   clientRequests.value = [...(selected.value.clientRequests ?? [])];
+  approvals.value = [];
   answeredClientRequestIds.value = new Set();
   selectedMessageText.value = null;
   selectedMessageContexts.value = [];
@@ -702,8 +724,66 @@ function clearResetFeedback(): void {
   resetConfirmed.value = false;
 }
 
+function requestCommandApproval(): void {
+  approvals.value.push({
+    id: `lab-approval-${++requestSequence}`, kind: 'command', conversationId: selectedId.value,
+    itemId: `lab-command-${requestSequence}`, title: 'Allow this command?', command: 'npm test',
+    description: 'Run the project tests.',
+  });
+}
+
+function requestApproval(): void {
+  const id = `lab-confirmation-${++requestSequence}`;
+  const confirmation = {
+    summary: 'Check for concurrent repo changes', integrationId: 'shell', integrationName: 'Shell',
+    toolName: 'run', argumentsPreview: JSON.stringify({
+      command: 'git status --short && git log --oneline -3',
+      description: 'Check for concurrent repo changes',
+    }, null, 2),
+  };
+  clientRequests.value.push({ id, kind: 'confirm_tool', conversationId: selectedId.value,
+    turnId: id, itemId: id, payload: { confirmation } });
+  messages.value.push({ id, role: 'assistant', status: 'streaming', turnId: id,
+    parts: [{ type: 'tool', id, kind: 'mcp', title: 'shell.run', status: 'running',
+      statusText: JSON.stringify({ source: 'mcp', action: 'confirm_tool', phase: 'running',
+        params: { requestId: id, confirmationSummary: confirmation.summary,
+          argumentsPreview: confirmation.argumentsPreview } }),
+    }],
+  });
+}
+
+function resolveApproval(id: string, decision: CodexSurfaceApprovalDecision): void {
+  approvals.value = approvals.value.filter((approval) => approval.id !== id);
+  activity.value = `Approval ${decision}`;
+}
+
+function requestQuestion(delivery: 'tool' | 'async'): void {
+  const id = `lab-question-${++requestSequence}`;
+  const turnId = `lab-request-turn-${requestSequence}`;
+  const request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> = {
+    id, kind: 'ask_user', conversationId: selectedId.value, turnId, itemId: id,
+    payload: { request: { itemId: id, delivery, blocking: delivery === 'tool',
+      questions: [{ id: 'context', header: 'Context', question: 'What should I know?',
+        isOther: false, isSecret: false, options: null }],
+    } },
+  };
+  mockActiveTurnId.value = turnId;
+  if (delivery === 'tool') clientRequests.value.push(request);
+  else messages.value.push({ id, turnId, role: 'assistant', status: 'streaming',
+    parts: [{ type: 'question', request }] });
+}
+
 function respondToClientRequest(response: ClientRequestResponse): void {
   answeredClientRequestIds.value = new Set([...answeredClientRequestIds.value, response.id]);
+  if (selected.value.id === 'requests-and-drafts') {
+    clientRequests.value = clientRequests.value.filter((request) => request.id !== response.id);
+    messages.value = messages.value.map((message) => ({ ...message,
+      parts: message.parts.map((part) => part.type === 'tool' && part.id === response.id
+        ? { ...part, output: response.payload } : part),
+    }));
+    activity.value = 'Question resolved';
+    return;
+  }
   if (selected.value.id === 'blocking-question') {
     const answers = response.payload?.answers ?? {};
     clientRequests.value = clientRequests.value.filter((request) => request.id !== response.id);

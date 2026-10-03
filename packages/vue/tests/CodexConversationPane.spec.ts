@@ -89,6 +89,46 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
+  it.each(['always_allow', 'deny'] as const)('moves MCP tool confirmation into the composer and restores draft/history after %s', async (decision) => {
+    const request: Extract<CodexSurfaceClientRequest, { kind: 'confirm_tool' }> = {
+      id: 'confirm-1', kind: 'confirm_tool', conversationId: 'thread-1', turnId: 'turn-1', itemId: 'tool-1',
+      payload: { confirmation: {
+        summary: 'Check for concurrent repo changes', argumentsPreview: '{"command":"git status"}',
+        integrationId: 'shell', integrationName: 'Shell', toolName: 'run',
+        allowConversation: true, allowAlways: true,
+      } },
+    };
+    const toolPart: SurfaceMessage['parts'][number] = {
+      type: 'tool', id: 'tool-1', kind: 'mcp', title: 'shell.run', status: 'running',
+      statusText: JSON.stringify({ source: 'mcp', action: 'confirm_tool', phase: 'running',
+        params: { requestId: request.id, confirmationSummary: request.payload.confirmation.summary } }),
+    };
+    const wrapper = mount(CodexConversationPane, { props: {
+      modelValue: 'My unfinished prompt', clientRequests: [request],
+      messages: [{ id: 'mixed', role: 'assistant', status: 'streaming',
+        parts: [{ type: 'text', text: 'Checking the repository.' }, toolPart] }],
+    } });
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    const footer = wrapper.get('.codex-conversation-pane__footer');
+    expect(footer.text()).toContain('Approve tool call');
+    expect(footer.text()).toContain('Check for concurrent repo changes');
+    expect(footer.get('pre').text()).toBe('{"command":"git status"}');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Checking the repository.');
+    expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-confirmation').exists()).toBe(false);
+    await footer.findAll('button').find((button) => button.text() === (decision === 'deny' ? 'Deny' : 'Always allow'))!.trigger('click');
+    expect(wrapper.emitted('clientResponse')).toStrictEqual([[
+      { id: request.id, payload: { decision } },
+    ]]);
+    await wrapper.setProps({ clientRequests: [], answeredClientRequestIds: new Set([request.id]),
+      messages: [{ id: 'mixed', role: 'assistant', status: 'streaming',
+        parts: [{ type: 'text', text: 'Checking the repository.' }, { ...toolPart, output: { decision } }] }],
+    });
+    expect(composerValue(wrapper)).toBe('My unfinished prompt');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain(
+      decision === 'deny' ? 'Denied tool call' : 'Allowed tool call',
+    );
+  });
+
   it('replaces the composer with a blocking question and restores its tool summary after answering', async () => {
     const wrapper = mount(CodexConversationPane, { props: {
       activeTurnId: 'turn-question', busy: true,
@@ -2599,11 +2639,12 @@ describe('CodexConversationPane', () => {
 
   it('forwards composer settings and decisions through exact legacy events', async () => {
     const wrapper = mount(CodexConversationPane, {
-      props: { approvals: [routingApproval], messages, modelValue: '' },
+      props: { messages, modelValue: '' },
     });
 
     emitComposerActionTable(wrapper);
-    await wrapper.findAll('button').find((button) => button.text() === 'Allow once')!.trigger('click');
+    await wrapper.setProps({ approvals: [routingApproval] });
+    await wrapper.findAll('button').find((button) => button.text() === 'Allow')!.trigger('click');
     await flushPromises();
 
     expect(wrapper.emitted('interrupt')).toStrictEqual([[]]);
@@ -2630,12 +2671,13 @@ describe('CodexConversationPane', () => {
     };
     Object.assign(surface, surfaceActions);
     const wrapper = mount(CodexConversationPane, {
-      props: { approvals: [routingApproval], surface },
+      props: { surface },
     });
     await vi.waitFor(() => expect(surface.connect).toHaveBeenCalledOnce());
 
     emitComposerActionTable(wrapper);
-    await wrapper.findAll('button').find((button) => button.text() === 'Allow once')!.trigger('click');
+    await wrapper.setProps({ approvals: [routingApproval] });
+    await wrapper.findAll('button').find((button) => button.text() === 'Allow')!.trigger('click');
     await flushPromises();
 
     expect(surfaceActions.interrupt).toHaveBeenCalledOnce();
@@ -2666,17 +2708,20 @@ describe('CodexConversationPane', () => {
       selectApprovalPreset: vi.fn(),
       updateSettings: vi.fn(),
     };
+    const state = reactive<CodexConversationPaneState>({
+      identity: { conversationKey: 'controlled-composer-actions', messages },
+      thread: { approvals: [] },
+    });
     const controller = createCodexConversationPaneController({
-      state: {
-        identity: { conversationKey: 'controlled-composer-actions', messages },
-        thread: { approvals: [routingApproval] },
-      },
+      state,
       actions,
     });
     const wrapper = mount(CodexConversationPane, { props: { controller } });
 
     emitComposerActionTable(wrapper);
-    await wrapper.findAll('button').find((button) => button.text() === 'Allow once')!.trigger('click');
+    state.thread = { approvals: [routingApproval] };
+    await nextTick();
+    await wrapper.findAll('button').find((button) => button.text() === 'Allow')!.trigger('click');
     await flushPromises();
 
     expect(actions.interrupt).toHaveBeenCalledOnce();
@@ -2721,17 +2766,20 @@ describe('CodexConversationPane', () => {
   });
 
   it('keeps composer settings and decisions controller-owned when actions are absent', async () => {
+    const state = reactive<CodexConversationPaneState>({
+      identity: { conversationKey: 'controlled-composer-actions-absent', messages },
+      thread: { approvals: [] },
+    });
     const controller = createCodexConversationPaneController({
-      state: {
-        identity: { conversationKey: 'controlled-composer-actions-absent', messages },
-        thread: { approvals: [routingApproval] },
-      },
+      state,
       actions: {},
     });
     const wrapper = mount(CodexConversationPane, { props: { controller } });
 
     emitComposerActionTable(wrapper);
-    await wrapper.findAll('button').find((button) => button.text() === 'Allow once')!.trigger('click');
+    state.thread = { approvals: [routingApproval] };
+    await nextTick();
+    await wrapper.findAll('button').find((button) => button.text() === 'Allow')!.trigger('click');
     await flushPromises();
 
     expect(wrapper.emitted('interrupt')).toBeUndefined();
@@ -3280,22 +3328,64 @@ describe('CodexConversationPane', () => {
     expect(wrapper.emitted('mentionSelect')).toBeUndefined();
   });
 
-  it('composes approvals and forwards decisions without exposing protocol types', async () => {
+  it('replaces the composer with queued approvals before questions, then restores the draft', async () => {
+    const approval = {
+      id: 'approval-1', kind: 'file-change' as const, conversationId: 'thread-1', turnId: 'turn-1',
+      itemId: 'item-1', title: 'Apply file changes',
+    };
     const wrapper = mount(CodexConversationPane, {
+      attachTo: document.body,
       props: {
-        approvals: [{
-          id: 'approval-1', kind: 'file-change', conversationId: 'thread-1', turnId: 'turn-1',
-          itemId: 'item-1', title: 'Apply file changes',
-        }],
         messages,
-        modelValue: '',
+        modelValue: 'My unfinished prompt',
       },
     });
-    await wrapper.findAll('button').find((button) => button.text() === 'Allow once')!.trigger('click');
+    await wrapper.setProps({
+      approvals: [approval, { ...approval, id: 'approval-2', title: 'Second approval' }],
+    });
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    await wrapper.setProps({ clientRequests: [blockingQuestion] });
+    expect(wrapper.text()).not.toContain('Second approval');
+    expect(wrapper.text()).not.toContain('Which framework should I use?');
+    await wrapper.findAll('button').find((button) => button.text() === 'Allow')!.trigger('click');
     expect(wrapper.emitted('resolveApproval')).toStrictEqual([['approval-1', 'approve', 'once']]);
+    await wrapper.setProps({ approvals: [{ ...approval, id: 'approval-2', title: 'Second approval' }] });
+    expect(wrapper.text()).toContain('Second approval');
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    await wrapper.findAll('button').find((button) => button.text() === 'Deny')!.trigger('click');
+    expect(wrapper.emitted('resolveApproval')?.at(-1)).toStrictEqual(['approval-2', 'deny', 'once']);
+    await wrapper.setProps({ approvals: [] });
+    expect(wrapper.text()).toContain('Which framework should I use?');
+    expect(wrapper.findComponent(CodexComposer).exists()).toBe(false);
+    wrapper.get<HTMLButtonElement>('button[aria-label="Vue"]').element.focus();
+    await wrapper.setProps({ clientRequests: [] });
+    await flushPromises();
+    expect(composerValue(wrapper)).toBe('My unfinished prompt');
+    expect(document.activeElement).toBe(wrapper.get('[role="textbox"]').element);
+    expect(wrapper.emitted('send')).toBeUndefined();
+    wrapper.unmount();
   });
 
-  it('forwards presentation extension slots at each composition boundary', () => {
+  it('does not steal another input focus when the host resolves an approval in the background', async () => {
+    const wrapper = mount(CodexConversationPane, {
+      attachTo: document.body,
+      props: { approvals: [routingApproval], modelValue: 'Keep this draft' },
+    });
+    const elsewhere = document.createElement('input');
+    document.body.append(elsewhere);
+    try {
+      elsewhere.focus();
+      await wrapper.setProps({ approvals: [] });
+      await flushPromises();
+      expect(composerValue(wrapper)).toBe('Keep this draft');
+      expect(document.activeElement).toBe(elsewhere);
+    } finally {
+      elsewhere.remove();
+      wrapper.unmount();
+    }
+  });
+
+  it('forwards presentation extension slots at each composition boundary', async () => {
     const wrapper = mount(CodexConversationPane, {
       props: {
         approvals: [{
@@ -3322,6 +3412,8 @@ describe('CodexConversationPane', () => {
     });
     expect(wrapper.get('.approval-slot').text()).toBe('Approval slot');
     expect(wrapper.get('.message-slot').text()).toBe('Message slot');
+    expect(wrapper.find('.input-slot').exists()).toBe(false);
+    await wrapper.setProps({ approvals: [] });
     expect(wrapper.get('.input-slot').text()).toBe('Input slot');
     expect(wrapper.get('.after-slot').text()).toBe('After slot');
     expect(wrapper.get<HTMLButtonElement>('.shelf-action-slot').element.disabled).toBe(true);

@@ -1,0 +1,44 @@
+.codex-request-card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-height: min(70vh, 38rem);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
+  color: var(--color-text);
+}
+
+.codex-request-button {
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-6);
+  background: var(--color-surface-base);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.codex-request-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.codex-request-button--primary:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.codex-request-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: var(--space-1);
+}

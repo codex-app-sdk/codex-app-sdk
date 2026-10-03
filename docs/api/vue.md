@@ -203,7 +203,24 @@ one gesture is dispatched exactly once.
 | `CodexConversationHistoryLoader` | Restored-history loading treatment |
 
 `CodexConversationPane` exposes `focusComposer()`. `CodexComposer` exposes
-`focus()`.
+`focus()`. Pass `focus({ preserveSelection: true })` to focus the saved selection
+instead of moving the caret to the end.
+
+Pending approvals replace the shelf and composer, one at a time in the supplied
+`approvals` order, followed by pending `confirm_tool` client requests, ahead of
+expanded questions. Native approvals and tool confirmations use one shared
+**Approve tool call** card, expandable Details, and left-aligned actions, with
+only their supported decision scopes. Native **Allow** emits `approve, once`;
+**Allow for session** emits `approve, session`. Tool confirmation responses use `actions.clientResponse`
+or `clientResponse`. Their pending tool card is hidden from the transcript,
+and the resolved history remains. The `approval` slot receives only
+the active approval. Resolution still uses `actions.resolveApproval`, the
+`resolveApproval` event, or the attached surface; the host must remove resolved
+approvals from its state. A rejected resolution leaves the request visible.
+Approvals and questions preserve draft text, selection, pending command mode and
+attachments. The composer returns after the last expanded request resolves or is
+cancelled; its saved selection is focused only if focus was still inside the
+resolved request. Background resolution does not steal focus.
 
 `CodexConversationPane` renders both blocking tool questions and asynchronous
 agent-message questions with the same answer controls. A pending question replaces the

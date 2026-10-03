@@ -23,9 +23,9 @@ describe('CodexApprovalPrompt', () => {
     expect(wrapper.text()).toContain('/tmp/project');
 
     const buttons = wrapper.findAll('button');
-    await buttons[0]!.trigger('click');
-    await buttons[1]!.trigger('click');
-    await buttons[2]!.trigger('click');
+    await buttons.find((button) => button.text() === 'Deny')!.trigger('click');
+    await buttons.find((button) => button.text() === 'Allow for session')!.trigger('click');
+    await buttons.find((button) => button.text() === 'Allow')!.trigger('click');
     expect(wrapper.emitted('resolve')).toStrictEqual([
       ['deny', 'once'],
       ['approve', 'session'],

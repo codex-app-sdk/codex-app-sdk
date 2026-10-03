@@ -53,7 +53,7 @@
         :show-tool-details="showToolDetails"
         :skills="effectiveSkills"
         :tool-visibility="toolVisibility"
-        :transform-message="dismissedQuestionIds.size > 0 || activeBlockingQuestionItemIds.size > 0 ? transformTranscriptMessage : transformMessage"
+        :transform-message="dismissedQuestionIds.size > 0 || activeComposerRequestItemIds.size > 0 ? transformTranscriptMessage : transformMessage"
         :turns="effectiveTurns"
         @cancel="cancel"
         @client-response="respondToClientRequest"
@@ -91,21 +91,27 @@
       </div>
 
       <template #footer>
-        <footer class="codex-conversation-pane__footer">
+        <footer ref="footerElement" class="codex-conversation-pane__footer">
           <p v-if="effectiveError" class="codex-conversation-pane__error" role="alert">{{ effectiveError }}</p>
-          <div v-if="effectiveApprovals.length > 0" class="codex-conversation-pane__approvals">
-            <template v-for="approval in effectiveApprovals" :key="approval.id">
-              <slot name="approval" :approval="approval">
-                <CodexApprovalPrompt
-                  :approval="approval"
-                  :disabled="effectiveDisabled"
-                  @resolve="(decision, scope) => resolveApproval(approval.id, decision, scope)"
-                />
-              </slot>
-            </template>
+          <div v-if="activeApproval" class="codex-conversation-pane__approvals">
+            <slot name="approval" :approval="activeApproval">
+              <CodexApprovalPrompt
+                :key="activeApproval.id"
+                :approval="activeApproval"
+                :disabled="effectiveDisabled"
+                @resolve="(decision, scope) => resolveApproval(activeApproval!.id, decision, scope)"
+              />
+            </slot>
           </div>
+          <ChatConfirmationRequest
+            v-else-if="activeConfirmation"
+            :key="activeConfirmation.id"
+            class="codex-conversation-pane__confirmation-composer"
+            :request="activeConfirmation"
+            @client-response="respondToClientRequest"
+          />
           <ChatQuestionRequest
-            v-if="expandedQuestionRequest"
+            v-else-if="expandedQuestionRequest"
             :key="expandedQuestionRequest.id"
             class="codex-conversation-pane__question-composer"
             :answered-client-request-ids="displayAnsweredClientRequestIds"
@@ -340,6 +346,7 @@ import { normalizeCodexComposerState } from '../composer-state';
 import { useConversationEscapeInterrupt } from '../chat/use-conversation-escape-interrupt';
 import { CircleXIcon, MessageQuestionIcon, X as XIcon } from '../icons/app-icons';
 import ChatQuestionRequest from '../chat/ChatQuestionRequest.vue';
+import ChatConfirmationRequest from '../chat/ChatConfirmationRequest.vue';
 import ChatComposerShelf from '../chat/ChatComposerShelf.vue';
 import { questionResponsesKey } from '../chat/message-work-state';
 import CodexComposer from './CodexComposer.vue';
@@ -550,7 +557,8 @@ provide(questionResponsesKey, questionResponses);
 const openedQuestionId = ref<string | null>(null);
 const locallyDismissedQuestionIds = ref<ReadonlySet<string>>(new Set());
 
-const composer = ref<{ focus(): void } | null>(null);
+const composer = ref<{ focus(options?: { preserveSelection?: boolean }): void } | null>(null);
+const footerElement = ref<HTMLElement | null>(null);
 const messageList = ref<{ scrollToBottom(): void } | null>(null);
 const paneElement = ref<HTMLElement | null>(null);
 const effectiveController = computed(() => resolveCodexConversationPaneValue(props.controller));
@@ -716,15 +724,22 @@ const expandedQuestionRequest = computed(() => (
 const hiddenQuestionRequestIds = computed<ReadonlySet<string>>(() => new Set(
   pendingQuestionRequests.value.map((request) => request.id),
 ));
-const activeBlockingQuestionItemIds = computed<ReadonlySet<string>>(() => new Set(
+const activeConfirmation = computed(() => effectiveClientRequests.value.find(
+  (request): request is Extract<CodexSurfaceClientRequest, { kind: 'confirm_tool' }> => (
+    request.kind === 'confirm_tool' && !displayAnsweredClientRequestIds.value.has(request.id)
+  ),
+));
+const activeComposerRequestItemIds = computed<ReadonlySet<string>>(() => new Set(
   effectiveClientRequests.value
-    .filter((request) => request.kind === 'ask_user' && request.payload.request.delivery === 'tool')
+    .filter((request) => request.kind === 'confirm_tool'
+      ? !displayAnsweredClientRequestIds.value.has(request.id)
+      : request.payload.request.delivery === 'tool')
     .map((request) => request.itemId),
 ));
 function transformTranscriptMessage(message: Message | SurfaceMessage, index: number): Message | SurfaceMessage {
   const transformed = props.transformMessage?.(message, index) ?? message;
   const chatMessage = chatMessageFromInput(transformed);
-  const isHiddenTool = (toolCall: MessageToolCall) => activeBlockingQuestionItemIds.value.has(toolCall.itemId ?? toolCall.id);
+  const isHiddenTool = (toolCall: MessageToolCall) => activeComposerRequestItemIds.value.has(toolCall.itemId ?? toolCall.id);
   if (!chatMessage.parts?.some((part) => (
     (part.type === 'question' && dismissedQuestionIds.value.has(part.request.id))
     || (part.type === 'tool' && isHiddenTool(part.toolCall))
@@ -745,6 +760,7 @@ const effectiveApprovals = computed(() => controlledValue(
   (state) => state.thread?.approvals ?? [],
   () => props.approvals ?? surfaceState.value?.approvals ?? [],
 ));
+const activeApproval = computed(() => effectiveApprovals.value[0]);
 const effectiveBusy = computed(() => controlledValue(
   (state) => state.identity.busy ?? false,
   () => props.busy ?? surfaceState.value?.busy ?? false,
@@ -923,6 +939,20 @@ const showHistoryLoader = computed(() => effectiveHistoryLoading.value);
 const started = computed(() => (
   effectiveMessages.value.length > 0 || effectiveBusy.value || effectiveApprovals.value.length > 0
 ));
+
+watch(() => Boolean(activeApproval.value || activeConfirmation.value || expandedQuestionRequest.value), async (pending, wasPending) => {
+  if (pending || !wasPending) return;
+  const focused = document.activeElement;
+  if (!focused || !footerElement.value?.contains(focused)) return;
+  const conversationKey = effectiveConversationKey.value;
+  await nextTick();
+  // Restore only this request's focus; never steal it from another pane or a
+  // control the user selected while the host was resolving the request.
+  if (effectiveConversationKey.value === conversationKey
+    && (document.activeElement === focused || document.activeElement === document.body)) {
+    composer.value?.focus({ preserveSelection: true });
+  }
+});
 
 watch(() => props.modelValue, () => {
   if (effectiveController.value || props.composerState) return;
@@ -1748,6 +1778,14 @@ defineExpose({ focusComposer });
 .codex-conversation-pane__approvals {
   display: grid;
   gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.codex-conversation-pane__confirmation-composer {
+  width: 100%;
+  box-sizing: border-box;
+  max-height: min(70vh, 38rem);
+  overflow-y: auto;
   margin-bottom: var(--space-4);
 }
 

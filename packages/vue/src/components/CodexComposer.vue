@@ -718,8 +718,12 @@ function resizeEditor(): void {
   editorEl.value?.autoResize();
 }
 
-function focus(): void {
-  editorEl.value?.focusEnd();
+function focus(options?: { preserveSelection?: boolean }): void {
+  if (options?.preserveSelection) {
+    editorEl.value?.setSelection(selectionStart.value, selectionEnd.value);
+  } else {
+    editorEl.value?.focusEnd();
+  }
 }
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.

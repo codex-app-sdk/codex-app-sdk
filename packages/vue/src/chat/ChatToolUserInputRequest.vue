@@ -10,7 +10,7 @@
 
   <section
     v-else
-    class="codex-chat-theme chat-tool-user-input"
+    class="codex-chat-theme codex-request-card chat-tool-user-input"
     :class="{
       'chat-tool-user-input--resolved': cancelled || answered || historical,
       'chat-tool-user-input--free-text': !cancelled && !answered && !historical && currentQuestion && isFreeTextOnly(currentQuestion),
@@ -149,14 +149,14 @@
       <footer class="chat-tool-user-input__actions">
         <button
           v-if="currentIndex > 0"
-          class="chat-tool-user-input__button"
+          class="codex-request-button chat-tool-user-input__button"
           type="button"
           @click="back"
         >
           Back
         </button>
         <button
-          class="chat-tool-user-input__button chat-tool-user-input__button--primary"
+          class="codex-request-button codex-request-button--primary chat-tool-user-input__button chat-tool-user-input__button--primary"
           :disabled="!canProceed"
           type="button"
           @click="proceed"
@@ -417,6 +417,7 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 </script>
 
+<style scoped src="./request-controls.css"></style>
 <style scoped>
 .chat-message__thinking {
   display: inline-flex;
@@ -425,21 +426,6 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   color: var(--color-text-muted);
 }
 
-.chat-tool-user-input {
-  container-type: inline-size;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  width: 100%;
-  max-height: min(70vh, 38rem);
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
-  color: var(--color-text);
-}
 
 .chat-tool-user-input--resolved {
   container-type: normal;
@@ -756,33 +742,9 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   gap: var(--space-2);
 }
 
-.chat-tool-user-input__button {
-  min-height: 32px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-6);
-  background: var(--color-surface-base);
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.chat-tool-user-input__button:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
-}
-
-.chat-tool-user-input__button--primary:not(:disabled) {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-}
 
 .chat-tool-user-input__option:focus-visible,
-.chat-tool-user-input__dismiss:focus-visible,
-.chat-tool-user-input__button:focus-visible {
+.chat-tool-user-input__dismiss:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: var(--space-1);
 }

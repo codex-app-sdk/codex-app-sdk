@@ -114,7 +114,30 @@ export const paneController = createCodexConversationPaneController({
 The adapter is intentionally a controlled-view boundary. It does not create a
 `CodexSurface`, fetch history, clone messages, or own application state.
 
-## Questions in the composer
+## Approvals and questions in the composer
+
+Tool approvals temporarily replace the shelf and composer, just like questions.
+This includes the **Approve tool call** card for `confirm_tool` client requests;
+its pending transcript copy is hidden, while surrounding text and the resolved
+tool history remain visible. Route those decisions through `actions.clientResponse`
+(or `clientResponse`), just like question answers.
+The pane displays one approval at a time, in supplied order, before expanded
+questions. Controlled hosts supply `thread.approvals` and handle
+`actions.resolveApproval`, removing an approval once its decision is accepted.
+The standalone `approvals` prop and `resolveApproval` event offer the same flow.
+
+Native approvals and tool confirmations share the same **Approve tool call**
+card: summary, optional description, expandable Details, and left-aligned
+actions. **Allow** approves once; additional scopes appear only when supported
+by the request. Controlled hosts can reuse this experience for external tool
+confirmations by supplying `confirm_tool` client requests with the matching
+transcript tool `itemId`; the host retains ownership of executing the decision.
+
+Both flows retain the unfinished prompt, attachments, pending command mode and
+caret selection. Resolving or cancelling a request never submits or clears the
+draft. Once no expanded request remains, the composer returns; focus returns to
+its saved selection if the resolved request still had focus. Try **Requests and
+drafts** in the component lab with a draft and attachment already entered.
 
 When the app-server provides a structured question, the pane shows that question
 once; its fallback agent-message text is not shown separately. Other assistant
