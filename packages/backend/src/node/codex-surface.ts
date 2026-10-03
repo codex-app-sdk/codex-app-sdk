@@ -28,7 +28,10 @@ import type {
   StartCodexReviewOptions,
   SurfaceMessage,
   UpdateCodexConversationSettings,
+  CodexSurfaceStatePatch,
+  CodexVersionedSurfaceSnapshot,
 } from '@codex-app-sdk/core/surface';
+import { diffCodexSurfaceState } from '@codex-app-sdk/core/surface-bridge';
 import {
   CodexAppServerStdioTransport,
 } from './codex-stdio-transport';
@@ -125,6 +128,7 @@ export type {
 } from './codex-surface-mcp';
 
 type StateListener = (snapshot: CodexSurfaceSnapshot) => void;
+type StatePatchListener = (patch: CodexSurfaceStatePatch) => void;
 type ConversationStateListener = (snapshot: CodexConversationSnapshot) => void;
 type SurfaceEventListener = (event: CodexSurfaceEvent) => void;
 type ConversationEventListener = (event: CodexConversationEvent) => void;
@@ -137,6 +141,8 @@ type SurfaceEventInput = CodexSurfaceEvent extends infer Event
 export class CodexSurface {
   private readonly client: CodexAppServerClient;
   private readonly listeners = new Set<StateListener>();
+  private readonly patchListeners = new Set<StatePatchListener>();
+  private stateVersion = 0;
   private readonly eventListeners = new Set<SurfaceEventListener>();
   private readonly conversationListeners = new Map<string, Set<ConversationStateListener>>();
   private readonly conversationHandles = new Map<string, CodexConversation>();
@@ -906,6 +912,21 @@ export class CodexSurface {
     return () => this.listeners.delete(listener);
   }
 
+  /** Returns the current snapshot with the version that the next state patch continues from. */
+  getVersionedSnapshot(): CodexVersionedSurfaceSnapshot {
+    return { version: this.stateVersion, snapshot: this.getSnapshot() };
+  }
+
+  /**
+   * Streams structural state patches. Each patch carries only changed values
+   * and list items, so its size tracks what changed rather than conversation
+   * length. Start from `getVersionedSnapshot()` and apply patches in order.
+   */
+  onStatePatch(listener: StatePatchListener): () => void {
+    this.patchListeners.add(listener);
+    return () => this.patchListeners.delete(listener);
+  }
+
   onEvent(listener: SurfaceEventListener): () => void {
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
@@ -1186,7 +1207,16 @@ export class CodexSurface {
   }
 
   private patch(patch: Partial<CodexSurfaceSnapshot>, conversationId?: string): void {
+    const previous = this.state;
     this.state = { ...this.state, ...patch };
+    const changes = diffCodexSurfaceState(previous, this.state);
+    if (changes.length > 0) {
+      this.stateVersion += 1;
+      if (this.patchListeners.size > 0) {
+        const statePatch = structuredClone({ version: this.stateVersion, changes });
+        for (const listener of this.patchListeners) listener(statePatch);
+      }
+    }
     if (this.listeners.size > 0) {
       const snapshot = this.getSnapshot();
       for (const listener of this.listeners) listener(snapshot);

@@ -5,7 +5,7 @@ import {
   type IpcMainPort,
   type IpcRendererPort,
 } from '../src';
-import type { CodexSurfaceEvent, CodexSurfaceSnapshot } from '@codex-app-sdk/core/surface';
+import type { CodexSurfaceEvent, CodexSurfaceSnapshot, CodexSurfaceStatePatch } from '@codex-app-sdk/core/surface';
 
 const snapshot: CodexSurfaceSnapshot = {
   status: 'ready',
@@ -167,6 +167,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:edit-turn',
       'codex-surface:fork-turn',
       'codex-surface:get-snapshot',
+      'codex-surface:get-versioned-snapshot',
       'codex-surface:interrupt',
       'codex-surface:list-conversations',
       'codex-surface:list-models',
@@ -575,6 +576,7 @@ describe('Codex surface Electron bridge', () => {
       modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
     });
     expect(surface.updateQueuedPrompt).toHaveBeenCalledWith('queued-1', 'Edited queue');
+    await expect(main.call('codex-surface:get-versioned-snapshot')).resolves.toBeNull();
     stateListener?.(snapshot);
     eventListener?.(surfaceEvent);
     expect(sender.send).toHaveBeenCalledWith('codex-surface:state-changed', snapshot);
@@ -588,9 +590,7 @@ describe('Codex surface Electron bridge', () => {
   it('provides a renderer API with no raw channel or protocol knowledge', async () => {
     const renderer = new FakeRendererPort();
     const api = createCodexSurfaceRendererApi(renderer);
-    const listener = vi.fn();
     const eventListener = vi.fn();
-    const unsubscribe = api.onStateChange(listener);
     const unsubscribeEvent = api.onEvent(eventListener);
 
     await api.archiveConversation('thread-archive');
@@ -632,11 +632,9 @@ describe('Codex surface Electron bridge', () => {
     await api.updateQueuedPrompt('queued-1', 'Edited queue');
     await api.interrupt();
     await api.getSnapshot();
-    renderer.emit('codex-surface:state-changed', snapshot);
     renderer.emit('codex-surface:event', surfaceEvent);
-    unsubscribe();
     unsubscribeEvent();
-    renderer.emit('codex-surface:state-changed', { ...snapshot, busy: true });
+    renderer.emit('codex-surface:event', { ...surfaceEvent, seq: 2 });
 
     expect(renderer.invoke.mock.calls).toStrictEqual([
       ['codex-surface:archive-conversation', 'thread-archive'],
@@ -679,9 +677,34 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:interrupt'],
       ['codex-surface:get-snapshot'],
     ]);
-    expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith(snapshot);
-    expect(eventListener).toHaveBeenCalledWith(surfaceEvent);
+    expect(eventListener.mock.calls).toStrictEqual([[surfaceEvent]]);
+  });
+
+  it('switches renderers that ask for a versioned base to patches and keeps unchanged messages', async () => {
+    const { api, sent, stream } = connectedPatchBridge();
+    const received: CodexSurfaceSnapshot[] = [];
+
+    api.onStateChange((value) => received.push(value));
+    await vi.waitFor(() => expect(sent.some(([channel]) => channel === 'codex-surface:get-versioned-snapshot')).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    stream('Hel');
+    stream('Hello');
+
+    expect(received.map((value) => value.messages.at(-1)?.parts)).toStrictEqual([
+      [{ type: 'text', text: 'Hel' }],
+      [{ type: 'text', text: 'Hello' }],
+    ]);
+    expect(received[1]!.messages[0]).toBe(received[0]!.messages[0]);
+    expect(sent.filter(([channel]) => channel === 'codex-surface:state-changed')).toStrictEqual([]);
+  });
+
+  it('keeps sending snapshots to renderers that never ask for patches', () => {
+    const { sent, stream } = connectedPatchBridge();
+
+    stream('Hel');
+
+    expect(sent.map(([channel]) => channel)).toStrictEqual(['codex-surface:state-changed']);
+    expect((sent[0]![1] as CodexSurfaceSnapshot).messages.at(-1)?.parts).toStrictEqual([{ type: 'text', text: 'Hel' }]);
   });
 
   it('rejects history paging when the host does not implement it', async () => {
@@ -698,6 +721,52 @@ describe('Codex surface Electron bridge', () => {
     dispose();
   });
 });
+
+/** A main process with a patch-capable surface, wired to a renderer API through serializing fake IPC. */
+function connectedPatchBridge() {
+  const kept = { id: 'm1', role: 'assistant' as const, status: 'complete' as const, parts: [{ type: 'text' as const, text: 'Done' }] };
+  let state: CodexSurfaceSnapshot = { ...snapshot, messages: [kept] };
+  let version = 0;
+  const stateListeners = new Set<(value: CodexSurfaceSnapshot) => void>();
+  const patchListeners = new Set<(patch: CodexSurfaceStatePatch) => void>();
+  const surface = {
+    getVersionedSnapshot: () => ({ version, snapshot: state }),
+    onStatePatch: (listener: (patch: CodexSurfaceStatePatch) => void) => {
+      patchListeners.add(listener);
+      return () => patchListeners.delete(listener);
+    },
+    onStateChange: (listener: (value: CodexSurfaceSnapshot) => void) => {
+      stateListeners.add(listener);
+      return () => stateListeners.delete(listener);
+    },
+    onEvent: () => () => undefined,
+  } as unknown as Parameters<typeof registerCodexSurfaceIpc>[2];
+  const main = new FakeMainPort();
+  const renderer = new FakeRendererPort();
+  const sent: Array<[string, unknown?]> = [];
+  const copy = <Value>(value: Value): Value => structuredClone(value);
+  renderer.invoke.mockImplementation(async (channel: string, ...args: unknown[]) => {
+    sent.push([channel]);
+    return copy(await main.call(channel, ...args)) as never;
+  });
+  registerCodexSurfaceIpc(main, {
+    send: (channel, payload) => {
+      sent.push([channel, payload]);
+      renderer.emit(channel, copy(payload));
+    },
+  }, surface);
+  const stream = (text: string) => {
+    const live = { id: 'live', role: 'assistant' as const, status: 'streaming' as const, parts: [{ type: 'text' as const, text }] };
+    state = { ...state, messages: [kept, live] };
+    version += 1;
+    for (const listener of patchListeners) listener({
+      version,
+      changes: [{ type: 'list', key: 'messages', ids: ['m1', 'live'], items: [live] }],
+    });
+    for (const listener of stateListeners) listener(state);
+  };
+  return { api: createCodexSurfaceRendererApi(renderer), sent, stream };
+}
 
 class FakeMainPort implements IpcMainPort {
   readonly handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();

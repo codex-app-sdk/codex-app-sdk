@@ -8,7 +8,9 @@ import type {
   CodexSurfaceEvent,
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
+  CodexSurfaceStatePatch,
 } from '@codex-app-sdk/core/surface';
+import { createCodexSurfaceStateMirror } from '@codex-app-sdk/core/surface-bridge';
 import {
   codexWebSocketProtocolVersion,
   encodeCodexWebSocketMessage,
@@ -112,6 +114,8 @@ class ClientTransport {
   #connectPromise: Promise<CodexSurfaceSnapshot> | null = null;
   #readyWaiter: ReadyWaiter | null = null;
   #latestSnapshot: CodexSurfaceSnapshot | null = null;
+  readonly #state = createCodexSurfaceStateMirror();
+  #streamingPatches = false;
   #requestSequence = 0;
   #manualClose = false;
   #reconnectAttempts = 0;
@@ -258,21 +262,33 @@ class ClientTransport {
       return;
     }
 
-    if (message.type === 'ready' && isPlainObject(message.snapshot)) {
-      const snapshot = message.snapshot as CodexSurfaceSnapshot;
-      this.#latestSnapshot = snapshot;
+    if (message.type === 'ready' && isPlainObject(message.snapshot) && isOptionalStateVersion(message.stateVersion)) {
+      const snapshot = this.#adoptSnapshot(message.snapshot as CodexSurfaceSnapshot, message.stateVersion);
+      this.#streamingPatches = false;
       this.connectionState = 'ready';
       this.#reconnectAttempts = 0;
       this.#emitSnapshot(snapshot);
       const waiter = this.#readyWaiter;
       this.#readyWaiter = null;
       if (waiter?.socket === socket) waiter.resolve(snapshot);
+      // Servers that can stream patches advertise a state version; older ones keep sending snapshots.
+      if (message.stateVersion !== undefined) this.#enableStatePatches(socket);
       return;
     }
-    if (message.type === 'snapshot' && isPlainObject(message.snapshot)) {
-      const snapshot = message.snapshot as CodexSurfaceSnapshot;
-      this.#latestSnapshot = snapshot;
-      this.#emitSnapshot(snapshot);
+    if (message.type === 'snapshot' && isPlainObject(message.snapshot) && isOptionalStateVersion(message.stateVersion)) {
+      this.#emitSnapshot(this.#adoptSnapshot(message.snapshot as CodexSurfaceSnapshot, message.stateVersion));
+      return;
+    }
+    if (message.type === 'statePatch' && this.#streamingPatches && isStatePatch(message.patch)) {
+      const result = this.#state.receive(message.patch);
+      if (result.status === 'applied') {
+        this.#latestSnapshot = result.snapshot;
+        this.#emitSnapshot(result.snapshot);
+      } else if (result.status === 'resync') {
+        // A fresh connection starts from a new versioned snapshot.
+        socket.close(4001, 'Codex state stream desynchronized');
+        this.#handleClose({ code: 4001, reason: 'Codex state stream desynchronized' }, socket);
+      }
       return;
     }
     if (message.type === 'event' && isPlainObject(message.event)) {
@@ -314,6 +330,23 @@ class ClientTransport {
     }
     this.connectionState = 'disconnected';
     if (shouldReconnect(close)) this.#scheduleReconnect();
+  }
+
+  #adoptSnapshot(snapshot: CodexSurfaceSnapshot, stateVersion: number | undefined): CodexSurfaceSnapshot {
+    const adopted = stateVersion === undefined
+      ? snapshot
+      : this.#state.reset({ version: stateVersion, snapshot });
+    this.#latestSnapshot = adopted;
+    return adopted;
+  }
+
+  #enableStatePatches(socket: CodexWebSocketPort): void {
+    try {
+      socket.send(encodeCodexWebSocketMessage({ version: codexWebSocketProtocolVersion, type: 'enableStatePatches' }));
+      this.#streamingPatches = true;
+    } catch {
+      // The session simply stays on snapshots.
+    }
   }
 
   #emitSnapshot(snapshot: CodexSurfaceSnapshot): void {
@@ -413,6 +446,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value) as object | null;
   return prototype === Object.prototype || prototype === null;
+}
+
+function isOptionalStateVersion(value: unknown): value is number | undefined {
+  return value === undefined || Number.isSafeInteger(value);
+}
+
+function isStatePatch(value: unknown): value is CodexSurfaceStatePatch {
+  return isPlainObject(value) && Number.isSafeInteger(value.version) && Array.isArray(value.changes);
 }
 
 function isRemoteError(value: unknown): value is CodexWebSocketErrorPayload {

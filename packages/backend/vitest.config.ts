@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.spec.ts'],
+    setupFiles: ['tests/setup/state-patch-invariant.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

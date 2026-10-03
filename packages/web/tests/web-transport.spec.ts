@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
   CodexSurfaceEvent,
   CodexSurfaceSnapshot,
+  CodexSurfaceStatePatch,
 } from '@codex-app-sdk/core/surface';
 import type { CodexSurfaceBridgeTarget } from '@codex-app-sdk/core/surface-bridge';
 import {
@@ -127,6 +128,48 @@ describe('Codex web transport', () => {
     client.disconnect();
     await nextTask();
     expect(release).toHaveBeenCalledWith(expect.objectContaining({ reason: 'socket_closed' }));
+  });
+
+  it('negotiates state patches that skip history and survive an update racing the switch', async () => {
+    const [browserSocket, serverSocket] = memorySocketPair();
+    const surface = patchingSurface({ raceOnSwitch: 'Hel' });
+    const frames = recordFrames(serverSocket);
+    const binding = bindCodexWebSocket({ socket: serverSocket, context: undefined, authorize: () => ({ surface: surface.target }) });
+    const client = createCodexWebSurfaceClient({ createSocket: () => browserSocket });
+    const states: CodexSurfaceSnapshot[] = [];
+    client.onStateChange((value) => states.push(value));
+
+    await client.connect();
+    await binding.ready;
+    await nextTask();
+    surface.stream('Hello');
+    await nextTask();
+
+    expect(states.map((value) => value.messages.at(-1)?.parts)).toStrictEqual([
+      surface.history.at(-1)!.parts,
+      [{ type: 'text', text: 'Hel' }],
+      [{ type: 'text', text: 'Hello' }],
+    ]);
+    expect(states[2]!.messages[0]).toBe(states[0]!.messages[0]);
+    expect(frames.map((frame) => frame.type)).toStrictEqual(['ready', 'statePatch', 'statePatch']);
+    expect(frames.slice(1).every((frame) => frame.size < 2_000)).toBe(true);
+    expect(frames[0]!.size).toBeGreaterThan(100_000);
+    client.disconnect();
+  });
+
+  it('keeps sending snapshots to clients that never opt into patches', async () => {
+    const [browserSocket, serverSocket] = memorySocketPair();
+    const surface = patchingSurface();
+    const frames = recordFrames(serverSocket);
+    const binding = bindCodexWebSocket({ socket: serverSocket, context: undefined, authorize: () => ({ surface: surface.target }) });
+    browserSocket.onMessage(() => undefined);
+
+    await binding.ready;
+    surface.stream('Hel');
+    await nextTask();
+
+    expect(frames.map((frame) => frame.type)).toStrictEqual(['ready', 'snapshot']);
+    browserSocket.close(1000);
   });
 
   it('accepts snapshots beyond the former 16 MiB ceiling by default', async () => {
@@ -330,6 +373,56 @@ function fakeSurface(initialSnapshot: CodexSurfaceSnapshot = snapshot) {
     emitState: (value: CodexSurfaceSnapshot) => stateListener?.(value),
     emitEvent: (value: CodexSurfaceEvent) => eventListener?.(value),
   };
+}
+
+/** A surface that, like `CodexSurface`, reports every change as both a snapshot and a structural patch. */
+function patchingSurface(options: { raceOnSwitch?: string } = {}) {
+  const history = Array.from({ length: 200 }, (_, index) => ({
+    id: `m${index}`,
+    role: 'assistant' as const,
+    status: 'complete' as const,
+    parts: [{ type: 'text' as const, text: `Answer ${index} `.repeat(40) }],
+  }));
+  let state: CodexSurfaceSnapshot = { ...snapshot, messages: history };
+  let version = 0;
+  let baseRequests = 0;
+  const patchListeners = new Set<(patch: CodexSurfaceStatePatch) => void>();
+  const base = fakeSurface(state);
+  const stream = (text: string) => {
+    const live = { id: 'live', role: 'assistant' as const, status: 'streaming' as const, parts: [{ type: 'text' as const, text }] };
+    state = { ...state, messages: [...history, live] };
+    version += 1;
+    for (const listener of patchListeners) listener({
+      version,
+      changes: [{ type: 'list', key: 'messages', ids: state.messages.map((message) => message.id), items: [live] }],
+    });
+    base.emitState(state);
+  };
+  const target = {
+    ...base.target,
+    connect: async () => state,
+    getVersionedSnapshot: async () => {
+      const current = { version, snapshot: state };
+      // The second request is the switch to patches; an update lands while it is in flight.
+      if (++baseRequests === 2 && options.raceOnSwitch) queueMicrotask(() => stream(options.raceOnSwitch!));
+      return current;
+    },
+    onStatePatch: (listener: (patch: CodexSurfaceStatePatch) => void) => {
+      patchListeners.add(listener);
+      return () => patchListeners.delete(listener);
+    },
+  };
+  return { target: target as CodexSurfaceBridgeTarget, history, stream };
+}
+
+function recordFrames(socket: MemorySocket): Array<{ type: string; size: number }> {
+  const frames: Array<{ type: string; size: number }> = [];
+  const send = socket.send.bind(socket);
+  socket.send = (data) => {
+    frames.push({ type: (JSON.parse(data) as { type: string }).type, size: data.length });
+    send(data);
+  };
+  return frames;
 }
 
 class MemorySocket implements CodexWebSocketPort {

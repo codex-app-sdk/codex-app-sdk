@@ -279,6 +279,8 @@ describe('Codex web server request validation', () => {
     [JSON.stringify({ version: 1, type: 'request', id: 'id', operation: 'missing', args: [] }), 'operation'],
     [JSON.stringify({ version: 1, type: 'request', id: 'id', operation: 'refreshAccount', args: {} }), 'args'],
     [new Uint8Array(2_001), 'oversized binary'],
+    [JSON.stringify({ version: 1, type: 'enableStatePatches' }), 'patches the session never offered'],
+    [JSON.stringify({ version: 1, type: 'enableStatePatches', extra: true }), 'patch opt-in extra key'],
   ])('closes malformed requests: %s', async (frame, _label) => {
     const socket = new ManualSocket();
     const surface = fakeSurface();

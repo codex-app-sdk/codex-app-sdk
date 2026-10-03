@@ -15,6 +15,7 @@ import type {
   StartCodexReviewOptions,
   UpdateCodexConversationSettings,
 } from '@codex-app-sdk/core/surface';
+import { subscribeCodexSurfaceState } from '@codex-app-sdk/core/surface-bridge';
 
 const initialState: CodexSurfaceSnapshot = {
   status: 'idle',
@@ -71,7 +72,9 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
       mutableAnsweredClientRequestIds.add(requestId);
     }
   };
-  const unsubscribe = api.onStateChange((snapshot) => {
+  // Patch-capable APIs keep unchanged messages identical between updates, so
+  // only the components whose data changed re-render.
+  const unsubscribe = subscribeCodexSurfaceState(api, (snapshot) => {
     pushedSnapshotVersion += 1;
     apply(snapshot);
   });

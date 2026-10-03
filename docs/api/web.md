@@ -94,5 +94,13 @@ can either use this adapter or implement `CodexWebSocketPort` directly.
 snapshot, and event envelope types. Applications normally do not import this
 entry point; the client and server own framing and validation.
 
+State patches are negotiated per connection and stay within protocol version 1.
+When the surface supports them, `ready` carries a `stateVersion`; a client that
+understands patches answers with `enableStatePatches` and then receives
+`statePatch` messages (`CodexWebSocketStatePatch`) carrying only changed values
+and list items. Older clients ignore `stateVersion` and keep receiving
+`snapshot` messages, and newer clients keep working against older servers.
+If a patch arrives out of sequence, the client reconnects to get a fresh base.
+
 See the [web integration guide](/guide/web) for host authentication, multi-user
 ownership, and attachment boundaries.

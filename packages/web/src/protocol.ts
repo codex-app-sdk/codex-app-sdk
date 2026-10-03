@@ -5,6 +5,7 @@ import type {
 import type {
   CodexSurfaceEvent,
   CodexSurfaceSnapshot,
+  CodexSurfaceStatePatch,
 } from '@codex-app-sdk/core/surface';
 
 export const codexWebSocketProtocolVersion = 1 as const;
@@ -21,6 +22,12 @@ export type CodexWebSocketReady = {
   version: typeof codexWebSocketProtocolVersion;
   type: 'ready';
   snapshot: CodexSurfaceSnapshot;
+  /**
+   * Present when the server can stream state patches. A client that supports
+   * them answers with `enableStatePatches`; others ignore it and keep
+   * receiving `snapshot` messages.
+   */
+  stateVersion?: number;
 };
 
 export type CodexWebSocketSuccess<Name extends CodexSurfaceBridgeOperation = CodexSurfaceBridgeOperation> = {
@@ -48,12 +55,27 @@ export type CodexWebSocketSnapshot = {
   version: typeof codexWebSocketProtocolVersion;
   type: 'snapshot';
   snapshot: CodexSurfaceSnapshot;
+  /** Present on the base snapshot that starts a patch stream; patches continue from it. */
+  stateVersion?: number;
 };
 
 export type CodexWebSocketEvent = {
   version: typeof codexWebSocketProtocolVersion;
   type: 'event';
   event: CodexSurfaceEvent;
+};
+
+/** Client opt-in, sent only after a `ready` that carries `stateVersion`. */
+export type CodexWebSocketEnableStatePatches = {
+  version: typeof codexWebSocketProtocolVersion;
+  type: 'enableStatePatches';
+};
+
+/** Sent instead of `snapshot` once a client has enabled state patches. */
+export type CodexWebSocketStatePatch = {
+  version: typeof codexWebSocketProtocolVersion;
+  type: 'statePatch';
+  patch: CodexSurfaceStatePatch;
 };
 
 export type CodexWebSocketClientMessage = CodexWebSocketRequest;
@@ -65,7 +87,11 @@ export type CodexWebSocketServerMessage =
   | CodexWebSocketEvent;
 
 export function encodeCodexWebSocketMessage(
-  message: CodexWebSocketClientMessage | CodexWebSocketServerMessage,
+  message:
+    | CodexWebSocketClientMessage
+    | CodexWebSocketServerMessage
+    | CodexWebSocketEnableStatePatches
+    | CodexWebSocketStatePatch,
 ): string {
   return JSON.stringify(message);
 }

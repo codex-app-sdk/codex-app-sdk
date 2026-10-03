@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { CodexSurfaceSnapshot } from '@codex-app-sdk/core/surface';
 import {
   CodexWebSocketTransportError,
   createCodexWebSurfaceClient,
@@ -383,6 +384,35 @@ describe('Codex web client responses and lifecycle', () => {
 });
 
 describe('Codex web client reconnect policy', () => {
+  it('opts into advertised patches and reconnects for a fresh base when one is skipped', async () => {
+    vi.useFakeTimers();
+    const first = new ManualSocket();
+    const second = new ManualSocket();
+    const createSocket = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+    const client = createCodexWebSurfaceClient({
+      createSocket,
+      reconnect: { initialDelayMs: 1, maximumDelayMs: 1, maxAttempts: 1 },
+    });
+    const states: CodexSurfaceSnapshot[] = [];
+    client.onStateChange((value) => states.push(value));
+    const initial = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    first.emitMessage(JSON.stringify({ version: 1, type: 'ready', snapshot, stateVersion: 3 }));
+    await initial;
+    expect(first.sent.map((data) => JSON.parse(data))).toStrictEqual([{ version: 1, type: 'enableStatePatches' }]);
+
+    first.emitMessage(JSON.stringify({
+      version: 1, type: 'statePatch', patch: { version: 5, changes: [{ type: 'set', key: 'busy', value: true }] },
+    }));
+    await vi.advanceTimersByTimeAsync(1);
+    second.emitMessage(JSON.stringify({ version: 1, type: 'ready', snapshot: { ...snapshot, busy: true } }));
+
+    expect(first.closes).toStrictEqual([{ code: 4001, reason: 'Codex state stream desynchronized' }]);
+    expect(second.sent).toStrictEqual([]);
+    expect(states.map((value) => value.busy)).toStrictEqual([false, true]);
+    expect(client.getConnectionState()).toBe('ready');
+  });
+
   it('does not retry a reconnect whose socket closes cleanly before ready', async () => {
     vi.useFakeTimers();
     const first = new ManualSocket();

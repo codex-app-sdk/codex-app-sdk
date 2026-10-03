@@ -189,6 +189,12 @@ schedulers are unref'd when supported and are always cleared during close.
 - `onStateChange(listener)`
 - `onEvent(listener)`
 - `close()`
+- `getVersionedSnapshot()` and `onStatePatch(listener)`: an incremental state
+  stream. Start from the versioned snapshot, then apply each patch in version
+  order with `applyCodexSurfaceStateChanges` (or let
+  `subscribeCodexSurfaceState` do it). A patch carries only changed top-level
+  values and changed list items, so its size tracks the change rather than
+  conversation length. The Electron and web transports use it automatically.
 
 During `connect()`, the surface discovers app-server experimental features and
 enables supported runtime capabilities when the running version advertises

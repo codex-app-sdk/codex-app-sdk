@@ -21,6 +21,17 @@
   cached per process. Closing a transport while it starts no longer leaves an
   orphaned app-server.
 
+### Performance
+
+- Streaming no longer sends the full state for every token. `CodexSurface`
+  exposes `getVersionedSnapshot()` and `onStatePatch()`, whose patches carry
+  only changed values and list items (about one message per token instead of
+  hundreds of kilobytes in long conversations). The Electron bridge and the web
+  transport switch to patches when both sides support them and keep sending
+  snapshots otherwise; the web protocol stays at version 1.
+  `useCodexSurface` mirrors patches so unchanged messages keep their identity,
+  and Markdown is parsed only when a block's text changes.
+
 ## 0.13.0
 
 First public npm release of all six `@codex-app-sdk` packages. Earlier versions

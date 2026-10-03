@@ -24,7 +24,10 @@ import type {
 } from './surface';
 
 type RequiredRendererApi = Required<CodexSurfaceRendererApi>;
-export type CodexSurfaceBridgeOperation = Exclude<keyof RequiredRendererApi, 'onEvent' | 'onStateChange'>;
+export type CodexSurfaceBridgeOperation = Exclude<
+  keyof RequiredRendererApi,
+  'onEvent' | 'onStateChange' | 'onStatePatch' | 'getVersionedSnapshot'
+>;
 type OperationFunction<Name extends CodexSurfaceBridgeOperation> = Extract<
   RequiredRendererApi[Name],
   (...args: never[]) => unknown
@@ -708,3 +711,16 @@ function isJsonValue(value: unknown, seen = new Set<object>()): value is CodexSu
   seen.delete(value);
   return valid;
 }
+
+export {
+  applyCodexSurfaceStateChanges,
+  createCodexSurfaceStateMirror,
+  diffCodexSurfaceState,
+  isCodexSurfaceStatePatchSource,
+  subscribeCodexSurfaceState,
+  type CodexSurfaceStateMirror,
+  type CodexSurfaceStateMirrorResult,
+  type CodexSurfaceStatePatchSource,
+  type CodexSurfaceStateSource,
+  type SubscribeCodexSurfaceStateOptions,
+} from './surface-state';

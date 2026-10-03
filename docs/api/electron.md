@@ -49,6 +49,13 @@ returns them as `CodexElectronRendererApis`.
 The renderer variant narrows conversation creation to `approvalPreset`, `model`,
 `reasoningEffort`, and `serviceTier`.
 
+State crosses IPC as full snapshots until the renderer calls
+`getVersionedSnapshot()`. When the surface supports state patches
+(`CodexSurface` does), the main process then streams small structural patches
+instead. `useCodexSurface` mirrors them in the renderer's own world, so
+unchanged messages keep their object identity and do not re-render. Renderers
+that never ask keep receiving snapshots.
+
 ## Native IPC
 
 - `registerCodexNativeIpc`

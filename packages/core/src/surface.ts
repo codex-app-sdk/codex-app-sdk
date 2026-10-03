@@ -1033,6 +1033,36 @@ export type CodexSurfaceApi = {
   getSnapshot(): Promise<CodexSurfaceSnapshot>;
   onStateChange(listener: (snapshot: CodexSurfaceSnapshot) => void): () => void;
   onEvent(listener: (event: CodexSurfaceEvent) => void): () => void;
+  /**
+   * Optional incremental state stream: one versioned snapshot followed by
+   * structural patches that carry only changed values and list items.
+   * `getVersionedSnapshot` resolves null when patches are unavailable.
+   * Prefer `subscribeCodexSurfaceState`, which falls back to `onStateChange`.
+   */
+  getVersionedSnapshot?(): Promise<CodexVersionedSurfaceSnapshot | null>;
+  onStatePatch?(listener: (patch: CodexSurfaceStatePatch) => void): () => void;
+};
+
+/** A snapshot paired with the state version that the next patch continues from. */
+export type CodexVersionedSurfaceSnapshot = {
+  version: number;
+  snapshot: CodexSurfaceSnapshot;
+};
+
+/**
+ * One top-level snapshot change. `list` updates an array of `{ id }` items:
+ * `ids` is the complete new order and `items` holds only new or changed items,
+ * so unchanged items keep their identity on the receiving side.
+ */
+export type CodexSurfaceStateChange =
+  | { type: 'set'; key: keyof CodexSurfaceSnapshot; value: unknown }
+  | { type: 'delete'; key: keyof CodexSurfaceSnapshot }
+  | { type: 'list'; key: keyof CodexSurfaceSnapshot; ids: string[]; items: Array<{ id: string }> };
+
+/** Changes that turn state `version - 1` into state `version`. */
+export type CodexSurfaceStatePatch = {
+  version: number;
+  changes: CodexSurfaceStateChange[];
 };
 
 export type CodexSurfaceRendererApi = Omit<

@@ -23,7 +23,14 @@ import type {
   StartCodexReviewOptions,
   StartCodexLiveChatOptions,
   UpdateCodexConversationSettings,
+  CodexSurfaceStatePatch,
+  CodexVersionedSurfaceSnapshot,
 } from '@codex-app-sdk/core/surface';
+import {
+  isCodexSurfaceStatePatchSource,
+  subscribeCodexSurfaceState,
+  type CodexSurfaceStatePatchSource,
+} from '@codex-app-sdk/core/surface-bridge';
 import {
   registerIpcMainHandlers,
   TypedIpcRenderer,
@@ -52,6 +59,7 @@ const channels = {
   editTurn: 'codex-surface:edit-turn',
   forkTurn: 'codex-surface:fork-turn',
   getSnapshot: 'codex-surface:get-snapshot',
+  getVersionedSnapshot: 'codex-surface:get-versioned-snapshot',
   interrupt: 'codex-surface:interrupt',
   listConversations: 'codex-surface:list-conversations',
   listModels: 'codex-surface:list-models',
@@ -79,6 +87,7 @@ const channels = {
   updateConversationSettings: 'codex-surface:update-conversation-settings',
   updateQueuedPrompt: 'codex-surface:update-queued-prompt',
   stateChanged: 'codex-surface:state-changed',
+  statePatch: 'codex-surface:state-patch',
   event: 'codex-surface:event',
 } as const;
 
@@ -96,6 +105,7 @@ type SurfaceRequests = {
   [channels.editTurn]: IpcRequest<[turnId: string, content: string], CodexSurfaceSnapshot>;
   [channels.forkTurn]: IpcRequest<[turnId: string], CodexSurfaceSnapshot>;
   [channels.getSnapshot]: IpcRequest<[], CodexSurfaceSnapshot>;
+  [channels.getVersionedSnapshot]: IpcRequest<[], CodexVersionedSurfaceSnapshot | null>;
   [channels.interrupt]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.listConversations]: IpcRequest<[
     options?: ListCodexConversationsOptions,
@@ -137,6 +147,7 @@ type SurfaceRequests = {
 
 type SurfaceEvents = {
   [channels.stateChanged]: CodexSurfaceSnapshot;
+  [channels.statePatch]: CodexSurfaceStatePatch;
   [channels.event]: CodexSurfaceEvent;
 };
 
@@ -148,9 +159,15 @@ export function registerCodexSurfaceIpc(
   port: IpcMainPort,
   sender: IpcEventSender,
   surface: Omit<CodexSurfaceBridgeTarget, OptionalSurfaceOperation>
-    & Partial<Pick<CodexSurfaceBridgeTarget, OptionalSurfaceOperation>>,
+    & Partial<Pick<CodexSurfaceBridgeTarget, OptionalSurfaceOperation>>
+    & Partial<CodexSurfaceStatePatchSource>,
   options: CodexSurfaceIpcOptions = {},
 ): () => void {
+  // State crosses IPC as full snapshots until a renderer asks for a versioned
+  // base; from then on it streams small patches. Older renderers never ask, and
+  // surfaces without native patch support decline, so both keep snapshots.
+  const patchSource = isCodexSurfaceStatePatchSource(surface) ? surface : null;
+  let streamingPatches = false;
   const invoke = <Name extends CodexSurfaceBridgeOperation>(name: Name, args: readonly unknown[]) => {
     if (name === 'loadOlderConversationHistory' && !surface.loadOlderConversationHistory) {
       return Promise.reject(new Error('Conversation history paging is not available.'));
@@ -184,6 +201,11 @@ export function registerCodexSurfaceIpc(
     [channels.editTurn]: (_event, ...args) => invoke('editTurn', args),
     [channels.forkTurn]: (_event, ...args) => invoke('forkTurn', args),
     [channels.getSnapshot]: (_event, ...args) => invoke('getSnapshot', args),
+    [channels.getVersionedSnapshot]: async () => {
+      if (!patchSource) return null;
+      streamingPatches = true;
+      return patchSource.getVersionedSnapshot();
+    },
     [channels.interrupt]: (_event, ...args) => invoke('interrupt', args),
     [channels.listConversations]: (_event, ...args) => invoke('listConversations', args),
     [channels.listModels]: (_event, ...args) => invoke('listModels', args),
@@ -211,7 +233,16 @@ export function registerCodexSurfaceIpc(
     [channels.updateConversationSettings]: (_event, ...args) => invoke('updateConversationSettings', args),
     [channels.updateQueuedPrompt]: (_event, ...args) => invoke('updateQueuedPrompt', args),
   }, options);
-  const unsubscribeState = surface.onStateChange((snapshot) => sender.send(channels.stateChanged, snapshot));
+  const unsubscribeSnapshots = surface.onStateChange((snapshot) => {
+    if (!streamingPatches) sender.send(channels.stateChanged, snapshot);
+  });
+  const unsubscribePatches = patchSource?.onStatePatch((patch) => {
+    if (streamingPatches) sender.send(channels.statePatch, patch);
+  });
+  const unsubscribeState = () => {
+    unsubscribePatches?.();
+    unsubscribeSnapshots();
+  };
   const unsubscribeEvents = surface.onEvent((event) => sender.send(channels.event, event));
   return () => {
     unsubscribeEvents();
@@ -222,7 +253,14 @@ export function registerCodexSurfaceIpc(
 
 export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfaceRendererApi {
   const renderer = new TypedIpcRenderer<SurfaceRequests, SurfaceEvents>(port);
+  const getVersionedSnapshot = () => renderer.invoke(channels.getVersionedSnapshot);
+  const onStatePatch = (listener: (patch: CodexSurfaceStatePatch) => void) => renderer.on(channels.statePatch, listener);
+  const stateSource = { getVersionedSnapshot, onStatePatch };
   return {
+    // Mirror patches in the renderer's own world: contextBridge copies every
+    // value it passes, so a mirror kept in the preload would lose identity.
+    getVersionedSnapshot,
+    onStatePatch,
     archiveConversation: (conversationId) => renderer.invoke(channels.archiveConversation, conversationId),
     cancelLogin: (loginId) => renderer.invoke(channels.cancelLogin, loginId),
     clearGoal: () => renderer.invoke(channels.clearGoal),
@@ -241,7 +279,16 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     listModels: (options) => renderer.invoke(channels.listModels, options),
     logout: () => renderer.invoke(channels.logout),
     onEvent: (listener) => renderer.on(channels.event, listener),
-    onStateChange: (listener) => renderer.on(channels.stateChanged, listener),
+    onStateChange: (listener) => {
+      // Snapshots arrive until the main process switches to patches; the
+      // switch point's base was already delivered as a snapshot, so it stays silent.
+      const unsubscribeSnapshots = renderer.on(channels.stateChanged, listener);
+      const unsubscribePatches = subscribeCodexSurfaceState(stateSource, listener, { emitInitialSnapshot: false });
+      return () => {
+        unsubscribePatches();
+        unsubscribeSnapshots();
+      };
+    },
     readConversationHistory: (conversationId) => renderer.invoke(channels.readConversationHistory, conversationId),
     readConversationPromptHistory: (conversationId) => (
       renderer.invoke(channels.readConversationPromptHistory, conversationId)

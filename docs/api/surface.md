@@ -267,6 +267,14 @@ retain ownership of credentials and authentication lifecycle.
 `CodexSurfaceRendererApi` narrows trusted conversation-creation input and uses
 `CodexRendererSendMessageOptions` for send/steer attachments.
 
+Optional `getVersionedSnapshot()` and `onStatePatch()` members expose an
+incremental state stream; `getVersionedSnapshot()` resolves null when the other
+side cannot stream patches. Consume it with
+`subscribeCodexSurfaceState(api, listener)` from
+`@codex-app-sdk/core/surface-bridge`. It keeps a local mirror whose unchanged
+messages and list items stay identical between notifications, and falls back to
+`onStateChange` when patches are unavailable. `useCodexSurface` uses it.
+
 `continueInterruptedTurn()` resumes the latest interrupted turn in the active
 conversation. It starts a new provider turn with empty input, does not append a
 user message, and leaves the interrupted turn immutable in `turns`. The new

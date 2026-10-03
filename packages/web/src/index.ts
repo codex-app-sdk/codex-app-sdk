@@ -31,6 +31,8 @@ export {
   type CodexWebSocketReady,
   type CodexWebSocketRequest,
   type CodexWebSocketServerMessage,
+  type CodexWebSocketEnableStatePatches,
   type CodexWebSocketSnapshot,
+  type CodexWebSocketStatePatch,
   type CodexWebSocketSuccess,
 } from './protocol';

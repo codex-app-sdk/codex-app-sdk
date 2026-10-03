@@ -6,6 +6,18 @@ export {
 export type * from './native';
 export type * from './surface';
 export {
+  applyCodexSurfaceStateChanges,
+  createCodexSurfaceStateMirror,
+  diffCodexSurfaceState,
+  isCodexSurfaceStatePatchSource,
+  subscribeCodexSurfaceState,
+  type CodexSurfaceStateMirror,
+  type CodexSurfaceStateMirrorResult,
+  type CodexSurfaceStatePatchSource,
+  type CodexSurfaceStateSource,
+  type SubscribeCodexSurfaceStateOptions,
+} from './surface-state';
+export {
   codexConversationBridgeOperations,
   codexSurfaceBridgeArities,
   codexSurfaceBridgeOperations,

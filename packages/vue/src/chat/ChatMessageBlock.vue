@@ -13,14 +13,14 @@
   <slot v-else-if="block.type === 'text'" name="text" :block="block" :content="block.content" :user="false">
     <div
       class="codex-chat-theme chat-message-block chat-message-block--text codex-markdown"
-      v-html="renderMarkdown(block.content, { codeCopyLabel: t('chat.code.copy') })"
+      v-html="renderedMarkdown"
       @click="copyCodeBlock"
     />
   </slot>
   <div
     v-else-if="block.type === 'reasoning'"
     class="codex-chat-theme chat-message-block chat-message-block--reasoning codex-markdown"
-    v-html="renderMarkdown(block.content, { codeCopyLabel: t('chat.code.copy') })"
+    v-html="renderedMarkdown"
     @click="copyCodeBlock"
   />
   <slot v-else-if="block.type === 'mermaid'" name="mermaid" :block="block" :code="block.code">
@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount } from 'vue'
 import ChatAttachmentBlock from './ChatAttachmentBlock.vue'
 import ChatQuestionRequest from './ChatQuestionRequest.vue'
 import ChatFollowUps from './ChatFollowUps.vue'
@@ -152,7 +152,7 @@ defineSlots<{
   }): unknown
 }>()
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   block: RenderedMessageBlock
   answeredClientRequestIds?: ReadonlySet<string>
   followUpsDisabled?: boolean
@@ -176,6 +176,13 @@ const emit = defineEmits<{
 
 const t = useCodexChatTranslate()
 const hostCapabilities = useCodexHostCapabilities()
+// Parents re-render their blocks often (every streamed token re-renders the
+// message list), so parse Markdown only when this block's text changes.
+const renderedMarkdown = computed(() => (
+  props.block.type === 'text' || props.block.type === 'reasoning'
+    ? renderMarkdown(props.block.content, { codeCopyLabel: t('chat.code.copy') })
+    : ''
+))
 const copyResetTimers = new Map<HTMLButtonElement, ReturnType<typeof setTimeout>>()
 
 async function copyCodeBlock(event: MouseEvent) {

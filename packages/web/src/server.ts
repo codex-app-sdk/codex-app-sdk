@@ -4,12 +4,18 @@ import {
   type CodexSurfaceBridgeAttachmentResolver,
   type CodexSurfaceBridgeTarget,
 } from '@codex-app-sdk/core/surface-bridge';
+import type { CodexSurfaceStatePatch } from '@codex-app-sdk/core/surface';
+import {
+  isCodexSurfaceStatePatchSource,
+  type CodexSurfaceStatePatchSource,
+} from '@codex-app-sdk/core/surface-bridge';
 import {
   codexWebSocketProtocolVersion,
   encodeCodexWebSocketMessage,
   type CodexWebSocketFailure,
   type CodexWebSocketRequest,
   type CodexWebSocketServerMessage,
+  type CodexWebSocketStatePatch,
 } from './protocol';
 import {
   codexWebSocketText,
@@ -29,7 +35,8 @@ export type CodexWebSocketSessionRelease = {
 
 /** A host-authorized, connection-scoped lease. The host owns its lifecycle and isolation policy. */
 export type CodexWebSocketSessionLease = {
-  surface: CodexSurfaceBridgeTarget;
+  /** A `CodexSurface` can stream state patches to clients that opt in; other targets send snapshots. */
+  surface: CodexSurfaceBridgeTarget & Partial<CodexSurfaceStatePatchSource>;
   resolveAttachment?: CodexSurfaceBridgeAttachmentResolver;
   release?(context: CodexWebSocketSessionRelease): Awaitable<void>;
 };
@@ -119,6 +126,12 @@ class ServerBinding<Context> implements CodexWebSocketBinding {
   #acceptingRequests = false;
   #finished = false;
   #releasePromise: Promise<void> | null = null;
+  // State stays on full snapshots unless the surface can stream patches and
+  // the client opts in after a `ready` that advertised `stateVersion`.
+  #patchSource: CodexSurfaceStatePatchSource | null = null;
+  #readyStateVersion: number | null = null;
+  #patchMode: 'off' | 'starting' | 'on' = 'off';
+  readonly #pendingPatches: CodexSurfaceStatePatch[] = [];
 
   constructor(options: BindCodexWebSocketOptions<Context>) {
     this.#socket = options.socket;
@@ -159,9 +172,10 @@ class ServerBinding<Context> implements CodexWebSocketBinding {
         return;
       }
       this.#lease = lease;
+      const patchSource = isCodexSurfaceStatePatchSource(lease.surface) ? lease.surface : null;
       this.#unsubscribers.push(
         lease.surface.onStateChange((snapshot) => {
-          if (this.#acceptingRequests) this.#send({
+          if (this.#acceptingRequests && this.#patchMode === 'off') this.#send({
             version: codexWebSocketProtocolVersion,
             type: 'snapshot',
             snapshot,
@@ -175,9 +189,22 @@ class ServerBinding<Context> implements CodexWebSocketBinding {
           });
         }),
       );
+      if (patchSource) {
+        this.#unsubscribers.push(patchSource.onStatePatch((patch) => {
+          if (this.#patchMode === 'on') this.#send(statePatchMessage(patch));
+          else if (this.#patchMode === 'starting') this.#pendingPatches.push(patch);
+        }));
+      }
       const snapshot = await lease.surface.connect();
+      const state = patchSource ? await patchSource.getVersionedSnapshot() : null;
       if (this.#finished) return;
-      this.#send({ version: codexWebSocketProtocolVersion, type: 'ready', snapshot });
+      this.#patchSource = state ? patchSource : null;
+      this.#readyStateVersion = state?.version ?? null;
+      this.#send({
+        version: codexWebSocketProtocolVersion,
+        type: 'ready',
+        ...(state ? { snapshot: state.snapshot, stateVersion: state.version } : { snapshot }),
+      });
       this.#acceptingRequests = true;
     } catch (error) {
       if (!this.#finished) {
@@ -195,15 +222,51 @@ class ServerBinding<Context> implements CodexWebSocketBinding {
       void this.#finish({ reason: 'socket_closed', close: { code: 4400 } });
       return;
     }
-    let request: CodexWebSocketRequest;
+    let request: CodexWebSocketRequest | 'enableStatePatches';
     try {
-      request = parseRequest(codexWebSocketText(data, this.#maxMessageBytes));
+      request = parseClientMessage(codexWebSocketText(data, this.#maxMessageBytes));
+      if (request === 'enableStatePatches' && (!this.#patchSource || this.#patchMode !== 'off')) {
+        throw new TypeError('State patches cannot be enabled for this session');
+      }
     } catch {
       this.#socket.close(4400, 'Invalid Codex WebSocket request');
       void this.#finish({ reason: 'socket_closed', close: { code: 4400 } });
       return;
     }
+    if (request === 'enableStatePatches') {
+      void this.#enableStatePatches();
+      return;
+    }
     this.#requestQueue = this.#requestQueue.then(() => this.#handle(request));
+  }
+
+  async #enableStatePatches(): Promise<void> {
+    const patchSource = this.#patchSource!;
+    this.#patchMode = 'starting';
+    let state;
+    try {
+      state = await patchSource.getVersionedSnapshot();
+    } catch {
+      state = null;
+    }
+    if (this.#finished) return;
+    if (!state) {
+      // Without a base the client cannot apply patches; a reconnect starts over.
+      this.#socket.close(1011, 'Codex state stream unavailable');
+      void this.#finish({ reason: 'surface_failed' });
+      return;
+    }
+    // Snapshots sent before the switch moved the client past `ready`; give it a new base.
+    if (state.version !== this.#readyStateVersion) this.#send({
+      version: codexWebSocketProtocolVersion,
+      type: 'snapshot',
+      snapshot: state.snapshot,
+      stateVersion: state.version,
+    });
+    this.#patchMode = 'on';
+    for (const patch of this.#pendingPatches.splice(0)) {
+      if (patch.version > state.version) this.#send(statePatchMessage(patch));
+    }
   }
 
   async #handle(request: CodexWebSocketRequest): Promise<void> {
@@ -232,7 +295,7 @@ class ServerBinding<Context> implements CodexWebSocketBinding {
     }
   }
 
-  #send(message: CodexWebSocketServerMessage): void {
+  #send(message: CodexWebSocketServerMessage | CodexWebSocketStatePatch): void {
     if (this.#finished) return;
     try {
       const encoded = encodeCodexWebSocketMessage(message);
@@ -258,9 +321,18 @@ class ServerBinding<Context> implements CodexWebSocketBinding {
   }
 }
 
-function parseRequest(text: string): CodexWebSocketRequest {
+function statePatchMessage(patch: CodexSurfaceStatePatch): CodexWebSocketStatePatch {
+  return { version: codexWebSocketProtocolVersion, type: 'statePatch', patch };
+}
+
+function parseClientMessage(text: string): CodexWebSocketRequest | 'enableStatePatches' {
   const value = JSON.parse(text) as unknown;
   if (!isPlainObject(value)) throw new TypeError('Codex WebSocket request must be an object');
+  if (value.type === 'enableStatePatches') {
+    onlyKeys(value, ['version', 'type']);
+    if (value.version !== codexWebSocketProtocolVersion) throw new TypeError('Codex WebSocket version is invalid');
+    return 'enableStatePatches';
+  }
   onlyKeys(value, ['version', 'type', 'id', 'operation', 'args']);
   if (value.version !== codexWebSocketProtocolVersion || value.type !== 'request') {
     throw new TypeError('Codex WebSocket request version or type is invalid');
