@@ -1,11 +1,19 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type WebContents } from 'electron';
-import { registerCodexElectronMain } from '@codex-app-sdk/electron';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import {
+  installCodexWindowPolicy,
+  isCodexRendererSender,
+  registerCodexElectronMain,
+} from '@codex-app-sdk/electron';
 import { createCodexSurface, type CodexSurface } from '@codex-app-sdk/backend';
 
 const bundleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const devServerUrl = process.env.VITE_DEV_SERVER_URL?.trim();
+const rendererFile = path.join(bundleDirectory, '../dist-renderer/index.html');
+// The window may only show this renderer, and only this renderer may call the Codex bridge.
+const rendererUrl = devServerUrl || pathToFileURL(rendererFile).href;
 let mainWindow: BrowserWindow | null = null;
 let surface: CodexSurface | null = null;
 let unregisterSdk: (() => void) | null = null;
@@ -26,12 +34,15 @@ async function createWindow(): Promise<void> {
       preload: path.join(bundleDirectory, 'preload.cjs'),
     },
   });
-  installWindowOpenPolicy(mainWindow.webContents);
-  const rendererUrl = process.env.VITE_DEV_SERVER_URL?.trim();
-  if (rendererUrl) {
-    await mainWindow.loadURL(rendererUrl);
+  installCodexWindowPolicy(mainWindow.webContents, {
+    rendererUrl,
+    // Spark only hands HTTPS links to the system browser.
+    openExternal: async (url) => { if (url.startsWith('https:')) await shell.openExternal(url); },
+  });
+  if (devServerUrl) {
+    await mainWindow.loadURL(devServerUrl);
   } else {
-    await mainWindow.loadFile(path.join(bundleDirectory, '../dist-renderer/index.html'));
+    await mainWindow.loadFile(rendererFile);
   }
   mainWindow.on('closed', () => { mainWindow = null; });
 }
@@ -71,6 +82,7 @@ app.whenReady().then(async () => {
     clipboard,
     dialog,
     ipcMain,
+    isTrustedSender: (event) => isCodexRendererSender(event, rendererUrl),
     shell,
     surface: sdkSurface,
     sender: { send: (channel, payload) => mainWindow?.webContents.send(channel, payload) },
@@ -80,27 +92,6 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow();
   });
 });
-
-function installWindowOpenPolicy(webContents: Pick<WebContents, 'setWindowOpenHandler'>): void {
-  webContents.setWindowOpenHandler(({ url }) => {
-    openExternalUrl(url);
-    return { action: 'deny' };
-  });
-}
-
-function openExternalUrl(url: string): void {
-  const externalUrl = allowedExternalUrl(url);
-  if (externalUrl) void shell.openExternal(externalUrl).catch(() => undefined);
-}
-
-function allowedExternalUrl(value: string): string | null {
-  try {
-    const url = new URL(value);
-    return url.protocol.toLowerCase() === 'https:' ? url.href : null;
-  } catch {
-    return null;
-  }
-}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

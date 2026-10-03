@@ -12,8 +12,12 @@ const electron = vi.hoisted(() => {
     }
 
     windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | undefined;
+    navigationHandler: ((event: { url: string; preventDefault(): void }) => void) | undefined;
     readonly webContents = {
       send: vi.fn(),
+      on: vi.fn((_event: 'will-navigate', handler: (event: { url: string; preventDefault(): void }) => void) => {
+        this.navigationHandler = handler;
+      }),
       setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => { action: 'deny' }) => {
         this.windowOpenHandler = handler;
       }),
@@ -75,7 +79,8 @@ vi.mock('electron', () => ({
   ipcMain: electron.ipcMain,
   shell: electron.shell,
 }));
-vi.mock('@codex-app-sdk/electron', () => ({
+vi.mock('@codex-app-sdk/electron', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@codex-app-sdk/electron')>(),
   registerCodexElectronMain: sdk.registerCodexElectronMain,
 }));
 vi.mock('@codex-app-sdk/backend', () => ({
@@ -141,5 +146,24 @@ describe('basic sample main lifecycle', () => {
     expect(electron.shell.openExternal).toHaveBeenCalledTimes(2);
     expect(electron.shell.openExternal).toHaveBeenNthCalledWith(1, 'https://example.com/docs');
     expect(electron.shell.openExternal).toHaveBeenNthCalledWith(2, 'mailto:team@example.com');
+  });
+
+  it('keeps the window and the Codex bridge on the development renderer', async () => {
+    vi.stubEnv('VITE_DEV_SERVER_URL', 'http://localhost:5173/');
+    await import('../src/main/index');
+    await vi.waitFor(() => expect(electron.windows).toHaveLength(1));
+    const navigate = (url: string) => {
+      const preventDefault = vi.fn();
+      electron.windows[0]!.navigationHandler!({ url, preventDefault });
+      return preventDefault.mock.calls.length > 0;
+    };
+    const { isTrustedSender } = (sdk.registerCodexElectronMain.mock.calls[0] as unknown as [{
+      isTrustedSender(event: unknown): boolean;
+    }])[0];
+
+    expect(navigate('http://localhost:5173/?reload=1')).toBe(false);
+    expect(navigate('https://attacker.example/')).toBe(true);
+    expect(isTrustedSender({ senderFrame: { url: 'http://localhost:5173/', parent: null } })).toBe(true);
+    expect(isTrustedSender({ senderFrame: { url: 'https://attacker.example/', parent: null } })).toBe(false);
   });
 });

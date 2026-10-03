@@ -118,8 +118,28 @@ webPreferences: {
 }
 ```
 
-Deny arbitrary renderer navigation. Add a hostname allowlist if your product
-needs stronger external-link policy than the SDK's protocol validation.
+Electron re-runs the preload script on every navigation, so any page the window
+reaches receives the full Codex bridge. Keep the window on your renderer and
+accept IPC only from it:
+
+```ts
+import { installCodexWindowPolicy, isCodexRendererSender, registerCodexElectronMain } from '@codex-app-sdk/electron';
+
+const rendererUrl = devServerUrl || pathToFileURL(rendererFile).href;
+installCodexWindowPolicy(window.webContents, {
+  rendererUrl,
+  openExternal: (url) => shell.openExternal(url),
+});
+registerCodexElectronMain({
+  // ...
+  isTrustedSender: (event) => isCodexRendererSender(event, rendererUrl),
+});
+```
+
+`installCodexWindowPolicy` denies new windows and foreign navigations and hands
+only `http(s)`, `mailto`, and `tel` URLs to `openExternal`. Same-origin dev
+server reloads and the packaged `file:` renderer stay allowed. Add a hostname
+allowlist inside `openExternal` if your product needs a stricter link policy.
 
 ## Product responsibility
 

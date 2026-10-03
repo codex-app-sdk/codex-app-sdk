@@ -6,7 +6,7 @@ import { relayOperationsSnapshot } from './fakes';
 
 const mocks = vi.hoisted(() => {
   const appHandlers = new Map<string, () => void>();
-  const ipcHandlers = new Map<string, () => unknown>();
+  const ipcHandlers = new Map<string, (event?: unknown) => unknown>();
   const windows: MockBrowserWindow[] = [];
 
   class MockBrowserWindow {
@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | undefined;
     readonly webContents = {
       send: vi.fn(),
+      on: vi.fn(),
       setWindowOpenHandler: vi.fn((handler: (details: { url: string }) => { action: 'deny' }) => {
         this.windowOpenHandler = handler;
       }),
@@ -66,7 +67,7 @@ const mocks = vi.hoisted(() => {
     initializeRelayState: vi.fn(async () => relayOperationsSnapshot()),
     ipcHandlers,
     ipcMain: {
-      handle: vi.fn((channel: string, handler: () => unknown) => ipcHandlers.set(channel, handler)),
+      handle: vi.fn((channel: string, handler: (event?: unknown) => unknown) => ipcHandlers.set(channel, handler)),
       removeHandler: vi.fn((channel: string) => ipcHandlers.delete(channel)),
     },
     mkdir: vi.fn(async () => undefined),
@@ -94,7 +95,8 @@ vi.mock('electron', () => ({
   ipcMain: mocks.ipcMain,
   shell: mocks.shell,
 }));
-vi.mock('@codex-app-sdk/electron', () => ({
+vi.mock('@codex-app-sdk/electron', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@codex-app-sdk/electron')>(),
   registerCodexElectronMain: mocks.registerCodexElectronMain,
 }));
 vi.mock('@codex-app-sdk/backend', () => ({
@@ -163,16 +165,21 @@ describe('Relay sample main lifecycle', () => {
       .toContain('Never call rebook_shipment until the user explicitly approves');
   });
 
-  it('exposes typed read and reset operations through app-owned IPC', async () => {
+  it('exposes typed read and reset operations only to the Relay renderer', async () => {
+    vi.stubEnv('VITE_DEV_SERVER_URL', 'http://localhost:5173/');
     await import('../src/main/index');
     await vi.waitFor(() => expect(mocks.ipcHandlers.has(RELAY_SNAPSHOT_CHANNEL)).toBe(true));
+    const renderer = { senderFrame: { url: 'http://localhost:5173/', parent: null } };
+    const attacker = { senderFrame: { url: 'https://attacker.example/', parent: null } };
 
-    await expect(mocks.ipcHandlers.get(RELAY_SNAPSHOT_CHANNEL)!())
+    await expect(mocks.ipcHandlers.get(RELAY_SNAPSHOT_CHANNEL)!(renderer))
       .resolves.toMatchObject({ revision: 1, metrics: { critical: 1 } });
     expect(mocks.readRelayState).toHaveBeenCalledWith('/tmp/relay-user-data/relay-operations.json');
-    await expect(mocks.ipcHandlers.get(RELAY_RESET_CHANNEL)!())
+    await expect(mocks.ipcHandlers.get(RELAY_RESET_CHANNEL)!(renderer))
       .resolves.toMatchObject({ revision: 1, metrics: { critical: 1 } });
     expect(mocks.resetRelayState).toHaveBeenCalledWith('/tmp/relay-user-data/relay-operations.json');
+    expect(() => mocks.ipcHandlers.get(RELAY_RESET_CHANNEL)!(attacker)).toThrow('untrusted sender');
+    expect(mocks.resetRelayState).toHaveBeenCalledOnce();
   });
 
   it('reuses one surface on reopen and removes both SDK and app IPC before quit', async () => {

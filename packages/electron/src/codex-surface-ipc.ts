@@ -31,9 +31,10 @@ import {
   type IpcMainPort,
   type IpcRendererPort,
   type IpcRequest,
+  type IpcSenderPolicy,
 } from './typed-ipc';
 
-export type CodexSurfaceIpcOptions = {
+export type CodexSurfaceIpcOptions = IpcSenderPolicy & {
   resolveAttachment?: import('@codex-app-sdk/core/surface-bridge').CodexSurfaceBridgeAttachmentResolver;
 };
 
@@ -209,7 +210,7 @@ export function registerCodexSurfaceIpc(
     [channels.unarchiveConversation]: (_event, ...args) => invoke('unarchiveConversation', args),
     [channels.updateConversationSettings]: (_event, ...args) => invoke('updateConversationSettings', args),
     [channels.updateQueuedPrompt]: (_event, ...args) => invoke('updateQueuedPrompt', args),
-  });
+  }, options);
   const unsubscribeState = surface.onStateChange((snapshot) => sender.send(channels.stateChanged, snapshot));
   const unsubscribeEvents = surface.onEvent((event) => sender.send(channels.event, event));
   return () => {

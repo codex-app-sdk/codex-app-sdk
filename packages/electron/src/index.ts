@@ -11,7 +11,16 @@ export {
   type IpcRequest,
   type IpcRequestArguments,
   type IpcRequestResult,
+  type IpcSenderPolicy,
 } from './typed-ipc';
+export {
+  codexExternalUrl,
+  installCodexWindowPolicy,
+  isCodexRendererSender,
+  isCodexRendererUrl,
+  type CodexWindowPolicyOptions,
+  type CodexWindowPolicyTarget,
+} from './codex-window-policy';
 export {
   createCodexSurfaceRendererApi,
   registerCodexSurfaceIpc,

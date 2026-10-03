@@ -6,14 +6,21 @@ import {
   ipcMain,
   shell,
   type BrowserWindowConstructorOptions,
-  type WebContents,
 } from 'electron';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createCodexAppBackend, type CodexAppBackend } from '@codex-app-sdk/backend';
-import { registerCodexElectronMain } from '@codex-app-sdk/electron';
+import {
+  installCodexWindowPolicy,
+  isCodexRendererSender,
+  registerCodexElectronMain,
+} from '@codex-app-sdk/electron';
 
 const bundleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const devServerUrl = process.env.VITE_DEV_SERVER_URL?.trim();
+const rendererFile = path.join(bundleDirectory, '../dist-renderer/index.html');
+// The window may only show this renderer, and only this renderer may call the Codex bridge.
+const rendererUrl = devServerUrl || pathToFileURL(rendererFile).href;
 let mainWindow: BrowserWindow | null = null;
 let backend: CodexAppBackend | null = null;
 let unregisterSdk: (() => void) | null = null;
@@ -44,10 +51,12 @@ async function createWindow(): Promise<void> {
   mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`Failed to load preload '${preloadPath}':`, error);
   });
-  installWindowOpenPolicy(mainWindow.webContents);
-  const rendererUrl = process.env.VITE_DEV_SERVER_URL?.trim();
-  if (rendererUrl) await mainWindow.loadURL(rendererUrl);
-  else await mainWindow.loadFile(path.join(bundleDirectory, '../dist-renderer/index.html'));
+  installCodexWindowPolicy(mainWindow.webContents, {
+    rendererUrl,
+    openExternal: (url) => shell.openExternal(url),
+  });
+  if (devServerUrl) await mainWindow.loadURL(devServerUrl);
+  else await mainWindow.loadFile(rendererFile);
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -59,6 +68,7 @@ void app.whenReady().then(async () => {
     clipboard,
     dialog,
     ipcMain,
+    isTrustedSender: (event) => isCodexRendererSender(event, rendererUrl),
     shell,
     surface: backend.surface,
     sender: { send: (channel, payload) => mainWindow?.webContents.send(channel, payload) },
@@ -83,21 +93,3 @@ app.on('before-quit', () => {
   void backend?.close().catch(() => undefined);
   backend = null;
 });
-
-function installWindowOpenPolicy(webContents: Pick<WebContents, 'setWindowOpenHandler'>): void {
-  webContents.setWindowOpenHandler(({ url }) => {
-    openExternalUrl(url);
-    return { action: 'deny' };
-  });
-}
-
-function openExternalUrl(value: string): void {
-  try {
-    const url = new URL(value);
-    if (['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol.toLowerCase())) {
-      void shell.openExternal(url.href).catch(() => undefined);
-    }
-  } catch {
-    // Invalid and non-web navigation stays blocked inside the renderer.
-  }
-}

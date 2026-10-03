@@ -64,8 +64,8 @@ test('creates a complete app without retaining template tokens', async (t) => {
   assert.equal(app.includes('{{displayName}}'), false);
   assert.match(main, /createCodexAppBackend/);
   assert.match(main, /autoSelectFirstConversation: false/);
-  assert.match(main, /setWindowOpenHandler/);
-  assert.doesNotMatch(main, /will-navigate/);
+  assert.match(main, /installCodexWindowPolicy\(mainWindow\.webContents/);
+  assert.match(main, /isTrustedSender: \(event\) => isCodexRendererSender\(event, rendererUrl\)/);
   assert.match(main, /from '@codex-app-sdk\/backend'/);
   assert.match(main, /from '@codex-app-sdk\/electron'/);
   assert.match(viteEnvironment, /from '@codex-app-sdk\/electron'/);

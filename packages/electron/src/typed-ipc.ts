@@ -84,14 +84,27 @@ export class TypedIpcMain<Requests extends object> {
   }
 }
 
+export type IpcSenderPolicy = {
+  /** Rejects an invocation before its handler runs when this returns false. */
+  isTrustedSender?: (event: unknown) => boolean;
+};
+
 export function registerIpcMainHandlers<Requests extends object>(
   port: IpcMainPort,
   handlers: IpcMainHandlers<Requests>,
+  policy: IpcSenderPolicy = {},
 ): () => void {
   const main = new TypedIpcMain<Requests>(port);
   const channels = Object.keys(handlers) as Array<RequestName<Requests>>;
+  const { isTrustedSender } = policy;
   for (const channel of channels) {
-    main.handle(channel, handlers[channel]);
+    const handler = handlers[channel];
+    main.handle(channel, isTrustedSender
+      ? (event, ...args) => {
+        if (!isTrustedSender(event)) throw new Error(`Rejected ${channel} from an untrusted sender`);
+        return handler(event, ...args);
+      }
+      : handler);
   }
   return () => main.dispose();
 }

@@ -7,6 +7,10 @@
 - `isAllowedCodexWebSocketOrigin()` rejects WebSocket upgrades from unexpected
   origins. The scaffolded web target and the web sample now apply it, so other
   websites can no longer drive a locally running Codex server.
+- `installCodexWindowPolicy()` keeps Electron windows on the app renderer, and
+  the new `isTrustedSender` option of `registerCodexElectronMain()` (with
+  `isCodexRendererSender()`) rejects IPC from any other page. The scaffold and
+  the Electron samples restore their navigation guard using both.
 
 ## 0.13.0
 

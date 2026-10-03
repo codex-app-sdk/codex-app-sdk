@@ -18,8 +18,22 @@ type CodexElectronMainOptions = {
   dialog: CodexNativeDialog;
   shell: CodexNativeShell;
   native?: CodexNativeMainOptions;
+  /** Rejects surface and native invocations before their handlers run when false. */
+  isTrustedSender?: (event: unknown) => boolean;
 };
 ```
+
+### Window policy
+
+- `installCodexWindowPolicy(webContents, { rendererUrl, openExternal })` keeps a
+  window on its renderer. It denies new windows and navigations away from
+  `rendererUrl` (same origin for dev servers, same file for packaged `file:`
+  renderers), and passes only `http(s)`, `mailto`, and `tel` URLs to
+  `openExternal`.
+- `isCodexRendererSender(event, rendererUrl)` accepts only the main frame of a
+  window currently showing the renderer. Pass it as `isTrustedSender`.
+- `isCodexRendererUrl(url, rendererUrl)` and `codexExternalUrl(url)` expose the
+  underlying checks.
 
 ### `exposeCodexElectronPreload(contextBridge, ipcRenderer)`
 

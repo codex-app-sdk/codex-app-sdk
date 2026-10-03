@@ -14,6 +14,7 @@ import {
 import {
   registerIpcMainHandlers,
   type IpcMainPort,
+  type IpcSenderPolicy,
 } from './typed-ipc';
 import {
   codexNativeChannels as channels,
@@ -37,7 +38,7 @@ export type CodexNativeShell = {
   openExternal(href: string): Promise<void>;
 };
 
-export type CodexNativeMainOptions = {
+export type CodexNativeMainOptions = IpcSenderPolicy & {
   appleSpeechAssetsPath?: string;
   maxAttachmentBytes?: number;
   maxTotalAttachmentBytes?: number;
@@ -183,7 +184,7 @@ export function registerCodexNativeIpc(
         ));
       return transcribe(Buffer.from(audioData), transcriptionOptions);
     },
-  });
+  }, options);
 
   return () => {
     unregister();
