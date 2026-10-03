@@ -1,11 +1,11 @@
-name: Publish private packages
+name: Publish public packages
 
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
 
 concurrency:
   group: publish-packages
@@ -23,9 +23,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
-          cache: npm
-          registry-url: https://npm.pkg.github.com
+          node-version: 24
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
           scope: '@codex-app-sdk'
 
       - name: Install dependencies
@@ -34,10 +34,11 @@ jobs:
       - name: Install schema-compatible Codex app-server
         run: npm install --global @openai/codex@0.154.0
 
+      - name: Install browser test dependencies
+        run: npx playwright install --with-deps chromium
+
       - name: Verify packages
-        run: npm run check:sdk
+        run: npm run check
 
       - name: Publish packages
         run: npm run publish:packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

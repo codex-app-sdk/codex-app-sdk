@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/electron",
-  "version": "0.12.6",
+  "version": "0.13.0",
   "description": "Electron main, preload, IPC, and native capability adapter for Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
@@ -10,8 +10,8 @@
     "directory": "packages/electron"
   },
   "publishConfig": {
-    "access": "restricted",
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "files": [
     "dist",
@@ -37,8 +37,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/backend": "0.12.6",
-    "@codex-app-sdk/core": "0.12.6"
+    "@codex-app-sdk/backend": "0.13.0",
+    "@codex-app-sdk/core": "0.13.0"
   },
   "peerDependencies": {
     "electron": ">=30"

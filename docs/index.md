@@ -112,10 +112,10 @@ protocol types.
 
 The repository and documentation are public. You can clone the source and run
 the [component lab or samples](/guide/installation#try-the-public-source)
-without GitHub Packages access. The six scoped packages, including the
-scaffolder, are published to GitHub Packages but currently require package
-access and authentication; they are not on the public npm registry. See
-[installation](/guide/installation#package-access) before using the package commands.
+without package credentials. Starting with 0.13.0, all six scoped packages,
+including the scaffolder, are public on npm and install without authentication.
+See [installation](/guide/installation#package-access) for setup and migration
+from the older GitHub Packages releases.
 
 The SDK is pre-1.0. These docs follow `main`; package releases may lag behind.
 The [JSON-RPC inventory](/api/json-rpc) records the checked-in app-server schema

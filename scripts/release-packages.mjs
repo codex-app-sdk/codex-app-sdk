@@ -24,9 +24,9 @@ for (const { directory, manifest } of packages) {
   if (manifest.version !== rootManifest.version) {
     errors.push(`${manifest.name}: expected version ${rootManifest.version}, received ${manifest.version}`);
   }
-  if (manifest.publishConfig?.registry !== 'https://npm.pkg.github.com'
-    || manifest.publishConfig?.access !== 'restricted') {
-    errors.push(`${manifest.name}: expected restricted GitHub Packages publication`);
+  if (manifest.publishConfig?.registry !== 'https://registry.npmjs.org'
+    || manifest.publishConfig?.access !== 'public') {
+    errors.push(`${manifest.name}: expected public npm publication`);
   }
   for (const [dependency, version] of Object.entries(manifest.dependencies ?? {})) {
     if (publishedNames.has(dependency) && version !== rootManifest.version) {

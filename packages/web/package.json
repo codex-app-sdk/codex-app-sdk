@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/web",
-  "version": "0.12.6",
+  "version": "0.13.0",
   "description": "Framework-neutral WebSocket bindings for browser-based Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
@@ -10,8 +10,8 @@
     "directory": "packages/web"
   },
   "publishConfig": {
-    "access": "restricted",
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "files": [
     "dist",
@@ -45,7 +45,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "0.12.6"
+    "@codex-app-sdk/core": "0.13.0"
   },
   "engines": {
     "node": ">=22"

@@ -23,6 +23,21 @@ authentication, tenancy, policy, business data, and integrations.
 | `@codex-app-sdk/web` | Framework-neutral WebSocket server binding and browser client |
 | `@codex-app-sdk/vue` | Shared sidebar, conversation pane, composer, messages, tools, and theme |
 
+## Start an application
+
+The SDK and scaffolder are public on npm starting with 0.13.0. No package token
+is required:
+
+```bash
+npx @codex-app-sdk/create-codex-app@latest my-codex-app
+cd my-codex-app
+npm run dev
+```
+
+Add `--target web` to generate a web application. See the
+[installation guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/installation.html)
+for prerequisites, existing-host integration, and migration from GitHub Packages.
+
 ## What you get
 
 - App-server discovery, startup, initialization, reconnects, and typed protocol

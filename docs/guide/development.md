@@ -157,12 +157,11 @@ The package should contain built entry points, declarations, source maps,
 `codex-app-sdk.css`, native assets, README, and LICENSE—not samples, tests, or
 the documentation build output.
 
-## Private package publication
+## Public package publication
 
-The six scoped SDK workspaces publish privately to GitHub Packages. Their
-package manifests pin `https://npm.pkg.github.com` as the registry and link each
-package to this repository. The source repository is public, but the existing
-packages remain private; package visibility and access are managed separately.
+The six scoped SDK workspaces publish publicly to npm starting with 0.13.0.
+Their manifests pin `https://registry.npmjs.org` and `access: public`, and link
+each package to this repository. The root compatibility facade is not released.
 
 All six packages release in lockstep. While the SDK is pre-1.0, versions use
 `0.x.y`: increment `x` for a significant new capability generation, such as a
@@ -172,11 +171,23 @@ Tests, documentation, internal refactors, and publishing infrastructure do not
 require a package version by themselves. The first published baseline is
 `0.12.2`, reconstructed from the repository's feature history.
 
-Publishing is intentionally CI-owned. Update all six package versions and
-their internal dependency versions together, commit the generated lockfile,
-let CI pass, then run the **Publish private packages** workflow on `main`. The
-workflow authenticates with its short-lived `GITHUB_TOKEN`; no long-lived
-publishing token or repository secret is required.
+Update all six package versions, their internal dependencies, and sample
+dependency versions together, then regenerate and commit the lockfile. Run
+`npm run check` and inspect `npm pack --dry-run --json --workspaces` before
+publication; never include credentials, local captures, or unrelated artifacts.
+
+The first npm release must be bootstrapped by an authenticated npm organization
+owner using `npm run publish:packages`. Complete any npm 2FA prompts locally.
+After the packages exist, configure an npm trusted publisher on **each package**:
+
+- GitHub organization and repository: `codex-app-sdk/codex-app-sdk`
+- Workflow filename: `publish-packages.yml`
+- Allow direct publishing; no GitHub environment is configured.
+
+Subsequent releases use the **Publish public packages** workflow on `main`.
+It verifies and builds the SDK, then uses GitHub OIDC trusted publishing with
+provenance. No npm token or repository publishing secret is needed. The workflow
+cannot publish until the npm-side trust relationships have been configured.
 
 Package versions are immutable. Re-running the workflow for an already
 published version fails instead of overwriting it.
