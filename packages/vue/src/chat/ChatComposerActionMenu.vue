@@ -179,13 +179,8 @@ function isComposerMenuAction(value: unknown): value is ComposerMenuAction {
 
 <style scoped>
 .chat-composer-action-menu__root {
-  --codex-border-color: var(--color-border);
   --codex-composer-menu-radius: var(--radius-xl);
   --codex-composer-menu-shadow: var(--shadow-menu);
-  --codex-hover-color: var(--color-surface-low);
-  --codex-muted-text-color: var(--color-text-muted);
-  --codex-surface-color: var(--color-surface-lowest);
-  --codex-text-color: var(--color-text);
 }
 
 .chat-composer-action-menu__button {
