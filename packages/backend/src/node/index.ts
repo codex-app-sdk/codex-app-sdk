@@ -10,8 +10,11 @@ export {
 export {
   codexRuntimePathEntries,
   discoverCodexExecutable,
+  resolveCodexRuntime,
   withCodexRuntimePath,
   type CodexExecutableDiscoveryDependencies,
+  type CodexRuntime,
+  type ResolveCodexRuntimeOptions,
 } from './codex-executable';
 export {
   CodexSurface,

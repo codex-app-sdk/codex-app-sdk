@@ -12,6 +12,15 @@
   `isCodexRendererSender()`) rejects IPC from any other page. The scaffold and
   the Electron samples restore their navigation guard using both.
 
+### Fixed
+
+- Starting or reconnecting the stdio app-server no longer freezes the event
+  loop (about 2 s in Electron's main process) while probing login shells.
+  Discovery now runs asynchronously through the new `resolveCodexRuntime()`,
+  each probe is bounded by `shellTimeoutMs` (default 5 s), and results are
+  cached per process. Closing a transport while it starts no longer leaves an
+  orphaned app-server.
+
 ## 0.13.0
 
 First public npm release of all six `@codex-app-sdk` packages. Earlier versions

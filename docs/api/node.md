@@ -466,6 +466,14 @@ at a time; stop it before starting another owner.
 - `discoverCodexExecutable`
 - `codexRuntimePathEntries`
 - `withCodexRuntimePath`
+- `resolveCodexRuntime({ command?, env?, discovery? })`
+
+The stdio transport resolves the Codex command and `PATH` with
+`resolveCodexRuntime()`, which probes the user's login shell asynchronously,
+gives up after `shellTimeoutMs` (default 5 seconds), and caches the result for
+the process, so starting or reconnecting does not block the event loop. The
+synchronous helpers keep their behavior but now also bound each shell probe by
+`shellTimeoutMs`.
 
 ### History adapters
 

@@ -2,8 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStd
 import { constants as bufferConstants } from 'node:buffer';
 import { RpcTransportProtocolError, type RpcMessage, type RpcTransport } from '../codex/wire';
 import {
-  discoverCodexExecutable,
-  withCodexRuntimePath,
+  resolveCodexRuntime,
   type CodexExecutableDiscoveryDependencies,
 } from './codex-executable';
 
@@ -42,17 +41,29 @@ export class CodexAppServerStdioTransport implements RpcTransport {
   private readonly messageListeners = new Set<(message: unknown) => void>();
   private readonly errorListeners = new Set<(error: Error) => void>();
 
+  private starting: Promise<void> | null = null;
+  private generation = 0;
+
   constructor(private readonly options: CodexAppServerStdioTransportOptions = {}) {}
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
     if (this.child) {
-      return;
+      return Promise.resolve();
     }
+    this.starting ??= this.spawnAppServer().finally(() => { this.starting = null; });
+    return this.starting;
+  }
 
-    const env = withCodexRuntimePath(this.options.env, this.options.executableDiscovery);
-    const command = this.options.command?.trim()
-      || discoverCodexExecutable({ ...this.options.executableDiscovery, env })
-      || 'codex';
+  private async spawnAppServer(): Promise<void> {
+    const generation = this.generation;
+    const { command, env } = await resolveCodexRuntime({
+      command: this.options.command,
+      env: this.options.env,
+      discovery: this.options.executableDiscovery,
+    });
+    if (generation !== this.generation) {
+      throw new Error('Codex app-server transport was closed while starting');
+    }
     const configArgs = [
       ...DEFAULT_CONFIG_OVERRIDES,
       ...(this.options.configOverrides ?? []),
@@ -155,6 +166,7 @@ export class CodexAppServerStdioTransport implements RpcTransport {
   }
 
   async close(): Promise<void> {
+    this.generation += 1;
     const child = this.child;
     this.child = null;
     if (!child) {

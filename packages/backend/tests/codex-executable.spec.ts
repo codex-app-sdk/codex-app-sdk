@@ -182,10 +182,10 @@ describe('Codex executable discovery', () => {
       shell: '/custom/zsh',
     })).toStrictEqual(['/env/bin', '/login/one', '/login/two', '/nvm/v22/bin']);
     expect(execFileSync).toHaveBeenNthCalledWith(1, '/custom/zsh', ['-l', '-c', 'printf "%s" "$PATH"'], {
-      encoding: 'utf8', env, stdio: 'pipe',
+      encoding: 'utf8', env, stdio: 'pipe', timeout: 5000,
     });
     expect(execFileSync).toHaveBeenNthCalledWith(2, '/custom/zsh', ['-l', '-c', 'nvm which current'], {
-      encoding: 'utf8', env, stdio: 'pipe',
+      encoding: 'utf8', env, stdio: 'pipe', timeout: 5000,
     });
   });
 
