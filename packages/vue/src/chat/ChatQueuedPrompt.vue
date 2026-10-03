@@ -8,6 +8,7 @@
         type="button"
         aria-label="Steer queued prompt now"
         title="Steer now"
+        :disabled="steerDisabled"
         @click="emit('steer', prompt.id)"
       >
         <SteeringWheelIcon aria-hidden="true" />
@@ -44,6 +45,7 @@ import type { QueuedChatPrompt } from './queued-prompts';
 defineProps<{
   prompt: QueuedChatPrompt;
   editDisabled?: boolean;
+  steerDisabled?: boolean;
 }>();
 
 const emit = defineEmits<{

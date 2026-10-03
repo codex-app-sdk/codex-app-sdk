@@ -127,6 +127,7 @@
             :presentation="effectivePresentation.shelf"
             :queued-prompts="effectiveQueuedPrompts"
             :queued-prompt-edit-disabled="localDraft.length > 0"
+            :queued-prompt-steer-disabled="!effectiveCapabilities.steerPrompt"
             :turn-git-diff="effectiveTurnGitDiff"
             @clear-goal="clearGoal"
             @delete-queued-prompt="deleteQueuedPrompt"
@@ -1533,6 +1534,7 @@ function updateQueuedPrompt(promptId: string, prompt: string): void {
 }
 
 function steerQueuedPrompt(promptId: string, prompt?: string): void {
+  if (!effectiveCapabilities.value.steerPrompt) return;
   if (editingQueuedPromptId.value === promptId) editingQueuedPromptId.value = null;
   if (prompt === undefined) dispatchControllerAction('steerQueuedPrompt', promptId);
   else dispatchControllerAction('steerQueuedPrompt', promptId, prompt);
@@ -1555,6 +1557,10 @@ function interrupt(): void {
 }
 
 function steer(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>): void {
+  if (!effectiveCapabilities.value.steerPrompt) {
+    submit(prompt, composerOptions);
+    return;
+  }
   const queuedPromptId = editingQueuedPromptId.value;
   if (queuedPromptId) {
     editingQueuedPromptId.value = null;

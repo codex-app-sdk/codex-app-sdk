@@ -32,6 +32,12 @@ export const capabilities: CodexCapabilities = {
 };
 ```
 
+Setting `steerPrompt: false` makes the composer's Cmd+Enter shortcut behave like
+normal send (or save when editing a queued prompt), including attachment-only
+drafts. It leaves existing queued prompts alone when the composer is empty and
+keeps the shelf's Steer button visible but disabled. Busy submissions still go
+through the host's ordinary send/queue policy.
+
 ## Presentation controls
 
 Presentation controls hide optional default UI without changing the operations

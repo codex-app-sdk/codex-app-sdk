@@ -451,6 +451,10 @@ async function handleSendButtonClick(): Promise<void> {
 }
 
 function submitSteer(): void {
+  if (!effectiveCodexCapabilities.value.steerPrompt) {
+    submitWithIntent('send');
+    return;
+  }
   if (!prompt.value.trim() && props.queuedPromptId && !props.hasAttachments && !props.hasExternalContent && !props.disabled) {
     emit('steerQueuedPrompt', props.queuedPromptId);
     return;

@@ -5,6 +5,7 @@ import { h, nextTick, reactive, ref, type Component } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CodexConversationPane,
+  codexCapabilities,
   codexCommands,
   createCodexConversationPaneController,
   CodexMessage,
@@ -1777,20 +1778,25 @@ describe('CodexConversationPane', () => {
     expect(empty.emitted('attachmentsChange')).toBeUndefined();
   });
 
-  it('emits attachment options when steering and clears the selected attachments', async () => {
+  it.each([
+    { steerPrompt: true, event: 'steer', forbidden: 'submit' },
+    { steerPrompt: false, event: 'submit', forbidden: 'steer' },
+  ])('routes Cmd Enter with attachments to $event when steerPrompt=$steerPrompt', async ({ steerPrompt, event, forbidden }) => {
     const attachment: CodexNativeAttachment = {
       id: 'notes', type: 'file', reference: 'attachment:notes', name: 'Notes', mimeType: 'text/markdown', size: 1,
     };
     const wrapper = mount(CodexConversationPane, {
-      props: { attachments: [attachment], busy: true, messages, modelValue: '' },
+      props: { attachments: [attachment], busy: true, messages, modelValue: '',
+        capabilities: { ...codexCapabilities, steerPrompt } },
     });
     await setComposerText(wrapper, 'Use these notes');
     await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
 
-    expect(wrapper.emitted('steer')).toStrictEqual([[
+    expect(wrapper.emitted(event)).toStrictEqual([[
       'Use these notes',
       { attachments: [{ type: 'file', reference: 'attachment:notes' }] },
     ]]);
+    expect(wrapper.emitted(forbidden)).toBeUndefined();
     expect(wrapper.emitted('attachmentsChange')).toContainEqual([[]]);
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
   });
@@ -1952,20 +1958,28 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
   });
 
-  it('steers the first queued prompt from an empty Cmd Enter composer', async () => {
+  it.each([true, false])('gates empty Cmd Enter and the shelf Steer button with steerPrompt=%s', async (steerPrompt) => {
     const wrapper = mount(CodexConversationPane, {
       props: {
         busy: true,
         messages,
         modelValue: '',
         queuedPrompts: [{ id: 'queued-1', text: 'Run the tests' }],
+        capabilities: { ...codexCapabilities, steerPrompt },
       },
     });
 
     await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
 
-    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['queued-1']]);
+    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual(steerPrompt ? [['queued-1']] : undefined);
+    const steerButton = wrapper.get<HTMLButtonElement>('[aria-label="Steer queued prompt now"]');
+    expect(steerButton.element.disabled).toBe(!steerPrompt);
+    await steerButton.trigger('click');
+    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual(steerPrompt ? [['queued-1'], ['queued-1']] : undefined);
     expect(wrapper.emitted('steer')).toBeUndefined();
+    expect(wrapper.emitted('submit')).toBeUndefined();
+    expect(wrapper.emitted('updateQueuedPrompt')).toBeUndefined();
+    expect(wrapper.emitted('deleteQueuedPrompt')).toBeUndefined();
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
 
@@ -2304,7 +2318,10 @@ describe('CodexConversationPane', () => {
     wrapper.unmount();
   });
 
-  it('steers and removes the edited queue item with Cmd Enter', async () => {
+  it.each([
+    { steerPrompt: true, editEvent: 'steerQueuedPrompt', draftEvent: 'steer', forbiddenEdit: 'updateQueuedPrompt', forbiddenDraft: 'submit' },
+    { steerPrompt: false, editEvent: 'updateQueuedPrompt', draftEvent: 'submit', forbiddenEdit: 'steerQueuedPrompt', forbiddenDraft: 'steer' },
+  ])('routes Cmd Enter queue edits to $editEvent when steerPrompt=$steerPrompt', async ({ steerPrompt, editEvent, draftEvent, forbiddenEdit, forbiddenDraft }) => {
     const attachment: CodexNativeAttachment = {
       id: 'queued-steer-attachment', type: 'file', reference: 'attachment:queued-steer',
       name: 'queued-steer.md', mimeType: 'text/markdown', size: 1,
@@ -2316,6 +2333,7 @@ describe('CodexConversationPane', () => {
         messages,
         modelValue: '',
         queuedPrompts: [{ id: 'queued-1', text: 'Original text' }],
+        capabilities: { ...codexCapabilities, steerPrompt },
       },
     });
 
@@ -2323,8 +2341,10 @@ describe('CodexConversationPane', () => {
     await setComposerText(wrapper, 'Edited steer');
     await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
 
-    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['queued-1', 'Edited steer']]);
+    expect(wrapper.emitted(editEvent)).toStrictEqual([['queued-1', 'Edited steer']]);
+    expect(wrapper.emitted(forbiddenEdit)).toBeUndefined();
     expect(wrapper.emitted('steer')).toBeUndefined();
+    expect(wrapper.emitted('submit')).toBeUndefined();
     expect(wrapper.emitted('attachmentsChange')).toContainEqual([[]]);
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
     expect(composerValue(wrapper)).toBe('');
@@ -2332,8 +2352,9 @@ describe('CodexConversationPane', () => {
     await setComposerText(wrapper, 'Next regular steer');
     await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
 
-    expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([['queued-1', 'Edited steer']]);
-    expect(wrapper.emitted('steer')).toStrictEqual([['Next regular steer']]);
+    expect(wrapper.emitted(editEvent)).toStrictEqual([['queued-1', 'Edited steer']]);
+    expect(wrapper.emitted(draftEvent)).toStrictEqual([['Next regular steer']]);
+    expect(wrapper.emitted(forbiddenDraft)).toBeUndefined();
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
 

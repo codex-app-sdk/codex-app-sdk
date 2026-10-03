@@ -7,6 +7,7 @@
     <ChatQueuedPrompts
       v-if="showQueuedPrompts"
       :edit-disabled="queuedPromptEditDisabled"
+      :steer-disabled="queuedPromptSteerDisabled"
       :prompts="queuedPrompts"
       @delete="$emit('deleteQueuedPrompt', $event)"
       @edit="$emit('editQueuedPrompt', $event)"
@@ -39,6 +40,7 @@ const props = defineProps<{
   presentation?: CodexComposerShelfPresentation;
   queuedPrompts: readonly QueuedChatPrompt[];
   queuedPromptEditDisabled?: boolean;
+  queuedPromptSteerDisabled?: boolean;
   turnGitDiff?: TurnGitDiff | null;
 }>();
 

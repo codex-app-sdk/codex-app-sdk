@@ -337,6 +337,13 @@ In `CodexConversationPane`, queued-prompt Edit loads the text into an empty
 composer. Enter dispatches `updateQueuedPrompt(promptId, prompt)`, while
 Cmd+Enter dispatches `steerQueuedPrompt(promptId, prompt)`.
 
+With `capabilities.steerPrompt: false`, Cmd+Enter uses ordinary send instead,
+preserving attachments and input options; the host can queue that submission
+while busy. An empty composer does not steer or change an existing queued
+prompt. During queue editing, Cmd+Enter saves through `updateQueuedPrompt`
+without submitting a duplicate. The shelf's Steer button remains visible but
+disabled. The default `steerPrompt: true` behavior is unchanged.
+
 ### Host-owned message selection and composer context
 
 `CodexMessageList` and `CodexConversationPane` accept
