@@ -46,8 +46,7 @@ export function filterComposerSkills(
   plugins: readonly CodexSurfacePlugin[] = [],
 ): CodexSkillSummary[] {
   return filterComposerSearchItems(skills, query, [
-    { values: (skill) => [skill.id] },
-    { values: (skill) => [skill.name, skill.displayName, skillDisplayName(skill, plugins)] },
+    { values: (skill) => [skill.id, skillInsertText(skill), skill.name, skill.displayName, skillDisplayName(skill, plugins)] },
     { values: (skill) => [skill.shortDescription, skill.description] },
   ], maxResults);
 }

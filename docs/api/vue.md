@@ -647,6 +647,11 @@ ID, the skill picker and user-message chip replace that prefix with the matching
 plugin catalog name (for example, `dropbox:find-dropbox-content`). The original
 skill name and path remain unchanged for prompt submission.
 
+Skill suggestions rank IDs, names, display names, and insertion aliases together:
+exact matches first, then whole words, word prefixes, and substrings.
+Description-only matches come last; equally scored matches retain catalog order.
+For example, `$cp` ranks **Commit Push (cp)** above **sites:sites-mcp**.
+
 ### Customization
 
 - `provideCodexChatTranslate` and `useCodexChatTranslate`

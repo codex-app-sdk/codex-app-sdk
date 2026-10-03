@@ -117,7 +117,7 @@ describe('composer search ranking', () => {
       .toStrictEqual([items[2], items[3]]);
   });
 
-  it('ranks skill id matches before name matches and description matches', () => {
+  it('ranks skill identity and name matches before descriptions', () => {
     const skills: CodexSkillSummary[] = [
       skill({
         name: 'frontend-polish',
@@ -143,10 +143,24 @@ describe('composer search ranking', () => {
     ];
 
     expect(filterComposerSkills(skills, 'dod').map((entry) => entry.name)).toStrictEqual([
-      'project-readiness',
       'release-dod',
+      'project-readiness',
       'frontend-polish',
     ]);
+  });
+
+  it('ranks an exact skill alias above whole words, prefixes, substrings and descriptions', () => {
+    const skills = [
+      skill({ id: 'sites:sites-mcp', name: 'sites:sites-mcp' }),
+      skill({ name: 'description-only', description: 'cp' }),
+      skill({ name: 'cplus-helper' }),
+      skill({ name: 'copy-review', displayName: 'Review cp changes' }),
+      skill({ id: '/skills/commit-push/SKILL.md', name: 'Commit Push (cp)' }),
+    ];
+    expect(filterComposerSkills(skills, ' CP ').map((entry) => entry.name)).toStrictEqual([
+      'Commit Push (cp)', 'copy-review', 'cplus-helper', 'sites:sites-mcp', 'description-only',
+    ]);
+    expect(filterComposerSkills(skills, 'cp', 1).map((entry) => entry.name)).toStrictEqual(['Commit Push (cp)']);
   });
 
   it('ranks command id matches before command name matches and descriptions', () => {

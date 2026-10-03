@@ -60,7 +60,10 @@ function searchScore(pattern: string, target: string): number {
     return 30_000;
   }
 
-  return 10_000 - normalizedTarget.indexOf(pattern);
+  const words = normalizedTarget.split(/[^\p{L}\p{N}_]+/u);
+  const score = words.includes(pattern) ? 20_000
+    : words.some((word) => word.startsWith(pattern)) ? 15_000 : 10_000;
+  return score - normalizedTarget.indexOf(pattern);
 }
 
 function limitItems<T>(items: T[], maxResults: number): T[] {
