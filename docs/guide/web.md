@@ -5,7 +5,7 @@ WebSocket. It does not create an HTTP server, depend on Express or `ws`, parse
 website cookies, store users or tokens, or decide how app-server processes are
 pooled.
 
-The [Basic web sample](https://github.com/nbonamy/codex-app-sdk/tree/main/samples/web/basic)
+The [Basic web sample](https://github.com/codex-app-sdk/codex-app-sdk/tree/main/samples/web/basic)
 is the smallest runnable integration. Its renderer is the same exported
 sidebar/pane shell as the Basic desktop sample plus the web client; its server
 is almost entirely Express/`ws`, site-authentication, and session-acquisition

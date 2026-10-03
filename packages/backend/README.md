@@ -32,8 +32,8 @@ yet projected by `CodexSurface`. Renderer code must use
 
 The backend does not own website users, authentication sessions, business data,
 token storage, or process-pool policy. See the [runtime
-guide](https://nbonamy.github.io/codex-app-sdk/guide/surface) and [Node
-API](https://nbonamy.github.io/codex-app-sdk/api/node). The generated
-[JSON-RPC coverage inventory](https://nbonamy.github.io/codex-app-sdk/api/json-rpc)
+guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/surface.html) and [Node
+API](https://codex-app-sdk.github.io/codex-app-sdk/api/node.html). The generated
+[JSON-RPC coverage inventory](https://codex-app-sdk.github.io/codex-app-sdk/api/json-rpc.html)
 shows which app-server methods have a high-level SDK projection and which remain
 available only through the trusted protocol client.

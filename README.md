@@ -3,12 +3,12 @@
 Build complete desktop and web Codex experiences without rebuilding app-server
 process management, transport bridges, conversation state, and chat UI in every app.
 
-[![Documentation](https://github.com/nbonamy/codex-app-sdk/actions/workflows/deploy-docs.yml/badge.svg)](https://nbonamy.github.io/codex-app-sdk/)
+[![Documentation](https://github.com/codex-app-sdk/codex-app-sdk/actions/workflows/deploy-docs.yml/badge.svg)](https://codex-app-sdk.github.io/codex-app-sdk/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-0b7a65.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-339933.svg)](./package.json)
 [![Vue](https://img.shields.io/badge/vue-%3E%3D3.5-42b883.svg)](https://vuejs.org/)
 
-**[Read the full documentation →](https://nbonamy.github.io/codex-app-sdk/)**
+**[Read the full documentation →](https://codex-app-sdk.github.io/codex-app-sdk/)**
 
 Codex App SDK is a set of five focused packages around Codex app-server. The
 SDK owns reusable Codex plumbing, renderer-safe contracts, desktop/web
@@ -72,34 +72,56 @@ const surface = useCodexSurface(rendererApi);
 
 No raw JSON-RPC method names, generated app-server payloads, Node primitives,
 filesystem paths, or Electron objects need to cross into ordinary renderer
-code. See the [Electron](https://nbonamy.github.io/codex-app-sdk/guide/electron)
-and [web](https://nbonamy.github.io/codex-app-sdk/guide/web) guides for how each
+code. See the [Electron](https://codex-app-sdk.github.io/codex-app-sdk/guide/electron.html)
+and [web](https://codex-app-sdk.github.io/codex-app-sdk/guide/web.html) guides for how each
 host creates `rendererApi`.
 
 ## Start here
 
+### Try it from source
+
+The repository is public. With Node.js 22 or newer, explore the UI without
+an API key, Codex login, or GitHub Packages access:
+
+```bash
+git clone https://github.com/codex-app-sdk/codex-app-sdk.git
+cd codex-app-sdk
+npm ci --ignore-scripts
+npm run dev:lab
+```
+
+For a live Codex conversation, install and authenticate a compatible Codex CLI,
+run `npm ci` to include Electron's install step, then `npm run dev:electron`
+or `npm run dev:web`.
+
+### Build your own application
+
+The source is open under Apache-2.0, but the published scoped packages are
+currently access-controlled on GitHub Packages, not the public npm registry.
+See the installation guide for package authentication before running `npx`.
+
 The default scaffold is a complete Electron + Vue application. Pass
 `--target web` for an Express + `ws` host using the same backend, surface, and
 Vue pane. Then update the generated host seams and shell for your product. The
-[scaffolding guide](https://nbonamy.github.io/codex-app-sdk/guide/scaffolding)
+[scaffolding guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/scaffolding.html)
 is the canonical source for commands, package-publication status, and options.
 For an existing application, follow the
-[installation guide](https://nbonamy.github.io/codex-app-sdk/guide/installation).
+[installation guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/installation.html).
 
-- [Scaffold an application](https://nbonamy.github.io/codex-app-sdk/guide/scaffolding)
-- [Tour the generated targets](https://nbonamy.github.io/codex-app-sdk/guide/quick-start)
-- [Add app-owned panels](https://nbonamy.github.io/codex-app-sdk/guide/app-ui)
-- [Add an MCP server](https://nbonamy.github.io/codex-app-sdk/guide/mcp)
-- [Add a backend service](https://nbonamy.github.io/codex-app-sdk/guide/backend)
-- [Existing app installation](https://nbonamy.github.io/codex-app-sdk/guide/installation)
-- [Architecture](https://nbonamy.github.io/codex-app-sdk/guide/architecture)
-- [Web integration](https://nbonamy.github.io/codex-app-sdk/guide/web)
-- [Vue conversation kit](https://nbonamy.github.io/codex-app-sdk/guide/vue)
-- [Controlled pane integration](https://nbonamy.github.io/codex-app-sdk/guide/conversation-pane)
-- [History and performance](https://nbonamy.github.io/codex-app-sdk/guide/history)
-- [Vue providers](https://nbonamy.github.io/codex-app-sdk/guide/vue-providers)
-- [API reference](https://nbonamy.github.io/codex-app-sdk/api/)
-- [JSON-RPC coverage inventory](https://nbonamy.github.io/codex-app-sdk/api/json-rpc)
+- [Scaffold an application](https://codex-app-sdk.github.io/codex-app-sdk/guide/scaffolding.html)
+- [Tour the generated targets](https://codex-app-sdk.github.io/codex-app-sdk/guide/quick-start.html)
+- [Add app-owned panels](https://codex-app-sdk.github.io/codex-app-sdk/guide/app-ui.html)
+- [Add an MCP server](https://codex-app-sdk.github.io/codex-app-sdk/guide/mcp.html)
+- [Add a backend service](https://codex-app-sdk.github.io/codex-app-sdk/guide/backend.html)
+- [Existing app installation](https://codex-app-sdk.github.io/codex-app-sdk/guide/installation.html)
+- [Architecture](https://codex-app-sdk.github.io/codex-app-sdk/guide/architecture.html)
+- [Web integration](https://codex-app-sdk.github.io/codex-app-sdk/guide/web.html)
+- [Vue conversation kit](https://codex-app-sdk.github.io/codex-app-sdk/guide/vue.html)
+- [Controlled pane integration](https://codex-app-sdk.github.io/codex-app-sdk/guide/conversation-pane.html)
+- [History and performance](https://codex-app-sdk.github.io/codex-app-sdk/guide/history.html)
+- [Vue providers](https://codex-app-sdk.github.io/codex-app-sdk/guide/vue-providers.html)
+- [API reference](https://codex-app-sdk.github.io/codex-app-sdk/api/)
+- [JSON-RPC coverage inventory](https://codex-app-sdk.github.io/codex-app-sdk/api/json-rpc.html)
 
 ## Samples
 
@@ -117,7 +139,7 @@ They do not require `npm run build` first, and renderer changes under
 
 The samples are product demonstrations, not templates for child safety or a
 production logistics backend. See the
-[sample guide](https://nbonamy.github.io/codex-app-sdk/guide/samples) for the
+[sample guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/samples.html) for the
 boundaries each one demonstrates.
 
 ## Develop
@@ -141,9 +163,16 @@ npm run preview:docs
 ```
 
 The checked-in generated protocol bindings currently target
-`codex-cli 0.151.0`. See the
-[development guide](https://nbonamy.github.io/codex-app-sdk/guide/development)
+`codex-cli 0.154.0`. See the
+[development guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/development.html)
 before updating them.
+
+## Contributing
+
+Issues and pull requests are welcome. Start with the
+[development guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/development.html)
+and [testing policy](./docs/guide/testing.md). Keep reusable SDK behavior here;
+application-specific orchestration belongs in the host app.
 
 ## License
 

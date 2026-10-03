@@ -28,5 +28,5 @@ the renderer-safe contract; it deliberately does not prescribe sub-agent UI.
 Most applications consume these contracts indirectly through
 `@codex-app-sdk/electron`, `@codex-app-sdk/web`, or
 `@codex-app-sdk/vue`. See the [architecture
-guide](https://nbonamy.github.io/codex-app-sdk/guide/architecture) and [surface
-API](https://nbonamy.github.io/codex-app-sdk/api/surface).
+guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/architecture.html) and [surface
+API](https://codex-app-sdk.github.io/codex-app-sdk/api/surface.html).

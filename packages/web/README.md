@@ -23,6 +23,6 @@ upload routes, or depend on Express or a WebSocket implementation. Those are
 host-application responsibilities.
 
 See the [web integration
-guide](https://nbonamy.github.io/codex-app-sdk/guide/web), [web
-API](https://nbonamy.github.io/codex-app-sdk/api/web), and [Basic Express
-sample](https://github.com/nbonamy/codex-app-sdk/tree/main/samples/web/basic).
+guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/web.html), [web
+API](https://codex-app-sdk.github.io/codex-app-sdk/api/web.html), and [Basic Express
+sample](https://github.com/codex-app-sdk/codex-app-sdk/tree/main/samples/web/basic).

@@ -4,20 +4,20 @@ layout: home
 hero:
   name: Codex App SDK
   text: Ship the app, not the plumbing.
-  tagline: A modular app-server runtime, Electron and web transports, and a shared Vue conversation kit for distinctive Codex products.
+  tagline: Open-source building blocks for Codex apps. One runtime, Electron and web transports, and a shared Vue conversation UI.
   image:
     src: /logo.svg
     alt: Codex App SDK
   actions:
     - theme: brand
-      text: Scaffold an application
-      link: /guide/scaffolding
+      text: Try it from source
+      link: /guide/installation#try-the-public-source
     - theme: alt
       text: Explore the architecture
       link: /guide/architecture
     - theme: alt
       text: View on GitHub
-      link: https://github.com/nbonamy/codex-app-sdk
+      link: https://github.com/codex-app-sdk/codex-app-sdk
 
 features:
   - icon: ⚡
@@ -41,6 +41,9 @@ features:
 ---
 
 ## One surface. Five focused packages.
+
+Build your own Codex experience on an Apache-2.0 SDK. Start with the mocked
+component lab, connect a real app-server, then make the application your own.
 
 <div class="sdk-layer-grid">
   <div class="sdk-layer">
@@ -105,11 +108,17 @@ goals, and events—not `thread/*`, `turn/*`, JSON-RPC envelopes, or generated
 protocol types.
 :::
 
-## Publication status
+## Source and package access
 
-The SDK is currently `0.1.x` and generated against `codex-cli 0.151.0`. Package
-publication is pending, but the documentation uses the intended npm package
-names and scaffold-first workflow throughout. The high-level API is deliberately
-smaller and more stable than app-server.
+The repository and documentation are public. You can clone the source and run
+the [component lab or samples](/guide/installation#try-the-public-source)
+without GitHub Packages access. The six scoped packages, including the
+scaffolder, are published to GitHub Packages but currently require package
+access and authentication; they are not on the public npm registry. See
+[installation](/guide/installation#package-access) before using the package commands.
+
+The SDK is pre-1.0. These docs follow `main`; package releases may lag behind.
+The [JSON-RPC inventory](/api/json-rpc) records the checked-in app-server schema
+version and its coverage.
 
 [Scaffold an application →](/guide/scaffolding)

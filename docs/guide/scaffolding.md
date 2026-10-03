@@ -4,6 +4,13 @@
 recommended modular boundaries. Electron + Vue is the backward-compatible
 default; `--target web` generates an Express + `ws` + Vue application.
 
+::: warning Package access required
+The source repository is public, but the scaffolder and generated application's
+SDK dependencies currently require [GitHub Packages access](/guide/installation#package-access).
+Configure that access before running these commands. To explore without a
+package token, [run the component lab from source](/guide/installation#try-the-public-source).
+:::
+
 ```bash
 npx @codex-app-sdk/create-codex-app@latest my-codex-app
 cd my-codex-app
@@ -16,8 +23,8 @@ Generate the web target with:
 npx @codex-app-sdk/create-codex-app@latest my-codex-web --target web
 ```
 
-The scaffolder is private and uses the same GitHub Packages authentication as
-the SDK packages. From a checkout of this repository, use:
+From a checkout of this repository, you can also run the scaffolder directly.
+Installing the generated application's dependencies still requires package access:
 
 ```bash
 npm run create:app -- ../my-codex-app

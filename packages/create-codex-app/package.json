@@ -13,7 +13,7 @@
     "url": "git+https://github.com/codex-app-sdk/codex-app-sdk.git",
     "directory": "packages/create-codex-app"
   },
-  "homepage": "https://nbonamy.github.io/codex-app-sdk/guide/scaffolding",
+  "homepage": "https://codex-app-sdk.github.io/codex-app-sdk/guide/scaffolding.html",
   "bin": {
     "create-codex-app": "./bin/create-codex-app.js"
   },

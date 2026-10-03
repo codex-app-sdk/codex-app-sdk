@@ -35,6 +35,6 @@ Controlled hosts also own queue persistence through `updateQueuedPrompt` and
 `steerQueuedPrompt`; the pane owns the editing interaction but never mutates a
 host queue behind the controller.
 
-See the [Vue guide](https://nbonamy.github.io/codex-app-sdk/guide/vue),
-[conversation pane guide](https://nbonamy.github.io/codex-app-sdk/guide/conversation-pane),
-and [Vue API](https://nbonamy.github.io/codex-app-sdk/api/vue).
+See the [Vue guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/vue.html),
+[conversation pane guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/conversation-pane.html),
+and [Vue API](https://codex-app-sdk.github.io/codex-app-sdk/api/vue.html).

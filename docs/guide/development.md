@@ -94,7 +94,8 @@ scaffolder and executes each sample's owned lint, test, and build gate.
 
 ## Documentation
 
-The docs use VitePress, the same stack as `multi-llm-ts`.
+The public docs use VitePress and deploy to
+[GitHub Pages](https://codex-app-sdk.github.io/codex-app-sdk/).
 
 ```bash
 npm run dev:docs
@@ -102,8 +103,15 @@ npm run build:docs
 npm run preview:docs
 ```
 
-The GitHub Pages workflow runs `npm ci`, builds the site, uploads
-`docs/.vitepress/dist`, and deploys it with the official Pages artifact flow.
+The **Deploy documentation** workflow runs `npm ci --ignore-scripts`, builds the
+site, uploads `docs/.vitepress/dist`, and deploys it with the official Pages
+artifact flow. It runs for docs/build-input changes on `main` and can also be
+started manually. Repository Settings → Pages must use **GitHub Actions** as
+the build source. No personal publishing token is required.
+
+The site uses the `/codex-app-sdk/` base path and explicit `.html` page links so
+deep links work on a static host. Checkout fetches full history for page update
+timestamps. Docs follow `main`, not a separately versioned package release.
 
 Do not commit `.vitepress/cache` or `.vitepress/dist`.
 
@@ -153,7 +161,8 @@ the documentation build output.
 
 The six scoped SDK workspaces publish privately to GitHub Packages. Their
 package manifests pin `https://npm.pkg.github.com` as the registry and link each
-package to this repository so package permissions follow repository access.
+package to this repository. The source repository is public, but the existing
+packages remain private; package visibility and access are managed separately.
 
 All six packages release in lockstep. While the SDK is pre-1.0, versions use
 `0.x.y`: increment `x` for a significant new capability generation, such as a

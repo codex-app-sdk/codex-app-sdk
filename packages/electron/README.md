@@ -35,5 +35,5 @@ references become filesystem paths only immediately before the trusted backend
 call. Keep context isolation and renderer sandboxing enabled.
 
 See the [Electron integration
-guide](https://nbonamy.github.io/codex-app-sdk/guide/electron) and [Electron
-API](https://nbonamy.github.io/codex-app-sdk/api/electron).
+guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/electron.html) and [Electron
+API](https://codex-app-sdk.github.io/codex-app-sdk/api/electron.html).

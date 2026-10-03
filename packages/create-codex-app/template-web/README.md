@@ -1,6 +1,6 @@
 # {{displayName}}
 
-Express, `ws`, and Vue application powered by [Codex App SDK](https://github.com/nbonamy/codex-app-sdk).
+Express, `ws`, and Vue application powered by [Codex App SDK](https://github.com/codex-app-sdk/codex-app-sdk).
 
 ```bash
 npm install
@@ -19,7 +19,7 @@ directories, stored tokens, quotas, and persistence remain host concerns.
 
 The SDK transport is framework-neutral; Express and `ws` make the generated
 boundary runnable but are not dependencies of `@codex-app-sdk/web`. See the
-[web integration guide](https://nbonamy.github.io/codex-app-sdk/guide/web)
+[web integration guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/web.html)
 before replacing the demo authorization seams.
 
 ## Commands

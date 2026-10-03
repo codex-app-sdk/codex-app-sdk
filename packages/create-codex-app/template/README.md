@@ -1,6 +1,6 @@
 # {{displayName}}
 
-Electron and Vue application powered by [Codex App SDK](https://github.com/nbonamy/codex-app-sdk).
+Electron and Vue application powered by [Codex App SDK](https://github.com/codex-app-sdk/codex-app-sdk).
 
 ```bash
 npm install
@@ -16,8 +16,8 @@ shell. Add trusted backend modules or MCP servers from `src/main/index.ts` while
 keeping renderer privileges behind the typed preload boundary.
 
 Architecture and extension guidance lives in the [generated target
-tour](https://nbonamy.github.io/codex-app-sdk/guide/quick-start) and [Electron
-integration guide](https://nbonamy.github.io/codex-app-sdk/guide/electron).
+tour](https://codex-app-sdk.github.io/codex-app-sdk/guide/quick-start.html) and [Electron
+integration guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/electron.html).
 
 ## Commands
 

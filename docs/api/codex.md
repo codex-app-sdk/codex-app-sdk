@@ -81,7 +81,7 @@ surface can reconcile conversation history after a slow rollback. An explicit
 - `RpcRemoteError` and `RpcTransportProtocolError`;
 - `codexSchemaCliVersion`.
 
-The current checked-in schema version is `codex-cli 0.151.0`.
+The current checked-in schema version is `codex-cli 0.154.0`.
 
 See the [JSON-RPC coverage inventory](./json-rpc) for every generated request,
 notification, and server request, including whether the high-level SDK projects it.

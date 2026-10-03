@@ -6,10 +6,10 @@ export default defineConfig({
   description: 'Build desktop and web Codex experiences with a modular app-server runtime, host transports, and Vue conversation UI.',
   lang: 'en-US',
   base: '/codex-app-sdk/',
-  cleanUrls: true,
+  cleanUrls: false,
   lastUpdated: true,
   sitemap: {
-    hostname: 'https://nbonamy.github.io/codex-app-sdk/',
+    hostname: 'https://codex-app-sdk.github.io/codex-app-sdk/',
   },
   head: [
     ['meta', { name: 'theme-color', content: '#0b7a65' }],
@@ -36,7 +36,7 @@ export default defineConfig({
       { text: 'Components', link: '/guide/vue' },
       { text: 'API', link: '/api/' },
       { text: 'Samples', link: '/guide/samples' },
-      { text: 'GitHub', link: 'https://github.com/nbonamy/codex-app-sdk' },
+      { text: 'GitHub', link: 'https://github.com/codex-app-sdk/codex-app-sdk' },
     ],
     sidebar: {
       '/guide/': [
@@ -123,7 +123,7 @@ export default defineConfig({
       label: 'On this page',
     },
     editLink: {
-      pattern: 'https://github.com/nbonamy/codex-app-sdk/edit/main/docs/:path',
+      pattern: 'https://github.com/codex-app-sdk/codex-app-sdk/edit/main/docs/:path',
       text: 'Improve this page',
     },
     docFooter: {
@@ -131,7 +131,7 @@ export default defineConfig({
       next: 'Next',
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/nbonamy/codex-app-sdk' },
+      { icon: 'github', link: 'https://github.com/codex-app-sdk/codex-app-sdk' },
     ],
     footer: {
       message: 'Released under the Apache License 2.0.',

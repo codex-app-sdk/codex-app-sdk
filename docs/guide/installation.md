@@ -9,7 +9,7 @@
 - A compatible Codex executable available to discovery, or an explicit
   transport command
 
-The checked-in app-server bindings currently target `codex-cli 0.153.4`.
+The checked-in app-server bindings currently target `codex-cli 0.154.0`.
 
 During connection, `CodexSurface` negotiates the runtime features used by its
 high-level behavior. It enables `compaction_image_budget` for image-aware
@@ -30,7 +30,25 @@ scaffolder](/guide/scaffolding): Electron is the default and `--target web`
 creates a runnable Express + `ws` baseline. Continue below when integrating the
 SDK into an existing host.
 
-::: warning Private package access
+## Try the public source
+
+The mocked component lab does not require Codex, an API key, or a package token:
+
+```bash
+git clone https://github.com/codex-app-sdk/codex-app-sdk.git
+cd codex-app-sdk
+npm ci --ignore-scripts
+npm run dev:lab
+```
+
+For live conversations, install and authenticate a compatible Codex executable.
+Run `npm ci` to include Electron's install step, then `npm run dev:electron`
+or `npm run dev:web`. Workspace dependencies resolve locally; the samples use
+SDK source directly and need no GitHub Packages access or prior SDK build.
+
+## Package access
+
+::: warning Public source, restricted packages
 The scoped SDK packages are private and hosted by GitHub Packages. Authenticate
 with a classic GitHub personal access token that has `read:packages` and access
 to the `codex-app-sdk` organization, then route the scope to GitHub Packages in
@@ -42,12 +60,12 @@ the consuming project's `.npmrc`:
 ```
 
 Never commit the token. Export `NODE_AUTH_TOKEN` in the shell or provide
-it through the consuming repository's secret store. The packages inherit the
-private repository's access; they are not available from the public npm
-registry.
+it through the consuming repository's secret store. Making the source repository
+public does not make these existing packages public. They still require package
+access and are not available from the public npm registry.
 :::
 
-## Install from npm
+## Install packages with npm
 
 Add the SDK to an existing Electron + Vue application:
 
@@ -125,7 +143,7 @@ intentionally absent from the renderer creation API.
 ## Repository development
 
 ```bash
-git clone git@github.com:codex-app-sdk/codex-app-sdk.git
+git clone https://github.com/codex-app-sdk/codex-app-sdk.git
 cd codex-app-sdk
 npm install
 npm run check
