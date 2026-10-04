@@ -3196,10 +3196,12 @@ describe('CodexConversationPane', () => {
     await vi.waitFor(() => expect(controller.connect).toHaveBeenCalledOnce());
 
     await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
-    await wrapper.get('[role="menuitemcheckbox"]').trigger('click');
+    const planItem = () => wrapper.findAll('[role="menuitemcheckbox"]')
+      .find((item) => item.text().includes('Plan mode'))!;
+    await planItem().trigger('click');
     await vi.waitFor(() => expect(controller.updateConversationSettings).toHaveBeenCalledWith({ planMode: true }));
     expect(wrapper.text()).toContain('Plan');
-    expect(wrapper.get('[role="menuitemcheckbox"]').attributes('aria-checked')).toBe('true');
+    expect(planItem().attributes('aria-checked')).toBe('true');
 
     await wrapper.get('[aria-label="Disable plan mode"]').trigger('click');
     await vi.waitFor(() => expect(controller.updateConversationSettings).toHaveBeenLastCalledWith({ planMode: false }));

@@ -151,7 +151,7 @@ briefly clears during that handoff. The host must not insert a second
 renderer-only optimistic row or preserve a synthetic busy flag.
 
 `composer.leadingMenuItems` renders host actions after the built-in Approval
-item and before Plan and Goal modes. `composer.menuItems` remains the trailing
+item and before Goal and Plan modes, in that order. `composer.menuItems` remains the trailing
 extension point after those modes. The equivalent granular pane prop is
 `leading-menu-items`.
 

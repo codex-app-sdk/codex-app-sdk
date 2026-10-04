@@ -1012,7 +1012,8 @@ describe('ChatComposer', () => {
     await wrapper.get('.chat-composer-action-menu__button').trigger('click');
 
     expect(wrapper.find('.chat-composer-action-menu').exists()).toBe(true);
-    await wrapper.find('[role="menuitemcheckbox"]').trigger('click');
+    await wrapper.findAll('[role="menuitemcheckbox"]')
+      .find((item) => item.text().includes('Plan mode'))!.trigger('click');
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[true]]);
   });

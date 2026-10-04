@@ -241,7 +241,7 @@ when the `codex.goal` command and goals capability are available. Activating
 Goal clears Plan mode, and activating Plan removes the pending Goal mode.
 
 Use `composer.leadingMenuItems` for host actions that belong beside the built-in
-Codex controls. They render after Approval and before Plan and Goal modes.
+Codex controls. They render after Approval and before Goal and Plan modes, in that order.
 Existing `composer.menuItems` remain after those modes; both collections use
 `CodexComposerMenuItem` and dispatch through `actions.menuSelect`.
 Use `composer.modelMenuItems` for host-owned presets or actions that belong

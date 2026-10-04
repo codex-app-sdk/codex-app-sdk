@@ -101,17 +101,6 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
 
   items.push(...props.leadingMenuItems);
 
-  if (props.showPlanMode) {
-    items.push({
-      id: 'plan-mode',
-      type: 'checkbox',
-      label: 'Plan mode',
-      accessory: 'switch',
-      checked: props.planMode,
-      icon: ListDetailsIcon,
-    });
-  }
-
   if (props.showGoalMode) {
     items.push({
       id: 'goal-mode',
@@ -120,6 +109,17 @@ const menuItems = computed<CodexComposerMenuItem<ComposerMenuAction | Payload>[]
       accessory: 'switch',
       checked: props.goalMode,
       icon: TargetArrowIcon,
+    });
+  }
+
+  if (props.showPlanMode) {
+    items.push({
+      id: 'plan-mode',
+      type: 'checkbox',
+      label: 'Plan mode',
+      accessory: 'switch',
+      checked: props.planMode,
+      icon: ListDetailsIcon,
     });
   }
 

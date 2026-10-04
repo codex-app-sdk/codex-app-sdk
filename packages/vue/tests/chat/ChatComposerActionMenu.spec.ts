@@ -133,7 +133,7 @@ describe('ChatComposerActionMenu', () => {
     ]]);
   });
 
-  it('renders leading host actions after Approval and before Plan mode', async () => {
+  it('renders leading host actions after Approval and before Goal then Plan mode', async () => {
     const wrapper = mountMenu({
       approvalPreset: 'ask-for-approval',
       approvalPresets: ['ask-for-approval'],
@@ -145,6 +145,7 @@ describe('ChatComposerActionMenu', () => {
       }],
       items: [{ id: 'refresh', type: 'custom', label: 'Refresh', payload: { source: 'host' } }],
       showApprovalMenu: true,
+      showGoalMode: true,
       showPlanMode: true,
     });
 
@@ -158,7 +159,7 @@ describe('ChatComposerActionMenu', () => {
       const label = button?.querySelector('.codex-composer-menu-list__label')?.textContent?.trim();
       return label ? [label] : [];
     });
-    expect(labels).toStrictEqual(['Approval', 'Permissions', 'Plan mode', 'Refresh']);
+    expect(labels).toStrictEqual(['Approval', 'Permissions', 'Goal mode', 'Plan mode', 'Refresh']);
   });
 
   it('enables attachment selection only when the host supports it', async () => {
@@ -274,6 +275,7 @@ function mountMenu(props: Partial<{
   items: CodexComposerMenuItem<unknown>[];
   planMode: boolean;
   showApprovalMenu: boolean;
+  showGoalMode: boolean;
   showPlanMode: boolean;
 }> = {}) {
   return mount(ChatComposerActionMenu, {
