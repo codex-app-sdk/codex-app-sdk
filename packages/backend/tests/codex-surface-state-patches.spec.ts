@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceStatePatch } from '@codex-app-sdk/core/surface';
 import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
-import { MockCodexAppServer, pluginSummary, thread } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, pluginSummary, resumeResponse, thread } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface state patches', () => {
   it('lists a conversation once when it moves between pages while paging', async () => {
@@ -71,5 +71,39 @@ describe('CodexSurface state patches', () => {
       ids: listed.map((value) => value.id),
       items: [expect.objectContaining({ id: 'thread-3', title: 'Renamed elsewhere' })],
     }]);
+  });
+});
+
+describe('CodexSurface host listeners', () => {
+  it('keeps a throwing host listener from failing the action or silencing other listeners', async () => {
+    const transport = new MockCodexAppServer({
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/settings/update': () => ({}),
+    });
+    const onListenerError = vi.fn();
+    const surface = new CodexSurface({
+      client: new CodexAppServerClient(transport),
+      autoSelectFirstConversation: false,
+      onListenerError,
+    });
+    await surface.connect();
+    const states: unknown[] = [];
+    const patches: unknown[] = [];
+    const events: unknown[] = [];
+    surface.onStateChange(() => { throw new Error('state listener bug'); });
+    surface.onStatePatch(() => { throw new Error('patch listener bug'); });
+    surface.onEvent(() => { throw new Error('event listener bug'); });
+    surface.onStateChange((snapshot) => states.push(snapshot));
+    surface.onStatePatch((patch) => patches.push(patch));
+    surface.onEvent((event) => events.push(event));
+
+    const snapshot = await surface.createConversation();
+
+    expect(snapshot.activeConversationId).toBe('thread-new');
+    expect(states.length).toBeGreaterThan(0);
+    expect(patches.length).toBeGreaterThan(0);
+    expect(events.length).toBeGreaterThan(0);
+    const reported = new Set(onListenerError.mock.calls.map(([error]) => (error as Error).message));
+    expect(reported).toStrictEqual(new Set(['state listener bug', 'patch listener bug', 'event listener bug']));
   });
 });

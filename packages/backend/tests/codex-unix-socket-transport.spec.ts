@@ -260,6 +260,41 @@ describe('CodexAppServerUnixSocketTransport', () => {
     }
   });
 
+  it('does not mistake a throwing message listener for malformed JSON', async () => {
+    const socketPath = join(await temporaryDirectory(), 'listener.sock');
+    const server = createServer((socket) => {
+      upgradeWebSocket(socket, () => undefined, () => {
+        socket.write(Buffer.concat([
+          encodeServerFrame(0x1, Buffer.from('{"n":1}')),
+          encodeServerFrame(0x1, Buffer.from('{"n":2}')),
+        ]));
+      });
+    });
+    await listen(server, socketPath);
+    const transport = new CodexAppServerUnixSocketTransport({ type: 'unixSocket', socketPath });
+    const delivered: unknown[] = [];
+    const errors: Error[] = [];
+    const warnings: Error[] = [];
+    const recordWarning = (warning: Error) => warnings.push(warning);
+    process.on('warning', recordWarning);
+    transport.onMessage(() => { throw new Error('host listener bug'); });
+    transport.onMessage((message) => delivered.push(message));
+    transport.onError((error) => errors.push(error));
+
+    try {
+      await transport.start();
+      await waitFor(() => delivered.length === 2);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(errors).toStrictEqual([]);
+      expect(delivered).toStrictEqual([{ n: 1 }, { n: 2 }]);
+      expect(warnings.map((warning) => warning.message)).toStrictEqual(['host listener bug', 'host listener bug']);
+    } finally {
+      process.off('warning', recordWarning);
+      await transport.close();
+      await closeServer(server);
+    }
+  });
+
   it('buffers a split upgrade response and a bytewise server frame', async () => {
     const socketPath = join(await temporaryDirectory(), 'partial.sock');
     const server = createServer((socket) => {

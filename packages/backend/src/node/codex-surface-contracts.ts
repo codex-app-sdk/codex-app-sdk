@@ -209,6 +209,13 @@ export type CodexSurfaceOptions = {
   mcpServers?: readonly CodexMcpServerDefinition[];
   /** Receives notifications added by a newer app-server than this SDK schema. */
   onUnknownNotification?: (notification: { method: string; params?: unknown }) => void;
+  /**
+   * Receives exceptions thrown by listeners registered through `onStateChange`,
+   * `onStatePatch`, `onEvent`, and conversation subscriptions. Each listener is
+   * isolated, so a failing subscriber never fails the action that triggered the
+   * change or silences other subscribers. Defaults to a process warning.
+   */
+  onListenerError?: (error: unknown) => void;
   permissionMode?: CodexSurfacePermissionMode;
   /** Defaults to a spawned stdio child; use `{ type: 'unixSocket' }` to reuse an existing local daemon. */
   transport?: CodexAppServerTransportOptions;

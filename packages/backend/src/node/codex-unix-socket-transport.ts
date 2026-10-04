@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createConnection, type Socket } from 'node:net';
+import { notifyListeners } from '../codex/listener-errors';
 import { RpcTransportProtocolError, type RpcMessage, type RpcTransport } from '../codex/wire';
 
 const DEFAULT_MAX_FRAME_BYTES = 64 * 1024 * 1024;
@@ -161,12 +162,15 @@ export class CodexAppServerUnixSocketTransport implements RpcTransport {
       this.fragments = [payload];
       return;
     }
+    let message: unknown;
     try {
-      const message: unknown = JSON.parse(payload.toString('utf8'));
-      for (const listener of this.messageListeners) listener(message);
+      message = JSON.parse(payload.toString('utf8'));
     } catch (error) {
       this.emitError(new RpcTransportProtocolError('Codex app-server sent malformed JSON', { cause: error }));
+      return;
     }
+    // A throwing subscriber is not a protocol error and must not fail the connection.
+    notifyListeners(this.messageListeners, message);
   }
 
   private writeFrame(opcode: number, payload: Buffer, target: Socket): void {

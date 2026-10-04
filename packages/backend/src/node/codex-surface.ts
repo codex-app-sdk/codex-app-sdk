@@ -3,6 +3,7 @@ import {
   type ServerNotification,
   type v2,
 } from '../codex/index';
+import { notifyListeners } from '../codex/listener-errors';
 import type {
   CodexConversationSummary,
   CodexConversationEvent,
@@ -183,6 +184,7 @@ export class CodexSurface {
       isUnixSocketTransportOptions(transportOptions)
         ? new CodexAppServerUnixSocketTransport(transportOptions)
         : new CodexAppServerStdioTransport(transportOptions),
+      options.onListenerError ? { onListenerError: options.onListenerError } : {},
     );
     this.markdownImages = new CodexMarkdownImageHydrator(this.client);
     this.authentication = new CodexSurfaceAuthenticationController(this.client, {
@@ -1103,7 +1105,7 @@ export class CodexSurface {
     const listeners = this.conversationListeners.get(threadId);
     if (!listeners) return;
     const snapshot = this.getConversationSnapshot(threadId);
-    for (const listener of listeners) listener(snapshot);
+    notifyListeners(listeners, snapshot, this.options.onListenerError);
   }
 
   private markRuntimeTurnActive(runtime: ThreadRuntimeState, turnId: string): void {
@@ -1203,7 +1205,7 @@ export class CodexSurface {
       occurredAt: new Date().toISOString(),
       origin,
     } as CodexSurfaceEvent;
-    for (const listener of this.eventListeners) listener(event);
+    notifyListeners(this.eventListeners, event, this.options.onListenerError);
   }
 
   private patch(patch: Partial<CodexSurfaceSnapshot>, conversationId?: string): void {
@@ -1214,12 +1216,12 @@ export class CodexSurface {
       this.stateVersion += 1;
       if (this.patchListeners.size > 0) {
         const statePatch = structuredClone({ version: this.stateVersion, changes });
-        for (const listener of this.patchListeners) listener(statePatch);
+        notifyListeners(this.patchListeners, statePatch, this.options.onListenerError);
       }
     }
     if (this.listeners.size > 0) {
       const snapshot = this.getSnapshot();
-      for (const listener of this.listeners) listener(snapshot);
+      notifyListeners(this.listeners, snapshot, this.options.onListenerError);
     }
     if (conversationId) {
       this.notifyConversationListeners(conversationId);

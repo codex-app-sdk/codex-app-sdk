@@ -605,6 +605,32 @@ describe('CodexAppServerStdioTransport', () => {
     expect(errors).toHaveLength(1);
   });
 
+  it('does not mistake a throwing message listener for malformed JSON or hide later messages', async () => {
+    const child = createFakeChild();
+    spawnMock.mockReturnValue(child);
+    const transport = new CodexAppServerStdioTransport();
+    const errors: Error[] = [];
+    const delivered: unknown[] = [];
+    const warnings: Error[] = [];
+    const recordWarning = (warning: Error) => warnings.push(warning);
+    process.on('warning', recordWarning);
+    try {
+      transport.onError((error) => errors.push(error));
+      transport.onMessage(() => { throw new Error('host listener bug'); });
+      transport.onMessage((message) => delivered.push(message));
+      await transport.start();
+
+      child.stdout.emit('data', '{"method":"thread/started"}\n{"method":"turn/started"}\n');
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off('warning', recordWarning);
+    }
+
+    expect(errors).toStrictEqual([]);
+    expect(delivered).toStrictEqual([{ method: 'thread/started' }, { method: 'turn/started' }]);
+    expect(warnings.map((warning) => warning.message)).toStrictEqual(['host listener bug', 'host listener bug']);
+  });
+
   it('removes the graceful-exit timeout after an early exit', async () => {
     vi.useFakeTimers();
     const child = createFakeChild();

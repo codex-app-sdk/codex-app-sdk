@@ -59,12 +59,18 @@ method-not-implemented error by default.
 type CodexAppServerClientOptions = {
   requestTimeoutMs?: number;
   onProtocolError?: (error: Error) => void;
+  onListenerError?: (error: unknown) => void;
   unhandledServerRequestError?: (request) => RpcError;
 };
 ```
 
 The client owns request correlation, timeouts, notification routing, disconnect
 propagation, server-request response state, and transport cleanup.
+
+A throwing notification or disconnect listener is isolated: other listeners still
+run, in-flight requests are unaffected, and the error goes to `onListenerError`
+(a process warning by default). Only a frame that is not valid JSON is a protocol
+error.
 
 Without an explicit `requestTimeoutMs`, ordinary requests use a 15-second
 deadline. The mutating `thread/rollback` and `thread/revert` operations use a

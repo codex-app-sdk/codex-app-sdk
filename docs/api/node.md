@@ -42,6 +42,7 @@ type CodexSurfaceOptions = {
   extensions?: readonly CodexSurfaceExtension[];
   mcpServers?: readonly CodexMcpServerDefinition[];
   onUnknownNotification?: (notification: { method: string; params?: unknown }) => void;
+  onListenerError?: (error: unknown) => void;
   permissionMode?: 'read-only' | 'workspace-write' | 'full-access';
   transport?: CodexAppServerTransportOptions;
   client?: CodexAppServerClient;

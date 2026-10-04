@@ -43,6 +43,7 @@ const surface = createCodexSurface({
 | `extensions` | Host configuration hooks and dynamic tools |
 | `mcpServers` | Trusted default MCP definitions |
 | `onUnknownNotification` | Observation seam for newer app-server notifications |
+| `onListenerError` | Receives exceptions thrown by subscriber callbacks; each subscriber is isolated, and the default is a process warning |
 | `transport` | Explicit Codex command, arguments, environment, and timeouts |
 
 History loading is independent from Vue's DOM rendering strategy. See

@@ -195,6 +195,29 @@ describe('CodexAppServerClient', () => {
     expect(turns).toHaveBeenCalledWith(notification);
   });
 
+  it('isolates throwing notification listeners from other listeners and pending requests', async () => {
+    const transport = new FakeTransport();
+    const onListenerError = vi.fn();
+    const client = new CodexAppServerClient(transport, { onListenerError });
+    const later = vi.fn();
+    await client.start();
+    client.onNotification(() => { throw new Error('first listener bug'); });
+    client.onNotification('turn/started', () => { throw new Error('method listener bug'); });
+    client.onNotification(later);
+    const pending = client.request('thread/list', {});
+
+    transport.receive({
+      method: 'turn/started',
+      params: { threadId: 'thread-1', turn: { id: 'turn-1', items: [], status: 'inProgress', error: null } },
+    });
+    transport.receive({ id: 1, result: { data: [], nextCursor: null, backwardsCursor: null } });
+
+    await expect(pending).resolves.toMatchObject({ data: [] });
+    expect(later).toHaveBeenCalledOnce();
+    expect(onListenerError.mock.calls.map(([error]) => (error as Error).message))
+      .toStrictEqual(['first listener bug', 'method listener bug']);
+  });
+
   it('handles typed server requests and prevents duplicate responses', async () => {
     const transport = new FakeTransport();
     const client = new CodexAppServerClient(transport);

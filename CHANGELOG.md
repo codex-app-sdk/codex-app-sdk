@@ -22,6 +22,13 @@
   orphaned app-server.
 - A conversation updated while the list was being paged no longer appears
   twice in `conversations`.
+- An exception thrown by a notification or state listener (for example
+  `webContents.send` on a destroyed window) was reported as "malformed JSON"
+  and rejected every in-flight request, and a throwing `onStateChange` listener
+  made the action that triggered it fail. Listeners are now isolated: others
+  still run, requests are unaffected, and the error goes to the new
+  `onListenerError` option of `CodexSurface` and `CodexAppServerClient`
+  (a process warning by default).
 
 ### Performance
 

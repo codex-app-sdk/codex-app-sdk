@@ -5,6 +5,7 @@ import type { ServerNotification } from './generated/ServerNotification';
 import type { ServerRequest } from './generated/ServerRequest';
 import type { CodexAppServerMethodMap } from './method-map';
 import type { CodexServerRequestMethodMap } from './server-request-map';
+import { notifyListeners, type ListenerErrorHandler } from './listener-errors';
 import {
   isRecord,
   isRpcError,
@@ -63,6 +64,12 @@ export type UntypedCodexServerRequestResponder = {
 export type CodexAppServerClientOptions = {
   requestTimeoutMs?: number;
   onProtocolError?: (error: Error) => void;
+  /**
+   * Receives exceptions thrown by notification and disconnect listeners. Each
+   * listener is isolated, so one failing subscriber never disturbs the others
+   * or fails in-flight requests. Defaults to a process warning.
+   */
+  onListenerError?: ListenerErrorHandler;
   unhandledServerRequestError?: (request: { id: RpcId; method: string; params?: unknown }) => RpcError;
 };
 
@@ -299,12 +306,12 @@ export class CodexAppServerClient {
   }
 
   private handleNotification(notification: ServerNotification): void {
-    for (const listener of this.notificationListeners) {
-      listener(notification);
-    }
-    for (const listener of this.notificationListenersByMethod.get(notification.method) ?? []) {
-      listener(notification);
-    }
+    notifyListeners(this.notificationListeners, notification, this.options.onListenerError);
+    notifyListeners(
+      this.notificationListenersByMethod.get(notification.method) ?? [],
+      notification,
+      this.options.onListenerError,
+    );
   }
 
   private async handleServerRequest(request: { id: RpcId; method: string; params?: unknown }): Promise<void> {
@@ -382,7 +389,7 @@ export class CodexAppServerClient {
     this.initializePromise = null;
     this.unsubscribeTransport();
     this.rejectAll(error);
-    for (const listener of this.disconnectListeners) listener(error);
+    notifyListeners(this.disconnectListeners, error, this.options.onListenerError);
   }
 
   private reportProtocolError(error: Error): void {

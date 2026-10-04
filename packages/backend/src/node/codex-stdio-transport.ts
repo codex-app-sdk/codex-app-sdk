@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'node:child_process';
 import { constants as bufferConstants } from 'node:buffer';
+import { notifyListeners } from '../codex/listener-errors';
 import { RpcTransportProtocolError, type RpcMessage, type RpcTransport } from '../codex/wire';
 import {
   resolveCodexRuntime,
@@ -203,17 +204,19 @@ export class CodexAppServerStdioTransport implements RpcTransport {
   }
 
   private parseLine(line: string): void {
+    let message: unknown;
     try {
-      const message: unknown = JSON.parse(line);
-      for (const listener of this.messageListeners) {
-        listener(message);
-      }
+      message = JSON.parse(line);
     } catch (error) {
       this.emitError(new RpcTransportProtocolError(
         'Codex app-server sent malformed JSON',
         { cause: error },
       ));
+      return;
     }
+    // Only a parse failure is a protocol error; a throwing subscriber must
+    // neither masquerade as one nor fail every request in flight.
+    notifyListeners(this.messageListeners, message);
   }
 
   private emitError(error: Error): void {
