@@ -587,7 +587,9 @@ export class CodexSurfaceItemsController {
   applyTurnCompleted(params: v2.TurnCompletedNotification): void {
     const runtime = this.host.requireRuntime(params.threadId);
     if (!runtime.turnIds.includes(params.turn.id)) runtime.turnIds.push(params.turn.id);
+    const turnStartPending = runtime.activeTurnId !== params.turn.id && runtime.turnStartPending;
     if (runtime.activeTurnId === params.turn.id) runtime.activeTurnId = null;
+    const busy = turnStartPending || runtime.activeTurnId !== null;
     const status: SurfaceMessage['status'] = params.turn.status === 'failed' ? 'error' : 'complete';
     const messages = finalizeTurnToolParts(runtime.messages, params.turn.id, params.turn.status)
       .map((message) => message.metadata?.turnId === params.turn.id ? { ...message, status } : message)
@@ -596,10 +598,9 @@ export class CodexSurfaceItemsController {
         && message.kind === undefined && message.parts.length === 0
       ));
     this.host.patchRuntime(params.threadId, {
-      busy: runtime.activeTurnId !== null,
-      ...(runtime.activeTurnId === null ? { threadStatus: { type: 'idle' as const } } : {}),
-      turnStartPending: false,
-      error: params.turn.error?.message ?? null,
+      busy,
+      ...(!busy ? { threadStatus: { type: 'idle' as const }, error: params.turn.error?.message ?? null } : {}),
+      turnStartPending,
       messages,
       turns: upsertSurfaceTurn(runtime.turns, surfaceTurn(params.turn)),
     });
@@ -607,7 +608,7 @@ export class CodexSurfaceItemsController {
       conversations: this.host.getState().conversations.map((conversation) => conversation.id === params.threadId
         ? {
           ...conversation,
-          status: params.turn.status === 'failed' ? 'error' : 'idle',
+          status: busy ? 'active' : params.turn.status === 'failed' ? 'error' : 'idle',
           turnCount: runtime.turnIds.length,
           updatedAt: new Date().toISOString(),
         }

@@ -64,10 +64,10 @@ describe('CodexSurface', () => {
     });
     expect(surface.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null });
     expect(surface.getSnapshot().turns).toContainEqual(expect.objectContaining({
-      id: 'lost-completion', status: 'interrupted',
+      id: 'lost-completion', status: 'inProgress',
     }));
     expect(replica.getSnapshot()).toMatchObject({ busy: false, activeTurnId: null,
-      turns: expect.arrayContaining([expect.objectContaining({ id: 'lost-completion', status: 'interrupted' })]),
+      turns: expect.arrayContaining([expect.objectContaining({ id: 'lost-completion', status: 'inProgress' })]),
     });
     await surface.sendMessage('New work');
     expect(lastRequest(transport, 'turn/start')).toBeDefined();

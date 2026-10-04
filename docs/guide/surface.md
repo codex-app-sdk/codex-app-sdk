@@ -119,6 +119,21 @@ unsubscribeEvents();
 Snapshots are authoritative. Events are ordered and emitted after the matching
 state mutation.
 
+### Readiness is not a turn outcome
+
+An app-server `thread/status/changed` notification with `idle` clears runtime
+busy/active state and allows queued prompts to start (unless a new `turn/start`
+is pending). It emits `conversation.activityChanged`, not `turn.completed`.
+Idle alone cannot tell the SDK whether the previous turn succeeded, failed, or
+was interrupted.
+
+The previous turn retains its ID and last-known status until an authoritative
+`turn/completed` or terminal `error` arrives. A late completion settles that
+turn without clearing a newer active or pending turn. If the terminal
+notification never arrives, its outcome remains unconfirmed; hosts must not
+infer success or interruption from readiness. Explicit history reads remain
+available separately, and bounded waits may time out.
+
 See the complete [Node runtime API](/api/node).
 
 For transport ownership, continue with [Electron integration](/guide/electron)

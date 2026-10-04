@@ -443,6 +443,7 @@ export class CodexSurface {
         requireRuntime: (threadId) => this.requireRuntime(threadId),
         runtime: (threadId) => this.runtimeState.get(threadId),
         runtimes: () => this.runtimeState.values(),
+        sendNextQueuedPrompt: (threadId) => { void this.messagesController.sendNextQueuedPrompt(threadId); },
         snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
         unknownNotification: (notification) => this.handleUnknownNotification(notification),
       },

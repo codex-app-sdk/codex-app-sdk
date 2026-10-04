@@ -14,6 +14,10 @@
 
 ### Fixed
 
+- Thread idle no longer fabricates an interrupted turn outcome. It restores
+  readiness and queue progress while waiting for authoritative completion;
+  late completions preserve a newer active or pending turn in both the runtime
+  and conversation replica.
 - Starting or reconnecting the stdio app-server no longer freezes the event
   loop (about 2 s in Electron's main process) while probing login shells.
   Discovery now runs asynchronously through the new `resolveCodexRuntime()`,

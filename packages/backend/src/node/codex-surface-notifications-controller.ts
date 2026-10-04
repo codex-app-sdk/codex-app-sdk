@@ -76,6 +76,7 @@ export interface CodexSurfaceNotificationsHost {
   requireRuntime(threadId: string): ThreadRuntimeState;
   runtime(threadId: string): ThreadRuntimeState | undefined;
   runtimes(): Iterable<ThreadRuntimeState>;
+  sendNextQueuedPrompt(threadId: string): void;
   snapshotForRuntime(runtime: ThreadRuntimeState): CodexSurfaceSnapshot;
   unknownNotification(notification: ServerNotification): void;
 }
@@ -110,14 +111,8 @@ export class CodexSurfaceNotificationsController {
         const { threadId, status } = notification.params;
         const runtime = this.host.requireRuntime(threadId);
         const systemError = status.type === 'systemError';
-        if (status.type === 'idle' && !runtime.turnStartPending && runtime.activeTurnId) {
-          // Idle is authoritative even if the terminal turn notification was
-          // missed. Settle conservatively, without inventing successful work.
-          this.items.applyTurnCompleted({ threadId, turn: {
-            id: runtime.activeTurnId, status: 'interrupted', items: [], itemsView: 'full',
-            error: null, startedAt: null, completedAt: null, durationMs: null,
-          } });
-        }
+        // Idle establishes readiness, not the outcome of the previous turn.
+        // Keep its last-known record until an authoritative terminal arrives.
         if (systemError || (status.type === 'idle' && !runtime.turnStartPending)) runtime.activeTurnId = null;
         this.host.patchRuntime(threadId, {
           threadStatus: surfaceThreadStatus(status),
@@ -137,6 +132,7 @@ export class CodexSurfaceNotificationsController {
         const summary = this.host.getState().conversations.find((conversation) => conversation.id === threadId);
         if (summary) this.host.emitSummaryUpserted(summary, 'updated', 'notification');
         this.host.emitConversationActivity(threadId, 'notification');
+        if (status.type === 'idle') this.host.sendNextQueuedPrompt(threadId);
         return;
       }
       case 'thread/archived':
@@ -373,7 +369,7 @@ export class CodexSurfaceNotificationsController {
               completedAt: null,
               durationMs: null,
             }),
-            status: terminalCurrentTurn ? 'failed' : 'inProgress',
+            status: notification.params.willRetry ? 'inProgress' : 'failed',
             error: surfaceTurnError(notification.params.error),
             willRetry: notification.params.willRetry,
           }),

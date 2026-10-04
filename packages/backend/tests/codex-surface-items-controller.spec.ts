@@ -579,7 +579,7 @@ describe('CodexSurfaceItemsController', () => {
     expect(setup.runtime.messages[0]).toMatchObject({
       status: 'complete', parts: [expect.objectContaining({ id: 'tool-1', status: 'completed' })],
     });
-    expect(setup.state.conversations[0]).toMatchObject({ status: 'idle', turnCount: 1 });
+    expect(setup.state.conversations[0]).toMatchObject({ status: 'active', turnCount: 1 });
     expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', {
       type: 'turn.completed', conversationId: 'thread-1', turnId: 'turn-1',
       payload: {

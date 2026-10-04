@@ -291,6 +291,13 @@ unsubscribes the ephemeral thread.
 
 ### Active conversation actions
 
+`turn.completed` reflects app-server `turn/completed`, never an inferred result
+from thread idle. `turn.error` preserves the server's `willRetry` flag; a
+non-retrying error records a failed turn. `conversation.activityChanged` and
+snapshot `busy` describe readiness, not task success. An idle turn whose
+terminal notification is missing retains its last-known status. See
+[readiness and turn outcomes](/guide/surface#readiness-is-not-a-turn-outcome).
+
 - `updateConversationSettings(settings)`
 - `sendMessage(prompt, options?)`
 - `continueInterruptedTurn()`

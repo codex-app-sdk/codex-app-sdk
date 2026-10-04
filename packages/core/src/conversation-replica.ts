@@ -77,6 +77,7 @@ function applyConversationEvent(
         ...snapshot,
         threadStatus: event.payload.threadStatus,
         busy: event.payload.busy,
+        activeTurnId: event.payload.busy ? snapshot.activeTurnId : null,
         error: event.payload.error,
       };
     case 'conversation.settingsChanged':
@@ -135,8 +136,9 @@ function applyConversationEvent(
       return {
         ...snapshot,
         activeTurnId: snapshot.activeTurnId === event.turnId ? null : snapshot.activeTurnId,
-        busy: false,
-        error: event.payload.error?.message ?? null,
+        busy: snapshot.activeTurnId !== event.turnId && snapshot.busy,
+        error: snapshot.activeTurnId === event.turnId || !snapshot.busy
+          ? event.payload.error?.message ?? null : snapshot.error,
         turnIds: addUnique(snapshot.turnIds, event.turnId),
         turns: upsertTurn(snapshot.turns, { id: event.turnId, ...event.payload }),
         messages,
@@ -153,7 +155,7 @@ function applyConversationEvent(
         turnIds: addUnique(snapshot.turnIds, event.turnId),
         turns: upsertTurn(snapshot.turns, {
           id: event.turnId,
-          status: terminal ? 'failed' : 'inProgress',
+          status: event.payload.willRetry ? 'inProgress' : 'failed',
           error: event.payload.error,
           willRetry: event.payload.willRetry,
           startedAt: previous?.startedAt ?? null,

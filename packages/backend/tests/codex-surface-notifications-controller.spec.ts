@@ -708,6 +708,7 @@ function createController(options: SetupOptions = {}) {
     requireRuntime: vi.fn((threadId: string) => requireRuntime(runtimes, threadId)),
     runtime: vi.fn((threadId: string) => runtimes.get(threadId)),
     runtimes: vi.fn(() => runtimes.values()),
+    sendNextQueuedPrompt: vi.fn(),
     snapshotForRuntime: vi.fn((target: ThreadRuntimeState) => ({ ...state, ...target })),
     unknownNotification: vi.fn(),
   };

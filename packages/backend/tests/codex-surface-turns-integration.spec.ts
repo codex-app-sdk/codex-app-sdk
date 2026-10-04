@@ -1,10 +1,111 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createCodexConversationReplica } from '@codex-app-sdk/core/conversation-replica';
 import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
-import { generatedPngBase64, MockCodexAppServer, createSurface, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
+import { deferred, generatedPngBase64, MockCodexAppServer, createSurface, lastRequest, requestsFor, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it.each(['completed', 'interrupted', 'failed', 'error'] as const)('waits for authoritative %s after idle', async (status) => {
+    const { surface, transport } = createSurface('turn/interrupt');
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    try {
+      const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+      surface.onConversationEvent('thread-existing', (event) => replica.apply(event));
+      transport.emitNotification('turn/started', {
+        threadId: 'thread-existing', turn: turn('turn-idle-first', 'inProgress', []),
+      });
+      if (status === 'interrupted') {
+        await surface.interrupt();
+        expect(lastRequest(transport, 'turn/interrupt')).toMatchObject({
+          params: { threadId: 'thread-existing', turnId: 'turn-idle-first' },
+        });
+      }
+      transport.emitNotification('thread/status/changed', {
+        threadId: 'thread-existing', status: { type: 'idle' },
+      });
+      expect(events.filter((event) => event.type === 'turn.completed')).toEqual([]);
+      expect(surface.getSnapshot()).toMatchObject({
+        busy: false, activeTurnId: null, threadStatus: { type: 'idle' },
+        turns: expect.arrayContaining([expect.objectContaining({ id: 'turn-idle-first', status: 'inProgress' })]),
+      });
+
+      if (status === 'error') {
+        transport.emitNotification('error', {
+          threadId: 'thread-existing', turnId: 'turn-idle-first', willRetry: false,
+          error: { message: 'Terminal failure', codexErrorInfo: null, additionalDetails: null, misalignment: null },
+        });
+      } else {
+        transport.emitNotification('turn/completed', {
+          threadId: 'thread-existing', turn: turn('turn-idle-first', status, []),
+        });
+      }
+      expect(surface.getSnapshot().turns).toContainEqual(expect.objectContaining({
+        id: 'turn-idle-first', status: status === 'error' ? 'failed' : status,
+      }));
+      expect(replica.getSnapshot().turns).toEqual(surface.getSnapshot().turns);
+      expect(events.filter((event) => event.type === 'turn.completed' || event.type === 'turn.error')).toEqual([
+        expect.objectContaining({
+          origin: 'notification', turnId: 'turn-idle-first',
+          payload: expect.objectContaining(status === 'error' ? { willRetry: false } : { status }),
+        }),
+      ]);
+    } finally {
+      await surface.close();
+    }
+  });
+
+  it.each(['pending', 'started'] as const)('recovers the queue on idle without settling unknown work or clearing a %s next turn', async (phase) => {
+    const next = deferred<v2.TurnStartResponse>();
+    const transport = new MockCodexAppServer({ 'turn/start': () => next.promise });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent((event) => events.push(event));
+    await surface.connect();
+    const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+    const completedStates: Array<{ busy: boolean; activeTurnId: string | null }> = [];
+    surface.onConversationEvent('thread-existing', (event) => {
+      const state = replica.apply(event);
+      if (event.type === 'turn.completed') completedStates.push({ busy: state.busy, activeTurnId: state.activeTurnId });
+    });
+    try {
+      transport.emitNotification('turn/started', {
+        threadId: 'thread-existing', turn: turn('turn-previous', 'inProgress', []),
+      });
+      await surface.sendMessage('Queued next');
+      await surface.sendMessage('Keep queued');
+      transport.emitNotification('thread/status/changed', {
+        threadId: 'thread-existing', status: { type: 'idle' },
+      });
+      await vi.waitFor(() => expect(requestsFor(transport, 'turn/start')).toHaveLength(1));
+      expect(surface.getSnapshot()).toMatchObject({ busy: true, queuedPrompts: [{ text: 'Keep queued' }] });
+      expect(events.filter((event) => event.type === 'turn.completed')).toEqual([]);
+
+      if (phase === 'started') {
+        next.resolve({ turn: turn('turn-next', 'inProgress', []) });
+        await vi.waitFor(() => expect(surface.getSnapshot().activeTurnId).toBe('turn-next'));
+      }
+      transport.emitNotification('turn/completed', {
+        threadId: 'thread-existing', turn: turn('turn-previous', 'completed', []),
+      });
+      expect(surface.getSnapshot()).toMatchObject({
+        busy: true, activeTurnId: phase === 'started' ? 'turn-next' : null,
+        queuedPrompts: [{ text: 'Keep queued' }],
+        conversations: [expect.objectContaining({ status: 'active' })],
+      });
+      expect(requestsFor(transport, 'turn/start')).toHaveLength(1);
+      expect(completedStates).toEqual([{ busy: true, activeTurnId: phase === 'started' ? 'turn-next' : null }]);
+      expect(events.filter((event) => event.type === 'turn.completed')).toEqual([
+        expect.objectContaining({ turnId: 'turn-previous', payload: expect.objectContaining({ status: 'completed' }) }),
+      ]);
+    } finally {
+      next.resolve({ turn: turn('turn-next', 'inProgress', []) });
+      await surface.close();
+    }
+  });
+
   it('continues the latest interrupted turn without creating a user message', async () => {
     const interrupted = turn('turn-interrupted', 'interrupted', [
       {
