@@ -81,7 +81,8 @@ describe('basic sample App', () => {
     await wrapper.vm.$nextTick();
 
     await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
-    await wrapper.get('[role="menuitemcheckbox"]').trigger('click');
+    await wrapper.findAll('[role="menuitemcheckbox"]')
+      .find((item) => item.text().includes('Plan mode'))!.trigger('click');
     await flushPromises();
     expect(api.updateConversationSettings).toHaveBeenCalledWith({ planMode: true });
   });
