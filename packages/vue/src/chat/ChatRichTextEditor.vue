@@ -108,11 +108,14 @@ function onInput(): void {
     ? selection
     : { end: caretPosition.value, start: caretPosition.value, valid: false });
   emit('input');
-  if (!value.endsWith('\n') && editor.value?.querySelector('br[data-trailing-line-break]')) {
-    renderText(value, caretPosition.value, { focus: true });
-  } else {
-    autoResize();
+  if (!value.endsWith('\n')) {
+    const placeholders = editor.value?.querySelectorAll('br[data-trailing-line-break]');
+    if (placeholders?.length) {
+      placeholders.forEach((placeholder) => placeholder.remove());
+      setCaret(caretPosition.value, { focus: true });
+    }
   }
+  autoResize();
 }
 
 function normalizeTrailingBrowserLineBreak(): void {
@@ -297,6 +300,22 @@ function setText(value: string, caret = value.length, options: { focus?: boolean
 
 function insertTextAtSelection(value: string): void {
   const selection = getSelectionRange();
+  // Native editing records an undo transaction; replacing the DOM does not.
+  if (typeof document.execCommand === 'function') {
+    setSelection(selection.start, selection.end);
+    const text = document.createElement('span');
+    appendTextNode(text, value);
+    if (value.endsWith('\n') && selection.end === readText().length) {
+      const placeholder = document.createElement('br');
+      placeholder.dataset.trailingLineBreak = '';
+      text.append(placeholder);
+    }
+    if (document.execCommand('insertHTML', false, text.innerHTML)) {
+      setCaret(selection.start + value.length);
+      scrollCaretIntoView(editor.value!);
+      return;
+    }
+  }
   const current = readText();
   const next = `${current.slice(0, selection.start)}${value}${current.slice(selection.end)}`;
   const nextCaret = selection.start + value.length;

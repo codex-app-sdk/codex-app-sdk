@@ -14,6 +14,29 @@ const skill = {
 };
 
 describe('ChatRichTextEditor', () => {
+  it.each([
+    { start: 6, end: 6, value: '<text>\n', expected: 'before<text>\n' },
+    { start: 2, end: 4, value: 'A\nB', expected: 'beA\nBre' },
+  ])('preserves the insertion when native editing rejects it ($start/$end)', ({ start, end, value, expected }) => {
+    const original = Object.getOwnPropertyDescriptor(document, 'execCommand');
+    const execCommand = vi.fn(() => false);
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+    const wrapper = mount(ChatRichTextEditor, { attachTo: document.body, props: { modelValue: 'before' } });
+    try {
+      const editor = wrapper.vm as unknown as CodexRichTextEditorExpose;
+      editor.setSelection(start, end);
+      editor.insertTextAtSelection(value);
+      expect(execCommand).toHaveBeenCalledOnce();
+      expect(editor.readText()).toBe(expected);
+      expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([expected]);
+      expect(editor.getSelectionRange()).toEqual({ start: start + value.length, end: start + value.length, valid: true });
+    } finally {
+      wrapper.unmount();
+      if (original) Object.defineProperty(document, 'execCommand', original);
+      else Reflect.deleteProperty(document, 'execCommand');
+    }
+  });
+
   it('renders canonical plugin, skill, and file tokens as editable chips', () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: {

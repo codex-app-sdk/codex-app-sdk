@@ -25,6 +25,10 @@ attachments, history state, and actions from the surface controller. The host
 still owns its page/window, navigation, header, conversation list, and product
 views. Electron preload and the web client both satisfy the same renderer API.
 
+The composer pastes clipboard text without rich HTML formatting. Text paste
+participates in native undo/redo (Cmd+Z on macOS, Ctrl+Z elsewhere), including
+multiline text and replacement of selected text.
+
 ## Controlled pane
 
 Use `createCodexConversationPaneController()` when the host owns a different

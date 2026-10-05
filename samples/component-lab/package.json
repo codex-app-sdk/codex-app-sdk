@@ -9,7 +9,7 @@
     "dev": "vite",
     "lint": "npm run typecheck",
     "test": "vitest run",
-    "test:browser": "node tests/scroll.browser.mjs && node tests/editor-focus.browser.mjs && node tests/requests.browser.mjs",
+    "test:browser": "node tests/scroll.browser.mjs && node tests/editor-focus.browser.mjs && node tests/requests.browser.mjs && node tests/composer-undo.browser.mjs",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
