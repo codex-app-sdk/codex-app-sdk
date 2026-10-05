@@ -98,6 +98,32 @@ function turnLifecycle(id: string, status: CodexSurfaceTurn['status']): CodexSur
   };
 }
 
+it('acknowledges a silent turn only after confirmed completion and keeps that acknowledgment during the next turn', async () => {
+  const report: SurfaceMessage = { id: 'report', role: 'user', turnId: 'report-turn', status: 'complete', parts: [{ type: 'text', text: 'Review completed.' }] };
+  const wrapper = mount(CodexMessageList, { props: {
+    messages: [report], busy: true, activeTurnId: 'report-turn', turns: [turnLifecycle('report-turn', 'inProgress')],
+  } });
+  expect(wrapper.find('.chat-message__thinking').exists()).toBe(true);
+  await wrapper.setProps({ busy: false, activeTurnId: null });
+  expect(wrapper.find('.chat-message__empty-response').exists()).toBe(false);
+  await wrapper.setProps({ turns: [turnLifecycle('report-turn', 'completed')] });
+  expect(wrapper.get('.chat-message__empty-response').text()).toBe('Empty response');
+  expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+
+  await wrapper.setProps({ busy: true, activeTurnId: 'next', messages: [report,
+    { id: 'next', role: 'user', turnId: 'next', status: 'complete', parts: [{ type: 'text', text: 'Next task' }] },
+  ], turns: [turnLifecycle('report-turn', 'completed'), turnLifecycle('next', 'inProgress')] });
+  expect(wrapper.findAll('.chat-message__empty-response')).toHaveLength(1);
+  expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+
+  await wrapper.setProps({ messages: [report,
+    { id: 'reply', role: 'assistant', turnId: 'report-turn', status: 'complete', parts: [{ type: 'text', text: 'Acknowledged.' }] },
+  ], busy: false, activeTurnId: null });
+  expect(wrapper.find('.chat-message__empty-response').exists()).toBe(false);
+  expect(wrapper.text()).toContain('Acknowledged.');
+  wrapper.unmount();
+});
+
 function selectText(
   startNode: Node,
   startOffset: number,
@@ -782,8 +808,12 @@ describe('CodexMessageList', () => {
     expect(wrapper.get('.chat-message__thinking').text()).toBe('Working');
     expect(wrapper.text()).not.toContain('host.internal');
 
-    await wrapper.setProps({ busy: false, messages: [user, { ...hiddenTool, status: 'complete' }] });
+    await wrapper.setProps({
+      busy: false, activeTurnId: null, messages: [user, { ...hiddenTool, status: 'complete' }],
+      turns: [turnLifecycle('turn-hidden-tool', 'completed')],
+    });
     expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+    expect(wrapper.find('.chat-message__empty-response').exists()).toBe(false);
 
     await wrapper.setProps({
       activeTurnId: 'turn-next', busy: true, messages: [

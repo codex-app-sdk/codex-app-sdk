@@ -543,6 +543,11 @@ the provider has not restored `activeTurnId` yet, including after an asynchronou
 question answer resumes a previously completed turn. An active `Working`
 disclosure is always expanded and cannot be collapsed.
 
+When a provider-confirmed completed turn has a user message but no assistant
+message, the list displays `Empty response` as an acknowledgment. Idle state
+alone does not create that acknowledgment. Provider messages and turn records
+remain unchanged, and filtered-out assistant tools do not count as an empty turn.
+
 Pass `busy` to `CodexMessageList` (the conversation pane wires this from its
 surface state) to keep a `Thinking` shimmer visible while a turn is accepted
 but the app-server has not yet materialized its first assistant row. When the

@@ -338,6 +338,23 @@ const displayGroups = computed(() => {
       ...(turnId ? { turnId } : {}),
     })
   }
+  const assistantTurnIds = new Set(visibleMessages.value
+    .filter((message) => message.role === 'assistant')
+    .map((message) => chatMessageFromInput(message).turnId?.trim()))
+  for (const [index, group] of groups.entries()) {
+    if (!group.turnId || group.turnId === inferredActiveTurnId.value
+      || turnStatusById.value.get(group.turnId) !== 'completed'
+      || assistantTurnIds.has(group.turnId)
+      || !group.entries.some((entry) => entry.message.role === 'user')) continue
+    // Provider snapshots may omit an empty assistant item. A confirmed
+    // completed turn still deserves a visible acknowledgment, unlike idle alone.
+    const id = `codex-empty-response:${group.turnId}`
+    group.entries.push({
+      index: props.messages.length + index + 1,
+      key: id,
+      message: { id, role: 'assistant', status: 'complete', turnId: group.turnId, parts: [] },
+    })
+  }
   return groups
 })
 
