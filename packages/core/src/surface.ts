@@ -714,6 +714,11 @@ export type CodexSurfaceEvent =
     /** Present on current runtimes; optional so recorded events from older SDKs remain consumable. */
     state?: CodexConversationHistoryPrependState;
   }>
+  | CodexConversationEventEnvelope<'conversation.historyStateChanged', {
+    historyLoading: boolean;
+    historyState: CodexConversationHistoryState;
+    error: string | null;
+  }>
   | CodexConversationEventEnvelope<'conversation.activityChanged', {
     threadStatus: CodexSurfaceThreadStatus | null;
     busy: boolean;

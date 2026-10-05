@@ -99,11 +99,24 @@ export class CodexSurfaceRuntimeController {
 
   patch(threadId: string, patch: ThreadRuntimePatch): void {
     const runtime = this.require(threadId);
+    const historyChanged = (['historyLoading', 'historyLoadingOlder', 'historyHasOlder', 'fullHistoryHydrated', 'loadingStrategy'] as const)
+      .some((key) => key in patch && patch[key] !== runtime[key]);
     Object.assign(runtime, patch);
     if (this.host.getState().activeConversationId === threadId) {
       this.host.patch(this.projection(runtime), threadId);
     } else {
       this.host.notifyConversationListeners(threadId);
+    }
+    if (historyChanged) {
+      this.host.emitEvent('lifecycle', {
+        type: 'conversation.historyStateChanged',
+        conversationId: threadId,
+        payload: {
+          historyLoading: runtime.historyLoading,
+          historyState: runtimeHistoryState(runtime),
+          error: runtime.error,
+        },
+      });
     }
   }
 

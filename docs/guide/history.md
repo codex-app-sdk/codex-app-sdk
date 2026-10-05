@@ -58,6 +58,12 @@ const page = await conversation.loadOlderHistory();
 `useCodexSurface`. Controlled hosts provide `hasOlderHistory` and
 `loadingOlderHistory`, then handle `loadOlderHistory`.
 
+Event-driven hosts should forward `conversation.historyStateChanged` as well
+as history message events to `createCodexConversationReplica()`. It tracks
+request start, completion, and failure, including empty pages; a finished page
+must clear `loadingOlder` before the user can request another one. No thread
+switch or full-snapshot refresh is needed between pages.
+
 ### Eager loading
 
 `eager` also returns the initial full-detail page promptly, then hydrates older

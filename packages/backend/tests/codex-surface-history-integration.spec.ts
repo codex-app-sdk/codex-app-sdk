@@ -221,6 +221,7 @@ describe('CodexSurface', () => {
       { type: 'agentMessage', id: 'agent-initial', text: 'Initial reply', phase: null, memoryCitation: null, delivery: null, questions: null },
     ]);
     const olderTurn = historyTurn('turn-older', 1);
+    const oldestTurn = historyTurn('turn-oldest', 0);
     const transport = new MockCodexAppServer({
       'thread/resume': () => ({
         ...resumeResponse(thread('thread-existing', false)),
@@ -232,9 +233,12 @@ describe('CodexSurface', () => {
           threadId: 'thread-existing',
           limit: (params as { cursor: string | null }).cursor === null ? 50 : 25,
         });
-        return (params as { cursor: string | null }).cursor === null
+        const cursor = (params as { cursor: string | null }).cursor;
+        return cursor === null
           ? { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null }
-          : { data: [olderTurn], nextCursor: null, backwardsCursor: null };
+          : cursor === 'older-page'
+            ? { data: [olderTurn], nextCursor: 'oldest-page', backwardsCursor: null }
+            : { data: [oldestTurn], nextCursor: null, backwardsCursor: null };
       },
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -248,23 +252,66 @@ describe('CodexSurface', () => {
     expect(transport.sent.filter((message) => 'method' in message && message.method === 'thread/turns/list')).toHaveLength(0);
 
     const page = await surface.loadOlderConversationHistory('thread-existing');
-    expect(page).toMatchObject({ conversationId: 'thread-existing', hasOlder: false });
+    expect(page).toMatchObject({ conversationId: 'thread-existing', hasOlder: true });
     expect(page.messages).toHaveLength(6);
+    expect(replica.getSnapshot().historyState).toMatchObject({ hasOlder: true, loadingOlder: false });
+
+    await surface.loadOlderConversationHistory('thread-existing');
     expect(surface.getSnapshot().historyState).toMatchObject({ hasOlder: false, fullyLoaded: true });
     expect(replica.getSnapshot()).toMatchObject({
-      turnIds: ['turn-older', 'turn-initial'],
-      historyState: { hasOlder: false, fullyLoaded: true },
+      turnIds: ['turn-oldest', 'turn-older', 'turn-initial'],
+      historyState: { hasOlder: false, fullyLoaded: true, loadingOlder: false },
     });
     expect(messagesWithoutCreatedAt(replica.getSnapshot().messages)).toStrictEqual(
       messagesWithoutCreatedAt(surface.conversation('thread-existing').getSnapshot().messages),
     );
 
     const history = await surface.readConversationHistory('thread-existing');
-    expect(history.messages).toHaveLength(8);
+    expect(history.messages).toHaveLength(14);
     expect(surface.getSnapshot().historyState).toMatchObject({ hasOlder: false, fullyLoaded: true });
     expect(transport.sent.filter((message) => 'method' in message && message.method === 'thread/turns/list')
       .map((message) => ('params' in message ? (message.params as { cursor: string | null }).cursor : undefined)))
-      .toEqual(['older-page', null, 'older-page']);
+      .toEqual(['older-page', 'oldest-page', null, 'older-page', 'oldest-page']);
+  });
+
+  it('keeps event-only history consumers retryable after a failed page and settles an empty final page', async () => {
+    const failedPage = deferred<v2.ThreadTurnsListResponse>();
+    let attempts = 0;
+    const transport = new MockCodexAppServer({
+      'thread/resume': () => ({
+        ...resumeResponse(thread('thread-existing', false)),
+        initialTurnsPage: { data: [historyTurn('turn-initial', 1)], nextCursor: 'older-page', backwardsCursor: null },
+      }),
+      'thread/turns/list': () => ++attempts === 1
+        ? failedPage.promise
+        : { data: [], nextCursor: null, backwardsCursor: null },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    try {
+      await surface.connect();
+      const conversation = surface.conversation('thread-existing');
+      const replica = createCodexConversationReplica(conversation.getSnapshot());
+      conversation.onEvent((event) => replica.apply(event));
+      const messages = replica.getSnapshot().messages;
+      const load = conversation.loadOlderHistory();
+      const rejection = expect(load).rejects.toThrow('History unavailable');
+      const loadingOlder = replica.getSnapshot().historyState?.loadingOlder;
+      failedPage.reject(new Error('History unavailable'));
+      await rejection;
+      expect(loadingOlder).toBe(true);
+      expect(replica.getSnapshot()).toMatchObject({
+        historyState: { hasOlder: true, loadingOlder: false },
+        error: expect.stringContaining('History unavailable'),
+      });
+      await conversation.loadOlderHistory();
+      expect(replica.getSnapshot()).toMatchObject({
+        historyState: { hasOlder: false, loadingOlder: false, fullyLoaded: true },
+        error: null,
+      });
+      expect(replica.getSnapshot().messages).toBe(messages);
+    } finally {
+      await surface.close();
+    }
   });
 
   it('does not resurrect a completed turn from a stale background history page', async () => {

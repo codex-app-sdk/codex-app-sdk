@@ -72,6 +72,8 @@ function applyConversationEvent(
         ...(event.payload.state ?? {}),
         messages: prependUniqueMessages(snapshot.messages, event.payload.messages),
       };
+    case 'conversation.historyStateChanged':
+      return { ...snapshot, ...event.payload };
     case 'conversation.activityChanged':
       return {
         ...snapshot,
