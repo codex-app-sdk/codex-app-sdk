@@ -263,6 +263,16 @@ multiple panes are busy, only the pane containing document focus responds.
 
 ### Controlled composer state
 
+Set `placeholder` on `CodexConversationPane` or `CodexComposer`, or
+`state.composer.placeholder` when using a pane controller, to show a dynamic
+suggested follow-up. When the editor is empty, plain **Tab** inserts a non-blank
+custom placeholder into the draft without submitting it. The caret moves to the
+end and the insertion supports normal undo. Existing text (including whitespace)
+is never replaced. Disabled editors, IME composition, modified Tab shortcuts,
+and active command modes do not accept the placeholder; suggestion-picker
+keyboard handling takes precedence. Omitting the placeholder retains the default
+“Ask Codex…” hint and normal Tab navigation; an empty string hides the hint.
+
 ```ts
 type CodexComposerState = {
   text: string;

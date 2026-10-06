@@ -90,6 +90,66 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
+  it.each(['props', 'controller'] as const)('accepts a changing custom placeholder with Tab through %s without submitting', async (mode) => {
+    const state = reactive<CodexConversationPaneState>({ identity: { messages: [] }, composer: {} });
+    const submit = vi.fn();
+    const updateComposerState = vi.fn((next) => { state.composer = { ...state.composer, state: next }; });
+    const wrapper = mount(CodexConversationPane, { props: mode === 'controller'
+      ? { controller: createCodexConversationPaneController({ state, actions: { submit, updateComposerState } }) }
+      : {},
+    });
+    const editor = wrapper.get('[role="textbox"]');
+    const tab = () => {
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+      editor.element.dispatchEvent(event);
+      return event;
+    };
+    expect(tab().defaultPrevented).toBe(false);
+    for (const placeholder of ['Review the changes', 'Write a release summary']) {
+      if (mode === 'controller') state.composer = { placeholder };
+      else await wrapper.setProps({ placeholder });
+      await nextTick();
+      expect(editor.attributes('data-placeholder')).toBe(placeholder);
+    }
+    for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }, { isComposing: true }]) {
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, ...modifier });
+      editor.element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(editor.element.textContent).toBe('');
+    }
+    expect(tab().defaultPrevented).toBe(true);
+    await nextTick();
+    expect(editor.element.textContent).toBe('Write a release summary');
+    expect(mode === 'controller' ? state.composer?.state : wrapper.emitted('update:composerState')?.at(-1)?.[0])
+      .toMatchObject({ text: 'Write a release summary' });
+    expect(wrapper.emitted('send')).toBeUndefined();
+    expect(submit).not.toHaveBeenCalled();
+    expect(tab().defaultPrevented).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each([
+    { placeholder: '' },
+    { placeholder: '   ' },
+    { placeholder: 'Suggested follow-up', disabled: true },
+    { placeholder: 'Suggested follow-up', modelValue: 'My draft' },
+    { placeholder: 'Suggested follow-up', modelValue: ' ' },
+    { placeholder: 'Suggested follow-up', composerState: { text: '', selectionStart: 0, selectionEnd: 0, activeCommandId: 'codex.goal' } },
+  ])('leaves Tab alone when the placeholder is not an available suggestion: %j', async (props) => {
+    const wrapper = mount(CodexConversationPane, { props: {
+      placeholder: props.placeholder, disabled: props.disabled,
+      modelValue: props.modelValue, composerState: props.composerState,
+    } });
+    const editor = wrapper.get('[role="textbox"]');
+    const text = editor.element.textContent;
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    editor.element.dispatchEvent(event);
+    await nextTick();
+    expect(event.defaultPrevented).toBe(false);
+    expect(editor.element.textContent).toBe(text);
+    wrapper.unmount();
+  });
+
   it.each(['always_allow', 'deny'] as const)('moves MCP tool confirmation into the composer and restores draft/history after %s', async (decision) => {
     const request: Extract<CodexSurfaceClientRequest, { kind: 'confirm_tool' }> = {
       id: 'confirm-1', kind: 'confirm_tool', conversationId: 'thread-1', turnId: 'turn-1', itemId: 'tool-1',
@@ -3013,12 +3073,12 @@ describe('CodexConversationPane', () => {
       leadingMenuItems: [],
       menuItems: [],
       modelMenuItems: [],
-      placeholder: 'Ask Codex…',
       selectedModelId: undefined,
       selectedReasoningEffort: undefined,
       selectedServiceTier: undefined,
       skillCatalogStatus: undefined,
     });
+    expect(wrapper.get('[role="textbox"]').attributes('data-placeholder')).toBe('Ask Codex…');
     expect(wrapper.findComponent(CodexMessageList).props()).toMatchObject({
       actionsDisabled: false,
       canDeleteTurn: true,

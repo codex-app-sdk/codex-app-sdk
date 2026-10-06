@@ -202,7 +202,7 @@ const props = defineProps<{
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   models?: readonly CodexModelOption[];
   modelMenuItems?: readonly CodexComposerMenuItem<Payload>[];
-  placeholder: string;
+  placeholder?: string;
   queuedPromptId?: string | null;
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
@@ -265,7 +265,7 @@ const goalCommand = computed(() => (
 ));
 const goalMode = computed(() => Boolean(goalCommand.value && activeCommandId.value === goalCommand.value.id));
 const effectivePlanMode = computed(() => Boolean(effectiveCodexCapabilities.value.planMode && props.planMode && !goalMode.value));
-const effectivePlaceholder = computed(() => activeCommand.value?.composerMode?.placeholder ?? props.placeholder);
+const effectivePlaceholder = computed(() => activeCommand.value?.composerMode?.placeholder ?? props.placeholder ?? 'Ask Codex…');
 const voiceVisible = computed(() => (
   effectivePresentation.value.composer.voice
   && Boolean(props.transcribeAudio || hostCapabilities?.capabilities.transcription)
@@ -604,6 +604,14 @@ function sameComposerState(left: CodexComposerState, right: CodexComposerState |
 
 function handleEditorKeydown(event: KeyboardEvent): void {
   if (handleSuggestionKeydown(event)) {
+    return;
+  }
+
+  if (event.key === 'Tab' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
+    && !event.isComposing && !props.disabled && !activeCommand.value
+    && props.placeholder?.trim() && (editorEl.value?.readText() ?? prompt.value) === '') {
+    event.preventDefault();
+    editorEl.value?.insertTextAtSelection(props.placeholder);
     return;
   }
 

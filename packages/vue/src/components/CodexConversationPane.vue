@@ -454,7 +454,6 @@ const props = withDefaults(defineProps<{
   menuItems: () => [],
   modelMenuItems: () => [],
   modelValue: '',
-  placeholder: 'Ask Codex…',
   planMode: undefined,
   showToolDetails: undefined,
   scrollToBottomLabel: 'Scroll to bottom',
@@ -912,7 +911,7 @@ const effectiveModelMenuItems = computed(() => controlledValue(
 const effectivePlaceholder = computed(() => controlledValue(
   (state) => state.composer?.placeholder,
   () => props.placeholder,
-) ?? 'Ask Codex…');
+));
 const effectiveCanDeleteTurn = computed(() => controlledValue(
   (state) => state.policy?.canDeleteTurn ?? true,
   () => props.canDeleteTurn,
