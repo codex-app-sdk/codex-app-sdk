@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/electron",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Electron main, preload, IPC, and native capability adapter for Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
@@ -37,8 +37,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/backend": "0.13.0",
-    "@codex-app-sdk/core": "0.13.0"
+    "@codex-app-sdk/backend": "0.14.0",
+    "@codex-app-sdk/core": "0.14.0"
   },
   "peerDependencies": {
     "electron": ">=30"

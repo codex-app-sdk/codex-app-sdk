@@ -159,7 +159,7 @@ the documentation build output.
 
 ## Public package publication
 
-The six scoped SDK workspaces publish publicly to npm starting with 0.13.0.
+The six scoped SDK workspaces publish publicly to npm starting with 0.14.0.
 Their manifests pin `https://registry.npmjs.org` and `access: public`, and link
 each package to this repository. The root compatibility facade is not released.
 

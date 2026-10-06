@@ -25,7 +25,7 @@ authentication, tenancy, policy, business data, and integrations.
 
 ## Start an application
 
-The SDK and scaffolder are public on npm starting with 0.13.0. No package token
+The SDK and scaffolder are public on npm starting with 0.14.0. No package token
 is required:
 
 ```bash

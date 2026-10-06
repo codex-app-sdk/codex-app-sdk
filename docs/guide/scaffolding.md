@@ -5,7 +5,7 @@ recommended modular boundaries. Electron + Vue is the backward-compatible
 default; `--target web` generates an Express + `ws` + Vue application.
 
 The scaffolder and generated application's SDK dependencies are public on npm
-starting with 0.13.0. No package token is needed. Existing GitHub Packages users
+starting with 0.14.0. No package token is needed. Existing GitHub Packages users
 should follow the [registry migration notes](/guide/installation#package-access).
 
 ```bash

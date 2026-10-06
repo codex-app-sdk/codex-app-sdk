@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.14.0
+
+First complete public npm release of all six scoped SDK packages.
+
 ### Security
 
 - `isAllowedCodexWebSocketOrigin()` rejects WebSocket upgrades from unexpected
@@ -14,6 +18,13 @@
 
 ### Fixed
 
+- Non-image attachments now deliver their filename and original path to the
+  model, while preserving attachment chips in live and reloaded history.
+- Composer paste operations participate in native undo history.
+- Paged history loading state stays synchronized in conversation replicas,
+  allowing older messages to load when scrolling back.
+- Completed turns without assistant messages no longer leave a stale working
+  indicator, and Goal mode precedes Plan mode in the composer menu.
 - Thread idle no longer fabricates an interrupted turn outcome. It restores
   readiness and queue progress while waiting for authoritative completion;
   late completions preserve a newer active or pending turn in both the runtime
@@ -49,8 +60,9 @@
 
 ## 0.13.0
 
-First public npm release of all six `@codex-app-sdk` packages. Earlier versions
-remain on GitHub Packages; see the [migration guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/installation.html#package-access).
+Initial public npm release preparation; only `@codex-app-sdk/backend` was
+published. Use 0.14.0 or newer for the complete SDK. Earlier versions remain on
+GitHub Packages; see the [migration guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/installation.html#package-access).
 
 ### Added
 

@@ -48,7 +48,7 @@ SDK source directly and need no GitHub Packages access or prior SDK build.
 
 ## Package access
 
-Starting with **0.13.0**, all six scoped packages are public on
+Starting with **0.14.0**, all six scoped packages are public on
 [npm](https://www.npmjs.com/org/codex-app-sdk). Installing them requires no
 GitHub token or npm login.
 
@@ -60,7 +60,7 @@ Versions through 0.12.6 remain on GitHub Packages. If your project or user
 @codex-app-sdk:registry=https://registry.npmjs.org
 ```
 
-Update the SDK dependencies together to 0.13.0 or newer and regenerate the
+Update the SDK dependencies together to 0.14.0 or newer and regenerate the
 affected lockfile entries so they resolve from npm. Keep any GitHub credentials
 needed by unrelated dependencies; this release does not change their access.
 :::
