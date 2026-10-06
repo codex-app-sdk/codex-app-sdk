@@ -267,6 +267,13 @@ retain ownership of credentials and authentication lifecycle.
 `CodexSurfaceRendererApi` narrows trusted conversation-creation input and uses
 `CodexRendererSendMessageOptions` for send/steer attachments.
 
+Non-image `CodexSurfaceAttachment` files are sent as model-visible text containing
+their name and absolute path, not as app-server mentions. The SDK restores these
+references as attachment parts in live and reloaded history; older mention-based
+history remains supported. Images still use native image inputs. Files are not
+copied, uploaded, or read into the prompt: the path must be accessible to the
+agent's runtime under its OS and sandbox permissions, including for queue/steer.
+
 Optional `getVersionedSnapshot()` and `onStatePatch()` members expose an
 incremental state stream; `getVersionedSnapshot()` resolves null when the other
 side cannot stream patches. Consume it with

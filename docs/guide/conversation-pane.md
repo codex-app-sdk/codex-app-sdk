@@ -209,6 +209,13 @@ passes `prompt === ''` to `actions.submit`, and the host must serialize its
 context before transport. Native image/file attachment-only submissions keep
 the existing `(no user instructions)` prompt.
 
+File attachments also send their filename and absolute path to the model so it
+can read the original file with tools. The transcript keeps the attachment chip,
+including after history reload. The SDK does not copy the file or inline its
+contents. Hosts must provide a path accessible to the agent (and transfer files
+to the execution host when running remotely); attaching does not bypass OS or
+sandbox permissions.
+
 Use `composer-shelf-actions` for compact host-owned controls that belong in the
 shelf above the composer rather than inside submitted context. The row renders
 after the SDK turn diff, queued prompts, and active goal, so it remains closest

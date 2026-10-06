@@ -3,6 +3,7 @@ import type { ThreadItem } from '../codex/generated/v2/ThreadItem';
 import type { Turn } from '../codex/generated/v2/Turn';
 import { basename, extname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { fileAttachmentReference } from './codex-file-attachment';
 import type {
   CodexSurfaceClientRequest,
   SurfaceMessage,
@@ -417,6 +418,12 @@ function userMessageParts(item: Extract<ThreadItem, { type: 'userMessage' }>): S
       renderedSkills.add(normalizedName);
     }
     const inputText = userInputText(input);
+    const file = fileAttachmentReference(inputText);
+    if (file) {
+      flushText();
+      parts.push({ type: 'attachment', attachment: { kind: 'file', ...file } });
+      continue;
+    }
     if (inputText) {
       text.push(inputText);
       continue;

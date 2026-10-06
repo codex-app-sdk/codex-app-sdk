@@ -1,6 +1,7 @@
 import { basename, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
+import { fileAttachmentInput } from './codex-file-attachment';
 import type { v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
@@ -98,11 +99,7 @@ export function attachmentInput(attachment: CodexSurfaceAttachment): v2.UserInpu
       ...(attachment.detail === undefined ? {} : { detail: attachment.detail }),
     };
   }
-  return {
-    type: 'mention',
-    name: attachment.name ?? basename(attachment.path),
-    path: attachment.path,
-  };
+  return fileAttachmentInput(attachment.name ?? basename(attachment.path), attachment.path);
 }
 
 export function surfaceAttachmentPart(attachment: CodexSurfaceAttachment): SurfaceMessageAttachmentPart {

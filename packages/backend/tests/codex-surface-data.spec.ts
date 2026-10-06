@@ -106,10 +106,10 @@ describe('Codex surface data codecs', () => {
 
   it('encodes file and image attachments for app-server input', () => {
     expect(attachmentInput({ type: 'file', path: '/tmp/file.txt' })).toStrictEqual({
-      type: 'mention', name: 'file.txt', path: '/tmp/file.txt',
+      type: 'text', text: '<attached_file>\n{"name":"file.txt","path":"/tmp/file.txt"}\n</attached_file>', text_elements: [],
     });
     expect(attachmentInput({ type: 'file', path: '/tmp/file.txt', name: 'Notes' })).toStrictEqual({
-      type: 'mention', name: 'Notes', path: '/tmp/file.txt',
+      type: 'text', text: '<attached_file>\n{"name":"Notes","path":"/tmp/file.txt"}\n</attached_file>', text_elements: [],
     });
     expect(attachmentInput({ type: 'image', path: '/tmp/image.png' })).toStrictEqual({
       type: 'localImage', path: '/tmp/image.png',

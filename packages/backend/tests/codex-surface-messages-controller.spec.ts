@@ -148,7 +148,7 @@ describe('CodexSurfaceMessagesController', () => {
       threadId: 'thread-1', clientUserMessageId: expect.any(String),
       input: [
         { type: 'text', text: 'Use $review', text_elements: [] },
-        { type: 'mention', name: 'Read me', path: '/workspace/README.md' },
+        { type: 'text', text: '<attached_file>\n{"name":"Read me","path":"/workspace/README.md"}\n</attached_file>', text_elements: [] },
         { type: 'skill', name: 'review', path: '/skills/review/SKILL.md' },
       ],
       serviceTier: 'priority', outputSchema: { type: 'object' },

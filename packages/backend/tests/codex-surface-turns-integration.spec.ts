@@ -308,7 +308,7 @@ describe('CodexSurface', () => {
         input: [
           { type: 'text', text: 'Inspect these' },
           { type: 'localImage', path: '/tmp/screenshot.png', detail: 'original' },
-          { type: 'mention', path: '/tmp/notes.md', name: 'Notes' },
+          { type: 'text', text: '<attached_file>\n{"name":"Notes","path":"/tmp/notes.md"}\n</attached_file>', text_elements: [] },
         ],
       },
     });

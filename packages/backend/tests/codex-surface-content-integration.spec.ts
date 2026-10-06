@@ -6,6 +6,47 @@ import { CodexSurface } from '../src/node';
 import { MockCodexAppServer, createSurface, deferred, lastRequest, resumeResponse, testGoal, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('delivers an attachment-only file as model-visible text and restores its chip from history', async () => {
+    const { surface, transport } = createSurface('turn/start');
+    await surface.connect();
+    try {
+      await surface.sendMessage('(no user instructions)', {
+        attachments: [{ type: 'file', path: '/tmp/research.html', name: 'Research' }],
+      });
+      const message = lastRequest(transport, 'turn/start')!;
+      if (!('params' in message)) throw new Error('Missing turn/start request');
+      const request = message.params as v2.TurnStartParams;
+      expect(request.input).toEqual([
+        { type: 'text', text: '(no user instructions)', text_elements: [] },
+        { type: 'text', text: '<attached_file>\n{"name":"Research","path":"/tmp/research.html"}\n</attached_file>', text_elements: [] },
+      ]);
+      transport.emitNotification('item/completed', {
+        threadId: 'thread-existing', turnId: 'turn-live', completedAtMs: 1_700_000_002_000,
+        item: { type: 'userMessage', id: 'attached-user', clientId: request.clientUserMessageId ?? null, content: request.input },
+      });
+      const expectedParts = [
+        { type: 'text', text: '(no user instructions)' },
+        { type: 'attachment', attachment: { kind: 'file', name: 'Research', path: '/tmp/research.html' } },
+      ];
+      expect(surface.getSnapshot().messages.find((message) => message.id === request.clientUserMessageId)?.parts).toEqual(expectedParts);
+      const restoredThread = thread('thread-existing', false);
+      restoredThread.turns = [turn('turn-live', 'completed', [{
+        type: 'userMessage', id: 'attached-user', clientId: null, content: request.input,
+      }])];
+      const restored = new CodexSurface({ client: new CodexAppServerClient(new MockCodexAppServer({
+        'thread/resume': () => resumeResponse(restoredThread),
+      })) });
+      try {
+        await restored.connect();
+        expect(restored.getSnapshot().messages.find((message) => message.role === 'user')?.parts).toEqual(expectedParts);
+      } finally {
+        await restored.close();
+      }
+    } finally {
+      await surface.close();
+    }
+  });
+
   it('preserves completion and messages received while resume is pending', async () => {
     const restored = thread('thread-existing', false);
     restored.status = { type: 'active', activeFlags: [] };
@@ -432,7 +473,7 @@ describe('CodexSurface', () => {
       params: {
         input: [
           { type: 'text', text: 'Queued with attachment' },
-          { type: 'mention', path: '/tmp/queued.txt', name: 'queued.txt' },
+          { type: 'text', text: '<attached_file>\n{"name":"queued.txt","path":"/tmp/queued.txt"}\n</attached_file>', text_elements: [] },
         ],
       },
     });
@@ -441,7 +482,7 @@ describe('CodexSurface', () => {
         input: [
           { type: 'text', text: 'Inspect attachments' },
           { type: 'localImage', path: '/tmp/screenshot.png', detail: 'high' },
-          { type: 'mention', path: '/tmp/README.md', name: 'README' },
+          { type: 'text', text: '<attached_file>\n{"name":"README","path":"/tmp/README.md"}\n</attached_file>', text_elements: [] },
         ],
       },
     });
@@ -508,7 +549,7 @@ describe('CodexSurface', () => {
         input: [
           { type: 'text', text: 'Original prompt' },
           { type: 'localImage', path: '/tmp/screenshot.png' },
-          { type: 'mention', path: '/tmp/README.md', name: 'README' },
+          { type: 'text', text: '<attached_file>\n{"name":"README","path":"/tmp/README.md"}\n</attached_file>', text_elements: [] },
         ],
       },
     });
@@ -519,7 +560,7 @@ describe('CodexSurface', () => {
         input: [
           { type: 'text', text: 'Edited prompt' },
           { type: 'localImage', path: '/tmp/screenshot.png' },
-          { type: 'mention', path: '/tmp/README.md', name: 'README' },
+          { type: 'text', text: '<attached_file>\n{"name":"README","path":"/tmp/README.md"}\n</attached_file>', text_elements: [] },
         ],
       },
     });
