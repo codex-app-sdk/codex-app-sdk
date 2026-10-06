@@ -515,7 +515,7 @@ defineExpose<CodexRichTextEditorExpose>({
 }
 
 .chat-rich-text-editor:empty::before {
-  color: var(--color-text-muted);
+  color: color-mix(in srgb, var(--color-text-muted) 50%, transparent);
   content: attr(data-placeholder);
   pointer-events: none;
 }
