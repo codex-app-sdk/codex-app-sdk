@@ -8,7 +8,7 @@ describe('CodexSurface', () => {
     ['item/completed', true], ['thread/compacted', true],
     ['item/completed', false], ['thread/compacted', false],
   ] as const)(
-    'settles compaction through %s before the turn finishes (start received: %s)', async (method, started) => {
+    'keeps new activity below compaction after a late tool result through %s (start received: %s)', async (method, started) => {
       const { surface, transport } = createSurface();
       await surface.connect();
       const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
@@ -20,6 +20,16 @@ describe('CodexSurface', () => {
       transport.emitNotification('turn/started', {
         threadId: params.threadId, turn: turn(params.turnId, 'inProgress', []),
       });
+      transport.emitNotification('item/agentMessage/delta', {
+        threadId: params.threadId, turnId: params.turnId, itemId: 'before', delta: 'Before compaction',
+      });
+      const command: v2.ThreadItem = {
+        type: 'commandExecution', id: 'long-running-check', command: 'npm run check',
+        cwd: '/tmp/project', processId: null, source: 'agent', status: 'inProgress',
+        commandActions: [], aggregatedOutput: null, exitCode: null, durationMs: null,
+        pluginId: null, scriptPath: null,
+      };
+      transport.emitNotification('item/started', { ...params, item: command });
       if (started) {
         transport.emitNotification('item/started', params);
         expect(replica.getSnapshot().messages.find((message) => message.kind === 'compaction')?.status).toBe('streaming');
@@ -28,14 +38,26 @@ describe('CodexSurface', () => {
       // Duplicate completion and a late start must not reopen the same marker.
       transport.emitNotification(method, params);
       transport.emitNotification('item/started', params);
+      transport.emitNotification('item/completed', {
+        threadId: params.threadId, turnId: params.turnId, completedAtMs: 2,
+        item: { ...command, status: 'completed', exitCode: 0 },
+      });
       transport.emitNotification('item/agentMessage/delta', {
         threadId: params.threadId, turnId: params.turnId, itemId: 'answer', delta: 'Continuing work',
+      });
+      transport.emitNotification('item/started', {
+        ...params, item: { ...command, id: 'new-check' },
       });
       for (const snapshot of [surface.getConversationSnapshot(params.threadId), replica.getSnapshot()]) {
         expect(snapshot.busy).toBe(true);
         expect(snapshot.messages.filter((message) => message.kind === 'compaction')).toMatchObject([
           { status: 'complete' },
         ]);
+        expect(snapshot.messages.filter((message) => message.turnId === params.turnId)
+          .map((message) => message.kind ?? message.parts.map((part) => part.type === 'text' ? part.text : part.type === 'tool' ? part.id : part.type)))
+          .toEqual([['Before compaction', 'long-running-check'], 'compaction', ['Continuing work', 'new-check']]);
+        expect(snapshot.messages.flatMap((message) => message.parts).find((part) => part.type === 'tool' && part.id === command.id))
+          .toMatchObject({ status: 'completed' });
       }
     },
   );

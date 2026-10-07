@@ -251,7 +251,8 @@ export function upsertAssistantToolPart(
   } else {
     parts.push(toolPart);
   }
-  next.splice(messageIndex, 1, { ...message, status: 'streaming', parts });
+  // A late tool result must not reopen a segment closed by compaction or steer.
+  next.splice(messageIndex, 1, { ...message, parts });
   return pruneEmptyAssistantPlaceholders(next, threadId);
 }
 
