@@ -112,15 +112,22 @@ Controller-based panes supply the catalog through
 
 | Gesture | Result |
 | --- | --- |
-| `Enter` | Submit the current prompt |
+| `Enter` | Send while idle; while busy, use `followUpBehavior` (queue by default) |
 | `Up` / `Down` with a slash menu open | Highlight a command |
 | `Enter` with a slash menu open | Execute the highlighted command; commands requiring input activate their composer mode |
 | `Tab` with a slash menu open | Complete the highlighted command without submitting it; commands requiring input activate their composer mode |
 | `Shift+Enter` | Insert a newline at the current selection |
-| `Cmd+Enter` | Steer the active turn; with `emptySendPrompt` configured and no composer content or queued prompt, send its fallback text instead |
+| `Cmd+Enter` / `Ctrl+Enter` | While busy, use the other follow-up action; while idle, use ordinary send |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |
 | `Up` / `Down` in an empty composer | Navigate backward / forward through submitted prompts |
 | `Escape`, then `Escape` again within two seconds | Interrupt the active turn |
+
+Set `follow-up-behavior="steer"` on `CodexComposer` or `CodexConversationPane`,
+or `composer.followUpBehavior: 'steer'` in a pane controller, to make Enter and
+the send button steer during an active turn. Cmd/Ctrl+Enter then queues instead.
+The default is `'queue'`. Button labels and tooltip shortcuts reflect the
+effective action. With `capabilities.steerPrompt: false`, both paths use ordinary
+send, preserving attachments and input options; the host queues while busy.
 
 Suggestion menus consume navigation keys before composer shortcuts. Newline
 insertion preserves the caret even when it splits text in the middle of a line,
@@ -154,22 +161,25 @@ activation of a conversation key and must resolve to chronological prompt
 strings. Standalone `CodexComposer` consumers can pass `promptHistory` and,
 when loading asynchronously, `promptHistoryLoading`.
 
-When `queuedPromptId` is supplied and the composer is empty, `Cmd+Enter` emits
-`steerQueuedPrompt` for that queued item. It does not create an empty steer.
+While busy, when `queuedPromptId` is supplied and the composer is empty, the
+steer shortcut emits `steerQueuedPrompt` for that queued item. This is
+Cmd/Ctrl+Enter by default, or Enter with `followUpBehavior: 'steer'`.
+It does not create an empty steer, and unsupported steering leaves the queue alone.
 
 Set `empty-send-prompt="continue"` on `CodexConversationPane` (or
 `CodexComposer`) to submit `continue` when Send is activated with an otherwise
 empty composer. With no text, attachments, host context, or active command, the
 muted Send button becomes available on hover; clicking it or pressing
-`Cmd+Enter` submits the configured fallback text. The default is empty, which
+Cmd/Ctrl+Enter submits the configured fallback text while idle. The default is empty, which
 preserves the normal disabled Send behavior. This does not override the
 dedicated interrupted-turn Continue action, an active-turn interrupt, or
-empty-composer `Cmd+Enter` on an existing queued prompt.
+the busy-composer steer shortcut on an existing queued prompt.
 
 `CodexConversationPane` also renders an Edit action for each queued prompt.
 Editing is disabled while the composer contains a draft. A normal submit saves
-the edited text in the same queue position; Cmd+Enter steers the edited
-text immediately and removes the queued item.
+the edited text in the same queue position; the steer shortcut while busy
+steers the edited text immediately and removes the queued item. Unsupported
+steering saves the edit instead, without duplicating it.
 
 ## Controlled text and selection
 
@@ -244,8 +254,8 @@ present, the composer submits the canonical prompt:
 
 This keeps the app-server turn contract explicit while allowing image- or
 file-only interaction. Attachment-only prompts also work while a turn is busy:
-normal Send queues them, while `Cmd+Enter` steers them with the same sentinel
-and attachment references.
+the queue and steer actions use the same sentinel and attachment references,
+regardless of the follow-up preference.
 
 ## Voice recording
 

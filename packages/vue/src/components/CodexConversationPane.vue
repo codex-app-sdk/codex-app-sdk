@@ -153,6 +153,7 @@
             :disabled="effectiveDisabled"
             :draft="localDraft"
             :empty-send-prompt="emptySendPrompt"
+            :follow-up-behavior="effectiveFollowUpBehavior"
             :files="effectiveFiles"
             :has-attachments="selectedAttachments.length > 0"
             :has-external-content="hasComposerContext"
@@ -382,6 +383,7 @@ const props = withDefaults(defineProps<{
   conversationKey?: string | number | null;
   disabled?: boolean;
   emptySendPrompt?: string;
+  followUpBehavior?: 'queue' | 'steer';
   emptyDescription?: string;
   emptyTitle?: string;
   error?: string | null;
@@ -911,6 +913,10 @@ const effectiveModelMenuItems = computed(() => controlledValue(
 const effectivePlaceholder = computed(() => controlledValue(
   (state) => state.composer?.placeholder,
   () => props.placeholder,
+));
+const effectiveFollowUpBehavior = computed(() => controlledValue(
+  (state) => state.composer?.followUpBehavior ?? 'queue',
+  () => props.followUpBehavior ?? 'queue',
 ));
 const effectiveCanDeleteTurn = computed(() => controlledValue(
   (state) => state.policy?.canDeleteTurn ?? true,

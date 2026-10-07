@@ -348,18 +348,27 @@ filesystem path.
 `CodexComposer` accepts `hasAttachments` when the host owns the attachment
 queue. This enables submit with an otherwise empty prompt and emits the
 canonical `'(no user instructions)'` prompt for send, queue, or steer. It also accepts
-`queuedPromptId`; when the composer is empty, Cmd+Enter emits
+`queuedPromptId`; while busy with the default queue preference and an empty
+composer, Cmd/Ctrl+Enter emits
 `steerQueuedPrompt` for that queued item instead of submitting an empty steer.
 In `CodexConversationPane`, queued-prompt Edit loads the text into an empty
 composer. Enter dispatches `updateQueuedPrompt(promptId, prompt)`, while
-Cmd+Enter dispatches `steerQueuedPrompt(promptId, prompt)`.
+Cmd/Ctrl+Enter dispatches `steerQueuedPrompt(promptId, prompt)` while busy.
 
-With `capabilities.steerPrompt: false`, Cmd+Enter uses ordinary send instead,
+`CodexComposer` and `CodexConversationPane` accept
+`followUpBehavior?: 'queue' | 'steer'` (default `'queue'`). Controlled panes read
+the same option from `state.composer.followUpBehavior`. While busy, Enter and
+the send button use the selected behavior, and Cmd/Ctrl+Enter uses the other
+action. The `'steer'` preference reverses the queue/edit shortcut mapping above.
+While idle, both shortcuts use ordinary send. Shift+Enter remains a newline.
+Send-button labels and tooltip shortcuts reflect the effective action.
+
+With `capabilities.steerPrompt: false`, either shortcut uses ordinary send instead,
 preserving attachments and input options; the host can queue that submission
 while busy. An empty composer does not steer or change an existing queued
-prompt. During queue editing, Cmd+Enter saves through `updateQueuedPrompt`
+prompt. During queue editing, either shortcut saves through `updateQueuedPrompt`
 without submitting a duplicate. The shelf's Steer button remains visible but
-disabled. The default `steerPrompt: true` behavior is unchanged.
+disabled.
 
 ### Host-owned message selection and composer context
 

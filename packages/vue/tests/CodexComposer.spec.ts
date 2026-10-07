@@ -17,6 +17,7 @@ type ChatComposerProps = {
   disabled: boolean;
   draft?: string;
   draftRevision?: number;
+  followUpBehavior?: 'queue' | 'steer';
   isSending: boolean;
   hasAttachments?: boolean;
   hasExternalContent?: boolean;
@@ -448,7 +449,7 @@ describe('ChatComposer', () => {
   });
 
   it('steers the queued prompt from an empty Cmd Enter shortcut', async () => {
-    const wrapper = mountComposer({ queuedPromptId: 'queued-1' });
+    const wrapper = mountComposer({ isSending: true, queuedPromptId: 'queued-1' });
 
     await editor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
 
@@ -457,7 +458,7 @@ describe('ChatComposer', () => {
   });
 
   it('steers the queued prompt from a whitespace-only Cmd Enter shortcut', async () => {
-    const wrapper = mountComposer({ queuedPromptId: 'queued-1' });
+    const wrapper = mountComposer({ isSending: true, queuedPromptId: 'queued-1' });
     await setEditorValue(wrapper, '   ');
 
     await editor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
@@ -469,7 +470,7 @@ describe('ChatComposer', () => {
   it('steers an attachment-only composer but not an empty or disabled one', async () => {
     const empty = mountComposer();
     const disabled = mountComposer({ disabled: true, queuedPromptId: 'queued-1' });
-    const attachments = mountComposer({ hasAttachments: true });
+    const attachments = mountComposer({ isSending: true, hasAttachments: true });
 
     await editor(empty).trigger('keydown', { key: 'Enter', metaKey: true });
     await editor(disabled).trigger('keydown', { key: 'Enter', metaKey: true });
@@ -941,14 +942,46 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('plain text');
   });
 
-  it('steers with Command Enter', async () => {
-    const wrapper = mountComposer({ isSending: true });
+  it.each([
+    [undefined, 'metaKey', 'steer'],
+    [undefined, 'ctrlKey', 'steer'],
+    ['steer', 'metaKey', 'send'],
+    ['steer', 'ctrlKey', 'send'],
+  ] as const)('uses the alternate follow-up for %s with %s', async (followUpBehavior, modifier, expected) => {
+    const wrapper = mountComposer({ isSending: true, followUpBehavior });
 
     await setEditorValue(wrapper, 'switch to the smaller fix');
-    await editor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+    await editor(wrapper).trigger('keydown', { key: 'Enter', [modifier]: true });
 
-    expect(wrapper.emitted('steer')).toStrictEqual([['switch to the smaller fix']]);
-    expect(wrapper.emitted('send')).toBeUndefined();
+    expect(wrapper.emitted(expected)).toStrictEqual([['switch to the smaller fix']]);
+    expect(wrapper.emitted(expected === 'send' ? 'steer' : 'send')).toBeUndefined();
+  });
+
+  it.each([undefined, 'steer'] as const)('uses ordinary send while idle with preference %s', async (followUpBehavior) => {
+    for (const modifiers of [{}, { metaKey: true }, { ctrlKey: true }]) {
+      const wrapper = mountComposer({ followUpBehavior });
+      await setEditorValue(wrapper, 'start a turn');
+      await editor(wrapper).trigger('keydown', { key: 'Enter', ...modifiers });
+      expect(wrapper.emitted('send')).toStrictEqual([['start a turn']]);
+      expect(wrapper.emitted('steer')).toBeUndefined();
+      wrapper.unmount();
+    }
+  });
+
+  it('uses the preferred follow-up action for Enter and the send button', async () => {
+    for (const action of ['enter', 'click']) {
+      const wrapper = mountComposer({ isSending: true, followUpBehavior: 'steer' });
+      await setEditorValue(wrapper, 'adjust the current work');
+      const button = wrapper.get('.chat-composer__send');
+      expect(button.attributes('aria-label')).toBe('Steer prompt');
+      expect(button.attributes('title')).toContain('Steer prompt (Enter)');
+      expect(button.attributes('title')).toContain('Queue prompt (Cmd/Ctrl+Enter)');
+      if (action === 'click') await button.trigger('click');
+      else await editor(wrapper).trigger('keydown', { key: 'Enter' });
+      expect(wrapper.emitted('steer')).toStrictEqual([['adjust the current work']]);
+      expect(wrapper.emitted('send')).toBeUndefined();
+      wrapper.unmount();
+    }
   });
 
   it('ignores unsupported Enter modifier combinations', async () => {
@@ -956,7 +989,6 @@ describe('ChatComposer', () => {
     await setEditorValue(wrapper, 'keep this draft');
 
     for (const init of [
-      { ctrlKey: true },
       { altKey: true },
       { metaKey: true, ctrlKey: true },
       { metaKey: true, altKey: true },

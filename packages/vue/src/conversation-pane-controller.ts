@@ -64,6 +64,8 @@ export type CodexConversationPaneComposerState = {
   /** Chronological user prompts available to Up/Down recall. */
   promptHistory?: readonly string[];
   placeholder?: string;
+  /** Primary follow-up action while busy; Cmd/Ctrl+Enter uses the other action. */
+  followUpBehavior?: 'queue' | 'steer';
   /** Host actions rendered after Approval and before Plan mode. */
   leadingMenuItems?: readonly CodexComposerMenuItem[];
   menuItems?: readonly CodexComposerMenuItem[];

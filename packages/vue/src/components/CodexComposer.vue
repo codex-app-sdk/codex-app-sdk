@@ -139,6 +139,7 @@
           :busy="sendButtonLoading"
           :interrupt-armed="interruptArmed"
           :submit-label="sendButtonLabel"
+          :title="sendButtonTitle"
           interrupt-label="Codex is working"
           @click="handleSendButtonClick"
         />
@@ -185,6 +186,7 @@ const props = defineProps<{
   draft?: string;
   draftRevision?: number;
   emptySendPrompt?: string;
+  followUpBehavior?: 'queue' | 'steer';
   files?: readonly CodexFileSearchItem[];
   hasAttachments?: boolean;
   hasExternalContent?: boolean;
@@ -306,6 +308,7 @@ const canInterrupt = computed(() => Boolean(
   && !isTranscribing.value,
 ));
 const sendButtonLoading = computed(() => canInterrupt.value);
+const preferSteer = computed(() => props.followUpBehavior === 'steer' && effectiveCodexCapabilities.value.steerPrompt);
 const sendButtonDisabled = computed(() => {
   if (props.interruptArmed) return false;
   if (isTranscribing.value) return true;
@@ -317,8 +320,15 @@ const sendButtonLabel = computed(() => (
     ? 'Continue'
     : canSubmitEmptyPrompt.value
       ? 'Send default prompt'
-      : props.isSending ? 'Queue prompt' : 'Send prompt'
+      : props.isSending ? (preferSteer.value ? 'Steer prompt' : 'Queue prompt') : 'Send prompt'
 ));
+const sendButtonTitle = computed(() => {
+  if (props.interruptArmed) return 'Press Escape again or click to stop generation';
+  if (canInterrupt.value) return 'Interrupt';
+  const primary = `${sendButtonLabel.value} (Enter)`;
+  if (!props.isSending || !effectiveCodexCapabilities.value.steerPrompt) return primary;
+  return `${primary}. ${preferSteer.value ? 'Queue' : 'Steer'} prompt (Cmd/Ctrl+Enter)`;
+});
 const {
   buttonDisabled: voiceButtonDisabled,
   buttonLabel: voiceButtonLabel,
@@ -428,7 +438,8 @@ function submitPrompt(): void {
     emit('send', emptySendPrompt.value);
     return;
   }
-  submitWithIntent('send');
+  if (props.isSending && preferSteer.value) submitSteer();
+  else submitWithIntent('send');
 }
 
 async function handleSendButtonClick(): Promise<void> {
@@ -648,8 +659,9 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   }
 
   event.preventDefault();
-  if (event.metaKey && !event.ctrlKey && !event.altKey) {
-    if (canContinueInterruptedTurn.value || (canSubmitEmptyPrompt.value && !props.queuedPromptId)) submitPrompt();
+  if ((event.metaKey !== event.ctrlKey) && !event.altKey) {
+    if (!props.isSending) submitPrompt();
+    else if (preferSteer.value) submitWithIntent('send');
     else submitSteer();
     return;
   }

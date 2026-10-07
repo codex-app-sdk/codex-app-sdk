@@ -1839,18 +1839,20 @@ describe('CodexConversationPane', () => {
   });
 
   it.each([
-    { steerPrompt: true, event: 'steer', forbidden: 'submit' },
-    { steerPrompt: false, event: 'submit', forbidden: 'steer' },
-  ])('routes Cmd Enter with attachments to $event when steerPrompt=$steerPrompt', async ({ steerPrompt, event, forbidden }) => {
+    { steerPrompt: true, followUpBehavior: 'queue' as const, event: 'steer', forbidden: 'submit' },
+    { steerPrompt: false, followUpBehavior: 'queue' as const, event: 'submit', forbidden: 'steer' },
+    { steerPrompt: true, followUpBehavior: 'steer' as const, event: 'steer', forbidden: 'submit' },
+    { steerPrompt: false, followUpBehavior: 'steer' as const, event: 'submit', forbidden: 'steer' },
+  ])('routes attachment follow-ups to $event with preference=$followUpBehavior and steerPrompt=$steerPrompt', async ({ steerPrompt, followUpBehavior, event, forbidden }) => {
     const attachment: CodexNativeAttachment = {
       id: 'notes', type: 'file', reference: 'attachment:notes', name: 'Notes', mimeType: 'text/markdown', size: 1,
     };
     const wrapper = mount(CodexConversationPane, {
-      props: { attachments: [attachment], busy: true, messages, modelValue: '',
+      props: { attachments: [attachment], busy: true, messages, modelValue: '', followUpBehavior,
         capabilities: { ...codexCapabilities, steerPrompt } },
     });
     await setComposerText(wrapper, 'Use these notes');
-    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: followUpBehavior === 'queue' });
 
     expect(wrapper.emitted(event)).toStrictEqual([[
       'Use these notes',
@@ -1870,13 +1872,14 @@ describe('CodexConversationPane', () => {
     const controller = createCodexConversationPaneController({
       state: {
         identity: { conversationKey: 'controlled-steer', messages, busy: true },
-        composer: { attachments: [attachment] },
+        composer: { attachments: [attachment], followUpBehavior: 'steer' },
       },
       actions: { steer },
     });
-    const wrapper = mount(CodexConversationPane, { props: { controller } });
+    const wrapper = mount(CodexConversationPane, { props: { controller, followUpBehavior: 'queue' } });
 
-    (wrapper.findComponent(CodexComposer) as unknown as VueWrapper).vm.$emit('steer', 'Controlled steer');
+    await setComposerText(wrapper, 'Controlled steer');
+    await composerEditor(wrapper).trigger('keydown', { key: 'Enter' });
     await flushPromises();
 
     expect(steer).toHaveBeenCalledWith('Controlled steer', {
@@ -2192,7 +2195,7 @@ describe('CodexConversationPane', () => {
     };
     const controller = createCodexConversationPaneController({
       state: {
-        identity: { conversationKey: 'controlled-queue', messages },
+        identity: { conversationKey: 'controlled-queue', messages, busy: true },
         thread: { queuedPrompts: [{ id: 'controlled-queued', text: 'Controlled queue' }] },
       },
       actions,
@@ -2229,7 +2232,7 @@ describe('CodexConversationPane', () => {
   it('keeps every queued-prompt operation controller-owned when actions are absent', async () => {
     const controller = createCodexConversationPaneController({
       state: {
-        identity: { conversationKey: 'controlled-queue-absent', messages },
+        identity: { conversationKey: 'controlled-queue-absent', messages, busy: true },
         thread: { queuedPrompts: [{ id: 'controlled-queued', text: 'Controlled queue' }] },
       },
       actions: {},
@@ -2257,6 +2260,7 @@ describe('CodexConversationPane', () => {
 
   it('forwards every queued-prompt operation to legacy events and an attached surface', async () => {
     const surface = fakeSurfaceController();
+    surface.state.busy = true;
     surface.state.queuedPrompts = [{ id: 'surface-queued', text: 'Surface queue' }];
     const surfaceActions = {
       deleteQueuedPrompt: vi.fn(async () => surface.state),
