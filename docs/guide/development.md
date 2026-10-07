@@ -208,12 +208,16 @@ see [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 In GitHub Actions, select **Publish public packages → Run workflow**, leave the
 branch on `main`, and enter the exact committed version. The version must match
 `package.json`; all six package versions and their internal dependencies are
-checked by the release gate. **Dry run** defaults to enabled: it runs the full
-checks and previews package contents, but does not publish or create a tag.
-After inspecting that run, start it again with **Dry run** disabled to approve
-publication. Use the same commit; if `main` advanced, validate the new commit
-first. On successful publication, the workflow creates `vVERSION` and a GitHub
-release with generated notes, pointing at the exact published commit.
+checked by the release gate. Starting the workflow authorizes publication:
+one run verifies and builds the SDK, inspects package contents, publishes all
+six packages to npm, and creates `vVERSION` with generated GitHub release notes.
+Checks must pass before publication begins. The workflow uses the exact commit
+selected at dispatch, even if `main` advances while it runs.
+
+There is no separate release dry run or second dispatch. The internal
+`npm pack --dry-run` step only inspects package contents as part of the normal
+production gate. For validation without publishing, run `npm run check` locally
+or use the repository's CI workflow.
 
 Package versions are immutable. Re-running the workflow for an already
 published version fails instead of overwriting it. If publication stops partway,

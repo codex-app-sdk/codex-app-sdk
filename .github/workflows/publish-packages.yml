@@ -4,13 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact SDK version already committed on main (for example 0.14.2)
+        description: Exact stable SDK version already committed on main
         required: true
         type: string
-      dry_run:
-        description: Validate and preview packages without publishing
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -69,13 +65,11 @@ jobs:
           done
 
       - name: Publish packages
-        if: ${{ !inputs.dry_run }}
         run: npm run publish:packages
 
   release:
     name: Create GitHub release
     needs: publish
-    if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

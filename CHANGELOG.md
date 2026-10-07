@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Release infrastructure
+
+- Use a single production publishing run: validate packages, publish to npm,
+  and create the GitHub release. Remove the separate workflow dry-run mode.
+
 ## 0.14.3
 
 ### Added
