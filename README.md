@@ -111,9 +111,9 @@ or `npm run dev:web`.
 
 ### Build your own application
 
-The source is open under Apache-2.0, but the published scoped packages are
-currently access-controlled on GitHub Packages, not the public npm registry.
-See the installation guide for package authentication before running `npx`.
+The source is open under Apache-2.0. All six scoped SDK and scaffolder packages
+are available on the public npm registry; no package token is required to
+install them or run `npx`.
 
 The default scaffold is a complete Electron + Vue application. Pass
 `--target web` for an Express + `ws` host using the same backend, surface, and
