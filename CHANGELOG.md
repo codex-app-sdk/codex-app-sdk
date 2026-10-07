@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.14.4
+
+### Added
+
+- Configurable composer follow-up behavior: Queue (default) or Steer on Enter
+  and the send button, with Cmd/Ctrl+Enter using the alternate action while busy.
+  Idle shortcuts use ordinary send, Shift+Enter keeps inserting a newline,
+  and unsupported steering falls back to ordinary send.
+
+### Fixed
+
+- Keep new assistant activity below the compaction divider when a tool started
+  before compaction finishes afterward.
+
 ### Release infrastructure
 
 - Use a single production publishing run: validate packages, publish to npm,
