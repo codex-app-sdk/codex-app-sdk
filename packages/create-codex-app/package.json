@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/create-codex-app",
-  "version": "0.14.2",
+  "version": "0.14.3",
   "description": "Scaffold Electron or web Vue applications powered by Codex App SDK.",
   "type": "module",
   "main": "./src/cli.js",

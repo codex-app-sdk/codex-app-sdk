@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.14.3
+
 ### Added
 
 - Interactive inline HTML previews for assistant artifacts and full-document
@@ -10,6 +12,14 @@
   controls and a streaming component-lab scenario with a Chart.js example.
   HTTPS script libraries are supported without granting host-origin access
   or enabling API fetches.
+
+### Changed
+
+- List models directly in the composer menu, with a reasoning-effort submenu
+  per model. Clicking a model preserves a supported effort or falls back to
+  High, then the model default. Hovering lets users browse without switching.
+- Align menu and suggestion labels and headings at 13.5px regular weight.
+- Refresh public npm installation and scaffolder README guidance.
 
 ## 0.14.2
 
