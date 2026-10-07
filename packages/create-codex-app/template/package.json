@@ -12,10 +12,10 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/backend": "^0.14.0",
-    "@codex-app-sdk/core": "^0.14.0",
-    "@codex-app-sdk/electron": "^0.14.0",
-    "@codex-app-sdk/vue": "^0.14.0",
+    "@codex-app-sdk/backend": "^0.14.1",
+    "@codex-app-sdk/core": "^0.14.1",
+    "@codex-app-sdk/electron": "^0.14.1",
+    "@codex-app-sdk/vue": "^0.14.1",
     "vue": "^3.5.0"
   },
   "devDependencies": {

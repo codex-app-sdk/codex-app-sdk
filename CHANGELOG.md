@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.14.1
+
+### Added
+
+- Press Tab in an empty composer to accept a host-provided placeholder as an
+  editable draft, without submitting it. Native undo and caret placement are
+  preserved; default hints and active command modes are not accepted.
+
+### Fixed
+
+- Composer placeholders use a more muted color while retaining normal text weight.
+- Non-macOS builds skip validation of the macOS-only speech helper.
+
 ## 0.14.0
 
 First complete public npm release of all six scoped SDK packages.

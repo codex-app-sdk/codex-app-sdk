@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/backend",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Node.js app-server runtime and backend composition for Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
@@ -38,7 +38,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "0.14.0"
+    "@codex-app-sdk/core": "0.14.1"
   },
   "engines": {
     "node": ">=22"
