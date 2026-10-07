@@ -129,7 +129,13 @@ function renderItem(
         'aria-expanded': expanded,
         disabled: !enabled,
         tabindex: firstFocusable ? 0 : -1,
-        onClick: () => expanded ? openSubmenus.delete(item.id) : openSubmenus.add(item.id),
+        onClick: () => {
+          if (item.selectAction) {
+            if (!item.selectAction.disabled) select(item.selectAction);
+          } else {
+            expanded ? openSubmenus.delete(item.id) : openSubmenus.add(item.id);
+          }
+        },
         onKeydown: (event: KeyboardEvent) => {
           if (event.key !== 'ArrowRight' || !enabled) return;
           const trigger = event.currentTarget as HTMLElement;

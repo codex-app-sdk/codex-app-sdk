@@ -1121,8 +1121,8 @@ describe('ChatComposer', () => {
     expect(trigger.element.disabled).toBe(false);
 
     await trigger.trigger('click');
-    await wrapper.get('[data-submenu-id="model"] > button').trigger('click');
-    await wrapper.findAll('[data-submenu-id="model"] [role="menuitemradio"]')[1]!.trigger('click');
+    await wrapper.get('[data-submenu-id="model:codex-fast"]').trigger('mouseenter');
+    await wrapper.findAll('[data-submenu-id="model:codex-fast"] [role="menuitemradio"]')[0]!.trigger('click');
 
     expect(wrapper.emitted('update:modelId')).toStrictEqual([['codex-fast']]);
   });

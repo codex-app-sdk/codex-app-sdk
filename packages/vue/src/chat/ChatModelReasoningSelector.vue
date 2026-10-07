@@ -50,7 +50,8 @@ import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../
 import CodexComposerMenu from '../components/CodexComposerMenu.vue';
 
 type SelectorCommand<Payload> =
-  | { source: 'selector'; kind: 'model' | 'reasoning' | 'serviceTier'; value: string }
+  | { source: 'selector'; kind: 'model'; value: string; reasoningEffort?: ReasoningEffort }
+  | { source: 'selector'; kind: 'serviceTier'; value: string }
   | { source: 'host'; item: CodexComposerMenuSelectableItem<Payload> };
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
@@ -116,37 +117,43 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand<Payload>>[]
     items.push(...wrapHostMenuItems(props.menuItems));
     items.push({ id: 'host-model-menu-separator', type: 'separator' });
   }
-  items.push({
-    id: 'model',
-    label: 'Model',
-    type: 'submenu',
-    value: selectedModel.value ? compactModelLabel(selectedModel.value.displayName) : undefined,
-    submenuAlignment: 'bottom',
-    submenuWidth: 'wide',
-    items: props.models.map((model) => ({
-      checked: model.id === selectedModel.value?.id,
-      closeOnSelect: false,
+  for (const model of props.models) {
+    const selected = model.id === selectedModel.value?.id;
+    const efforts = model.supportedReasoningEfforts ?? [];
+    if (!props.showReasoning || efforts.length === 0) {
+      items.push({
+        checked: selected,
+        closeOnSelect: true,
+        id: `model:${model.id}`,
+        label: model.displayName,
+        payload: { source: 'selector', kind: 'model', value: model.id },
+        type: 'radio',
+      });
+      continue;
+    }
+    items.push({
       id: `model:${model.id}`,
       label: model.displayName,
-      payload: { source: 'selector' as const, kind: 'model' as const, value: model.id },
-      type: 'radio' as const,
-    })),
-  });
-
-  if (showReasoning.value) {
-    items.push({
-      id: 'reasoning',
-      label: 'Reasoning',
       type: 'submenu',
-      value: effectiveReasoningEffort.value ? effortLabel(effectiveReasoningEffort.value) : undefined,
+      selectAction: {
+        id: `select-model:${model.id}`,
+        label: model.displayName,
+        type: 'action',
+        payload: {
+          source: 'selector', kind: 'model', value: model.id,
+          reasoningEffort: [effectiveReasoningEffort.value, 'high', model.defaultReasoningEffort]
+            .find((candidate) => efforts.some((effort) => effort.reasoningEffort === candidate))
+            ?? efforts[0]!.reasoningEffort,
+        },
+      },
+      value: selected && effectiveReasoningEffort.value ? effortLabel(effectiveReasoningEffort.value) : undefined,
       submenuAlignment: 'bottom',
-      submenuWidth: 'wide',
-      items: reasoningEfforts.value.map((effort) => ({
-        checked: effort.reasoningEffort === effectiveReasoningEffort.value,
+      items: efforts.map((effort) => ({
+        checked: selected && effort.reasoningEffort === effectiveReasoningEffort.value,
         closeOnSelect: true,
-        id: `reasoning:${effort.reasoningEffort}`,
+        id: `model:${model.id}:reasoning:${effort.reasoningEffort}`,
         label: effortLabel(effort.reasoningEffort),
-        payload: { source: 'selector' as const, kind: 'reasoning' as const, value: effort.reasoningEffort },
+        payload: { source: 'selector' as const, kind: 'model' as const, value: model.id, reasoningEffort: effort.reasoningEffort },
         type: 'radio' as const,
       })),
     });
@@ -232,9 +239,8 @@ function onSelect(item: CodexComposerMenuSelectableItem<SelectorCommand<Payload>
   if (command.source === 'host') {
     emit('menuSelect', command.item);
   } else if (command.kind === 'model') {
-    emit('update:modelId', command.value);
-  } else if (command.kind === 'reasoning' && showReasoning.value) {
-    emit('update:reasoningEffort', command.value);
+    if (props.modelId !== command.value) emit('update:modelId', command.value);
+    if (props.showReasoning && command.reasoningEffort !== undefined) emit('update:reasoningEffort', command.reasoningEffort);
   } else if (command.kind === 'serviceTier' && fastServiceTier.value) {
     emit('update:serviceTier', props.serviceTier === fastServiceTier.value.id ? null : command.value);
   }
@@ -260,8 +266,13 @@ function wrapHostMenuItems(
       };
     }
     if (item.type === 'submenu') {
-      const { items: childItems, payload: _payload, ...submenu } = item;
-      return { ...submenu, id, items: wrapHostMenuItems(childItems, path) };
+      const { items: childItems, payload: _payload, selectAction, ...submenu } = item;
+      return {
+        ...submenu, id, items: wrapHostMenuItems(childItems, path),
+        selectAction: selectAction ? {
+          ...selectAction, id: `${id}:select`, payload: { source: 'host', item: selectAction },
+        } : undefined,
+      };
     }
     return {
       ...item,
@@ -339,7 +350,15 @@ function wrapHostMenuItems(
   display: none;
 }
 
+:deep(.chat-model-selector__menu [data-submenu-id^="model:"] > .codex-composer-menu-list__submenu-list) {
+  width: 160px;
+}
+
 :deep(.chat-model-selector__menu [role="menuitemradio"][aria-checked="true"]) {
+  background: var(--color-surface-low);
+}
+
+:deep(.chat-model-selector__menu [data-submenu-id^="model:"]:has([role="menuitemradio"][aria-checked="true"]) > button) {
   background: var(--color-surface-low);
 }
 
@@ -349,7 +368,7 @@ function wrapHostMenuItems(
 }
 
 :deep(.chat-model-selector__menu .codex-composer-menu-list__submenu-list .codex-composer-menu-list__item) {
-  font-size: var(--codex-composer-model-submenu-font-size, var(--font-size-13));
+  font-size: var(--codex-composer-model-submenu-font-size, var(--codex-composer-menu-item-font-size, var(--chat-menu-font-size, 13.5px)));
 }
 
 :deep(.chat-model-selector__menu .codex-composer-menu-list__heading) {

@@ -112,8 +112,9 @@
           :plan-mode="false"
           :plugins="plugins"
           :queued-prompts="selected.queuedPrompts"
-          :selected-model-id="models[0].id"
-          selected-reasoning-effort="medium"
+          :selected-model-id="selectedModelId"
+          :selected-reasoning-effort="selectedEffort"
+          :selected-service-tier="selectedServiceTier"
           :skills="skills"
           :turn-git-diff="selected.turnGitDiff"
           :turns="mockTurns"
@@ -124,6 +125,9 @@
           @continue-interrupted-turn="continueInterruptedTurn"
           @message-text-selection-change="selectedMessageText = $event"
           @submit="submitPrompt"
+          @update:model-id="selectedModelId = $event"
+          @update:reasoning-effort="selectedEffort = $event"
+          @update:service-tier="selectedServiceTier = $event"
         >
           <template #message-header="{ message }">
             <span v-if="messageHeaderFor(message)">
@@ -180,6 +184,7 @@ import {
   type CodexQueuedPromptData,
   type CodexSkillSummary,
   type CodexRendererSendMessageOptions,
+  type ReasoningEffort,
   type SurfaceMessage,
   type SurfaceMessagePart,
   type TurnGitDiff,
@@ -229,6 +234,18 @@ const models: [CodexModelOption, ...CodexModelOption[]] = [{
   serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Faster responses when available' }],
   defaultServiceTier: null,
   isDefault: true,
+}, {
+  id: 'mock-astra', model: 'mock-astra', displayName: 'GPT-6-Astra',
+  description: 'Mock model with a different effort catalog',
+  supportedReasoningEfforts: [
+    { reasoningEffort: 'high', description: 'Deep' },
+    { reasoningEffort: 'xhigh', description: 'Maximum' },
+  ],
+  defaultReasoningEffort: 'high', isDefault: false,
+}, {
+  id: 'mock-direct', model: 'mock-direct', displayName: 'Direct model',
+  description: 'Mock model without reasoning settings',
+  supportedReasoningEfforts: [], defaultReasoningEffort: null, isDefault: false,
 }];
 
 const transcribeAudio: CodexChatTranscription = async () => ({ text: 'Mock voice prompt' });
@@ -516,6 +533,9 @@ const scenarios: [Scenario, ...Scenario[]] = [
 const selectedId = ref('conversation');
 const theme = ref<'light' | 'dark' | 'system'>('light');
 const draft = ref('');
+const selectedModelId = ref(models[0].id);
+const selectedEffort = ref<ReasoningEffort>('medium');
+const selectedServiceTier = ref<string | null>(null);
 const activity = ref('Ready');
 const messages = ref<SurfaceMessage[]>([]);
 const mockBusy = ref(false);
@@ -557,6 +577,9 @@ function resetScenario(confirmReset = true): void {
   htmlPlaying.value = false;
   clearResetFeedback();
   draft.value = '';
+  selectedModelId.value = models[0].id;
+  selectedEffort.value = 'medium';
+  selectedServiceTier.value = null;
   messages.value = selected.value.messages.map((message) => ({ ...message, parts: [...message.parts] }));
   mockBusy.value = selected.value.busy ?? false;
   mockActiveTurnId.value = selected.value.activeTurnId ?? null;

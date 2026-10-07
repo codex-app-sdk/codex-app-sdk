@@ -62,7 +62,7 @@
   --chat-message-line-height: var(--codex-message-line-height, var(--line-height-22));
   --chat-composer-font-size: var(--codex-composer-font-size, var(--font-size-15));
   --chat-composer-line-height: var(--codex-composer-line-height, var(--line-height-24));
-  --chat-menu-font-size: var(--codex-menu-font-size, var(--font-size-14));
+  --chat-menu-font-size: var(--codex-menu-font-size, 13.5px);
   --chat-menu-description-font-size: var(--codex-menu-description-font-size, var(--font-size-12));
   --chat-menu-line-height: var(--codex-menu-line-height, var(--line-height-20));
   --chat-composer-control-size: var(--codex-composer-control-size, var(--codex-composer-button-size, 36px));

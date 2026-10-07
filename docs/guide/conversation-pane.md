@@ -256,8 +256,8 @@ Codex controls. They render after Approval and before Goal and Plan modes, in th
 Existing `composer.menuItems` remain after those modes; both collections use
 `CodexComposerMenuItem` and dispatch through `actions.menuSelect`.
 Use `composer.modelMenuItems` for host-owned presets or actions that belong
-inside the model selector. They render before the SDK-owned Model, Reasoning,
-and Speed groups and dispatch the host's original payload through the same
+inside the model selector. They render before the SDK-owned model rows (each
+with its own effort submenu) and Speed group, and dispatch the host's original payload through the same
 `actions.menuSelect` callback. The SDK keeps its own selector commands distinct
 from host payloads, so hosts do not need to mirror or namespace built-in menu
 behavior. A `heading` item may include compact trailing `actions`; those icon

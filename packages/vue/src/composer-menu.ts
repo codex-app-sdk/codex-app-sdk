@@ -48,6 +48,8 @@ export type CodexComposerMenuHeadingItem<Payload = unknown> = {
 export type CodexComposerMenuSubmenuItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
   type: 'submenu';
   items: readonly CodexComposerMenuItem<Payload>[];
+  /** Optional action for click/Enter; hover and ArrowRight still open the submenu. */
+  selectAction?: CodexComposerMenuActionItem<Payload>;
   submenuAlignment?: 'top' | 'bottom';
   submenuWidth?: 'default' | 'wide';
 };

@@ -287,9 +287,16 @@ reasoning effort, and service tier are visible together. Models and supported
 efforts come from the app-server catalog; the component does not invent IDs. The
 selector stays available while a turn is running. Changes update the conversation
 settings used by subsequent prompts without interrupting the active turn.
-Choosing a built-in model keeps the menu open so users can immediately choose
-its reasoning effort and optional speed tier. Reasoning selection keeps its
-existing close behavior.
+Models appear directly at the menu root. Each model opens a submenu containing
+only its supported reasoning efforts; hovering or pressing ArrowRight opens it
+without changing settings. Clicking a model (or pressing Enter) selects it
+immediately, preserving the current effort when supported. Otherwise it chooses
+High, then the model's supported default, then its first supported effort.
+Choosing an effort selects that model and effort, then closes the menu. Models
+without reasoning options (or with `showReasoning` disabled) are selected
+directly. The current model shows its effort beside its name, and the selected
+effort is highlighted without a checkmark. Fast mode remains below the model
+list and applies to the currently selected model.
 
 Hosts can prepend their own actions and nested presets with
 `composer.modelMenuItems` on a controlled pane, or `model-menu-items` on the

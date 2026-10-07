@@ -118,8 +118,8 @@ watch(
 .chat-composer-slash-menu__section {
   padding: var(--space-2) var(--space-4);
   color: var(--color-text-muted);
-  font-size: var(--codex-composer-menu-heading-font-size, 13px);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--codex-composer-menu-heading-font-size, var(--chat-menu-font-size));
+  font-weight: var(--font-weight-regular);
   line-height: 18px;
 }
 
@@ -170,7 +170,8 @@ watch(
 
 .chat-composer-slash-menu__name {
   overflow: hidden;
-  font-weight: var(--font-weight-medium);
+  font-size: var(--chat-menu-font-size);
+  font-weight: var(--font-weight-regular);
   text-overflow: ellipsis;
   white-space: nowrap;
   flex-shrink: 0;

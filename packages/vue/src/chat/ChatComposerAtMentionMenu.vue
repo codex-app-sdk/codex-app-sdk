@@ -144,11 +144,11 @@ function mentionIndex(groupId: string, itemId: string): number {
 }
 .chat-composer-at-menu__section,
 .chat-composer-at-menu__hint { padding: var(--space-2) var(--space-4); color: var(--color-text-muted); font-size: var(--font-size-12); }
-.chat-composer-at-menu__section { font-size: var(--codex-composer-menu-heading-font-size, 13px); font-weight: var(--font-weight-medium); line-height: 18px; }
+.chat-composer-at-menu__section { font-size: var(--codex-composer-menu-heading-font-size, var(--chat-menu-font-size)); font-weight: var(--font-weight-regular); line-height: 18px; }
 .chat-composer-at-menu__item { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: var(--chat-menu-control-min-height); margin-block: 0.125px; padding: var(--space-2) var(--space-4); border: 0; border-radius: var(--radius-lg); background: transparent; color: var(--color-text); text-align: left; }
 .chat-composer-at-menu__item--active { background: var(--color-surface-low); }
 .chat-composer-at-menu__icon { width: var(--icon-md); height: var(--icon-md); flex: 0 0 var(--icon-md); opacity: 0.5; stroke-width: 2px; }
 .chat-composer-at-menu__item span { display: flex; min-width: 0; flex-direction: column; }
-.chat-composer-at-menu__item strong { font-weight: var(--font-weight-medium); }
+.chat-composer-at-menu__item strong { font-size: var(--chat-menu-font-size); font-weight: var(--font-weight-regular); }
 .chat-composer-at-menu__item small { overflow: hidden; color: var(--color-text-muted); text-overflow: ellipsis; white-space: nowrap; }
 </style>

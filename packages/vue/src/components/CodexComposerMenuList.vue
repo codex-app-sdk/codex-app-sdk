@@ -44,7 +44,7 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   box-shadow: var(--codex-composer-menu-shadow, var(--shadow-menu, 0 4px 6px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 5%)));
   box-sizing: border-box;
   font-family: var(--codex-font-family, var(--font-family-base, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif));
-  font-size: var(--codex-composer-menu-font-size, 13px);
+  font-size: var(--codex-composer-menu-font-size, var(--chat-menu-font-size, 13.5px));
   line-height: 18px;
 }
 
@@ -61,7 +61,7 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   color: inherit;
   background: transparent;
   font-family: inherit;
-  font-size: var(--codex-composer-menu-item-font-size, var(--chat-menu-font-size, 14px));
+  font-size: var(--codex-composer-menu-item-font-size, var(--chat-menu-font-size, 13.5px));
   line-height: var(--chat-menu-line-height, 20px);
   text-align: left;
   cursor: pointer;
@@ -143,7 +143,7 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 }
 
 .codex-composer-menu-list__label {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
 }
 
 .codex-composer-menu-list__description,
@@ -193,8 +193,8 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4) var(--space-2) calc(var(--space-4) + var(--codex-composer-menu-icon-size, 16px) + var(--space-3));
   color: var(--codex-muted-text-color, var(--color-text-muted, #666));
-  font-size: var(--codex-composer-menu-heading-font-size, 13px);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--codex-composer-menu-heading-font-size, var(--chat-menu-font-size, 13.5px));
+  font-weight: var(--font-weight-regular);
   line-height: 18px;
 }
 

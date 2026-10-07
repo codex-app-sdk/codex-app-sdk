@@ -155,11 +155,18 @@ item and before Goal and Plan modes, in that order. `composer.menuItems` remains
 extension point after those modes. The equivalent granular pane prop is
 `leading-menu-items`.
 
-`composer.modelMenuItems` renders host actions before the built-in Model,
-Reasoning, and Speed groups. Selections preserve the original host payload and
+`composer.modelMenuItems` renders host actions before the built-in model rows
+(each with its own effort submenu) and Speed group. Clicking a model preserves
+the current effort when supported, otherwise selecting High, its supported
+default, or its first effort, in that order. Selections preserve the original host payload and
 dispatch through `actions.menuSelect`; the equivalent granular prop is
 `model-menu-items`. `CodexComposerMenuHeadingItem.actions` accepts action items
 rendered as accessible trailing icon controls in the heading row.
+`CodexComposerMenuSubmenuItem.selectAction` optionally supplies the action emitted
+when its trigger is clicked or activated with Enter/Space. Hover and ArrowRight
+still open its submenu. Without it, clicking the trigger only toggles the submenu.
+Menu labels and headings default to regular weight and share the 13.5px
+`--codex-menu-font-size` default across root menus, submenus, and suggestions.
 `CodexComposerMenuItemBase.valueIcon` adds a trailing icon beside `value`; set
 `valueIconLabel` when the icon carries meaning. `valueAppearance: 'badge'`
 renders short values as compact metadata badges.

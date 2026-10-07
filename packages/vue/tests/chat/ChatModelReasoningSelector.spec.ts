@@ -106,13 +106,18 @@ describe('ChatModelReasoningSelector', () => {
   it.each([
     [{ showReasoning: false }, '5.1 Codex Max'],
     [{ models: [{ ...models[0]!, supportedReasoningEfforts: [] }] }, '5.1 Codex Fast'],
+    [{ models: [{ ...models[0]!, supportedReasoningEfforts: undefined }] }, '5.1 Codex Fast'],
   ] satisfies Array<[Partial<SelectorProps>, string]>)
   ('hides reasoning when its gate is closed %#', async (overrides, expectedLabel) => {
     const wrapper = mountSelector(overrides);
 
     expect(wrapper.get('.chat-model-selector__button').text()).toBe(expectedLabel);
     await wrapper.get('.chat-model-selector__button').trigger('click');
-    expect(wrapper.find('[data-submenu-id="reasoning"]').exists()).toBe(false);
+    expect(wrapper.find('[data-submenu-id]').exists()).toBe(false);
+    await wrapper.findAll('[role="menuitemradio"]')[0]!.trigger('click');
+    expect(wrapper.emitted('update:modelId')?.[0]).toStrictEqual(['codex-fast']);
+    expect(wrapper.emitted('update:reasoningEffort')).toBeUndefined();
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
   });
 
   it('renders exact fallback effort labels when a supported effort is blank', () => {
@@ -128,21 +133,43 @@ describe('ChatModelReasoningSelector', () => {
       .get('.chat-model-selector__button').text()).toBe('5.1 Codex Fast Reasoning');
   });
 
-  it('emits model and reasoning changes from dropdown commands', async () => {
+  it('selects a model and its own effort together without changing settings on submenu open', async () => {
     const wrapper = mountSelector();
     await wrapper.get('.chat-model-selector__button').trigger('click');
-    await wrapper.get('[data-submenu-id="model"] > button').trigger('click');
-    const modelChoices = wrapper.findAll('[data-submenu-id="model"] [role="menuitemradio"]');
-
-    expect(modelChoices).toHaveLength(2);
-    await modelChoices[0]!.trigger('click');
-    expect(wrapper.find('.chat-model-selector__menu').exists()).toBe(true);
-    expect(wrapper.get('[data-submenu-id="model"]').classes()).not.toContain('codex-composer-menu-list__submenu--open');
-    await wrapper.get('[data-submenu-id="reasoning"] > button').trigger('click');
-    await wrapper.findAll('[data-submenu-id="reasoning"] [role="menuitemradio"]')[0]!.trigger('click');
+    await wrapper.get('[data-submenu-id="model:codex-fast"]').trigger('mouseenter');
+    expect(wrapper.emitted('update:modelId')).toBeUndefined();
+    const efforts = wrapper.findAll('[data-submenu-id="model:codex-fast"] [role="menuitemradio"]');
+    expect(efforts.map((effort) => effort.text())).toStrictEqual(['Low', 'Medium']);
+    await efforts[0]!.trigger('click');
 
     expect(wrapper.emitted('update:modelId')).toStrictEqual([['codex-fast']]);
-    expect(wrapper.emitted('update:reasoningEffort')).toStrictEqual([['medium']]);
+    expect(wrapper.emitted('update:reasoningEffort')).toStrictEqual([['low']]);
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+  });
+
+  it('changes the current model effort without re-emitting the model selection', async () => {
+    const wrapper = mountSelector({ modelId: 'codex-max', reasoningEffort: 'medium' });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+    await wrapper.get('[data-submenu-id="model:codex-max"] > button').trigger('keydown', { key: 'ArrowRight' });
+    await wrapper.findAll('[data-submenu-id="model:codex-max"] [role="menuitemradio"]')[1]!.trigger('click');
+    expect(wrapper.emitted('update:modelId')).toBeUndefined();
+    expect(wrapper.emitted('update:reasoningEffort')).toStrictEqual([['high']]);
+  });
+
+  it.each([
+    ['codex-fast', 'medium', 'codex-max', 'medium'],
+    ['codex-fast', 'low', 'codex-max', 'high'],
+    ['codex-max', 'xhigh', 'codex-fast', 'medium'],
+    ['codex-fast', null, 'codex-max', 'medium'],
+  ] as const)('clicking %s/%s to %s selects the compatible or fallback effort %s', async (modelId, reasoningEffort, target, expected) => {
+    const wrapper = mountSelector({
+      modelId, reasoningEffort,
+      models: models.map((model) => ({ ...model, defaultReasoningEffort: 'medium' })),
+    });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+    await wrapper.get(`[data-submenu-id="model:${target}"] > button`).trigger('click');
+    expect(wrapper.emitted('update:modelId')).toStrictEqual([[target]]);
+    expect(wrapper.emitted('update:reasoningEffort')).toStrictEqual([[expected]]);
     expect(wrapper.find('[role="menu"]').exists()).toBe(false);
   });
 
@@ -265,8 +292,10 @@ describe('ChatModelReasoningSelector', () => {
     const wrapper = mountSelector({ modelId: 'codex-max', reasoningEffort: 'xhigh', serviceTier: 'priority' });
     await wrapper.get('.chat-model-selector__button').trigger('click');
 
-    expect(wrapper.get('[data-submenu-id="model"] > button').text()).toContain('5.1 Codex Max');
-    expect(wrapper.get('[data-submenu-id="reasoning"] > button').text()).toContain('Extra High');
+    expect(wrapper.get('[data-submenu-id="model:codex-max"] > button').text()).toContain('GPT-5.1 Codex Max');
+    expect(wrapper.get('[data-submenu-id="model:codex-max"] > button').text()).toContain('Extra High');
+    expect(wrapper.get('[data-submenu-id="model:codex-fast"] > button').text()).not.toContain('Extra High');
+    expect(wrapper.findAll('[role="menuitemradio"][aria-checked="true"]')).toHaveLength(1);
     expect(wrapper.get('[role="menuitemcheckbox"]').attributes('aria-checked')).toBe('true');
   });
 
@@ -291,13 +320,11 @@ describe('ChatModelReasoningSelector', () => {
     };
     const wrapper = mountSelector({ models: [customModel] });
     await wrapper.get('.chat-model-selector__button').trigger('click');
-    await wrapper.get('[data-submenu-id="reasoning"] > button').trigger('click');
-    const choices = wrapper.findAll('[data-submenu-id="reasoning"] [role="menuitemradio"]');
+    await wrapper.get('[data-submenu-id="model:codex-fast"]').trigger('mouseenter');
+    const choices = wrapper.findAll('[data-submenu-id="model:codex-fast"] [role="menuitemradio"]');
 
-    expect(wrapper.get('[data-submenu-id="reasoning"] > button .codex-composer-menu-list__label').text())
-      .toBe('Reasoning');
-    expect(wrapper.get('[data-submenu-id="reasoning"] > .codex-composer-menu-list__submenu-list').classes())
-      .toContain('codex-composer-menu-list__submenu-list--wide');
+    expect(wrapper.get('[data-submenu-id="model:codex-fast"] > button .codex-composer-menu-list__label').text())
+      .toBe('GPT-5.1 Codex Fast');
     expect(choices.map((choice) => choice.get('.codex-composer-menu-list__label').text())).toStrictEqual([
       'One Two',
       'Three Four',
@@ -384,15 +411,15 @@ describe('ChatModelReasoningSelector', () => {
     await wrapper.get('.chat-model-selector__button').trigger('click');
 
     expect(wrapper.findAll('[data-submenu-id]')).toHaveLength(2);
-    expect(wrapper.get('[data-submenu-id="model"] > button').attributes('aria-expanded')).toBe('false');
-    expect(wrapper.get('[data-submenu-id="reasoning"] > button').attributes('aria-expanded')).toBe('false');
-    for (const submenuId of ['model', 'reasoning']) {
+    expect(wrapper.get('[data-submenu-id="model:codex-fast"] > button').attributes('aria-expanded')).toBe('false');
+    expect(wrapper.get('[data-submenu-id="model:codex-max"] > button').attributes('aria-expanded')).toBe('false');
+    for (const submenuId of ['model:codex-fast', 'model:codex-max']) {
       expect(wrapper.get(`[data-submenu-id="${submenuId}"] > .codex-composer-menu-list__submenu-list`).classes())
         .toContain('codex-composer-menu-list__submenu-list--bottom-aligned');
     }
-    await wrapper.get('[data-submenu-id="model"] > button').trigger('click');
-    expect(wrapper.get('[data-submenu-id="model"] > button').attributes('aria-expanded')).toBe('true');
-    expect(wrapper.findAll('[data-submenu-id="model"] [role="menuitemradio"]')).toHaveLength(2);
+    await wrapper.get('[data-submenu-id="model:codex-fast"]').trigger('mouseenter');
+    expect(wrapper.get('[data-submenu-id="model:codex-fast"] > button').attributes('aria-expanded')).toBe('true');
+    expect(wrapper.findAll('[data-submenu-id="model:codex-fast"] [role="menuitemradio"]')).toHaveLength(2);
     expect(wrapper.findAll('.codex-composer-menu-list__description')).toHaveLength(1);
     expect(wrapper.findAll('.chat-model-selector__menu')).toHaveLength(1);
   });
