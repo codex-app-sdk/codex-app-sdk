@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Interactive inline HTML previews for assistant artifacts and full-document
+  HTML fences. Sandboxed streaming preserves DOM, input, and script state
+  without replacing the page on each chunk. Includes source/copy/download
+  controls and a streaming component-lab scenario with a Chart.js example.
+  HTTPS script libraries are supported without granting host-origin access
+  or enabling API fetches.
+
 ## 0.14.2
 
 ### Release infrastructure

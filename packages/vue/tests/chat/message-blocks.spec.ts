@@ -30,6 +30,52 @@ const runningTool: MessageToolCall = {
 };
 
 describe('message block computation', () => {
+  it('renders explicit HTML artifacts without interpreting their contents as chat markup', () => {
+    const source = '<button>Try me</button>\n<script>const example = "<follow-up>not a suggestion</follow-up> ![not media](x.png)";</script>\n';
+    expect(computeMessageBlocks({ role: 'assistant', content: '', parts: [
+      { type: 'text', phase: 'final_answer', content: `Before\n<artifact title="Demo">\n\`\`\`html\n${source}\`\`\`\n</artifact>\nAfter` },
+    ] })).toStrictEqual([
+      { type: 'text', content: 'Before\n', phase: 'final_answer' },
+      { type: 'html', source, title: 'Demo', complete: true, phase: 'final_answer' },
+      { type: 'text', content: '\nAfter', phase: 'final_answer' },
+    ]);
+  });
+
+  it('keeps streamed HTML append-only across split closing fences and finalization', () => {
+    const source = '<!doctype html><html><body><p>Hello</p></body></html>\n';
+    for (const ending of ['', '`', '``', '```']) {
+      const blocks = computeMessageBlocks({ role: 'assistant', streaming: true, content: `\`\`\`html\n${source}${ending}` });
+      expect(blocks).toStrictEqual([{ type: 'html', source, complete: ending === '```' }]);
+    }
+    expect(computeMessageBlocks({ role: 'assistant', content: `\`\`\`html\n${source}` }))
+      .toStrictEqual([{ type: 'html', source, complete: true }]);
+    for (const ending of ['', '</art', '</artifact>']) {
+      expect(computeMessageBlocks({ role: 'assistant', streaming: true, content: `<artifact title='Live'><div>Hi</div>${ending}` }))
+        .toStrictEqual([{ type: 'html', source: '<div>Hi</div>', title: 'Live', complete: ending === '</artifact>' }]);
+    }
+  });
+
+  it('leaves ordinary snippets, quoted artifacts and user HTML as inert text', () => {
+    for (const content of ['```html\n<button>Example</button>\n```', '```xml\n<artifact><button>Example</button></artifact>\n```', '<artifact>Just markdown</artifact>']) {
+      expect(computeMessageBlocks({ role: 'assistant', content })).toStrictEqual([{ type: 'text', content }]);
+    }
+    const content = '<artifact><button>Example</button></artifact>';
+    expect(computeMessageBlocks({ role: 'user', content })).toStrictEqual([{ type: 'user-text', content }]);
+  });
+
+  it('recognizes adjacent previews after a fenced code example', () => {
+    const blocks = computeMessageBlocks({ role: 'assistant', content: [
+      '```js', 'const example = true', '```',
+      '```html', '<html><body>First</body></html>', '```',
+      '<artifact><button>Second</button></artifact>',
+    ].join('\n') });
+    expect(blocks).toStrictEqual([
+      { type: 'text', content: '```js\nconst example = true\n```\n' },
+      { type: 'html', source: '<html><body>First</body></html>\n', complete: true },
+      { type: 'html', source: '<button>Second</button>', complete: true },
+    ]);
+  });
+
   it('strips hidden context from user messages', () => {
     expect(stripMessageContext('<context>secret</context>\nvisible')).toBe('visible');
     expect(computeMessageBlocks({ role: 'user', content: '<context>x</context>\nhello' })).toStrictEqual([

@@ -424,6 +424,25 @@ delivered to `onTranscript`, or `false` when recording/transcription fails.
 `CodexMermaidBlock`, `CodexVisualizationBlock`, `CodexCompactionMessage`, `CodexMessageActions`,
 `CodexMessageEditor`, `CodexWorkGroup`, and `CodexFoldTransition`.
 
+The message block union includes an interactive HTML variant:
+
+```ts
+{ type: 'html'; source: string; title?: string; complete: boolean; phase?: MessagePhase }
+```
+
+Assistant `<artifact title="…">…</artifact>` blocks and document-sized `html`
+fences produce this block. `complete` becomes true at the closing delimiter or
+when the message stops streaming (including an interrupted partial document).
+The stock renderer uses a persistent, opaque-origin sandbox: appended source
+does not reload it or re-execute prior scripts. Source changes that are not
+append-only reset the preview. The existing generic `block` slot can override
+this rendering, including replacing previews with inert source in a host that
+does not permit generated JavaScript. No new pane prop or backend API is needed.
+The sandbox permits HTTPS script libraries while continuing to block host
+access, HTTP scripts, and API fetches; CDN requests require network access.
+See [interactive HTML previews](/guide/messages-tools#interactive-html-previews)
+for syntax, controls, and sandbox restrictions.
+
 Image attachments and media open `CodexImageLightbox` by default. Override
 message image clicks with either `CodexConversationPane`'s `openImage` prop or
 the controlled pane's `actions.openImage(image, context)`. The handler owns the

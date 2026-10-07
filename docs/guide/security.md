@@ -50,6 +50,32 @@ They are not an authorization mechanism. A custom renderer can still call any
 action exposed by the renderer API.
 :::
 
+## Inline HTML sandbox
+
+Assistant HTML previews run inside an iframe with `sandbox="allow-scripts"`:
+no same-origin access, forms, popups, top-level navigation, or native capability
+bridge. A restrictive child CSP allows inline scripts/styles, data images/fonts,
+and HTTPS scripts (including CDN libraries). HTTP scripts, external styles,
+images and fonts, API fetches, nested frames, forms, and base URL changes remain
+blocked. HTTPS script URLs are not restricted to an allowlist: they cause
+network requests and can carry data in their URLs. `connect-src 'none'` is not
+a guarantee against data exfiltration by generated code or third-party libraries.
+The parent passes HTML over a document-bound MessagePort,
+not a general RPC bridge; navigation within the child does not deliver later
+chunks to the destination document. Child self-navigation is not a network
+firewall, and arbitrary generated JavaScript can still consume CPU or memory.
+
+Keep Electron renderers sandboxed with context isolation and Node integration
+disabled, including in subframes. Do not expose privileged preload APIs to
+untrusted child frames. Web hosts must permit the sandboxed `srcdoc` frame and
+its inline bootstrap under their own CSP; a child policy cannot loosen an
+inherited host policy. Do not weaken a strict host CSP just for previews:
+override the message `block` slot to show inert source instead if necessary.
+
+Preview copy/download exports the original source. A downloaded HTML file does
+not carry the SDK sandbox and must be treated as untrusted code when opened
+outside the application.
+
 ## Native input validation
 
 The native bridge validates:

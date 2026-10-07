@@ -293,6 +293,47 @@ and Web surfaces without exposing a backend filesystem URL to the renderer.
 Markdown, syntax highlighting, KaTeX, and Mermaid rendering share the same
 message block pipeline.
 
+### Interactive HTML previews
+
+Assistant messages can include HTML/CSS/JavaScript previews.
+Use an explicit artifact for fragments or complete pages:
+
+```html
+<artifact title="Counter">
+<button onclick="this.textContent = Number(this.textContent) + 1">0</button>
+</artifact>
+```
+
+A fenced `html` block starting with `<!doctype html>` or `<html>` also renders
+as a preview. Ordinary HTML snippets, other fenced languages, and user messages
+remain inert text/code. A title is optional; both quoted attribute styles work.
+Artifact delimiters must be outside the HTML source itself.
+
+The preview keeps one sandboxed document open while text streams, feeding only
+new HTML into its parser. Existing DOM nodes, typed input, and JavaScript state
+survive subsequent chunks and completion. Incomplete tags and scripts wait for
+the remaining bytes naturally. A genuinely rewritten source starts a fresh
+preview; moving away from the conversation and remounting it also resets state.
+Use the source toggle, copy, or download controls to inspect or save the HTML.
+The preview is 360px high and vertically resizable, with internal scrolling;
+it does not continually resize the transcript as content streams.
+
+Inline scripts/styles, data images/fonts, and **HTTPS script libraries** work.
+For example, load Chart.js from a version-pinned CDN URL with a normal script
+tag. HTTP scripts, external styles/images/fonts, API fetches, forms, popups,
+and embedded frames remain blocked. Code cannot access the host DOM, storage,
+or native bridge. Loading a library makes a network request to its server;
+this sandbox isolates code from the host, not from all network traffic.
+See [Security](/guide/security#inline-html-sandbox) for host
+requirements and limitations. Downloads contain the original HTML, not the
+sandbox wrapper, so these restrictions do not follow a file opened externally.
+
+Try **Inline HTML** in the component lab: advance one chunk, type a destination,
+click the counter, then stream the remainder. Select **Chart.js (HTTPS)** for
+a CDN-backed interactive chart. No runtime/backend changes are
+needed; this is an assistant-message rendering feature, not an instruction
+automatically sent to the model.
+
 Codex visualization annotations render as a titled visualization row instead
 of leaking their private delimiters or JSON into assistant text. The SDK never
 executes or embeds the referenced HTML. Selecting the row calls the dedicated

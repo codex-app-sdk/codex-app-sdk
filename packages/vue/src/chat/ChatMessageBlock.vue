@@ -23,6 +23,7 @@
     v-html="renderedMarkdown"
     @click="copyCodeBlock"
   />
+  <ChatHtmlBlock v-else-if="block.type === 'html'" :source="block.source" :title="block.title" :complete="block.complete" />
   <slot v-else-if="block.type === 'mermaid'" name="mermaid" :block="block" :code="block.code">
     <ChatMermaidBlock :code="block.code" />
   </slot>
@@ -117,6 +118,7 @@ import ChatQuestionRequest from './ChatQuestionRequest.vue'
 import ChatFollowUps from './ChatFollowUps.vue'
 import ChatMediaBlock from './ChatMediaBlock.vue'
 import ChatMermaidBlock from './ChatMermaidBlock.vue'
+import ChatHtmlBlock from './ChatHtmlBlock.vue'
 import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import ChatUserText from './ChatUserText.vue'

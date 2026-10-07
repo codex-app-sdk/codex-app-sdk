@@ -30,7 +30,7 @@
       </label>
     </aside>
 
-    <section class="lab__stage" :class="{ 'lab__stage--requests': selected.id === 'requests' }">
+    <section class="lab__stage" :class="{ 'lab__stage--requests': selected.id === 'requests' || selected.id === 'inline-html' }">
       <header class="lab__header">
         <div>
           <p class="lab__eyebrow">{{ selected.name }}</p>
@@ -72,6 +72,18 @@
           </select>
           <button type="button" @click="requestQuestion">Ask question</button>
           <button v-if="hasActiveAsyncQuestion" type="button" @click="completeAsyncQuestionTurn">Complete turn</button>
+        </div>
+      </div>
+
+      <div v-if="selected.id === 'inline-html'" class="lab__request-controls">
+        <div>
+          <select v-model="htmlExample" aria-label="HTML example" @change="resetScenario(false)">
+            <option value="interactive">Interactive HTML</option>
+            <option value="chart">Chart.js (HTTPS)</option>
+          </select>
+          <button type="button" :disabled="htmlChunkIndex >= htmlChunks.length" @click="nextHtmlChunk">Next HTML chunk</button>
+          <button type="button" :disabled="htmlPlaying || htmlChunkIndex >= htmlChunks.length" @click="streamHtml">Stream HTML</button>
+          <span>{{ htmlChunkIndex }} / {{ htmlChunks.length }} chunks</span>
         </div>
       </div>
 
@@ -153,6 +165,7 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue';
 import LiveChatLab from './LiveChatLab.vue';
+import { chartHtmlChunks, inlineHtmlChunks } from './inline-html-demo';
 import {
   CodexConversationPane,
   provideCodexToolPresentation,
@@ -311,6 +324,14 @@ const scenarios: [Scenario, ...Scenario[]] = [
         { type: 'text', text: 'The docs are current.', phase: 'commentary' },
       ] },
     ],
+  },
+  {
+    id: 'inline-html',
+    name: 'Inline HTML',
+    summary: 'Interactive, sandboxed streaming previews',
+    title: 'HTML that stays alive while streaming',
+    description: 'Start the preview, type a destination and click its counter, then stream the rest. Try source view too: input and JavaScript state should survive.',
+    messages: [],
   },
   {
     id: 'long-history',
@@ -520,6 +541,10 @@ const selectionActionStyle = computed(() => selectedMessageText.value ? {
   top: `${selectedMessageText.value.anchor.y + selectedMessageText.value.anchor.height + 8}px`,
 } : undefined);
 const streamTimers = new Set<number>();
+const htmlChunkIndex = ref(0);
+const htmlPlaying = ref(false);
+const htmlExample = ref('interactive');
+const htmlChunks = computed(() => htmlExample.value === 'chart' ? chartHtmlChunks : inlineHtmlChunks);
 const mockAttachments = new Map<string, CodexNativeAttachment>();
 let resetFeedbackTimer: number | undefined;
 
@@ -528,6 +553,8 @@ watch(selected, () => resetScenario(false), { immediate: true });
 function resetScenario(confirmReset = true): void {
   resetRevision.value += 1;
   clearMockStream();
+  htmlChunkIndex.value = 0;
+  htmlPlaying.value = false;
   clearResetFeedback();
   draft.value = '';
   messages.value = selected.value.messages.map((message) => ({ ...message, parts: [...message.parts] }));
@@ -543,6 +570,29 @@ function resetScenario(confirmReset = true): void {
   if (confirmReset) showResetFeedback();
   if (selected.value.id === 'busy') startBusyToolCompletion();
   if (selected.value.id === 'reasoning-activity') startReasoningActivityLifecycle();
+}
+
+function nextHtmlChunk(): void {
+  if (htmlChunkIndex.value >= htmlChunks.value.length) return;
+  htmlChunkIndex.value += 1;
+  const complete = htmlChunkIndex.value === htmlChunks.value.length;
+  messages.value = [{
+    id: 'html-demo', role: 'assistant', status: complete ? 'complete' : 'streaming',
+    parts: [{ type: 'text', text: htmlChunks.value.slice(0, htmlChunkIndex.value).join(''), phase: 'final_answer' }],
+  }];
+  mockBusy.value = !complete;
+}
+
+function streamHtml(): void {
+  htmlPlaying.value = true;
+  const step = () => {
+    nextHtmlChunk();
+    if (htmlChunkIndex.value < htmlChunks.value.length) {
+      const timer = window.setTimeout(() => { streamTimers.delete(timer); step(); }, 650);
+      streamTimers.add(timer);
+    } else htmlPlaying.value = false;
+  };
+  step();
 }
 
 function addSelectedContext(): void {

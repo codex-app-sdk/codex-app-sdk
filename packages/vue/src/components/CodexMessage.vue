@@ -439,6 +439,7 @@ function isVisibleAssistantBlock(block: RenderedMessageBlock) {
   return block.type === 'attachment'
     || block.type === 'media'
     || block.type === 'mermaid'
+    || block.type === 'html'
     || block.type === 'reasoning'
     || block.type === 'tool'
     || block.type === 'tool-group'

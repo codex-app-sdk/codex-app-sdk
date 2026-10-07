@@ -1,4 +1,5 @@
 import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageAttachment, type MessageMedia, type MessagePhase, type MessageToolCall, type MessagePart } from './types'
+import { findInlineHtmlBlocks } from './inline-html'
 
 type PhasedMessageBlock = {
   phase?: MessagePhase
@@ -11,6 +12,7 @@ export type MessageBlock =
   | { type: 'user-text'; content: string }
   | ({ type: 'reasoning'; content: string } & PhasedMessageBlock)
   | ({ type: 'mermaid'; code: string } & PhasedMessageBlock)
+  | ({ type: 'html'; source: string; title?: string; complete: boolean } & PhasedMessageBlock)
   | ({ type: 'visualization'; path?: string; title: string } & PhasedMessageBlock)
   | ({ type: 'media'; media: MessageMedia; toolCall?: MessageToolCall } & PhasedMessageBlock)
   | { type: 'tool'; toolCall: MessageToolCall }
@@ -66,11 +68,11 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
   const toolCalls = message.toolCalls ?? []
   const parts = message.parts ?? []
   if (parts.length > 0) {
-    return computeMessageBlocksFromParts(parts, toolCalls)
+    return computeMessageBlocksFromParts(parts, toolCalls, message.streaming === true)
   }
 
   const anchoredToolCallIds = new Set<string>()
-  const { blocks, prompts } = parseTextBlocks(message.content, toolCalls, anchoredToolCallIds)
+  const { blocks, prompts } = parseTextBlocks(message.content, toolCalls, anchoredToolCallIds, undefined, message.streaming === true)
 
   appendUnanchoredTools(blocks, toolCalls, anchoredToolCallIds)
   return finalizeAssistantBlocks(blocks, prompts)
@@ -116,7 +118,7 @@ export function groupAssistantWorkBlocks(
   return workGroupCount > 0 ? rendered : blocks
 }
 
-function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageToolCall[]): MessageBlock[] {
+function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageToolCall[], streaming: boolean): MessageBlock[] {
   const blocks: MessageBlock[] = []
   const prompts: string[] = []
   const anchoredToolCallIds = new Set<string>()
@@ -156,7 +158,7 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
       continue
     }
 
-    const parsed = parseTextBlocks(part.content, toolCalls, anchoredToolCallIds, part.phase)
+    const parsed = parseTextBlocks(part.content, toolCalls, anchoredToolCallIds, part.phase, streaming)
     blocks.push(...parsed.blocks)
     prompts.push(...parsed.prompts)
   }
@@ -166,6 +168,31 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
 }
 
 function parseTextBlocks(
+  rawContent: string,
+  toolCalls: MessageToolCall[],
+  anchoredToolCallIds: Set<string>,
+  phase?: MessagePhase,
+  streaming = false,
+) {
+  const blocks: MessageBlock[] = []
+  const prompts: string[] = []
+  let offset = 0
+  const appendMarkdown = (content: string) => {
+    const parsed = parseMarkdownBlocks(content, toolCalls, anchoredToolCallIds, phase)
+    blocks.push(...parsed.blocks)
+    prompts.push(...parsed.prompts)
+  }
+  for (const html of findInlineHtmlBlocks(rawContent, streaming)) {
+    appendMarkdown(rawContent.slice(offset, html.start))
+    const { start: _start, end, ...block } = html
+    blocks.push({ ...block, ...(phase ? { phase } : {}) })
+    offset = end
+  }
+  appendMarkdown(rawContent.slice(offset))
+  return { blocks, prompts }
+}
+
+function parseMarkdownBlocks(
   rawContent: string,
   toolCalls: MessageToolCall[],
   anchoredToolCallIds: Set<string>,
