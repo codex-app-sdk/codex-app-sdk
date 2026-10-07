@@ -25,8 +25,7 @@ authentication, tenancy, policy, business data, and integrations.
 
 ## Start an application
 
-The SDK and scaffolder are public on npm starting with 0.14.0. No package token
-is required:
+Create a new application with the scaffolder:
 
 ```bash
 npx @codex-app-sdk/create-codex-app@latest my-codex-app
@@ -36,7 +35,7 @@ npm run dev
 
 Add `--target web` to generate a web application. See the
 [installation guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/installation.html)
-for prerequisites, existing-host integration, and migration from GitHub Packages.
+for prerequisites and existing-host integration.
 
 ## What you get
 
@@ -96,7 +95,7 @@ host creates `rendererApi`.
 ### Try it from source
 
 The repository is public. With Node.js 22 or newer, explore the UI without
-an API key, Codex login, or GitHub Packages access:
+an API key or Codex login:
 
 ```bash
 git clone https://github.com/codex-app-sdk/codex-app-sdk.git
@@ -111,15 +110,13 @@ or `npm run dev:web`.
 
 ### Build your own application
 
-The source is open under Apache-2.0. All six scoped SDK and scaffolder packages
-are available on the public npm registry; no package token is required to
-install them or run `npx`.
+The SDK and scaffolder are available on npm under the Apache-2.0 license.
 
 The default scaffold is a complete Electron + Vue application. Pass
 `--target web` for an Express + `ws` host using the same backend, surface, and
 Vue pane. Then update the generated host seams and shell for your product. The
 [scaffolding guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/scaffolding.html)
-is the canonical source for commands, package-publication status, and options.
+is the canonical source for commands and options.
 For an existing application, follow the
 [installation guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/installation.html).
 
