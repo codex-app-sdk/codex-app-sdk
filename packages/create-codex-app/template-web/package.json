@@ -11,10 +11,10 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"
   },
   "dependencies": {
-    "@codex-app-sdk/backend": "^0.14.1",
-    "@codex-app-sdk/core": "^0.14.1",
-    "@codex-app-sdk/vue": "^0.14.1",
-    "@codex-app-sdk/web": "^0.14.1",
+    "@codex-app-sdk/backend": "^0.14.2",
+    "@codex-app-sdk/core": "^0.14.2",
+    "@codex-app-sdk/vue": "^0.14.2",
+    "@codex-app-sdk/web": "^0.14.2",
     "express": "^5.1.0",
     "vue": "^3.5.0",
     "ws": "^8.18.0"

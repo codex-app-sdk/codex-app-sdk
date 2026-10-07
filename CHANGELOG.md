@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.14.2
+
+### Release infrastructure
+
+- Publish all six packages through GitHub Actions using npm trusted publishing
+  and provenance. Add version confirmation, a dry-run mode, and GitHub release
+  creation for the published commit.
+- No runtime or API changes from 0.14.1.
+
 ## 0.14.1
 
 ### Added

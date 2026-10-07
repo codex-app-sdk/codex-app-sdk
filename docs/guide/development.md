@@ -189,8 +189,37 @@ It verifies and builds the SDK, then uses GitHub OIDC trusted publishing with
 provenance. No npm token or repository publishing secret is needed. The workflow
 cannot publish until the npm-side trust relationships have been configured.
 
+To configure trust from an authenticated maintainer's terminal (npm 11.15+), run
+the following for each of `core`, `backend`, `vue`, `electron`, `web`, and
+`create-codex-app`, replacing `PACKAGE` with the package suffix:
+
+```bash
+npm trust github @codex-app-sdk/PACKAGE \
+  --repo codex-app-sdk/codex-app-sdk \
+  --file publish-packages.yml --allow-publish
+npm trust list @codex-app-sdk/PACKAGE
+```
+
+Complete npm's browser authentication when prompted. Do not revoke an existing
+trust configuration without inspecting it first. New trust configurations must
+complete their first successful publication within two days or be recreated;
+see [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+
+In GitHub Actions, select **Publish public packages → Run workflow**, leave the
+branch on `main`, and enter the exact committed version. The version must match
+`package.json`; all six package versions and their internal dependencies are
+checked by the release gate. **Dry run** defaults to enabled: it runs the full
+checks and previews package contents, but does not publish or create a tag.
+After inspecting that run, start it again with **Dry run** disabled to approve
+publication. Use the same commit; if `main` advanced, validate the new commit
+first. On successful publication, the workflow creates `vVERSION` and a GitHub
+release with generated notes, pointing at the exact published commit.
+
 Package versions are immutable. Re-running the workflow for an already
-published version fails instead of overwriting it.
+published version fails instead of overwriting it. If publication stops partway,
+inspect npm before retrying; the publisher does not silently skip existing
+versions. If only GitHub release creation fails, rerun that failed job rather
+than republishing the packages.
 
 ## Architectural test philosophy
 

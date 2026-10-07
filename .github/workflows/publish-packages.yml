@@ -2,6 +2,15 @@ name: Publish public packages
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Exact SDK version already committed on main (for example 0.14.2)
+        required: true
+        type: string
+      dry_run:
+        description: Validate and preview packages without publishing
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -28,6 +37,19 @@ jobs:
           registry-url: https://registry.npmjs.org
           scope: '@codex-app-sdk'
 
+      - name: Confirm release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+          if (!/^\d+\.\d+\.\d+$/.test(process.env.RELEASE_VERSION ?? '')
+            || process.env.RELEASE_VERSION !== version) {
+            throw new Error(`Requested version must match the committed stable SDK version: ${version}`);
+          }
+          NODE
+
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
@@ -40,5 +62,32 @@ jobs:
       - name: Verify packages
         run: npm run check
 
+      - name: Preview package contents
+        run: |
+          for package in core backend vue electron web create-codex-app; do
+            npm pack --dry-run --json --workspace "@codex-app-sdk/$package"
+          done
+
       - name: Publish packages
+        if: ${{ !inputs.dry_run }}
         run: npm run publish:packages
+
+  release:
+    name: Create GitHub release
+    needs: publish
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Tag the published commit and create release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          gh release create "v${RELEASE_VERSION}" \
+            --target "$RELEASE_SHA" \
+            --title "SDK ${RELEASE_VERSION}" \
+            --generate-notes
