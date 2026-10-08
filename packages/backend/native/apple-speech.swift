@@ -38,7 +38,7 @@ func emit(_ event: [String: Any]) {
         }
         let streaming = args.contains("--stream")
         let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [],
-                                           reportingOptions: streaming ? [.volatileResults] : [], attributeOptions: [])
+                                           reportingOptions: streaming ? [.volatileResults, .fastResults] : [], attributeOptions: [])
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             try await installation.downloadAndInstall()
         }

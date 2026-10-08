@@ -507,6 +507,10 @@ synchronous helpers keep their behavior but now also bound each shell probe by
 when the native helper is ready. Its session exposes `append(ArrayBuffer)` for
 mono Float32 little-endian PCM, `stop()` to drain a final `{ text, error? }`, and
 `cancel()` to discard input. Partial/final snapshot events carry the session ID.
+Live sessions enable Apple's `volatileResults` and `fastResults` reporting options
+to prioritize responsiveness. Apple documents a potential accuracy tradeoff for
+[`fastResults`](https://developer.apple.com/documentation/speech/speechtranscriber/reportingoption/fastresults);
+completed-file batch transcription does not enable it.
 The optional dependencies include `assetsPath`, `signal` for cancellation during
 startup, and `spawn` for process integration. Startup has a two-minute deadline;
 finalization has a 30-second deadline. Temporary helper copies are removed at exit.
@@ -517,6 +521,9 @@ Contributors can rebuild the universal macOS binary with `npm run build:apple-sp
 To verify actual streaming locally, build the backend and run
 `node scripts/test-apple-speech-live.mjs <mono-16000-f32le.pcm>` with a non-sensitive
 speech fixture. This tests paced native recognition, not physical microphone access.
+The command reports startup and first-text latency. Pass an optional maximum
+first-text time in milliseconds after the fixture path to enforce a local latency
+budget. Compare the same fixture on the same Mac; timings include its leading silence.
 
 See the [surface guide](/guide/surface), [conversations](/guide/conversations),
 and [extensions](/guide/extensions).

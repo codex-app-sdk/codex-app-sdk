@@ -280,6 +280,9 @@ Draft text is preserved until finalization, and the transcript is inserted at
 the saved caret (or replaces the selected text). A failed or empty recording
 does not submit the old draft. Apple recognition runs on device; it may require
 a first-use speech-model download. See [native setup](/api/electron#streaming-dictation).
+Live dictation favors faster text delivery using Apple's fast-result mode, which
+can trade some recognition accuracy for responsiveness. Review the text before
+sending when accuracy is important; batch transcription retains its standard mode.
 
 When transcription contributes to a submission, the stock composer includes
 `inputMethod: 'dictated'` in the emitted `CodexRendererSendMessageOptions` and
