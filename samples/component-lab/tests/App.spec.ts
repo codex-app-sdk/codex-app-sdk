@@ -25,7 +25,6 @@ describe('component lab', () => {
     expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
 
     await footer.get('button[aria-label="Vue"]').trigger('click');
-    await footer.get('.chat-tool-user-input__button--primary').trigger('click');
     expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(true);
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
@@ -45,7 +44,6 @@ describe('component lab', () => {
     expect(vueOption).toBeDefined();
     expect(vueOption!.element.closest('.chat-fold')).toBeNull();
     await vueOption!.trigger('click');
-    await wrapper.findAll('button').find((button) => button.text() === 'Next')!.trigger('click');
     await wrapper.get<HTMLTextAreaElement>('.chat-tool-user-input__other-input--direct').setValue('Preserve the existing API.');
     const send = wrapper.findAll('button').find((button) => button.text() === 'Send');
     expect(send).toBeDefined();
@@ -64,7 +62,7 @@ describe('component lab', () => {
     const questionCard = wrapper.findAll('.chat-tool-user-input')
       .find((card) => card.find('.chat-tool-user-input__other-input--direct').exists());
     expect(questionCard).toBeDefined();
-    expect(questionCard!.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(questionCard!.get('.chat-tool-user-input__eyebrow').text()).toBe('Question');
     expect(questionCard!.find('[aria-label="Question progress"]').exists()).toBe(false);
     expect(questionCard!.find('.chat-tool-user-input__option--other').exists()).toBe(false);
     await vi.waitFor(() => expect(document.activeElement).toBe(input.element));

@@ -55,7 +55,7 @@ describe('CodexMessage', () => {
     });
 
     expect(wrapper.text().split(question)).toHaveLength(2);
-    expect(wrapper.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(wrapper.get('.chat-tool-user-input__eyebrow').text()).toBe('Question');
     expect(wrapper.find('textarea').exists()).toBe(true);
   });
 
@@ -105,8 +105,6 @@ describe('CodexMessage', () => {
     expect(wrapper.find('.chat-work-group').exists()).toBe(false);
     const vueOption = wrapper.findAll('button').find((button) => button.text().includes('Vue'))!;
     await vueOption.trigger('click');
-    const send = wrapper.findAll('button').find((button) => button.text() === 'Send')!;
-    await send.trigger('click');
 
     expect(wrapper.emitted('client-response')).toStrictEqual([{
       id: request.id,

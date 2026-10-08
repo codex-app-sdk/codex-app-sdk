@@ -10,11 +10,11 @@
 
   <section
     v-else
+    ref="root"
     class="codex-chat-theme codex-request-card chat-tool-user-input"
-    :class="{
-      'chat-tool-user-input--resolved': cancelled || answered || historical,
-      'chat-tool-user-input--free-text': !cancelled && !answered && !historical && currentQuestion && isFreeTextOnly(currentQuestion),
-    }"
+    :class="{ 'chat-tool-user-input--resolved': cancelled || answered || historical }"
+    :tabindex="interactive ? -1 : undefined"
+    @keydown="onCardKeydown"
   >
     <div v-if="cancelled" class="chat-tool-user-input__summary chat-tool-user-input__summary--muted">
       <ChatToolCallTitle title="Cancelled user question" :icon="SquareX" />
@@ -39,30 +39,19 @@
     </template>
 
     <template v-else-if="currentQuestion">
-      <header class="chat-tool-user-input__header">
-        <div class="chat-tool-user-input__heading">
-          <span
-            v-if="currentQuestion.header.trim() !== currentQuestion.question.trim()"
-            class="chat-tool-user-input__tag"
-          >{{ currentQuestion.header }}</span>
-          <span class="chat-tool-user-input__question">{{ currentQuestion.question }}</span>
-        </div>
+      <header class="codex-request-header chat-tool-user-input__header">
+        <span class="codex-request-eyebrow chat-tool-user-input__eyebrow">
+          <MessageQuestionIcon :size="16" aria-hidden="true" />
+          <span class="chat-tool-user-input__eyebrow-text">{{ eyebrow }}</span>
+        </span>
         <div class="chat-tool-user-input__header-actions">
-          <div
+          <span
             v-if="questions.length > 1"
-            class="chat-tool-user-input__progress"
+            class="chat-tool-user-input__index"
             aria-label="Question progress"
           >
-            <span
-              v-for="(_, index) in questions"
-              :key="index"
-              class="chat-tool-user-input__progress-dot"
-              :class="{ 'chat-tool-user-input__progress-dot--active': index === currentIndex }"
-            />
-            <span class="chat-tool-user-input__index">
-              {{ currentIndex + 1 }} / {{ questions.length }}
-            </span>
-          </div>
+            {{ currentIndex + 1 }} / {{ questions.length }}
+          </span>
           <button
             class="chat-tool-user-input__dismiss"
             type="button"
@@ -75,103 +64,91 @@
         </div>
       </header>
 
-      <div class="chat-tool-user-input__options">
-        <textarea
-          v-if="isFreeTextOnly(currentQuestion)"
-          v-focus
-          v-model="otherTexts[currentQuestion.id]"
-          autofocus
-          class="chat-tool-user-input__other-input chat-tool-user-input__other-input--direct"
-          :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
-          rows="1"
-          :type="currentQuestion.isSecret ? 'password' : 'text'"
-          @keydown="onAnswerKeydown"
-        />
+      <p class="codex-request-title chat-tool-user-input__question">{{ currentQuestion.question }}</p>
+      <p v-if="currentQuestion.multiSelect && options.length > 0" class="codex-request-description chat-tool-user-input__hint">
+        Select all that apply
+      </p>
 
-        <template v-else>
-          <button
-            v-for="option in currentQuestion.options ?? []"
-            :key="option.label"
-            :aria-label="option.label"
-            :aria-pressed="isSelected(currentQuestion.id, option.label)"
-            class="chat-tool-user-input__option"
-            :class="{ 'chat-tool-user-input__option--selected': isSelected(currentQuestion.id, option.label) }"
-            type="button"
-            @click="toggleOption(currentQuestion, option.label)"
-          >
-            <span class="chat-tool-user-input__check">
-              <Check v-if="isSelected(currentQuestion.id, option.label)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
-              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
+      <div
+        v-if="options.length > 0"
+        class="chat-tool-user-input__options"
+        role="group"
+        :aria-label="currentQuestion.question"
+      >
+        <button
+          v-for="(option, index) in options"
+          :key="option.label"
+          :aria-keyshortcuts="index < 9 ? String(index + 1) : undefined"
+          :aria-label="option.label"
+          :aria-pressed="isSelected(currentQuestion.id, option.label)"
+          class="chat-tool-user-input__option"
+          :class="{ 'chat-tool-user-input__option--selected': isSelected(currentQuestion.id, option.label) }"
+          type="button"
+          @click="toggleOption(currentQuestion, option.label)"
+        >
+          <span class="chat-tool-user-input__key" aria-hidden="true">
+            <Check v-if="isSelected(currentQuestion.id, option.label)" :size="14" stroke-width="3" />
+            <template v-else>{{ index + 1 }}</template>
+          </span>
+          <span class="chat-tool-user-input__option-copy">
+            <span class="chat-tool-user-input__option-heading">
+              <span class="chat-tool-user-input__option-label">{{ displayOptionLabel(option.label) }}</span>
+              <span v-if="isRecommendedOption(option.label)" class="chat-tool-user-input__recommended">Recommended</span>
             </span>
-            <span class="chat-tool-user-input__option-copy">
-              <span class="chat-tool-user-input__option-heading">
-                <span class="chat-tool-user-input__option-label">{{ displayOptionLabel(option.label) }}</span>
-                <span v-if="isRecommendedOption(option.label)" class="chat-tool-user-input__recommended">Recommended</span>
-              </span>
-              <span v-if="option.description" class="chat-tool-user-input__option-description">{{ option.description }}</span>
-            </span>
-          </button>
-
-          <div
-            v-if="currentQuestion.isOther"
-            class="chat-tool-user-input__option chat-tool-user-input__option--other"
-            :class="{ 'chat-tool-user-input__option--selected': isOtherSelected(currentQuestion.id) }"
-            role="button"
-            :aria-pressed="isOtherSelected(currentQuestion.id)"
-            tabindex="0"
-            @click="toggleOther(currentQuestion)"
-            @keydown.enter.prevent="toggleOther(currentQuestion)"
-            @keydown.space.prevent="toggleOther(currentQuestion)"
-          >
-            <span class="chat-tool-user-input__check">
-              <Check v-if="isOtherSelected(currentQuestion.id)" class="chat-tool-user-input__icon chat-tool-user-input__icon--checked" :size="16" />
-              <Circle v-else class="chat-tool-user-input__icon" :size="16" />
-            </span>
-            <span class="chat-tool-user-input__option-copy">
-              <span class="chat-tool-user-input__option-label">Other</span>
-            </span>
-            <textarea
-              v-model="otherTexts[currentQuestion.id]"
-              class="chat-tool-user-input__other-input"
-              aria-label="Other answer"
-              :placeholder="currentQuestion.isSecret ? 'Enter private answer' : 'Type your answer...'"
-              rows="1"
-              :type="currentQuestion.isSecret ? 'password' : 'text'"
-              @click.stop
-              @focus="selectOther(currentQuestion)"
-              @input="selectOther(currentQuestion)"
-              @keydown="onAnswerKeydown"
-            />
-          </div>
-        </template>
+            <span v-if="option.description" class="chat-tool-user-input__option-description">{{ option.description }}</span>
+          </span>
+        </button>
       </div>
 
-      <footer class="chat-tool-user-input__actions">
-        <button
-          v-if="currentIndex > 0"
-          class="codex-request-button chat-tool-user-input__button"
-          type="button"
-          @click="back"
-        >
-          Back
-        </button>
-        <button
-          class="codex-request-button codex-request-button--primary chat-tool-user-input__button chat-tool-user-input__button--primary"
-          :disabled="!canProceed"
-          type="button"
-          @click="proceed"
-        >
-          {{ isLastQuestion ? 'Send' : 'Next' }}
-        </button>
+      <footer
+        class="chat-tool-user-input__footer"
+        :class="{ 'chat-tool-user-input__footer--divided': options.length > 0 }"
+      >
+        <div v-if="acceptsText" class="chat-tool-user-input__write">
+          <PencilIcon class="chat-tool-user-input__write-icon" :size="16" aria-hidden="true" />
+          <component
+            :is="currentQuestion.isSecret ? 'input' : 'textarea'"
+            ref="answerField"
+            class="chat-tool-user-input__other-input"
+            :class="{ 'chat-tool-user-input__other-input--direct': isFreeTextOnly(currentQuestion) }"
+            :aria-label="isFreeTextOnly(currentQuestion) ? currentQuestion.question : 'Other answer'"
+            :autocomplete="currentQuestion.isSecret ? 'off' : undefined"
+            :placeholder="answerPlaceholder"
+            :rows="currentQuestion.isSecret ? undefined : 1"
+            :type="currentQuestion.isSecret ? 'password' : undefined"
+            :value="otherTexts[currentQuestion.id] ?? ''"
+            @input="onAnswerInput(currentQuestion, $event)"
+            @keydown="onAnswerKeydown"
+          />
+        </div>
+
+        <div class="codex-request-footer chat-tool-user-input__actions">
+          <button
+            v-if="currentIndex > 0"
+            class="codex-request-button chat-tool-user-input__button"
+            type="button"
+            @click="back"
+          >
+            Back
+          </button>
+          <button
+            class="codex-request-button codex-request-button--primary chat-tool-user-input__button chat-tool-user-input__button--primary"
+            :disabled="!canProceed"
+            type="button"
+            @click="proceed"
+          >
+            {{ isLastQuestion ? 'Send' : 'Next' }}
+          </button>
+        </div>
       </footer>
     </template>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { AskUserAnswers, AskUserQuestion } from './contracts'
-import { Check, Circle, SquareCheck, SquareDashed, SquareX, X } from '../icons/app-icons'
+import { Check, MessageQuestionIcon, PencilIcon, SquareCheck, SquareDashed, SquareX, X } from '../icons/app-icons'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
 import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
@@ -192,7 +169,8 @@ const currentIndex = ref(0)
 const localAnswered = ref(false)
 const localCancelled = ref(false)
 const selections = reactive<Record<string, string[]>>({})
-const otherSelected = reactive<Record<string, boolean>>({})
+const root = ref<HTMLElement>()
+const answerField = ref<HTMLElement>()
 const otherTexts = reactive<Record<string, string>>({})
 
 const descriptor = computed(() => parseToolStatusDescriptor(props.toolCall.status))
@@ -224,6 +202,23 @@ const answerSummary = computed(() => {
   }
   return summary
 })
+const interactive = computed(() => !cancelled.value && !answered.value && !props.historical && !!currentQuestion.value)
+const options = computed(() => currentQuestion.value?.options ?? [])
+const acceptsText = computed(() => {
+  const question = currentQuestion.value
+  return !!question && (isFreeTextOnly(question) || question.isOther === true)
+})
+const eyebrow = computed(() => {
+  const question = currentQuestion.value
+  return question && question.header.trim() !== question.question.trim() ? question.header : 'Question'
+})
+const answerPlaceholder = computed(() => {
+  const question = currentQuestion.value
+  if (question?.isSecret) {
+    return 'Enter private answer'
+  }
+  return question && isFreeTextOnly(question) ? 'Type your answer...' : 'Or write your own answer...'
+})
 const canProceed = computed(() => {
   const question = currentQuestion.value
   if (!question || !hasAnswerFor(question)) {
@@ -233,11 +228,24 @@ const canProceed = computed(() => {
   return !isLastQuestion.value || questions.value.every((entry) => hasAnswerFor(entry))
 })
 
-const vFocus = {
-  mounted(element: HTMLTextAreaElement) {
-    window.setTimeout(() => element.focus(), 0)
-  },
+// A free-text question focuses its field. A choice question focuses the card so number keys and Enter work
+// immediately, unless the user already moved focus somewhere deliberate (e.g. a transcript-hosted card).
+function focusEntry() {
+  void nextTick(() => window.setTimeout(() => {
+    const question = currentQuestion.value
+    if (!interactive.value || !question) {
+      return
+    }
+    if (isFreeTextOnly(question)) {
+      answerField.value?.focus()
+    } else if (!document.activeElement || document.activeElement === document.body) {
+      root.value?.focus()
+    }
+  }, 0))
 }
+
+onMounted(focusEntry)
+watch(currentIndex, focusEntry)
 
 function isFreeTextOnly(question: AskUserQuestion) {
   return question.options === null
@@ -257,10 +265,6 @@ function isSelected(questionId: string, label: string) {
   return selections[questionId]?.includes(label) ?? false
 }
 
-function isOtherSelected(questionId: string) {
-  return otherSelected[questionId] ?? false
-}
-
 function toggleOption(question: AskUserQuestion, label: string) {
   if (answered.value || cancelled.value) {
     return
@@ -278,42 +282,47 @@ function toggleOption(question: AskUserQuestion, label: string) {
     return
   }
 
-  selections[questionId] = selections[questionId].includes(label) ? [] : [label]
-  otherSelected[questionId] = false
+  // A single choice answers the question: move on (or submit) without a second confirmation.
+  selections[questionId] = [label]
   otherTexts[questionId] = ''
+  proceed()
 }
 
-function toggleOther(question: AskUserQuestion) {
+function onAnswerInput(question: AskUserQuestion, event: Event) {
   if (answered.value || cancelled.value) {
     return
   }
 
-  const questionId = question.id
-  otherSelected[questionId] = !otherSelected[questionId]
-  if (!question.multiSelect) {
-    selections[questionId] = []
-  }
-
-  if (!otherSelected[questionId]) {
-    otherTexts[questionId] = ''
-  }
-}
-
-function selectOther(question: AskUserQuestion) {
-  if (answered.value || cancelled.value) {
-    return
-  }
-
-  otherSelected[question.id] = true
-  if (!question.multiSelect) {
+  const text = (event.target as HTMLInputElement | HTMLTextAreaElement).value
+  otherTexts[question.id] = text
+  if (!question.multiSelect && text.trim()) {
     selections[question.id] = []
   }
 }
 
 function hasAnswerFor(question: AskUserQuestion) {
-  return (selections[question.id]?.length ?? 0) > 0 || (
-    (isFreeTextOnly(question) || otherSelected[question.id]) && !!otherTexts[question.id]?.trim()
-  )
+  return (selections[question.id]?.length ?? 0) > 0 || !!otherTexts[question.id]?.trim()
+}
+
+function onCardKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !interactive.value) {
+    return
+  }
+
+  const question = currentQuestion.value
+  if (question && /^[1-9]$/.test(event.key)) {
+    const option = question.options?.[Number(event.key) - 1]
+    if (option) {
+      event.preventDefault()
+      toggleOption(question, option.label)
+    }
+    return
+  }
+
+  if (event.key === 'Enter' && event.target === root.value && canProceed.value) {
+    event.preventDefault()
+    proceed()
+  }
 }
 
 function onAnswerKeydown(event: KeyboardEvent) {
@@ -323,7 +332,7 @@ function onAnswerKeydown(event: KeyboardEvent) {
   }
 
   event.preventDefault()
-  if (currentQuestion.value && otherTexts[currentQuestion.value.id]?.trim()) {
+  if (canProceed.value) {
     proceed()
   }
 }
@@ -383,7 +392,7 @@ function cancel() {
 function buildAnswer(question: AskUserQuestion): { answers: string[] } {
   const answers = [...(selections[question.id] ?? [])]
   const otherText = otherTexts[question.id]?.trim()
-  if ((isFreeTextOnly(question) || otherSelected[question.id]) && otherText) {
+  if ((isFreeTextOnly(question) || question.isOther) && otherText) {
     answers.push(otherText)
   }
   return { answers }
@@ -426,6 +435,9 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   color: var(--color-text-muted);
 }
 
+.chat-tool-user-input:focus {
+  outline: none;
+}
 
 .chat-tool-user-input--resolved {
   container-type: normal;
@@ -438,65 +450,16 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   background: transparent;
 }
 
-.chat-tool-user-input--free-text {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  column-gap: var(--space-3);
-  row-gap: var(--space-4);
-}
-
-.chat-tool-user-input--free-text .chat-tool-user-input__header {
-  grid-column: 1 / -1;
-}
-
-.chat-tool-user-input--free-text .chat-tool-user-input__other-input--direct {
-  min-height: 38px;
-  max-height: 9rem;
-  box-sizing: border-box;
-  field-sizing: content;
-  overflow-y: auto;
-  resize: none;
-  border: 0;
-  padding: 9px 0;
-  background: transparent;
-}
-
-.chat-tool-user-input--free-text .chat-tool-user-input__other-input--direct:focus {
-  outline: none;
-}
-
-.chat-tool-user-input--free-text .chat-tool-user-input__actions {
-  grid-column: 2;
-  align-self: end;
-  padding: 0;
-  background: transparent;
-}
-
 .chat-tool-user-input__historical-question {
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-.chat-tool-user-input__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-6);
-}
-
-.chat-tool-user-input__heading,
 .chat-tool-user-input__options,
 .chat-tool-user-input__summary {
   display: flex;
   flex-direction: column;
-}
-
-.chat-tool-user-input__heading {
-  flex: 1 1 auto;
-  gap: var(--space-4);
-  min-width: 0;
 }
 
 .chat-tool-user-input__options {
@@ -517,17 +480,11 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.chat-tool-user-input__tag {
-  width: fit-content;
-  flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
-  border-radius: var(--radius-full);
-  padding: var(--space-1) var(--space-3);
-  background: color-mix(in srgb, var(--color-primary-container) 74%, var(--color-surface-lowest));
-  color: var(--color-primary);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-16);
+.chat-tool-user-input__eyebrow-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-tool-user-input__header-actions {
@@ -556,39 +513,15 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   color: var(--color-text);
 }
 
-.chat-tool-user-input__question {
-  min-width: 0;
-  font-size: var(--font-size-16);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-24);
-}
-
-.chat-tool-user-input__progress {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
+.chat-tool-user-input__hint {
+  margin-top: calc(var(--space-2) * -1);
 }
 
 .chat-tool-user-input__index {
-  flex: 0 0 auto;
+  color: var(--color-text-muted);
   font-size: var(--font-size-12);
+  font-variant-numeric: tabular-nums;
   line-height: var(--line-height-16);
-}
-
-.chat-tool-user-input__progress-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--radius-full);
-  background: var(--color-border-strong);
-  opacity: 0.45;
-}
-
-.chat-tool-user-input__progress-dot--active {
-  width: 12px;
-  background: var(--color-primary);
-  opacity: 1;
 }
 
 .chat-tool-user-input__answer,
@@ -628,30 +561,39 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   background: var(--color-surface-base);
 }
 
-.chat-tool-user-input__option--selected {
+.chat-tool-user-input__option--selected,
+.chat-tool-user-input__option--selected:hover {
   background: color-mix(in srgb, var(--color-primary-container) 50%, var(--color-surface-base));
 }
 
-.chat-tool-user-input__check {
+.chat-tool-user-input__key {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 20px;
-}
-
-.chat-tool-user-input__icon {
-  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-base);
   color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.chat-tool-user-input__icon--checked {
-  border-radius: var(--radius-full);
+.chat-tool-user-input__option:hover .chat-tool-user-input__key,
+.chat-tool-user-input__option:focus-visible .chat-tool-user-input__key {
+  background: color-mix(in srgb, var(--color-primary-container) 74%, var(--color-surface-lowest));
+  color: var(--color-primary);
+}
+
+.chat-tool-user-input__option--selected .chat-tool-user-input__key,
+.chat-tool-user-input__option--selected:hover .chat-tool-user-input__key,
+.chat-tool-user-input__option--selected:focus-visible .chat-tool-user-input__key {
   background: var(--color-primary);
   color: var(--color-on-primary);
-  padding: var(--space-2);
-  stroke-width: var(--space-3);
 }
 
 .chat-tool-user-input__option-copy {
@@ -671,7 +613,7 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 .chat-tool-user-input__option-label {
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-20);
+  line-height: var(--line-height-22);
 }
 
 .chat-tool-user-input__recommended {
@@ -703,54 +645,66 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   white-space: pre-wrap;
 }
 
-.chat-tool-user-input__option--other {
-  display: grid;
-  grid-template-columns: 18px auto minmax(0, 1fr);
-  align-items: center;
+.chat-tool-user-input__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
 }
 
-.chat-tool-user-input__option--other .chat-tool-user-input__other-input {
-  grid-column: 3;
-  margin-top: 0;
-  box-sizing: border-box;
-  field-sizing: content;
-  max-height: 9rem;
-  resize: none;
+.chat-tool-user-input__footer--divided {
+  border-top: 1px solid var(--color-border);
+  /* Match the card's own bottom padding so the field sits centered between the divider and the card edge. */
+  padding-top: var(--space-6);
+}
+
+.chat-tool-user-input__write {
+  display: flex;
+  flex: 1 1 14rem;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+}
+
+.chat-tool-user-input__write-icon {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  color: var(--color-text-muted);
 }
 
 .chat-tool-user-input__other-input {
-  grid-column: 2;
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  margin-top: -2px;
-  resize: vertical;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-lowest);
+  min-height: 32px;
+  max-height: 9rem;
+  box-sizing: border-box;
+  field-sizing: content;
+  resize: none;
+  overflow-y: auto;
+  border: 0;
+  padding: 5px 0;
+  background: transparent;
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-14);
   line-height: var(--line-height-20);
 }
 
-.chat-tool-user-input__other-input:focus {
-  outline: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+.chat-tool-user-input__other-input::placeholder {
+  color: var(--color-text-muted);
 }
 
-.chat-tool-user-input__other-input--direct {
-  grid-column: auto;
-  margin-top: 0;
+.chat-tool-user-input__other-input:focus {
+  outline: none;
 }
 
 .chat-tool-user-input__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex: 0 0 auto;
   justify-content: flex-end;
-  gap: var(--space-2);
+  margin-left: auto;
 }
-
 
 .chat-tool-user-input__option:focus-visible,
 .chat-tool-user-input__dismiss:focus-visible {
@@ -759,30 +713,8 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
 }
 
 @container (max-width: 32rem) {
-  .chat-tool-user-input__header {
-    gap: var(--space-3);
-  }
-
-  .chat-tool-user-input__question {
-    font-size: var(--font-size-15);
-    line-height: var(--line-height-20);
-  }
-
   .chat-tool-user-input__option {
     padding: var(--space-3);
-  }
-
-  .chat-tool-user-input__actions {
-    position: sticky;
-    bottom: 0;
-    padding-top: var(--space-2);
-    background: var(--color-surface-lowest);
-  }
-
-  .chat-tool-user-input--free-text .chat-tool-user-input__actions {
-    position: static;
-    padding: 0;
-    background: transparent;
   }
 }
 </style>

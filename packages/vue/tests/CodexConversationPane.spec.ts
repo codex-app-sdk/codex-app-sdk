@@ -202,7 +202,6 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
 
     await wrapper.get('.codex-conversation-pane__footer button[aria-label="Vue"]').trigger('click');
-    await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
     expect(wrapper.emitted('clientResponse')).toStrictEqual([[
       { id: blockingQuestion.id, payload: { answers: { framework: { answers: ['Vue'] } } } },
     ]]);
@@ -236,7 +235,6 @@ describe('CodexConversationPane', () => {
     expect(wrapper.get('.codex-conversation-pane__footer').text()).toContain('Which framework should I use?');
     expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
     await wrapper.get('.codex-conversation-pane__footer button[aria-label="Vue"]').trigger('click');
-    await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
 
     expect(clientResponse).toHaveBeenCalledWith({
       id: blockingQuestion.id, payload: { answers: { framework: { answers: ['Vue'] } } },
@@ -282,7 +280,6 @@ describe('CodexConversationPane', () => {
     expect(footer.text()).toContain('Which framework should I use?');
 
     await footer.findAll('button').find((button) => button.text().includes('Vue'))!.trigger('click');
-    await footer.findAll('button').find((button) => button.text() === 'Send')!.trigger('click');
     await nextTick();
 
     expect(wrapper.emitted('clientResponse')).toStrictEqual([[

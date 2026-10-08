@@ -136,8 +136,8 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
       },
     });
 
-    expect(wrapper.findAll('.chat-tool-user-input__progress-dot')).toHaveLength(2);
-    expect(wrapper.find('.chat-tool-user-input__tag').exists()).toBe(false);
+    expect(wrapper.get('.chat-tool-user-input__index').text()).toBe('1 / 2');
+    expect(wrapper.get('.chat-tool-user-input__eyebrow').text()).toBe('Question');
     expect(wrapper.get('.chat-tool-user-input__question').text()).toBe('Minimal question');
     expect(wrapper.findAll('.chat-tool-user-input__option')).toHaveLength(0);
     expect(wrapper.get('textarea').attributes('placeholder')).toBe('Type your answer...');
@@ -145,12 +145,12 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
     await wrapper.get('textarea').setValue('minimal answer');
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
 
-    expect(wrapper.get('.chat-tool-user-input__tag').text()).toBe('Secret');
+    expect(wrapper.get('.chat-tool-user-input__eyebrow').text()).toBe('Secret');
     expect(wrapper.get('.chat-tool-user-input__question').text()).toBe('Secret question');
-    expect(wrapper.findAll('.chat-tool-user-input__option')).toHaveLength(1);
-    await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
-    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Enter private answer');
-    expect(wrapper.get('textarea').attributes('type')).toBe('password');
+    expect(wrapper.find('textarea').exists()).toBe(false);
+    const secret = wrapper.get('input');
+    expect(secret.attributes('placeholder')).toBe('Enter private answer');
+    expect(secret.attributes('type')).toBe('password');
   });
 
   it('defaults omitted Other and secret flags to false', async () => {
@@ -172,13 +172,12 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
       },
     });
 
-    expect(wrapper.find('.chat-tool-user-input__option--other').exists()).toBe(false);
+    expect(wrapper.find('.chat-tool-user-input__other-input').exists()).toBe(false);
     await wrapper.get('.chat-tool-user-input__option').trigger('click');
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
-    await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
 
-    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Type your answer...');
-    expect(wrapper.get('textarea').attributes('type')).toBe('text');
+    expect(wrapper.get('textarea').attributes('placeholder')).toBe('Or write your own answer...');
+    expect(wrapper.find('input[type="password"]').exists()).toBe(false);
   });
 
   it('keeps invalid request ids interactive but refuses submit and cancel responses', async () => {
@@ -283,13 +282,10 @@ describe('ChatToolUserInputRequest interactions', () => {
   it.each([
     { mode: 'direct', question: { ...firstQuestion, options: null } },
     { mode: 'Other', question: firstQuestion },
-  ])('submits a non-empty $mode answer with Enter and reserves Shift+Enter for a newline', async ({ mode, question }) => {
+  ])('submits a non-empty $mode answer with Enter and reserves Shift+Enter for a newline', async ({ question }) => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: { toolCall: requestTool([question]) },
     });
-    if (mode === 'Other') {
-      await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
-    }
 
     const input = wrapper.get('textarea');
     await input.setValue('   ');
@@ -340,7 +336,6 @@ describe('ChatToolUserInputRequest interactions', () => {
     expect(options[0]!.attributes('aria-label')).toBe('README.md (Recommended)');
 
     await options[0]!.trigger('click');
-    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
 
     expect(wrapper.emitted('client-response')?.[0]?.[0]).toStrictEqual({
       id: 'request-1',
@@ -348,30 +343,17 @@ describe('ChatToolUserInputRequest interactions', () => {
     });
   });
 
-  it('toggles a single option and submits the exact selected answer', async () => {
+  it('answers a single-choice question as soon as an option is picked', async () => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: { toolCall: requestTool([firstQuestion]) },
     });
-    const options = wrapper.findAll('.chat-tool-user-input__option:not(.chat-tool-user-input__option--other)');
-    const primary = wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary');
+    const options = wrapper.findAll('.chat-tool-user-input__option');
 
-    expect(primary.element.disabled).toBe(true);
-    expect(options[0]!.classes()).not.toContain('chat-tool-user-input__option--selected');
-    expect(options[0]!.attributes('aria-pressed')).toBe('false');
-
-    await options[0]!.trigger('click');
-    expect(options[0]!.classes()).toContain('chat-tool-user-input__option--selected');
-    expect(options[0]!.attributes('aria-pressed')).toBe('true');
-    expect(options[0]!.find('.chat-tool-user-input__icon--checked').exists()).toBe(true);
-    expect(primary.element.disabled).toBe(false);
-
-    await options[0]!.trigger('click');
-    expect(options[0]!.classes()).not.toContain('chat-tool-user-input__option--selected');
-    expect(options[0]!.attributes('aria-pressed')).toBe('false');
-    expect(primary.element.disabled).toBe(true);
+    expect(wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary').element.disabled).toBe(true);
+    expect(options.map((option) => option.attributes('aria-pressed'))).toStrictEqual(['false', 'false']);
+    expect(options.map((option) => option.get('.chat-tool-user-input__key').text())).toStrictEqual(['1', '2']);
 
     await options[1]!.trigger('click');
-    await primary.trigger('click');
 
     expect(wrapper.emitted('client-response')).toStrictEqual([[
       {
@@ -383,41 +365,45 @@ describe('ChatToolUserInputRequest interactions', () => {
     expect(wrapper.get('.chat-tool-user-input__answer-value').text()).toBe('package.json');
   });
 
-  it('makes a single-select Other answer mutually exclusive and clears deselected text', async () => {
+  it('makes a single-select written answer replace the chosen option and vice versa', async () => {
     const wrapper = mount(ChatToolUserInputRequest, {
-      props: { toolCall: requestTool([firstQuestion]) },
+      props: { toolCall: requestTool([firstQuestion, secondQuestion]) },
     });
-    const other = wrapper.get('.chat-tool-user-input__option--other');
-    const option = wrapper.findAll('.chat-tool-user-input__option:not(.chat-tool-user-input__option--other)')[0]!;
-    const primary = wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary');
+    const field = () => wrapper.get<HTMLTextAreaElement>('textarea');
+    const option = () => wrapper.findAll('.chat-tool-user-input__option')[0]!;
+    const primary = () => wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary');
+    const back = () => wrapper.findAll('.chat-tool-user-input__button').find((button) => button.text() === 'Back')!;
 
-    await option.trigger('click');
-    await wrapper.get('textarea').trigger('focus');
-    expect(option.classes()).not.toContain('chat-tool-user-input__option--selected');
-    expect(other.classes()).toContain('chat-tool-user-input__option--selected');
-    expect(primary.element.disabled).toBe(true);
+    await field().setValue('  custom target  ');
+    expect(primary().element.disabled).toBe(false);
 
-    await wrapper.get('textarea').setValue('  custom target  ');
-    expect(primary.element.disabled).toBe(false);
+    await option().trigger('click');
+    await back().trigger('click');
+    expect(field().element.value).toBe('');
+    expect(option().attributes('aria-pressed')).toBe('true');
 
-    await other.trigger('keydown', { key: ' ' });
-    expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
-    expect(primary.element.disabled).toBe(true);
+    await field().trigger('focus');
+    expect(option().attributes('aria-pressed')).toBe('true');
+    await field().setValue('  custom target  ');
+    expect(option().attributes('aria-pressed')).toBe('false');
+    await primary().trigger('click');
 
-    await other.trigger('click');
-    expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
-    await wrapper.get('textarea').setValue('ignored after option selection');
-    await option.trigger('click');
-    expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
-    expect(option.classes()).toContain('chat-tool-user-input__option--selected');
+    await wrapper.findAll('.chat-tool-user-input__option')[0]!.trigger('click');
+    await primary().trigger('click');
+    expect(wrapper.emitted('client-response')?.[0]?.[0]).toStrictEqual({
+      id: 'request-1',
+      payload: { answers: {
+        target: { answers: ['custom target'] },
+        depth: { answers: ['Summary'] },
+      } },
+    });
   });
 
   it('adds and removes multi-select options while preserving an independent Other answer', async () => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: { toolCall: requestTool([multiOtherQuestion]) },
     });
-    const options = wrapper.findAll('.chat-tool-user-input__option:not(.chat-tool-user-input__option--other)');
-    const other = wrapper.get('.chat-tool-user-input__option--other');
+    const options = wrapper.findAll('.chat-tool-user-input__option');
 
     await options[0]!.trigger('click');
     await options[1]!.trigger('click');
@@ -425,8 +411,6 @@ describe('ChatToolUserInputRequest interactions', () => {
     expect(options[0]!.classes()).not.toContain('chat-tool-user-input__option--selected');
     expect(options[1]!.classes()).toContain('chat-tool-user-input__option--selected');
 
-    await wrapper.get('textarea').trigger('focus');
-    expect(other.attributes('aria-pressed')).toBe('true');
     await wrapper.get('textarea').setValue('  Documentation  ');
     expect(options[1]!.classes()).toContain('chat-tool-user-input__option--selected');
 
@@ -439,13 +423,12 @@ describe('ChatToolUserInputRequest interactions', () => {
     ]]);
   });
 
-  it('does not append an empty selected Other value to a valid multi-select answer', async () => {
+  it('submits only the chosen options when the written answer is left blank', async () => {
     const wrapper = mount(ChatToolUserInputRequest, {
       props: { toolCall: requestTool([multiOtherQuestion]) },
     });
 
     await wrapper.findAll('.chat-tool-user-input__option')[0]!.trigger('click');
-    await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
     expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
     expect(wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary').element.disabled).toBe(false);
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
@@ -463,7 +446,6 @@ describe('ChatToolUserInputRequest interactions', () => {
     });
     const primary = wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary');
 
-    await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
     await wrapper.get('textarea').setValue('   ');
     expect(primary.element.disabled).toBe(true);
 
@@ -485,9 +467,9 @@ describe('ChatToolUserInputRequest interactions', () => {
     expect(wrapper.get('.chat-tool-user-input__index').text()).toBe('1 / 2');
     expect(wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary').element.disabled).toBe(true);
     await wrapper.findAll('.chat-tool-user-input__option')[0]!.trigger('click');
-    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
 
-    expect(wrapper.get('.chat-tool-user-input__tag').text()).toBe('Depth');
+    expect(wrapper.emitted('client-response')).toBeUndefined();
+    expect(wrapper.get('.chat-tool-user-input__eyebrow').text()).toBe('Depth');
     expect(wrapper.get('.chat-tool-user-input__index').text()).toBe('2 / 2');
     expect(wrapper.get('.chat-tool-user-input__button--primary').text()).toBe('Send');
     expect(wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary').element.disabled).toBe(true);
@@ -495,7 +477,7 @@ describe('ChatToolUserInputRequest interactions', () => {
     const back = wrapper.findAll('.chat-tool-user-input__button').find((button) => button.text() === 'Back');
     expect(back).toBeDefined();
     await back!.trigger('click');
-    expect(wrapper.get('.chat-tool-user-input__tag').text()).toBe('Target');
+    expect(wrapper.get('.chat-tool-user-input__eyebrow').text()).toBe('Target');
     expect(wrapper.findAll('.chat-tool-user-input__option')[0]!.classes()).toContain('chat-tool-user-input__option--selected');
 
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
@@ -538,12 +520,53 @@ describe('ChatToolUserInputRequest interactions', () => {
     });
 
     await wrapper.findAll('.chat-tool-user-input__option')[0]!.trigger('click');
-    await wrapper.get('.chat-tool-user-input__option--other').trigger('click');
     await wrapper.get('textarea').setValue('  Docs  ');
     await wrapper.setProps({ answeredClientRequestIds: new Set(['request-1']) });
 
     expect(wrapper.get('.chat-tool-user-input__answer-value').text()).toBe('Implementation, Docs');
     expect(wrapper.find('.chat-tool-user-input__actions').exists()).toBe(false);
     expect(wrapper.emitted('client-response')).toBeUndefined();
+  });
+
+  it('selects numbered options with the 1-9 keys and confirms with Enter, never while typing', async () => {
+    const wrapper = mount(ChatToolUserInputRequest, {
+      attachTo: document.body,
+      props: { toolCall: requestTool([secondQuestion, firstQuestion]) },
+    });
+    const card = wrapper.get('.chat-tool-user-input');
+    await vi.waitFor(() => expect(document.activeElement).toBe(card.element));
+
+    await card.trigger('keydown', { key: '9' });
+    await card.trigger('keydown', { key: '2' });
+    await card.trigger('keydown', { key: '3' });
+    await card.trigger('keydown', { key: '2', ctrlKey: true });
+    expect(wrapper.findAll('.chat-tool-user-input__option').map((option) => option.attributes('aria-pressed'))).toStrictEqual([
+      'false', 'true', 'true',
+    ]);
+
+    await card.trigger('keydown', { key: 'Enter' });
+    expect(wrapper.get('.chat-tool-user-input__question').text()).toBe('Which target?');
+    await vi.waitFor(() => expect(document.activeElement).toBe(card.element));
+
+    const field = wrapper.get('textarea');
+    await field.setValue('typed ');
+    await field.trigger('keydown', { key: '1' });
+    expect(wrapper.findAll('.chat-tool-user-input__option')[0]!.attributes('aria-pressed')).toBe('false');
+    wrapper.unmount();
+  });
+
+  it('leaves focus alone when the user is already typing elsewhere', async () => {
+    const composer = document.createElement('textarea');
+    document.body.append(composer);
+    composer.focus();
+    const wrapper = mount(ChatToolUserInputRequest, {
+      attachTo: document.body,
+      props: { toolCall: requestTool([firstQuestion]) },
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 10));
+
+    expect(document.activeElement).toBe(composer);
+    wrapper.unmount();
+    composer.remove();
   });
 });

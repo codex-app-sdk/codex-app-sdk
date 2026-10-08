@@ -1,17 +1,20 @@
 <template>
-  <section class="codex-chat-theme chat-tool-confirmation">
-    <header class="chat-tool-confirmation__header">
-      <span class="chat-tool-confirmation__tag">Approve tool call</span>
-      <span class="chat-tool-confirmation__question">{{ summary }}</span>
-      <p v-if="description" class="chat-tool-confirmation__description">{{ description }}</p>
+  <section class="codex-chat-theme codex-request-card chat-tool-confirmation">
+    <header class="codex-request-header chat-tool-confirmation__header">
+      <span class="codex-request-eyebrow chat-tool-confirmation__tag">
+        <ShieldCheckIcon :size="16" aria-hidden="true" />
+        Approve tool call
+      </span>
     </header>
+    <span class="codex-request-title chat-tool-confirmation__question">{{ summary }}</span>
+    <p v-if="description" class="codex-request-description chat-tool-confirmation__description">{{ description }}</p>
     <details v-if="details || $slots.details" class="chat-tool-confirmation__details">
       <summary class="chat-tool-confirmation__details-summary">Details</summary>
       <div class="chat-tool-confirmation__details-body">
         <slot name="details"><pre>{{ details }}</pre></slot>
       </div>
     </details>
-    <footer class="chat-tool-confirmation__actions">
+    <footer class="codex-request-footer chat-tool-confirmation__actions">
       <button
         v-for="action in actions"
         :key="action.id"
@@ -26,6 +29,8 @@
 </template>
 
 <script setup lang="ts" generic="Decision extends string">
+import { ShieldCheckIcon } from '../icons/app-icons'
+
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineProps<{
   summary: string
@@ -36,57 +41,12 @@ defineProps<{
 }>()
 defineEmits<{ decide: [decision: Decision] }>()
 // Stryker restore all
+
 </script>
 
 <style scoped src="./request-controls.css"></style>
 
 <style scoped>
-.chat-tool-confirmation {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  width: 100%;
-  box-sizing: border-box;
-  max-height: min(70vh, 38rem);
-  overflow-y: auto;
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-lowest);
-  color: var(--color-text);
-}
-
-.chat-tool-confirmation__header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.chat-tool-confirmation__tag {
-  width: fit-content;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
-  border-radius: var(--radius-full);
-  padding: var(--space-1) var(--space-3);
-  background: var(--color-primary-container);
-  color: var(--color-primary);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-16);
-}
-
-.chat-tool-confirmation__question {
-  font-size: var(--font-size-16);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-24);
-}
-
-.chat-tool-confirmation__description {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-20);
-}
-
 .chat-tool-confirmation__details-body pre {
   margin: 0;
   font: inherit;
@@ -120,19 +80,4 @@ defineEmits<{ decide: [decision: Decision] }>()
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
-.chat-tool-confirmation__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.chat-tool-confirmation__button:not(:disabled):hover {
-  background: var(--color-surface-low);
-}
-
-.chat-tool-confirmation__button--primary:not(:disabled):hover {
-  background: var(--color-secondary);
-}
-
 </style>

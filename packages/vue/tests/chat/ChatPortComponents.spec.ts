@@ -728,7 +728,6 @@ describe('ported id8 chat components', () => {
     expect(wrapper.text()).toContain('Target');
     expect(wrapper.text()).toContain('Which file should I inspect?');
     await wrapper.get('.chat-tool-user-input__option').trigger('click');
-    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
 
     expect(wrapper.emitted('client-response')).toStrictEqual([
       [
@@ -819,7 +818,6 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    await wrapper.find('.chat-tool-user-input__option--other').trigger('click');
     await wrapper.find('.chat-tool-user-input__other-input').setValue('docs/frontend.md');
     await wrapper.get('.chat-tool-user-input__button--primary').trigger('click');
 

@@ -2,7 +2,7 @@
   container-type: inline-size;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   width: 100%;
   max-height: min(70vh, 38rem);
   overflow-y: auto;
@@ -14,20 +14,72 @@
   color: var(--color-text);
 }
 
+.codex-request-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.codex-request-eyebrow {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-3);
+  background: color-mix(in srgb, var(--color-primary-container) 74%, var(--color-surface-lowest));
+  color: var(--color-primary);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-16);
+}
+
+.codex-request-title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-16);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-24);
+}
+
+.codex-request-description {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+
+.codex-request-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .codex-request-button {
   min-height: 32px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 0 var(--space-6);
-  background: var(--color-surface-base);
-  color: var(--color-text);
+  background: transparent;
+  color: var(--color-primary);
   font: inherit;
   font-size: var(--font-size-13);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
 
+.codex-request-button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
 .codex-request-button:disabled {
+  background: var(--color-surface-base);
+  color: var(--color-text);
   cursor: not-allowed;
   opacity: 0.52;
 }
@@ -36,6 +88,11 @@
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-on-primary);
+}
+
+.codex-request-button--primary:hover:not(:disabled) {
+  border-color: var(--color-secondary);
+  background: var(--color-secondary);
 }
 
 .codex-request-button:focus-visible {

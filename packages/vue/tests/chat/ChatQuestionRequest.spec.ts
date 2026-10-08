@@ -51,7 +51,6 @@ describe('ChatQuestionRequest', () => {
     const wrapper = mount(ChatQuestionRequest, { props: { request } })
 
     await wrapper.get('[aria-label="Vue"]').trigger('click')
-    await wrapper.get('.chat-tool-user-input__button--primary').trigger('click')
 
     expect(wrapper.emitted('client-response')).toStrictEqual([[
       { id: request.id, payload: { answers: { 'question-1': { answers: ['Vue'] } } } },
