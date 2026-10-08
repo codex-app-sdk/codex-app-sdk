@@ -501,6 +501,22 @@ synchronous helpers keep their behavior but now also bound each shell probe by
 
 - `resolveAppleSpeechAnalyzerPath`
 - `transcribeWithAppleSpeechAnalyzer`
+- `startAppleSpeechSession(options, onEvent, dependencies?)`
+
+`startAppleSpeechSession` accepts `{ sessionId, sampleRate, locale? }` and resolves
+when the native helper is ready. Its session exposes `append(ArrayBuffer)` for
+mono Float32 little-endian PCM, `stop()` to drain a final `{ text, error? }`, and
+`cancel()` to discard input. Partial/final snapshot events carry the session ID.
+The optional dependencies include `assetsPath`, `signal` for cancellation during
+startup, and `spawn` for process integration. Startup has a two-minute deadline;
+finalization has a 30-second deadline. Temporary helper copies are removed at exit.
+
+The owned helper source is published in `@codex-app-sdk/backend/native`.
+Contributors can rebuild the universal macOS binary with `npm run build:apple-speech`
+(Xcode 26 or later). The same binary supports the existing completed-file batch API.
+To verify actual streaming locally, build the backend and run
+`node scripts/test-apple-speech-live.mjs <mono-16000-f32le.pcm>` with a non-sensitive
+speech fixture. This tests paced native recognition, not physical microphone access.
 
 See the [surface guide](/guide/surface), [conversations](/guide/conversations),
 and [extensions](/guide/extensions).

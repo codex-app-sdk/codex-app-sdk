@@ -259,6 +259,14 @@ regardless of the follow-up preference.
 
 ## Voice recording
 
+On supported macOS hosts, words appear in the composer while you speak. Unstable
+words are quieter and can change as recognition improves. Finalized phrases use
+normal text, followed by a small translucent dot that reacts to microphone volume
+without waiting for words to arrive. It stays still in silence. The
+microphone button becomes a primary-colored
+circle with a white icon. Batch-only hosts use the same active microphone state
+and transcribe on stop.
+
 The microphone control records without disabling the normal Send button:
 
 - pressing the microphone again stops, transcribes, and inserts text without
@@ -266,6 +274,12 @@ The microphone control records without disabling the normal Send button:
 - pressing Send while recording stops, waits for transcription, updates the
   prompt, and submits the completed text exactly once;
 - duplicate submission is disabled while transcribe-and-send is pending.
+- Escape discards dictation, restoring the existing draft and attachments.
+
+Draft text is preserved until finalization, and the transcript is inserted at
+the saved caret (or replaces the selected text). A failed or empty recording
+does not submit the old draft. Apple recognition runs on device; it may require
+a first-use speech-model download. See [native setup](/api/electron#streaming-dictation).
 
 When transcription contributes to a submission, the stock composer includes
 `inputMethod: 'dictated'` in the emitted `CodexRendererSendMessageOptions` and
@@ -281,14 +295,34 @@ const voice = useCodexComposerVoice({
   isDisabled: () => disabled.value,
   isSending: () => sending.value,
   onTranscript: (text) => insertTranscript(text),
-  transcribeAudio,
 });
 ```
 
 The controller exposes `buttonDisabled`, `buttonLabel`, `buttonTitle`, `error`,
-`isRecording`, `isTranscribing`, `recorder`, `stop()`, `toggle()`, and
-`dispose()`. Pair it with `CodexComposerVoiceButton` and
-`CodexComposerVoiceField`.
+`isStarting`, `isRecording`, `isTranscribing`, `isLive`, `transcript`, `audioLevel`,
+`stop()`, `cancel()`, `toggle()`, and `dispose()`. Pair it with
+`CodexComposerVoiceButton` and `CodexComposerVoiceField`:
+
+```vue
+<CodexComposerVoiceField
+  :starting="voice.isStarting.value"
+  :recording="voice.isRecording.value"
+  :transcript="voice.transcript.value"
+  :audio-level="voice.audioLevel.value"
+/>
+<CodexComposerVoiceButton
+  :disabled="voice.buttonDisabled.value"
+  :label="voice.buttonLabel.value"
+  :recording="voice.isRecording.value"
+  :title="voice.buttonTitle.value"
+  @toggle="voice.toggle()"
+/>
+```
+
+The controller discovers the scoped host capability automatically. A custom
+batch `transcribeAudio` callback remains supported and opts out of native
+streaming. Custom fields can instead supply a `streamingTranscription` service;
+only `onTranscript` should insert final text into their editable value.
 
 ## Model, reasoning, and Fast mode
 

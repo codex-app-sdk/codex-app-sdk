@@ -416,7 +416,7 @@ shelf. Slot content does not alter SDK conversation state.
 `CodexComposerFileMentionMenu`, `CodexComposerPluginMenu`,
 `CodexComposerSkillMenu`,
 `CodexComposerSlashMenu`, `CodexComposerVoiceButton`, `CodexComposerVoiceField`,
-`CodexComposerWaveform`, `CodexMentionChip`, `CodexRichTextEditor`,
+`CodexMentionChip`, `CodexRichTextEditor`,
 `CodexContextUsageIndicator`, and
 `CodexModelReasoningSelector`.
 
@@ -427,11 +427,33 @@ stock composer.
 
 `useCodexComposerVoice(options)` exposes the same recording and transcription
 controller used by `CodexComposer` for custom layouts. Options are
-`isDisabled`, `isSending`, `onTranscript`, and optional `transcribeAudio`.
+`isDisabled`, `isSending`, `onTranscript`, optional `transcribeAudio` (batch),
+and optional `streamingTranscription: CodexStreamingTranscription`.
+Without overrides it uses the scoped host's optional `streamingTranscription`
+capability, falling back to batch transcription when that capability is absent.
+A custom `transcribeAudio` opts out of native streaming unless a streaming
+override is also supplied.
 The controller provides `buttonDisabled`, `buttonLabel`, `buttonTitle`,
-`error`, `isRecording`, `isTranscribing`, `recorder`, `stop()`, `toggle()`, and
-`dispose()`. `stop()` resolves to `true` after a recording is transcribed and
-delivered to `onTranscript`, or `false` when recording/transcription fails.
+`error`, `isStarting`, `isRecording`, `isTranscribing`, `isLive`, `transcript`, `audioLevel`,
+`stop()`, `cancel()`, `toggle()`, and `dispose()`.
+`transcript` is a ref containing `{ finalText, partialText }`: each event replaces
+this snapshot, rather than appending unstable words. `onTranscript` runs only
+once, after finalization, so the host can preserve its draft and caret until then.
+`stop()` resolves to `true` after nonempty final text is delivered, or `false`
+on failure, cancellation, empty speech, or a duplicate stop. `cancel()` and
+scope disposal discard unfinished text and release capture/listeners.
+
+`audioLevel` is a normalized (0–1) local microphone energy ref, updated independently
+of recognition. It resets when capture stops or is cancelled; batch-only capture
+reports zero.
+
+`CodexComposerVoiceField` accepts `recording`, optional `starting`, `transcript`, `audioLevel`,
+and `before`/`after` draft fragments. It shows quieter provisional text and a
+muted listening dot that grows and brightens with `audioLevel`, remaining still
+in silence, without changing layout or adding recording controls.
+`CodexComposerVoiceButton` displays a primary-colored circle
+with a white microphone while recording; connect its `toggle` event to the
+controller. In the stock composer, Escape cancels dictation and restores the draft.
 
 ### Messages and media
 

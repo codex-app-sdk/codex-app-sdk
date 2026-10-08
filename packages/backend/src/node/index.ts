@@ -82,3 +82,4 @@ export {
   type AppleSpeechTranscriptionOptions,
   type AppleSpeechTranscriptionResult,
 } from './apple-speech-transcription';
+export { startAppleSpeechSession, type AppleSpeechSession } from './apple-speech-session';

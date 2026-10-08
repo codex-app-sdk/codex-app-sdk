@@ -64,6 +64,7 @@
   "scripts": {
     "benchmark:conversation": "vitest bench packages/backend/tests/performance/conversation-streaming.bench.ts",
     "build": "npm run build:sdk",
+    "build:apple-speech": "node scripts/build-apple-speech.mjs",
     "build:all": "npm run build:sdk && npm run build:workspaces",
     "build:compat": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly && node scripts/package-katex-assets.mjs && node scripts/verify-package-css.mjs && node scripts/verify-native-assets.mjs",
     "build:docs": "npm run check:rpc && vitepress build docs",

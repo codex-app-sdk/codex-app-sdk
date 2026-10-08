@@ -61,7 +61,7 @@ surface controller. Or build a different layout from exported components:
 - `CodexComposerMenu` and `CodexComposerMenuList`
 - `CodexComposerActionMenu`
 - model/reasoning, skill, slash, and file-mention menus
-- voice button, field, waveform, send button, active modes, context usage, and
+- voice button, live transcript field, send button, active modes, context usage, and
   composer shelf
 
 For a custom composer layout, use `useCodexComposerVoice` with the exported

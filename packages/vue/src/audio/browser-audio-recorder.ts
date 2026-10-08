@@ -21,28 +21,12 @@ export class BrowserAudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private startTime = 0;
   private stream: MediaStream | null = null;
-  private analyser: AnalyserNode | null = null;
-  private audioContext: AudioContext | null = null;
-  private bufferLength = 0;
-  private microphone: MediaStreamAudioSourceNode | null = null;
 
   async start(): Promise<void> {
     this.release();
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     this.chunks = [];
     this.startTime = Date.now();
-    const AudioContextCtor = resolveAudioContextConstructor();
-    if (!AudioContextCtor) {
-      throw new Error('Audio recording is not supported in this browser.');
-    }
-
-    this.audioContext = new AudioContextCtor();
-    await this.audioContext.resume();
-    this.microphone = this.audioContext.createMediaStreamSource(this.stream);
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = 256;
-    this.bufferLength = this.analyser.frequencyBinCount;
-    this.microphone.connect(this.analyser);
     this.mediaRecorder = new MediaRecorder(this.stream, preferredMediaRecorderOptions());
     this.mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -50,14 +34,6 @@ export class BrowserAudioRecorder {
       }
     };
     this.mediaRecorder.start();
-  }
-
-  getAnalyser(): AnalyserNode | null {
-    return this.analyser;
-  }
-
-  getBufferLength(): number {
-    return this.bufferLength;
   }
 
   stop(): Promise<RecordedAudio> {
@@ -88,15 +64,8 @@ export class BrowserAudioRecorder {
     this.stream?.getTracks().forEach((track) => {
       track.stop();
     });
-    this.microphone?.disconnect();
-    this.analyser?.disconnect();
-    void this.audioContext?.close();
     this.stream = null;
     this.mediaRecorder = null;
-    this.microphone = null;
-    this.analyser = null;
-    this.audioContext = null;
-    this.bufferLength = 0;
     this.chunks = [];
     this.startTime = 0;
   }

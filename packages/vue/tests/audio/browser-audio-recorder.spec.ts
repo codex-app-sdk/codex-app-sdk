@@ -55,7 +55,7 @@ describe('BrowserAudioRecorder', () => {
   it('records audio with the preferred WebM codec and stops tracks', async () => {
     vi.spyOn(Date, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_250);
     const track = { stop: vi.fn() };
-    const audioContext = installAudioContextMock();
+    installAudioContextMock();
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
@@ -69,13 +69,6 @@ describe('BrowserAudioRecorder', () => {
     const recorder = new BrowserAudioRecorder();
 
     await recorder.start();
-    expect(recorder.getAnalyser()).toBe(audioContext.analyser);
-    expect(recorder.getBufferLength()).toBe(4);
-    expect(audioContext.resume).toHaveBeenCalledOnce();
-    expect(audioContext.createMediaStreamSource).toHaveBeenCalledOnce();
-    expect(audioContext.createAnalyser).toHaveBeenCalledOnce();
-    expect(audioContext.analyser.fftSize).toBe(256);
-    expect(audioContext.source.connect).toHaveBeenCalledExactlyOnceWith(audioContext.analyser);
     const recording = await recorder.stop();
 
     expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: true });
@@ -159,28 +152,6 @@ describe('BrowserAudioRecorder', () => {
     expect(recording.blob.type).toBe('audio/webm');
   });
 
-  it('uses a WebKit audio context for support checks and recording', async () => {
-    const audioContext = installAudioContextMock({ webkit: true });
-    installMediaDevices();
-    vi.stubGlobal('MediaRecorder', mediaRecorderClass(() => true));
-    const recorder = new BrowserAudioRecorder();
-
-    expect(isBrowserAudioRecordingSupported()).toBe(true);
-    await recorder.start();
-    expect(recorder.getAnalyser()).toBe(audioContext.analyser);
-    recorder.release();
-  });
-
-  it('rejects start when media capture succeeds without an audio context', async () => {
-    installMediaDevices();
-    vi.stubGlobal('AudioContext', undefined);
-    vi.stubGlobal('webkitAudioContext', undefined);
-    vi.stubGlobal('MediaRecorder', mediaRecorderClass(() => true));
-
-    await expect(new BrowserAudioRecorder().start())
-      .rejects.toThrow('Audio recording is not supported in this browser.');
-  });
-
   it('releases an active recording before starting its replacement', async () => {
     const firstTrack = { stop: vi.fn() };
     const secondTrack = { stop: vi.fn() };
@@ -191,7 +162,7 @@ describe('BrowserAudioRecorder', () => {
       configurable: true,
       value: { getUserMedia },
     });
-    const audioContext = installAudioContextMock();
+    installAudioContextMock();
     const FakeMediaRecorder = mediaRecorderClass(() => true);
     vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
     const recorder = new BrowserAudioRecorder();
@@ -202,13 +173,12 @@ describe('BrowserAudioRecorder', () => {
     expect(FakeMediaRecorder.stopCalls).toBe(1);
     expect(firstTrack.stop).toHaveBeenCalledOnce();
     expect(secondTrack.stop).not.toHaveBeenCalled();
-    expect(audioContext.close).toHaveBeenCalledOnce();
     recorder.release();
   });
 
   it('releases active recordings without returning audio', async () => {
     const track = { stop: vi.fn() };
-    const audioContext = installAudioContextMock();
+    installAudioContextMock();
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
@@ -225,19 +195,11 @@ describe('BrowserAudioRecorder', () => {
     recorder.release();
 
     expect(FakeMediaRecorder.stopCalls).toBe(1);
-    expect(audioContext.source.disconnect).toHaveBeenCalled();
-    expect(audioContext.analyser.disconnect).toHaveBeenCalled();
-    expect(audioContext.close).toHaveBeenCalled();
     expect(track.stop).toHaveBeenCalled();
-    expect(recorder.getAnalyser()).toBeNull();
-    expect(recorder.getBufferLength()).toBe(0);
 
     recorder.release();
     expect(FakeMediaRecorder.stopCalls).toBe(1);
     expect(track.stop).toHaveBeenCalledOnce();
-    expect(audioContext.source.disconnect).toHaveBeenCalledOnce();
-    expect(audioContext.analyser.disconnect).toHaveBeenCalledOnce();
-    expect(audioContext.close).toHaveBeenCalledOnce();
   });
 
   it('rejects and releases when the MediaRecorder errors', async () => {
@@ -338,38 +300,6 @@ function installMediaDevices(track = { stop: vi.fn() }) {
   return track;
 }
 
-function installAudioContextMock(options: { webkit?: boolean } = {}) {
-  const analyser = {
-    disconnect: vi.fn(),
-    fftSize: 0,
-    frequencyBinCount: 4,
-    getByteTimeDomainData: vi.fn(),
-  };
-  const source = {
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  };
-  const audioContext = {
-    analyser,
-    close: vi.fn(async () => undefined),
-    createAnalyser: vi.fn(() => analyser),
-    createMediaStreamSource: vi.fn(() => source),
-    resume: vi.fn(async () => undefined),
-    source,
-  };
-
-  class FakeAudioContext {
-    close = audioContext.close;
-    createAnalyser = audioContext.createAnalyser;
-    createMediaStreamSource = audioContext.createMediaStreamSource;
-    resume = audioContext.resume;
-  }
-
-  if (options.webkit) {
-    vi.stubGlobal('AudioContext', undefined);
-    vi.stubGlobal('webkitAudioContext', FakeAudioContext);
-  } else {
-    vi.stubGlobal('AudioContext', FakeAudioContext);
-  }
-  return audioContext;
+function installAudioContextMock() {
+  vi.stubGlobal('AudioContext', class {});
 }

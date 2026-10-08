@@ -7,6 +7,7 @@ import type {
   CodexNativeClipboardContent,
 } from '@codex-app-sdk/core/native';
 import {
+  startAppleSpeechSession,
   transcribeWithAppleSpeechAnalyzer,
   type AppleSpeechTranscriptionOptions,
   type AppleSpeechTranscriptionResult,
@@ -21,6 +22,7 @@ import {
   type CodexNativeRequests as NativeRequests,
 } from './codex-native-renderer';
 import { CodexElectronAttachmentRegistry } from './codex-attachment-registry';
+import { createCodexSpeechSessions } from './codex-speech-sessions';
 
 export type CodexNativeDialog = {
   showOpenDialog(options: {
@@ -44,6 +46,7 @@ export type CodexNativeMainOptions = IpcSenderPolicy & {
   maxTotalAttachmentBytes?: number;
   maxAudioBytes?: number;
   maxImagePreviewBytes?: number;
+  startSpeechSession?: typeof startAppleSpeechSession;
   transcribeAudio?: (
     audioData: Buffer,
     options?: AppleSpeechTranscriptionOptions,
@@ -89,7 +92,9 @@ export function registerCodexNativeIpc(
     'Image preview byte limit',
   );
 
+  const speech = createCodexSpeechSessions({ ...options, maxAudioBytes });
   const unregister = registerIpcMainHandlers<NativeRequests>(dependencies.ipcMain, {
+    ...speech.handlers,
     [channels.copyToClipboard]: (_event, value) => {
       const content = clipboardContent(value);
       dependencies.clipboard.write(content);
@@ -188,6 +193,7 @@ export function registerCodexNativeIpc(
 
   return () => {
     unregister();
+    speech.dispose();
     attachments.clear();
   };
 }

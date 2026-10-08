@@ -44,10 +44,15 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
-.chat-composer__voice:hover:not(:disabled),
-.chat-composer__voice--recording {
+.chat-composer__voice:hover:not(:disabled) {
   color: var(--color-text);
   background: var(--color-surface-base);
+}
+
+.chat-composer__voice--recording,
+.chat-composer__voice--recording:hover:not(:disabled) {
+  color: #fff;
+  background: var(--color-primary);
 }
 
 .chat-composer__voice:disabled {

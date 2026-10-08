@@ -53,11 +53,15 @@ describe('Codex native Electron bridge', () => {
     }, attachments);
 
     expect([...main.handlers.keys()].sort()).toStrictEqual([
+      'codex-native:append-speech',
+      'codex-native:cancel-speech',
       'codex-native:copy-to-clipboard',
       'codex-native:ingest-attachments',
       'codex-native:open-external',
       'codex-native:pick-attachments',
       'codex-native:read-image-preview',
+      'codex-native:start-speech',
+      'codex-native:stop-speech',
       'codex-native:transcribe-audio',
     ]);
     const picked = await main.call('codex-native:pick-attachments') as Array<Record<string, unknown>>;

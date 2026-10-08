@@ -15,6 +15,7 @@
   },
   "files": [
     "assets",
+    "native",
     "dist",
     "README.md"
   ],

@@ -22,6 +22,34 @@ function fakeRecorder(overrides: Partial<BrowserAudioRecorder> = {}) {
 }
 
 describe('useChatComposerVoice', () => {
+  it.each(['startup', 'capture drain', 'transcription'] as const)('ignores batch completion after disposal during %s', async (stage) => {
+    let resume!: () => void;
+    const pending = new Promise<void>((resolve) => { resume = resolve; });
+    const recorder = fakeRecorder({
+      start: vi.fn(async () => { if (stage === 'startup') await pending; }),
+      stop: vi.fn(async () => { if (stage === 'capture drain') await pending; return recording; }),
+    });
+    const onTranscript = vi.fn();
+    const transcribe = vi.fn(async () => { if (stage === 'transcription') await pending; return { text: 'late result' }; });
+    const voice = useChatComposerVoice({ isDisabled: () => false, isSending: () => false, onTranscript }, {
+      canTranscribe: () => true, isRecordingSupported: () => true, createRecorder: () => recorder, transcribe,
+    });
+    const starting = voice.toggle();
+    let stopping: Promise<boolean> | undefined;
+    if (stage !== 'startup') {
+      await starting;
+      stopping = voice.stop();
+      if (stage === 'transcription') await vi.waitFor(() => expect(transcribe).toHaveBeenCalledOnce());
+    }
+    voice.dispose();
+    resume();
+    await starting;
+    if (stopping) expect(await stopping).toBe(false);
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(voice.isRecording.value).toBe(false);
+    expect(voice.isTranscribing.value).toBe(false);
+    expect(recorder.release).toHaveBeenCalled();
+  });
   afterEach(() => {
     delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
   });
@@ -34,7 +62,6 @@ describe('useChatComposerVoice', () => {
     });
 
     expect(voice.buttonDisabled.value).toBe(true);
-    expect(voice.recorder.value).toBeNull();
     expect(voice.buttonLabel.value).toBe('Record voice prompt');
     expect(typeof voice.dispose).toBe('function');
     voice.dispose();
@@ -246,7 +273,6 @@ describe('useChatComposerVoice', () => {
     await Promise.resolve();
     expect(voice.isRecording.value).toBe(false);
     expect(voice.isTranscribing.value).toBe(true);
-    expect(voice.recorder.value).toBeNull();
     expect(voice.buttonDisabled.value).toBe(true);
     expect(voice.buttonTitle.value).toBe('Transcribing...');
 
@@ -370,7 +396,6 @@ describe('useChatComposerVoice', () => {
     voice.dispose();
 
     expect(recorder.release).toHaveBeenCalledOnce();
-    expect(voice.recorder.value).toBeNull();
     expect(voice.isRecording.value).toBe(false);
   });
 });

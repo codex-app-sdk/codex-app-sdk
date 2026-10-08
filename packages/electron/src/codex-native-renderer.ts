@@ -4,6 +4,8 @@ import type {
   CodexNativeClipboardContent,
   CodexNativeRendererApi,
   CodexSpeechTranscriptionResult,
+  CodexSpeechSessionOptions,
+  CodexSpeechSessionEvent,
 } from '@codex-app-sdk/core/native';
 import {
   TypedIpcRenderer,
@@ -18,9 +20,18 @@ export const codexNativeChannels = {
   pickAttachments: 'codex-native:pick-attachments',
   readImagePreview: 'codex-native:read-image-preview',
   transcribeAudio: 'codex-native:transcribe-audio',
+  startSpeech: 'codex-native:start-speech',
+  appendSpeech: 'codex-native:append-speech',
+  stopSpeech: 'codex-native:stop-speech',
+  cancelSpeech: 'codex-native:cancel-speech',
 } as const;
+export const codexSpeechEventChannel = 'codex-native:speech-event';
 
 export type CodexNativeRequests = {
+  [codexNativeChannels.startSpeech]: IpcRequest<[options: CodexSpeechSessionOptions], void>;
+  [codexNativeChannels.appendSpeech]: IpcRequest<[sessionId: string, audio: ArrayBuffer], void>;
+  [codexNativeChannels.stopSpeech]: IpcRequest<[sessionId: string], CodexSpeechTranscriptionResult>;
+  [codexNativeChannels.cancelSpeech]: IpcRequest<[sessionId: string], void>;
   [codexNativeChannels.copyToClipboard]: IpcRequest<[content: CodexNativeClipboardContent], void>;
   [codexNativeChannels.ingestAttachments]: IpcRequest<[
     files: readonly CodexNativeAttachmentInput[],
@@ -40,16 +51,26 @@ export type CodexContextBridge = {
 
 export function createCodexNativeRendererApi(
   port: IpcRendererPort,
-  options: { transcription?: boolean } = {},
+  options: { transcription?: boolean; streamingTranscription?: boolean } = {},
 ): CodexNativeRendererApi {
-  const renderer = new TypedIpcRenderer<CodexNativeRequests, object>(port);
+  const renderer = new TypedIpcRenderer<CodexNativeRequests, { [codexSpeechEventChannel]: CodexSpeechSessionEvent }>(port);
+  const transcription = options.transcription ?? process.platform === 'darwin';
   return {
     capabilities: {
       attachments: true,
       clipboard: true,
       externalLinks: true,
-      transcription: options.transcription ?? process.platform === 'darwin',
+      transcription,
     },
+    ...(transcription && (options.streamingTranscription ?? process.platform === 'darwin') ? {
+      streamingTranscription: {
+        start: (input: CodexSpeechSessionOptions) => renderer.invoke(codexNativeChannels.startSpeech, input),
+        append: (id: string, audio: ArrayBuffer) => renderer.invoke(codexNativeChannels.appendSpeech, id, audio),
+        stop: (id: string) => renderer.invoke(codexNativeChannels.stopSpeech, id),
+        cancel: (id: string) => renderer.invoke(codexNativeChannels.cancelSpeech, id),
+        onEvent: (listener: (event: CodexSpeechSessionEvent) => void) => renderer.on(codexSpeechEventChannel, listener),
+      },
+    } : {}),
     copyToClipboard: (content) => renderer.invoke(codexNativeChannels.copyToClipboard, content),
     ingestAttachments: (files) => renderer.invoke(codexNativeChannels.ingestAttachments, files),
     openExternal: (href) => renderer.invoke(codexNativeChannels.openExternal, href),
@@ -64,7 +85,7 @@ export function createCodexNativeRendererApi(
 export function exposeCodexNativeRendererApi(
   contextBridge: CodexContextBridge,
   port: IpcRendererPort,
-  options?: { transcription?: boolean },
+  options?: { transcription?: boolean; streamingTranscription?: boolean },
 ): CodexNativeRendererApi {
   const api = createCodexNativeRendererApi(port, options);
   contextBridge.exposeInMainWorld('codexAppSdkNative', api);

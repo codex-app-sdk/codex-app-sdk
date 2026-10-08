@@ -45,12 +45,10 @@ export type { CodexRichTextEditorExpose } from './chat/ChatRichTextEditor.vue';
 export { default as CodexComposerSlashMenu } from './chat/ChatComposerSlashMenu.vue';
 export { default as CodexComposerVoiceButton } from './chat/ChatComposerVoiceButton.vue';
 export { default as CodexComposerVoiceField } from './chat/ChatComposerVoiceField.vue';
-export { default as CodexComposerWaveform } from './chat/ChatComposerWaveform.vue';
 export {
   useCodexComposerVoice,
   type CodexComposerVoiceController,
   type CodexComposerVoiceOptions,
-  type CodexComposerVoiceRecorder,
 } from './chat/use-chat-composer-voice';
 export { default as CodexContextUsageIndicator } from './chat/ChatContextUsageIndicator.vue';
 export { default as CodexFoldTransition } from './chat/ChatFoldTransition.vue';

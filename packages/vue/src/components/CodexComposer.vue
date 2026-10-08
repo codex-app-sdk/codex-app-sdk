@@ -4,6 +4,7 @@
     :class="{ 'chat-composer--disabled': disabled && !isSending }"
     aria-label="Prompt composer"
     @submit.prevent="submitPrompt"
+    @keydown.esc="handleVoiceEscape"
   >
     <slot name="before" />
     <ChatComposerAtMentionMenu
@@ -41,9 +42,14 @@
 
     <div class="chat-composer__input-row">
       <ChatComposerVoiceField
-        v-if="voiceVisible && (isRecording || isTranscribing)"
-        :recorder="recorder"
+        v-if="voiceVisible && (isStarting || isRecording || isTranscribing)"
+        class="chat-composer__input"
         :recording="isRecording"
+        :starting="isStarting"
+        :transcript="voiceTranscript"
+        :audio-level="voiceAudioLevel"
+        :before="voicePreviewBefore"
+        :after="voicePreviewAfter"
       />
       <ChatRichTextEditor
         v-else
@@ -311,7 +317,7 @@ const sendButtonLoading = computed(() => canInterrupt.value);
 const preferSteer = computed(() => props.followUpBehavior === 'steer' && effectiveCodexCapabilities.value.steerPrompt);
 const sendButtonDisabled = computed(() => {
   if (props.interruptArmed) return false;
-  if (isTranscribing.value) return true;
+  if (isStarting.value || isTranscribing.value) return true;
   if (isRecording.value && !props.disabled) return false;
   return !canSend.value && !canInterrupt.value && !canContinueInterruptedTurn.value;
 });
@@ -335,8 +341,11 @@ const {
   buttonTitle: voiceButtonTitle,
   error: voiceError,
   isRecording,
+  isStarting,
   isTranscribing,
-  recorder,
+  transcript: voiceTranscript,
+  audioLevel: voiceAudioLevel,
+  cancel: cancelRecording,
   stop: stopRecording,
   toggle: toggleRecording,
 } = useChatComposerVoice({
@@ -346,7 +355,22 @@ const {
   transcribeAudio: props.transcribeAudio,
 });
 
+const voicePreviewBefore = computed(() => {
+  const text = prompt.value.slice(0, selectionStart.value);
+  return text && !/\s$/.test(text) ? `${text} ` : text;
+});
+const voicePreviewAfter = computed(() => {
+  const text = prompt.value.slice(selectionEnd.value);
+  return text && !/^\s/.test(text) ? ` ${text}` : text;
+});
+
 watch(voiceError, (message) => emit('error', message));
+function handleVoiceEscape(event: KeyboardEvent): void {
+  if (!isStarting.value && !isRecording.value && !isTranscribing.value) return;
+  event.preventDefault();
+  event.stopPropagation();
+  void cancelRecording();
+}
 watch(isTranscribing, (transcribing) => {
   if (transcribing || pendingTranscriptCaret === null) return;
   const caret = pendingTranscriptCaret;
@@ -430,6 +454,7 @@ onMounted(() => {
 });
 
 function submitPrompt(): void {
+  if (isStarting.value || isRecording.value || isTranscribing.value) return;
   if (canContinueInterruptedTurn.value) {
     emit('continueInterruptedTurn');
     return;
@@ -462,6 +487,7 @@ async function handleSendButtonClick(): Promise<void> {
 }
 
 function submitSteer(): void {
+  if (isStarting.value || isRecording.value || isTranscribing.value) return;
   if (!effectiveCodexCapabilities.value.steerPrompt) {
     submitWithIntent('send');
     return;

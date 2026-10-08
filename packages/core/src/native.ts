@@ -3,6 +3,22 @@ export type CodexSpeechTranscriptionResult = {
   error?: string;
 };
 
+/** Full replacement of the current transcript, not an append-only word delta. */
+export type CodexSpeechTranscript = { finalText: string; partialText: string };
+export type CodexSpeechSessionOptions = { sessionId: string; sampleRate: number; locale?: string };
+export type CodexSpeechSessionEvent =
+  | ({ type: 'transcript'; sessionId: string } & CodexSpeechTranscript)
+  | { type: 'error'; sessionId: string; error: string };
+
+/** Mono Float32 little-endian PCM, sent once in capture order. Stop drains final results. */
+export type CodexStreamingTranscription = {
+  start(options: CodexSpeechSessionOptions): Promise<void>;
+  append(sessionId: string, audio: ArrayBuffer): Promise<void>;
+  stop(sessionId: string): Promise<CodexSpeechTranscriptionResult>;
+  cancel(sessionId: string): Promise<void>;
+  onEvent(listener: (event: CodexSpeechSessionEvent) => void): () => void;
+};
+
 /** Renderer-safe attachment metadata. `reference` is an opaque host capability, never a filesystem path. */
 export type CodexHostAttachment = {
   id: string;
@@ -31,6 +47,8 @@ export type CodexNativeClipboardContent = {
 };
 
 export type CodexHostCapabilities = {
+  /** Absent when only batch transcription is available. */
+  streamingTranscription?: CodexStreamingTranscription;
   capabilities: {
     attachments: boolean;
     clipboard: boolean;

@@ -11,6 +11,7 @@ function isExternal(id: string): boolean {
 }
 
 export default defineConfig({
+  base: './',
   plugins: [vue()],
   build: {
     lib: {

@@ -74,9 +74,54 @@ type CodexNativeMainOptions = {
   maxTotalAttachmentBytes?: number;
   maxAudioBytes?: number;
   maxImagePreviewBytes?: number;
+  startSpeechSession?: typeof startAppleSpeechSession;
   transcribeAudio?: (audioData, options?) => Promise<AppleSpeechTranscriptionResult>;
 };
 ```
+
+### Streaming dictation
+
+The default macOS preload exposes `streamingTranscription` on
+`CodexHostCapabilities`. `createCodexNativeRendererApi` and
+`exposeCodexNativeRendererApi` accept `streamingTranscription?: boolean` to
+enable or disable it; `transcription: false` disables both modes. Hosts with a
+custom batch-only service should set `streamingTranscription: false`.
+
+```ts
+type CodexStreamingTranscription = {
+  start(options: { sessionId: string; sampleRate: number; locale?: string }): Promise<void>;
+  append(sessionId: string, audio: ArrayBuffer): Promise<void>;
+  stop(sessionId: string): Promise<{ text: string; error?: string }>;
+  cancel(sessionId: string): Promise<void>;
+  onEvent(listener: (event: CodexSpeechSessionEvent) => void): () => void;
+};
+```
+
+Each audio chunk is mono Float32 little-endian PCM, delivered once, in order.
+Await each append before sending the next. Transcript events contain
+`{ type: 'transcript', sessionId, finalText, partialText }`; replace the current
+snapshot on corrections. Error events contain `{ type: 'error', sessionId, error }`.
+`stop()` drains pending recognition and returns the authoritative final text.
+`cancel()` discards it. Subscribe before starting and unsubscribe on teardown;
+ignore events from any other session ID.
+
+The main bridge permits one active session per renderer and binds it to the
+invoking frame. Replacing that frame's document or the main document, renderer
+destruction, and bridge disposal cancel recording. Same-document navigation and
+unrelated iframe navigation leave recording active. Requests use the same
+`isTrustedSender` policy as other native APIs.
+Audio is limited to 256 KiB per chunk and `maxAudioBytes` total (25 MiB by default,
+about 6.8 minutes at 16 kHz). Use unique IDs for successive recordings.
+
+Native recognition requires a supported Mac running macOS 26 or later and an
+available Apple speech model for the locale. Missing model assets can require
+a first-use download; recognition itself stays on device. Unsupported or failed
+native sessions report an error, not invented provisional text.
+
+For source-mode development, point `appleSpeechAssetsPath` (or
+`CODEX_APP_SDK_ASSETS_PATH`) at the source SDK's `packages/backend/assets` so
+the native helper matches the source API. Packaged apps should use the helper
+from the same SDK version as their bridge.
 
 `CodexNativeRendererApi.readImagePreview?(reference)` lazily requests a bounded,
 non-SVG local image as a renderer-safe data URL. It returns `null` when the file

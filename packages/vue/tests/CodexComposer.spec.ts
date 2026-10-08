@@ -1586,7 +1586,7 @@ describe('ChatComposer', () => {
     await vi.waitFor(() => {
       expect(wrapper.get('.chat-composer__voice').attributes('aria-pressed')).toBe('true');
     });
-    expect(wrapper.find('.chat-composer-waveform').exists()).toBe(true);
+    expect(wrapper.find('.chat-composer__audio-status').exists()).toBe(false);
 
     await wrapper.get('.chat-composer__voice').trigger('click');
     await vi.waitFor(() => {
@@ -1790,6 +1790,8 @@ describe('ChatComposer', () => {
     });
 
     void wrapper.get('.chat-composer__voice').trigger('click');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('send')).toBeUndefined();
     await vi.waitFor(() => {
       expect(wrapper.get('.chat-composer__send').attributes()).toHaveProperty('disabled');
     });
@@ -1954,39 +1956,14 @@ function disabledCapabilities(): CodexCapabilities {
 }
 
 function installAudioRecordingMocks(): void {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
-    clearRect: vi.fn(),
-    fillRect: vi.fn(),
-    fillStyle: '',
-  }) as unknown as CanvasRenderingContext2D);
-  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
-  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
-    color: 'rgb(10, 20, 30)',
-  } as CSSStyleDeclaration);
-  const analyser = {
-    disconnect: vi.fn(),
-    fftSize: 0,
-    frequencyBinCount: 4,
-    getByteTimeDomainData: vi.fn((target: Uint8Array) => {
-      target.fill(128);
-    }),
-  };
-  const source = {
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  };
   class FakeAudioContext {
     close = vi.fn(async () => undefined);
-    createAnalyser = vi.fn(() => analyser);
-    createMediaStreamSource = vi.fn(() => source);
     decodeAudioData = vi.fn(async () => ({
       length: 1,
       numberOfChannels: 1,
       sampleRate: 16_000,
       getChannelData: () => new Float32Array([0]),
     } as unknown as AudioBuffer));
-    resume = vi.fn(async () => undefined);
   }
 
   vi.stubGlobal('AudioContext', FakeAudioContext);
