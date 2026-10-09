@@ -5,8 +5,10 @@
       class="chat-model-selector__button"
       type="button"
       aria-label="Model and reasoning"
+      :title="selectorLabel"
       disabled
     >
+      <BrainIcon class="chat-model-selector__compact-icon" aria-hidden="true" />
       <span class="chat-model-selector__label">{{ selectorLabel }}</span>
       <ChevronDown class="chat-model-selector__chevron" aria-hidden="true" />
     </button>
@@ -24,11 +26,13 @@
           class="chat-model-selector__button"
           type="button"
           aria-label="Model and reasoning"
+          :title="selectorLabel"
           aria-haspopup="menu"
           :aria-expanded="open"
           :disabled="controlDisabled"
           @click="toggle"
         >
+          <BrainIcon class="chat-model-selector__compact-icon" aria-hidden="true" />
           <BoltIcon
             v-if="selectedModel && fastServiceTier && props.serviceTier === fastServiceTier.id"
             class="chat-model-selector__leading-icon"
@@ -45,7 +49,7 @@
 <script setup lang="ts" generic="Payload = unknown">
 import { computed } from 'vue';
 import type { CodexModelOption, ReasoningEffort } from './contracts';
-import { BoltIcon, ChevronDown } from '../icons/app-icons';
+import { BoltIcon, BrainIcon, ChevronDown } from '../icons/app-icons';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposerMenu from '../components/CodexComposerMenu.vue';
 
@@ -333,6 +337,13 @@ function wrapHostMenuItems(
   height: var(--icon-sm);
 }
 
+.chat-model-selector__compact-icon {
+  display: none;
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.8;
+}
+
 :deep(.chat-model-selector__menu) {
   right: 0;
   left: auto;
@@ -376,8 +387,21 @@ function wrapHostMenuItems(
 }
 
 @media (max-width: 720px) {
-  .chat-model-selector {
+  .chat-model-selector__label,
+  .chat-model-selector__leading-icon,
+  .chat-model-selector__chevron {
     display: none;
+  }
+
+  .chat-model-selector__button {
+    justify-content: center;
+    width: var(--chat-composer-compact-control-size, var(--chat-composer-button-size-small, 28px));
+    min-height: var(--chat-composer-compact-control-size, var(--chat-composer-button-size-small, 28px));
+    padding: 0;
+  }
+
+  .chat-model-selector__compact-icon {
+    display: block;
   }
 }
 </style>

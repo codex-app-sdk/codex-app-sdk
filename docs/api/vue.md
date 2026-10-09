@@ -162,6 +162,8 @@ default, or its first effort, in that order. Selections preserve the original ho
 dispatch through `actions.menuSelect`; the equivalent granular prop is
 `model-menu-items`. `CodexComposerMenuHeadingItem.actions` accepts action items
 rendered as accessible trailing icon controls in the heading row.
+At viewport widths up to 720px, the model selector uses a compact brain-icon
+button with the same model and reasoning menu; wider layouts show the model label.
 `CodexComposerMenuSubmenuItem.selectAction` optionally supplies the action emitted
 when its trigger is clicked or activated with Enter/Space. Hover and ArrowRight
 still open its submenu. Without it, clicking the trigger only toggles the submenu.

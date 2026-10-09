@@ -56,10 +56,27 @@ try {
     document.body.append(target);
     createApp({ render: () => h(Composer, {
       disabled: false, isSending: false, placeholder: 'Dictate',
+      models: [{ id: 'test-model', model: 'test-model', displayName: 'Test model', supportedReasoningEfforts: [] }],
+      modelId: 'test-model', modelCatalogStatus: 'loaded',
       onSend: (text, options) => probe.sent.push({ text, options }),
     }) }).mount(target);
   }, { root, packaged: process.env.SDK_SPEECH_PACKAGE === '1' });
   const fixture = page.locator('#speech-fixture');
+  const modelPicker = fixture.getByRole('button', { name: 'Model and reasoning', exact: true });
+  assert.equal(await modelPicker.locator('span').isVisible(), true, 'Desktop keeps the model label');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture.evaluate((el) => { el.style.inset = '12px'; el.style.padding = '12px'; });
+  assert.equal(await modelPicker.isVisible(), true, 'Phone keeps the model picker accessible');
+  assert.equal(await modelPicker.locator('span').isVisible(), false, 'Phone uses an icon instead of the model label');
+  assert.equal(await modelPicker.locator('svg:visible').count(), 1, 'Phone shows one model icon');
+  for (const control of [modelPicker, fixture.locator('.chat-composer__voice'), fixture.locator('.chat-composer__send')]) {
+    const bounds = await control.boundingBox();
+    assert.ok(bounds && bounds.width > 0 && bounds.x >= 0 && bounds.x + bounds.width <= 390,
+      'Model, mic, and send must fit inside the phone viewport');
+  }
+  await modelPicker.click();
+  await page.getByRole('menuitemradio', { name: 'Test model', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
   const editor = fixture.locator('.chat-rich-text-editor');
   await editor.fill('Before ending');
   await editor.press('Home');

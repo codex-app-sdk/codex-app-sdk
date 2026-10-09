@@ -4,6 +4,7 @@ export {
   IconArrowFork as ArrowForkIcon,
   IconBolt as BoltIcon,
   IconBookmark as SaveToBenchIcon,
+  IconBrain as BrainIcon,
   IconBrandSpeedtest as BrandSpeedTest,
   IconCheck as CheckIcon,
   IconCheck as Check,
