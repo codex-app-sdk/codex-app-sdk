@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.15.1
+
+### Fixed
+
+- Keep the model selector accessible on phone-sized screens with a compact
+  brain-icon button. Desktop layouts retain the model and reasoning label.
+
 ## 0.15.0
 
 ### Added
