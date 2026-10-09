@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 0.15.0
+
+### Added
+
+- On-device live dictation on supported Macs, with provisional words, finalized
+  text, and an audio-reactive listening indicator. Preserve drafts and attachments
+  across stop, cancel, navigation, and send-on-stop.
+- Shared streaming speech sessions across the native helper, Electron bridge,
+  and Vue voice controller, with batch transcription fallback.
+
+### Changed
+
+- Deliver live transcription sooner using Apple's fast-result reporting mode.
+  Batch transcription retains its standard recognition mode.
+- Simplify approval and question cards, including immediate selection of answers.
+- Replace the waveform UI with live text and microphone controls. Custom voice
+  layouts should use `CodexComposerVoiceField` and the controller's `transcript`
+  and `audioLevel` state; the `CodexComposerWaveform` and
+  `CodexComposerVoiceRecorder` exports and controller `recorder` field are removed.
+
 ## 0.14.4
 
 ### Added
