@@ -17,6 +17,7 @@ import type {
   CreateCodexRendererConversationOptions,
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
+  ReadCodexRateLimitsOptions,
   SendCodexMessageOptions,
   StartCodexReviewOptions,
   StartCodexLiveChatOptions,
@@ -40,11 +41,15 @@ type Awaitable<Value> = Value | Promise<Value>;
 type SurfaceOperationFunction<Name extends CodexSurfaceBridgeOperation> = Name extends keyof Required<CodexSurfaceApi>
   ? Extract<Required<CodexSurfaceApi>[Name], (...args: never[]) => unknown>
   : never;
-export type CodexSurfaceBridgeTarget = {
+type OptionalAccountOperation = 'readRateLimits';
+type BridgeOperationMethods = {
   [Name in CodexSurfaceBridgeOperation]: (
     ...args: Parameters<SurfaceOperationFunction<Name>>
   ) => Awaitable<Awaited<ReturnType<SurfaceOperationFunction<Name>>>>;
-} & Pick<CodexSurfaceApi, 'onEvent' | 'onStateChange'>;
+};
+export type CodexSurfaceBridgeTarget = Omit<BridgeOperationMethods, OptionalAccountOperation>
+  & Partial<Pick<BridgeOperationMethods, OptionalAccountOperation>>
+  & Pick<CodexSurfaceApi, 'onEvent' | 'onStateChange'>;
 
 export type CodexSurfaceBridgeAttachmentResolver = (
   attachment: CodexRendererAttachment,
@@ -248,6 +253,7 @@ export const codexSurfaceBridgeOperations = [
   'startChatGptDeviceCodeLogin', 'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
   'unarchiveConversation', 'updateConversationSettings', 'updateQueuedPrompt',
   'startLiveChat', 'stopLiveChat',
+  'readRateLimits',
 ] as const satisfies readonly CodexSurfaceBridgeOperation[];
 
 const operationSet = new Set<string>(codexSurfaceBridgeOperations);
@@ -262,6 +268,7 @@ export const codexSurfaceBridgeArities: Readonly<
   listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
   logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
   refreshAccount: [0, 0],
+  readRateLimits: [0, 1],
   refreshConversations: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
   resolveApproval: [2, 3], retryTurn: [1, 1], selectConversation: [1, 1],
   sendMessage: [1, 2], setGoal: [1, 2], startChatGptDeviceCodeLogin: [0, 0],
@@ -363,6 +370,11 @@ async function invokeValidated(
       optionalString(args[0], 'Conversation id'),
     );
     case 'refreshAccount': return target.refreshAccount();
+    case 'readRateLimits': {
+      const options = rateLimitsOptions(args[0]);
+      if (!target.readRateLimits) throw new Error('Account rate-limit reads are not available.');
+      return target.readRateLimits(options);
+    }
     case 'refreshConversations': return target.refreshConversations();
     case 'renameConversation': return target.renameConversation(nonEmptyString(args[0], 'Conversation title'));
     case 'respondToClientRequest': return target.respondToClientRequest(clientRequestResponse(args[0]));
@@ -449,6 +461,15 @@ function listConversationOptions(value: unknown): ListCodexConversationsOptions 
     ...(cwd === undefined ? {} : { cwd }),
     ...(record.limit === undefined ? {} : { limit: record.limit as number }),
     ...(record.searchTerm === undefined ? {} : { searchTerm: nonEmptyString(record.searchTerm, 'Conversation list search term') }),
+  };
+}
+
+function rateLimitsOptions(value: unknown): ReadCodexRateLimitsOptions | undefined {
+  if (value === undefined) return undefined;
+  const record = plainObject(value, 'Rate-limit read options');
+  onlyKeys(record, ['excludeResetCreditDetails'], 'Rate-limit read options');
+  return record.excludeResetCreditDetails === undefined ? {} : {
+    excludeResetCreditDetails: booleanValue(record.excludeResetCreditDetails, 'Exclude reset credit details'),
   };
 }
 

@@ -89,6 +89,23 @@ type CodexSurfaceServiceTier = {
 };
 ```
 
+## Account rate limits
+
+`CodexSurfaceApi.readRateLimits?()` is available through the native, Electron,
+and web surfaces. It is optional for compatibility with host-supplied APIs.
+
+`CodexSurfaceRateLimits.rateLimitResetCredits` is either `null` (not provided)
+or a summary with `availableCount: string` and nullable `credits` rows.
+`availableCount` is an exact, nonnegative decimal string. Unsafe numeric counts
+are rejected rather than rounded. The detail list may be capped: use the count,
+not the list length, as the total. A `null` list means count-only; an empty list
+means details were returned with no rows. Credit timestamps are Unix seconds.
+
+`account/rateLimits/updated` notifications update limit windows, but do not
+include reset credits. They retain the last read credit summary; explicitly
+call `readRateLimits()` when the host needs a fresh count. A count-only read
+replaces previously fetched credit details with `null`.
+
 ## Skills
 
 `CodexSurfaceSkill.defaultPrompt` is exposed only when the app-server provides

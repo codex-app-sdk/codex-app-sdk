@@ -210,10 +210,18 @@ export function surfaceRateLimits(response: v2.GetAccountRateLimitsResponse): Co
     rateLimits: surfaceRateLimitSnapshot(response.rateLimits),
     rateLimitsByLimitId: byLimitId,
     rateLimitResetCredits: response.rateLimitResetCredits ? {
-      availableCount: String(response.rateLimitResetCredits.availableCount),
+      availableCount: nonnegativeDecimal(response.rateLimitResetCredits.availableCount),
       credits: response.rateLimitResetCredits.credits?.map((credit) => ({ ...credit })) ?? null,
     } : null,
   };
+}
+
+/** JSON may decode protocol bigint fields as numbers. Never publish rounded counts. */
+export function nonnegativeDecimal(value: unknown): string {
+  if (typeof value === 'bigint' && value >= 0n) return value.toString();
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value);
+  if (typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value)) return value;
+  throw new Error('Invalid account count: expected an exact nonnegative integer');
 }
 
 export function surfaceRateLimitSnapshot(snapshot: v2.RateLimitSnapshot): CodexSurfaceRateLimitSnapshot {

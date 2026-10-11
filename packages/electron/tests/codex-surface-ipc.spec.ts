@@ -106,6 +106,11 @@ describe('Codex surface Electron bridge', () => {
       readConversationHistory: vi.fn(async () => history),
       readConversationPromptHistory: vi.fn(async () => promptHistory),
       refreshAccount: vi.fn(async () => snapshot),
+      readRateLimits: vi.fn(async () => ({
+        rateLimits: { limitId: 'codex', limitName: null, primary: null, secondary: null,
+          credits: null, individualLimit: null, planType: null, rateLimitReachedType: null },
+        rateLimitsByLimitId: null, rateLimitResetCredits: { availableCount: '2', credits: null },
+      })),
       refreshConversations: vi.fn(async () => snapshot),
       renameConversation: vi.fn(async () => snapshot),
       respondToClientRequest: vi.fn(async () => snapshot),
@@ -148,6 +153,12 @@ describe('Codex surface Electron bridge', () => {
     await expect(liveApi.startLiveChat!('thread-voice', { sdp: 'offer', version: 'v3' })).resolves.toEqual({ sdp: 'remote-answer' });
     expect(surface.startLiveChat).toHaveBeenCalledWith('thread-voice', { sdp: 'offer', version: 'v3' });
     await liveApi.stopLiveChat!('thread-voice');
+    await expect(liveApi.readRateLimits!({ excludeResetCreditDetails: true })).resolves.toMatchObject({
+      rateLimitResetCredits: { availableCount: '2', credits: null },
+    });
+    expect(surface.readRateLimits).toHaveBeenCalledWith({ excludeResetCreditDetails: true });
+    Reflect.deleteProperty(surface, 'readRateLimits');
+    await expect(liveApi.readRateLimits!()).rejects.toThrow('Account rate-limit reads are not available.');
     expect(surface.stopLiveChat).toHaveBeenCalledWith('thread-voice');
     Reflect.deleteProperty(surface, 'startLiveChat');
     Reflect.deleteProperty(surface, 'stopLiveChat');
@@ -175,6 +186,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:logout',
       'codex-surface:read-conversation-history',
       'codex-surface:read-conversation-prompt-history',
+      'codex-surface:read-rate-limits',
       'codex-surface:refresh-account',
       'codex-surface:refresh-conversations',
       'codex-surface:rename-conversation',

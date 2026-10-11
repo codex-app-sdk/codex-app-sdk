@@ -162,7 +162,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `account/bedrock/setup` | Typed client only | — |
 | `account/login/cancel` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
 | `account/logout` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
-| `account/rateLimits/read` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |
+| `account/rateLimits/read` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts`<br>`packages/backend/src/node/codex-surface.ts` |
 | `account/rateLimitResetCredit/consume` | Typed client only | — |
 | `account/usage/read` | Typed client only | — |
 | `account/workspaceMessages/read` | Typed client only | — |

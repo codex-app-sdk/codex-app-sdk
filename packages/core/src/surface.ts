@@ -352,6 +352,10 @@ export type CodexSurfaceRateLimitSnapshot = {
   rateLimitReachedType: string | null;
 };
 
+export type ReadCodexRateLimitsOptions = {
+  excludeResetCreditDetails?: boolean;
+};
+
 export type CodexSurfaceRateLimits = {
   rateLimits: CodexSurfaceRateLimitSnapshot;
   rateLimitsByLimitId: Record<string, CodexSurfaceRateLimitSnapshot> | null;
@@ -993,6 +997,7 @@ export type UpdateCodexConversationSettings = {
 };
 
 export type CodexSurfaceApi = {
+  readRateLimits?(options?: ReadCodexRateLimitsOptions): Promise<CodexSurfaceRateLimits>;
   startLiveChat?(conversationId: string, options: StartCodexLiveChatOptions): Promise<{ sdp: string }>;
   stopLiveChat?(conversationId: string): Promise<void>;
   connect(): Promise<CodexSurfaceSnapshot>;

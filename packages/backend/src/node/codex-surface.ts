@@ -18,6 +18,8 @@ import type {
   CodexSurfaceEvent,
   CodexSurfaceEventOrigin,
   CodexSurfaceModel,
+  CodexSurfaceRateLimits,
+  ReadCodexRateLimitsOptions,
   CodexSurfaceSnapshot,
   CodexSurfaceSkill,
   CreateCodexConversationOptions,
@@ -68,7 +70,9 @@ import {
 } from './codex-surface-runtime';
 import {
   initialAuthentication,
+  surfaceAuthenticationIdentityKey,
 } from './codex-surface-authentication';
+import { surfaceRateLimits } from './codex-surface-data';
 import {
   isUnixSocketTransportOptions,
   surfaceTransportOptions,
@@ -169,6 +173,7 @@ export class CodexSurface {
   private readonly unsubscribeToolInputRequests: () => void;
   private readonly unsubscribeMcpElicitationRequests: () => void;
   private eventSequence = 0;
+  private accountGeneration = 0;
   private readonly pendingMarkdownImageHydrations = new Set<string>();
   private closed = false;
   private state: CodexSurfaceSnapshot = initialSurfaceSnapshot(initialAuthentication());
@@ -457,9 +462,13 @@ export class CodexSurface {
       },
     );
     this.unsubscribeNotification = this.client.onNotification((notification) => {
+      if (notification.method === 'account/updated' || notification.method === 'account/login/completed') {
+        this.accountGeneration += 1;
+      }
       if (!this.textGeneration.handleNotification(notification)) this.notifications.handle(notification);
     });
     this.unsubscribeDisconnect = this.client.onDisconnect((error) => {
+      this.accountGeneration += 1;
       this.textGeneration.close(error);
       this.connection.handleDisconnect(error);
     });
@@ -495,14 +504,27 @@ export class CodexSurface {
   }
 
   async refreshAccount(): Promise<CodexSurfaceSnapshot> {
+    this.accountGeneration += 1;
     return this.connection.refreshAccount();
   }
 
+  /** Reads fresh account limits; errors leave the last successful snapshot intact. */
+  async readRateLimits(options?: ReadCodexRateLimitsOptions): Promise<CodexSurfaceRateLimits> {
+    return this.readForAccount(() => this.client.request('account/rateLimits/read', options), response => {
+      const rateLimits = surfaceRateLimits(response);
+      this.patch({ rateLimits });
+      this.emitEvent('action', { type: 'rateLimits.changed', payload: { rateLimits: structuredClone(rateLimits) } });
+      return structuredClone(rateLimits);
+    });
+  }
+
   async startChatGptLogin(): Promise<CodexSurfaceChatGptLogin> {
+    this.accountGeneration += 1;
     return this.connection.startChatGptLogin();
   }
 
   async startChatGptDeviceCodeLogin(): Promise<CodexSurfaceChatGptDeviceCodeLogin> {
+    this.accountGeneration += 1;
     return this.connection.startChatGptDeviceCodeLogin();
   }
 
@@ -563,6 +585,7 @@ export class CodexSurface {
   }
 
   async logout(): Promise<CodexSurfaceSnapshot> {
+    this.accountGeneration += 1;
     return this.connection.logout();
   }
 
@@ -1198,6 +1221,21 @@ export class CodexSurface {
     });
   }
 
+
+  private async readForAccount<Response, Result>(
+    read: () => Promise<Response>, project: (response: Response) => Result,
+  ): Promise<Result> {
+    await this.ensureConnected();
+    await this.authentication.pendingRefresh();
+    const generation = this.accountGeneration;
+    const identity = surfaceAuthenticationIdentityKey(this.state.authentication);
+    const result = await read();
+    if (this.closed || generation !== this.accountGeneration
+      || identity !== surfaceAuthenticationIdentityKey(this.state.authentication)) {
+      throw new Error('Account changed while reading account data');
+    }
+    return project(result);
+  }
 
   private emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void {
     const event = {

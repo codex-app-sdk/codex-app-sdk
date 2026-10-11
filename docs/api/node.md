@@ -218,6 +218,18 @@ must be launched with the feature enabled by its owner.
 - `cancelLogin(loginId?)`
 - `logout()`
 
+### Account rate limits
+
+`readRateLimits(options?: ReadCodexRateLimitsOptions)` reads fresh account limits
+and returns `CodexSurfaceRateLimits`. Pass `{ excludeResetCreditDetails: true }`
+for counts only, or `false` for credit details. The successful read replaces
+`snapshot.rateLimits` and emits `rateLimits.changed`; failed reads preserve the
+last successful value and reject. Reads also reject if the account changes or
+the surface closes before the response is published.
+
+Requests use the `CodexAppServerClient` request timeout. There is no per-read
+transport abort. A host can abandon a read and discard its late result.
+
 ### Remote control
 
 - `readConfigRequirements()`

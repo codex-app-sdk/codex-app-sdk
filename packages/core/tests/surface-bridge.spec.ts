@@ -45,6 +45,7 @@ describe('Codex surface bridge', () => {
       listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
       logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
       refreshAccount: [0, 0], refreshConversations: [0, 0], renameConversation: [1, 1],
+      readRateLimits: [0, 1],
       respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryTurn: [1, 1],
       selectConversation: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
       startChatGptDeviceCodeLogin: [0, 0], startChatGptLogin: [0, 0],
@@ -89,6 +90,7 @@ describe('Codex surface bridge', () => {
       { operation: 'readConversationHistory', args: ['conversation-1'] },
       { operation: 'readConversationPromptHistory', args: ['conversation-1'] },
       { operation: 'refreshAccount', args: [] },
+      { operation: 'readRateLimits', args: [{ excludeResetCreditDetails: false }] },
       { operation: 'refreshConversations', args: [] },
       { operation: 'renameConversation', args: ['New title'] },
       {
@@ -180,6 +182,16 @@ describe('Codex surface bridge', () => {
       serviceTier: 'priority',
       planMode: true,
     });
+  });
+
+  it('supports optional account reads without requiring older hosts to implement them', async () => {
+    const { calls, target } = recordingTarget();
+    await invokeCodexSurfaceBridgeOperation(target, 'readRateLimits', []);
+    await invokeCodexSurfaceBridgeOperation(target, 'readRateLimits', [{}]);
+    expect(calls.get('readRateLimits')).toStrictEqual([[undefined], [{}]]);
+    delete target.readRateLimits;
+    await expect(invokeCodexSurfaceBridgeOperation(target, 'readRateLimits', []))
+      .rejects.toThrow('Account rate-limit reads are not available.');
   });
 
   it('rejects malformed arity and non-serializable nested values', async () => {
@@ -283,6 +295,8 @@ describe('Codex surface bridge', () => {
   });
 
   it.each([
+    ['readRateLimits', [{ excludeResetCreditDetails: 'yes' }], 'Exclude reset credit details must be a boolean'],
+    ['readRateLimits', [{ threadId: 'thread' }], 'Rate-limit read options contains unsupported property "threadId"'],
     ['startLiveChat', ['thread', { sdp: '' }], 'SDP offer must be a non-empty string'],
     ['startLiveChat', ['thread', { sdp: 'offer', version: 'v4' }], 'Invalid realtime version'],
     ['startLiveChat', ['thread', { sdp: 'offer', includeStartupContext: 'yes' }], 'includeStartupContext must be a boolean'],
