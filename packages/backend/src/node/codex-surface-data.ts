@@ -170,6 +170,14 @@ export function surfaceMessageAttachments(message: SurfaceMessage): CodexSurface
   });
 }
 
+export function surfaceTokenUsage(usage: v2.TokenUsageBreakdown): import('@codex-app-sdk/core/surface').CodexSurfaceTokenUsage {
+  return {
+    totalTokens: usage.totalTokens, inputTokens: usage.inputTokens,
+    cachedInputTokens: usage.cachedInputTokens, cacheWriteInputTokens: usage.cacheWriteInputTokens ?? null,
+    outputTokens: usage.outputTokens, reasoningOutputTokens: usage.reasoningOutputTokens,
+  };
+}
+
 export function surfaceContextUsage(tokenUsage: v2.ThreadTokenUsage): CodexSurfaceContextUsage {
   const modelContextWindow = tokenUsage.modelContextWindow;
   const contextTokens = tokenUsage.last.totalTokens;
@@ -222,6 +230,22 @@ export function nonnegativeDecimal(value: unknown): string {
   if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value);
   if (typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value)) return value;
   throw new Error('Invalid account count: expected an exact nonnegative integer');
+}
+
+export function surfaceAccountUsage(response: v2.GetAccountTokenUsageResponse): import('@codex-app-sdk/core/surface').CodexSurfaceAccountUsage {
+  const decimal = (value: bigint | null) => value === null ? null : nonnegativeDecimal(value);
+  return {
+    summary: {
+      lifetimeTokens: decimal(response.summary.lifetimeTokens),
+      peakDailyTokens: decimal(response.summary.peakDailyTokens),
+      longestRunningTurnSec: decimal(response.summary.longestRunningTurnSec),
+      currentStreakDays: decimal(response.summary.currentStreakDays),
+      longestStreakDays: decimal(response.summary.longestStreakDays),
+    },
+    dailyUsageBuckets: response.dailyUsageBuckets?.map(bucket => ({
+      startDate: bucket.startDate, tokens: nonnegativeDecimal(bucket.tokens),
+    })) ?? null,
+  };
 }
 
 export function surfaceRateLimitSnapshot(snapshot: v2.RateLimitSnapshot): CodexSurfaceRateLimitSnapshot {

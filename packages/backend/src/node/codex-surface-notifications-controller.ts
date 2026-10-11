@@ -21,6 +21,7 @@ import {
   conversationStatus,
   mergeSurfaceRateLimits,
   surfaceContextUsage,
+  surfaceTokenUsage,
   surfaceThreadStatus,
   threadToSummary,
   upsertConversation,
@@ -235,8 +236,25 @@ export class CodexSurfaceNotificationsController {
           turnId: notification.params.turnId,
           payload: { contextUsage: structuredClone(contextUsage) },
         });
+        this.host.emitEvent('notification', {
+          type: 'conversation.executionUsageChanged',
+          conversationId: notification.params.threadId,
+          turnId: notification.params.turnId,
+          payload: { usage: {
+            last: surfaceTokenUsage(notification.params.tokenUsage.last),
+            total: surfaceTokenUsage(notification.params.tokenUsage.total),
+            execution: null, model: null, observedStart: false,
+          } },
+        });
         return;
       }
+      case 'model/rerouted':
+        this.host.emitEvent('notification', {
+          type: 'turn.modelRerouted', conversationId: notification.params.threadId,
+          turnId: notification.params.turnId,
+          payload: { fromModel: notification.params.fromModel, toModel: notification.params.toModel, reason: notification.params.reason },
+        });
+        return;
       case 'turn/started': {
         const runtime = this.host.requireRuntime(notification.params.threadId);
         const alreadyActive = runtime.activeTurnId === notification.params.turn.id;
@@ -496,7 +514,6 @@ export class CodexSurfaceNotificationsController {
       case 'item/reasoning/summaryTextDelta':
       case 'item/reasoning/summaryPartAdded':
       case 'item/reasoning/textDelta':
-      case 'model/rerouted':
       case 'model/verification':
       case 'turn/moderationMetadata':
       case 'model/safetyBuffering/updated':

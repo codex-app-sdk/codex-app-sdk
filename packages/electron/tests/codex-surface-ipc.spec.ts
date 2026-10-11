@@ -106,6 +106,10 @@ describe('Codex surface Electron bridge', () => {
       readConversationHistory: vi.fn(async () => history),
       readConversationPromptHistory: vi.fn(async () => promptHistory),
       refreshAccount: vi.fn(async () => snapshot),
+      readAccountUsage: vi.fn(async () => ({
+        summary: { lifetimeTokens: '42', peakDailyTokens: null, longestRunningTurnSec: null, currentStreakDays: null, longestStreakDays: null },
+        dailyUsageBuckets: null,
+      })),
       readRateLimits: vi.fn(async () => ({
         rateLimits: { limitId: 'codex', limitName: null, primary: null, secondary: null,
           credits: null, individualLimit: null, planType: null, rateLimitReachedType: null },
@@ -157,6 +161,9 @@ describe('Codex surface Electron bridge', () => {
       rateLimitResetCredits: { availableCount: '2', credits: null },
     });
     expect(surface.readRateLimits).toHaveBeenCalledWith({ excludeResetCreditDetails: true });
+    await expect(liveApi.readAccountUsage!()).resolves.toMatchObject({ summary: { lifetimeTokens: '42' }, dailyUsageBuckets: null });
+    Reflect.deleteProperty(surface, 'readAccountUsage');
+    await expect(liveApi.readAccountUsage!()).rejects.toThrow('Account usage reads are not available.');
     Reflect.deleteProperty(surface, 'readRateLimits');
     await expect(liveApi.readRateLimits!()).rejects.toThrow('Account rate-limit reads are not available.');
     expect(surface.stopLiveChat).toHaveBeenCalledWith('thread-voice');
@@ -184,6 +191,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:list-models',
       'codex-surface:load-older-conversation-history',
       'codex-surface:logout',
+      'codex-surface:read-account-usage',
       'codex-surface:read-conversation-history',
       'codex-surface:read-conversation-prompt-history',
       'codex-surface:read-rate-limits',

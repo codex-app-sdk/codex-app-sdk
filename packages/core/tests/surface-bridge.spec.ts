@@ -46,6 +46,7 @@ describe('Codex surface bridge', () => {
       logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
       refreshAccount: [0, 0], refreshConversations: [0, 0], renameConversation: [1, 1],
       readRateLimits: [0, 1],
+      readAccountUsage: [0, 0],
       respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryTurn: [1, 1],
       selectConversation: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
       startChatGptDeviceCodeLogin: [0, 0], startChatGptLogin: [0, 0],
@@ -91,6 +92,7 @@ describe('Codex surface bridge', () => {
       { operation: 'readConversationPromptHistory', args: ['conversation-1'] },
       { operation: 'refreshAccount', args: [] },
       { operation: 'readRateLimits', args: [{ excludeResetCreditDetails: false }] },
+      { operation: 'readAccountUsage', args: [] },
       { operation: 'refreshConversations', args: [] },
       { operation: 'renameConversation', args: ['New title'] },
       {
@@ -192,6 +194,9 @@ describe('Codex surface bridge', () => {
     delete target.readRateLimits;
     await expect(invokeCodexSurfaceBridgeOperation(target, 'readRateLimits', []))
       .rejects.toThrow('Account rate-limit reads are not available.');
+    delete target.readAccountUsage;
+    await expect(invokeCodexSurfaceBridgeOperation(target, 'readAccountUsage', []))
+      .rejects.toThrow('Account usage reads are not available.');
   });
 
   it('rejects malformed arity and non-serializable nested values', async () => {

@@ -19,6 +19,7 @@ import type {
   CodexSurfaceEventOrigin,
   CodexSurfaceModel,
   CodexSurfaceRateLimits,
+  CodexSurfaceAccountUsage,
   ReadCodexRateLimitsOptions,
   CodexSurfaceSnapshot,
   CodexSurfaceSkill,
@@ -72,7 +73,7 @@ import {
   initialAuthentication,
   surfaceAuthenticationIdentityKey,
 } from './codex-surface-authentication';
-import { surfaceRateLimits } from './codex-surface-data';
+import { surfaceAccountUsage, surfaceRateLimits } from './codex-surface-data';
 import {
   isUnixSocketTransportOptions,
   surfaceTransportOptions,
@@ -98,6 +99,7 @@ import {
   readPromptHistory,
 } from './codex-surface-prompt-history';
 import { CodexSurfaceTextGenerationController } from './codex-surface-text-generation-controller';
+import { CodexSurfaceUsageController } from './codex-surface-usage-controller';
 
 export type {
   CodexAppServerTransportOptions,
@@ -173,6 +175,7 @@ export class CodexSurface {
   private readonly unsubscribeToolInputRequests: () => void;
   private readonly unsubscribeMcpElicitationRequests: () => void;
   private eventSequence = 0;
+  private readonly usage = new CodexSurfaceUsageController();
   private accountGeneration = 0;
   private readonly pendingMarkdownImageHydrations = new Set<string>();
   private closed = false;
@@ -464,11 +467,13 @@ export class CodexSurface {
     this.unsubscribeNotification = this.client.onNotification((notification) => {
       if (notification.method === 'account/updated' || notification.method === 'account/login/completed') {
         this.accountGeneration += 1;
+        this.usage.clear();
       }
       if (!this.textGeneration.handleNotification(notification)) this.notifications.handle(notification);
     });
     this.unsubscribeDisconnect = this.client.onDisconnect((error) => {
       this.accountGeneration += 1;
+      this.usage.clear();
       this.textGeneration.close(error);
       this.connection.handleDisconnect(error);
     });
@@ -516,6 +521,11 @@ export class CodexSurface {
       this.emitEvent('action', { type: 'rateLimits.changed', payload: { rateLimits: structuredClone(rateLimits) } });
       return structuredClone(rateLimits);
     });
+  }
+
+  /** Account-wide, on-demand usage; never collects thread estimates or changes surface state. */
+  async readAccountUsage(): Promise<CodexSurfaceAccountUsage> {
+    return this.readForAccount(() => this.client.request('account/usage/read', {}), surfaceAccountUsage);
   }
 
   async startChatGptLogin(): Promise<CodexSurfaceChatGptLogin> {
@@ -961,6 +971,7 @@ export class CodexSurface {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    this.usage.clear();
     this.unsubscribeNotification();
     this.unsubscribeToolInputRequests();
     this.unsubscribeMcpElicitationRequests();
@@ -1238,6 +1249,17 @@ export class CodexSurface {
   }
 
   private emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void {
+    input = this.usage.observe(origin, input);
+    if (input.type === 'conversation.executionUsageChanged' || input.type === 'turn.completed') {
+      const runtime = this.runtimeState.get(input.conversationId);
+      const executionUsage = input.type === 'turn.completed' ? input.payload.executionUsage : input.payload.usage;
+      const turnId = input.turnId;
+      if (runtime?.turns.some(turn => turn.id === turnId)) {
+        this.patchRuntime(input.conversationId, {
+          turns: runtime.turns.map(turn => turn.id === turnId ? { ...turn, executionUsage: structuredClone(executionUsage) } : turn),
+        });
+      }
+    }
     const event = {
       ...input,
       seq: ++this.eventSequence,

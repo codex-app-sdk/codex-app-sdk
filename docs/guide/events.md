@@ -38,8 +38,23 @@ The matching snapshot mutation is applied before the event is emitted.
 | Sub-agents | collaboration tool calls and agent activity for host-owned presentation |
 | Plans and goals | plan updates, goal set/clear/status |
 | Queues and diffs | queued prompts, git diff updates |
-| Usage | context usage and account rate limits |
+| Usage | context occupancy, attributed execution usage, and account rate limits |
 | Remote control | connection status changes for host-owned native behavior |
+
+## Local usage accounting
+
+Use `conversation.executionUsageChanged` for turn-key replacements, not
+`contextUsage` as a consumption metric. Store `usage.execution` only for
+observed starts, and retain `null` as unknown. Repeated observations replace
+the same turn; they are not increments. A terminal event carries the latest
+usage, but later corrections can invalidate it. Keep this revisable evidence
+local rather than sending irreversible usage totals.
+
+Account-wide summaries are separate: call `readAccountUsage()` explicitly
+for an account settings screen, never once per observing agent or as a sum of
+local turns. Use `readRateLimits({ excludeResetCreditDetails: false })` for
+fresh earned-reset details. See [execution usage](/api/events#execution-usage)
+and [account reads](/api/node#account-rate-limits) for exact contracts.
 
 ## Conversation-scoped subscription
 

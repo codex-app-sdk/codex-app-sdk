@@ -11,6 +11,27 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 describe('Codex conversation replica', () => {
+  it('retains turn-scoped usage through completion and late replacement without touching other turns', () => {
+    const other = turn('other');
+    const replica = createCodexConversationReplica(snapshot({ turns: [turn('turn-1'), other] }));
+    const counts = { totalTokens: 10, inputTokens: 8, cachedInputTokens: 2, cacheWriteInputTokens: null, outputTokens: 2, reasoningOutputTokens: 1 };
+    const usage = { last: counts, total: counts, execution: counts, model: null, observedStart: true };
+    apply(replica, event('conversation.executionUsageChanged', 'turn-1', { usage }));
+    expect(replica.getSnapshot().turns[0]?.executionUsage).toStrictEqual(usage);
+    apply(replica, event('turn.error', 'turn-1', {
+      error: { message: 'retry', additionalDetails: null, codexErrorInfo: null }, willRetry: true,
+    }));
+    expect(replica.getSnapshot().turns[0]?.executionUsage).toStrictEqual(usage);
+    apply(replica, event('turn.completed', 'turn-1', {
+      status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null, executionUsage: usage,
+    }));
+    const later = { ...usage, execution: { ...counts, totalTokens: 12, outputTokens: 4 } };
+    apply(replica, event('conversation.executionUsageChanged', 'turn-1', { usage: later }));
+    apply(replica, event('turn.modelRerouted', 'turn-1', { fromModel: 'one', toModel: 'two', reason: 'highRiskCyberActivity' }));
+    expect(replica.getSnapshot().turns[0]).toMatchObject({ status: 'completed', executionUsage: later });
+    expect(replica.getSnapshot().turns[1]).toBe(other);
+  });
+
   it('projects structured execution plans into the conversation snapshot', () => {
     const replica = createCodexConversationReplica(snapshot());
 

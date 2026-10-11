@@ -93,6 +93,8 @@ type CodexSurfaceServiceTier = {
 
 `CodexSurfaceApi.readRateLimits?()` is available through the native, Electron,
 and web surfaces. It is optional for compatibility with host-supplied APIs.
+`readAccountUsage?()` is likewise optional, returning a normalized
+`CodexSurfaceAccountUsage` without changing surface snapshots.
 
 `CodexSurfaceRateLimits.rateLimitResetCredits` is either `null` (not provided)
 or a summary with `availableCount: string` and nullable `credits` rows.

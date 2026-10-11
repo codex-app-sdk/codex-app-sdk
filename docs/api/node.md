@@ -230,6 +230,22 @@ the surface closes before the response is published.
 Requests use the `CodexAppServerClient` request timeout. There is no per-read
 transport abort. A host can abandon a read and discard its late result.
 
+### Account usage
+
+`readAccountUsage(): Promise<CodexSurfaceAccountUsage>` reads account-wide
+ChatGPT token summaries and daily buckets on demand. It takes no thread ID,
+does not request or return thread estimates, and does not change snapshots or
+emit usage events. Reads are never collected automatically or exported to
+telemetry. Unsupported authentication/provider reads reject rather than
+returning invented zeroes.
+
+The five summary metrics (`lifetimeTokens`, `peakDailyTokens`,
+`longestRunningTurnSec`, `currentStreakDays`, `longestStreakDays`) are nullable
+decimal strings. `dailyUsageBuckets` is either `null` or rows containing
+`startDate` and an exact decimal-string `tokens` count. Unsafe numeric counts
+reject. Account changes, surface closure, request timeouts, and provider errors
+have the same read controls as `readRateLimits()`.
+
 ### Remote control
 
 - `readConfigRequirements()`

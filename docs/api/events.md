@@ -62,6 +62,44 @@ Event families cover:
 - `approval.*`
 - `clientRequest.*`
 
+## Execution usage
+
+`conversation.executionUsageChanged` carries `{ usage: CodexSurfaceExecutionUsage }`
+with stable `conversationId` and `turnId`. Each observation includes:
+
+- `last`: the provider's latest request counts, not the whole turn;
+- `total`: provider thread counters, which may be replayed or reset;
+- `observedStart`: whether this surface instance observed this turn starting;
+- `execution`: cumulative counts since that start, or `null` when attribution is unknown;
+- `model`: `null` without authoritative whole-execution model evidence.
+
+`execution` is computed only from a known prior thread-counter baseline and an
+observed start. Missing baselines, decreasing or synthetic context-only
+counters, overlapping late turns, and history replacement leave attribution
+unknown. Absent cache-write counts remain `null`, not zero. These observations
+do not classify provider packets as independently verified live or replayed
+traffic: `observedStart` describes SDK-local lifecycle evidence.
+
+Replace stored usage by `(conversationId, turnId)`; never add successive
+samples, `last`, or thread totals. `observedStart: false` observations should
+not erase previously retained live usage. For observed executions, a later
+`execution: null` invalidates earlier attribution. `turn.completed` includes
+the latest `executionUsage` projection, and late usage replacements can still
+arrive after completion. There is no immutable final-consumption guarantee;
+these counters are unsuitable for irreversible positive-only telemetry.
+
+`CodexSurfaceTokenUsage` contains `totalTokens`, `inputTokens`,
+`cachedInputTokens`, nullable `cacheWriteInputTokens`, `outputTokens`, and
+`reasoningOutputTokens`. Cached reads are included in input; reasoning is
+included in output. Do not sum those subsets again. The app-server does not
+guarantee how cache writes relate to input, so do not claim disjoint uncached
+input by subtracting cache writes without additional provider evidence.
+
+`CodexSurfaceTurn.executionUsage?` and conversation replicas retain the latest
+projection for materialized turns. `turn.modelRerouted` separately carries
+`{ fromModel, toModel, reason }`; a reroute is not evidence that one model owns
+all of a turn's usage.
+
 `message.delta` includes `messageId`, `itemId`, `delta`, and an optional
 `phase: 'commentary' | 'final_answer'`. Completed reasoning summaries arrive
 through the full message carried by `message.updated`, avoiding a second

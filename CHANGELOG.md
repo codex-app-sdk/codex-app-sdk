@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Read fresh account rate limits and earned-reset details through native,
+  Electron, and web surfaces, with exact counts and stale-account rejection.
+- Read account-wide token summaries and daily buckets explicitly, separately
+  from local turn usage and telemetry.
+- Observe cumulative execution usage when lifecycle and counter evidence permit
+  attribution, retaining unknowns, late corrections, and model reroutes.
+
 ## 0.15.1
 
 ### Fixed

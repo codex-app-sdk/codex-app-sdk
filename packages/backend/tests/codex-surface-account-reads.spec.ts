@@ -24,6 +24,36 @@ const response: v2.GetAccountRateLimitsResponse = {
 };
 
 describe('CodexSurface account reads', () => {
+  it('reads account-wide usage only on demand, preserving nullable metrics and excluding thread estimates', async () => {
+    let result: v2.GetAccountTokenUsageResponse = {
+      summary: { lifetimeTokens: 9007199254740993n, peakDailyTokens: 42n, longestRunningTurnSec: null, currentStreakDays: 0n, longestStreakDays: 7n },
+      dailyUsageBuckets: [{ startDate: '2026-10-10', tokens: 42n }],
+      threadUsage: { threadId: 'unrequested-thread', estimatedUsageCreditsMicros: 100n, estimatedUsageUsdMicros: null, groups: [] },
+    };
+    let fail = false;
+    const transport = new MockCodexAppServer({ 'account/usage/read': () => {
+      if (fail) throw new Error('Account usage unavailable');
+      return result;
+    } });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    try {
+      await surface.connect();
+      await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('loaded'));
+      const before = surface.getSnapshot();
+      expect(transport.requests('account/usage/read')).toHaveLength(0);
+      expect(await surface.readAccountUsage()).toStrictEqual({
+        summary: { lifetimeTokens: '9007199254740993', peakDailyTokens: '42', longestRunningTurnSec: null, currentStreakDays: '0', longestStreakDays: '7' },
+        dailyUsageBuckets: [{ startDate: '2026-10-10', tokens: '42' }],
+      });
+      expect(transport.lastRequest('account/usage/read')?.params).toStrictEqual({});
+      result = { summary: { lifetimeTokens: null, peakDailyTokens: null, longestRunningTurnSec: null, currentStreakDays: null, longestStreakDays: null }, dailyUsageBuckets: null };
+      expect(await surface.readAccountUsage()).toStrictEqual(result);
+      fail = true;
+      await expect(surface.readAccountUsage()).rejects.toThrow('Account usage unavailable');
+      expect(surface.getSnapshot()).toStrictEqual(before);
+    } finally { await surface.close(); }
+  });
+
   it('preserves exact counts across JSON representations and rejects rounded or malformed values', async () => {
     let count: unknown = 5n;
     const transport = new MockCodexAppServer({ 'account/rateLimits/read': () => ({

@@ -88,6 +88,11 @@ function applyConversationEvent(
       return { ...snapshot, goal: event.payload.goal };
     case 'conversation.contextUsageChanged':
       return { ...snapshot, contextUsage: event.payload.contextUsage };
+    case 'conversation.executionUsageChanged':
+      return {
+        ...snapshot,
+        turns: snapshot.turns.map(turn => turn.id === event.turnId ? { ...turn, executionUsage: event.payload.usage } : turn),
+      };
     case 'conversation.skillsChanged':
       return {
         ...snapshot,
@@ -156,6 +161,7 @@ function applyConversationEvent(
         error: event.payload.error.message,
         turnIds: addUnique(snapshot.turnIds, event.turnId),
         turns: upsertTurn(snapshot.turns, {
+          ...previous,
           id: event.turnId,
           status: event.payload.willRetry ? 'inProgress' : 'failed',
           error: event.payload.error,
@@ -248,6 +254,7 @@ function applyConversationEvent(
     case 'clientRequest.resolved':
       return resolveClientRequest(snapshot, event);
     case 'file.activity':
+    case 'turn.modelRerouted':
     case 'subagent.toolCallChanged':
     case 'subagent.activity':
     case 'realtime.started':

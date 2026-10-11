@@ -22,8 +22,8 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Client → app-server requests | 162 | 48 | 0 | 0 | 114 |
-| App-server → client notifications | 83 | 42 | 0 | 30 | 11 |
+| Client → app-server requests | 162 | 49 | 0 | 0 | 113 |
+| App-server → client notifications | 83 | 43 | 0 | 29 | 11 |
 | App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
 ## Client → app-server requests
@@ -164,7 +164,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `account/logout` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
 | `account/rateLimits/read` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts`<br>`packages/backend/src/node/codex-surface.ts` |
 | `account/rateLimitResetCredit/consume` | Typed client only | — |
-| `account/usage/read` | Typed client only | — |
+| `account/usage/read` | High-level SDK | `packages/backend/src/node/codex-surface.ts` |
 | `account/workspaceMessages/read` | Typed client only | — |
 | `account/sendAddCreditsNudgeEmail` | Typed client only | — |
 | `feedback/upload` | Typed client only | — |
@@ -254,7 +254,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `item/reasoning/summaryPartAdded` | Intentionally ignored | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `item/reasoning/textDelta` | Intentionally ignored | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `thread/compacted` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
-| `model/rerouted` | Intentionally ignored | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
+| `model/rerouted` | High-level SDK | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `model/verification` | Intentionally ignored | `packages/backend/src/node/codex-surface-notifications-controller.ts` |
 | `modelProvider/authRecoveryStarted` | Typed client only | — |
 | `modelProvider/authRecoveryCompleted` | Typed client only | — |

@@ -330,7 +330,7 @@ describe('CodexSurfaceNotificationsController', () => {
       reasoningOutputTokens: 30, lastTotalTokens: 100,
       modelContextWindow: 1000, usedPercent: 10,
     });
-    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
+    expect(setup.host.emitEvent).toHaveBeenCalledWith('notification', {
       type: 'conversation.contextUsageChanged', conversationId: 'thread-1', turnId: 'turn-1',
       payload: { contextUsage: setup.runtime.contextUsage },
     });
@@ -609,7 +609,7 @@ describe('CodexSurfaceNotificationsController', () => {
       'mcpServer/oauthLogin/completed', 'mcpServer/startupStatus/updated', 'app/list/updated',
       'externalAgentConfig/import/progress', 'externalAgentConfig/import/completed', 'fs/changed',
       'item/reasoning/summaryTextDelta', 'item/reasoning/summaryPartAdded', 'item/reasoning/textDelta',
-      'model/rerouted', 'model/verification', 'turn/moderationMetadata',
+      'model/verification', 'turn/moderationMetadata',
       'model/safetyBuffering/updated', 'warning', 'guardianWarning', 'deprecationNotice',
       'configWarning', 'fuzzyFileSearch/sessionUpdated', 'fuzzyFileSearch/sessionCompleted',
       'windows/worldWritableWarning', 'windowsSandbox/setupCompleted',

@@ -15,6 +15,7 @@ import type {
   CodexSurfaceEvent,
   CodexSurfaceModel,
   CodexSurfaceRateLimits,
+  CodexSurfaceAccountUsage,
   ReadCodexRateLimitsOptions,
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
@@ -71,6 +72,7 @@ const channels = {
   loadOlderConversationHistory: 'codex-surface:load-older-conversation-history',
   refreshAccount: 'codex-surface:refresh-account',
   readRateLimits: 'codex-surface:read-rate-limits',
+  readAccountUsage: 'codex-surface:read-account-usage',
   refreshConversations: 'codex-surface:refresh-conversations',
   renameConversation: 'codex-surface:rename-conversation',
   respondToClientRequest: 'codex-surface:respond-to-client-request',
@@ -122,6 +124,7 @@ type SurfaceRequests = {
   [channels.loadOlderConversationHistory]: IpcRequest<[conversationId?: string], import('@codex-app-sdk/core/surface').CodexConversationHistoryPage>;
   [channels.refreshAccount]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.readRateLimits]: IpcRequest<[options?: ReadCodexRateLimitsOptions], CodexSurfaceRateLimits>;
+  [channels.readAccountUsage]: IpcRequest<[], CodexSurfaceAccountUsage>;
   [channels.refreshConversations]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.renameConversation]: IpcRequest<[title: string], CodexSurfaceSnapshot>;
   [channels.respondToClientRequest]: IpcRequest<[response: CodexSurfaceClientRequestResponse], CodexSurfaceSnapshot>;
@@ -219,6 +222,7 @@ export function registerCodexSurfaceIpc(
     [channels.loadOlderConversationHistory]: (_event, ...args) => invoke('loadOlderConversationHistory', args),
     [channels.refreshAccount]: (_event, ...args) => invoke('refreshAccount', args),
     [channels.readRateLimits]: (_event, ...args) => invoke('readRateLimits', args),
+    [channels.readAccountUsage]: (_event, ...args) => invoke('readAccountUsage', args),
     [channels.refreshConversations]: (_event, ...args) => invoke('refreshConversations', args),
     [channels.renameConversation]: (_event, ...args) => invoke('renameConversation', args),
     [channels.respondToClientRequest]: (_event, ...args) => invoke('respondToClientRequest', args),
@@ -301,6 +305,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     loadOlderConversationHistory: (conversationId) => renderer.invoke(channels.loadOlderConversationHistory, conversationId),
     refreshAccount: () => renderer.invoke(channels.refreshAccount),
     readRateLimits: (options) => renderer.invoke(channels.readRateLimits, options),
+    readAccountUsage: () => renderer.invoke(channels.readAccountUsage),
     refreshConversations: () => renderer.invoke(channels.refreshConversations),
     renameConversation: (title) => renderer.invoke(channels.renameConversation, title),
     respondToClientRequest: (response) => renderer.invoke(channels.respondToClientRequest, response),

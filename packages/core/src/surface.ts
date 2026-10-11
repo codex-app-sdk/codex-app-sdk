@@ -298,6 +298,30 @@ export type CodexSurfaceContextUsage = {
   usedPercent: number | null;
 };
 
+/** Provider counts: cached input is part of input, and reasoning is part of output. */
+export type CodexSurfaceTokenUsage = {
+  totalTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  /** Null when absent. Its relationship to input is not guaranteed by app-server. */
+  cacheWriteInputTokens: number | null;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+};
+
+export type CodexSurfaceExecutionUsage = {
+  /** This surface instance observed the turn start, rather than only its replayed counters. */
+  observedStart: boolean;
+  /** Latest provider request, not the complete turn. */
+  last: CodexSurfaceTokenUsage;
+  /** Provider thread counters; may be replayed or reset. */
+  total: CodexSurfaceTokenUsage;
+  /** Cumulative replacement since an observed start with a known baseline. */
+  execution: CodexSurfaceTokenUsage | null;
+  /** Unknown unless the provider supplies authoritative whole-execution evidence. */
+  model: string | null;
+};
+
 export type CodexSurfaceGoal = {
   threadId: string;
   objective: string;
@@ -354,6 +378,17 @@ export type CodexSurfaceRateLimitSnapshot = {
 
 export type ReadCodexRateLimitsOptions = {
   excludeResetCreditDetails?: boolean;
+};
+
+export type CodexSurfaceAccountUsage = {
+  summary: {
+    lifetimeTokens: string | null;
+    peakDailyTokens: string | null;
+    longestRunningTurnSec: string | null;
+    currentStreakDays: string | null;
+    longestStreakDays: string | null;
+  };
+  dailyUsageBuckets: readonly { startDate: string; tokens: string }[] | null;
 };
 
 export type CodexSurfaceRateLimits = {
@@ -587,6 +622,7 @@ export type CodexSurfaceTurn = {
   startedAt: string | null;
   completedAt: string | null;
   durationMs: number | null;
+  executionUsage?: CodexSurfaceExecutionUsage | null;
 };
 
 /**
@@ -741,6 +777,14 @@ export type CodexSurfaceEvent =
   | CodexTurnEventEnvelope<'conversation.contextUsageChanged', {
     contextUsage: CodexSurfaceContextUsage | null;
   }>
+  | CodexTurnEventEnvelope<'conversation.executionUsageChanged', {
+    usage: CodexSurfaceExecutionUsage;
+  }>
+  | CodexTurnEventEnvelope<'turn.modelRerouted', {
+    fromModel: string;
+    toModel: string;
+    reason: string;
+  }>
   | CodexConversationEventEnvelope<'conversation.skillsChanged', {
     cwd: string | null;
     skills: readonly CodexSurfaceSkill[];
@@ -804,6 +848,7 @@ export type CodexSurfaceEvent =
     startedAt: string | null;
     completedAt: string | null;
     durationMs: number | null;
+    executionUsage?: CodexSurfaceExecutionUsage | null;
   }>
   | CodexTurnEventEnvelope<'turn.error', {
     error: CodexSurfaceTurnError;
@@ -998,6 +1043,7 @@ export type UpdateCodexConversationSettings = {
 
 export type CodexSurfaceApi = {
   readRateLimits?(options?: ReadCodexRateLimitsOptions): Promise<CodexSurfaceRateLimits>;
+  readAccountUsage?(): Promise<CodexSurfaceAccountUsage>;
   startLiveChat?(conversationId: string, options: StartCodexLiveChatOptions): Promise<{ sdp: string }>;
   stopLiveChat?(conversationId: string): Promise<void>;
   connect(): Promise<CodexSurfaceSnapshot>;
