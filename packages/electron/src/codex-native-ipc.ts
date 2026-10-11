@@ -22,7 +22,7 @@ import {
   type CodexNativeRequests as NativeRequests,
 } from './codex-native-renderer';
 import { CodexElectronAttachmentRegistry } from './codex-attachment-registry';
-import { createCodexSpeechSessions } from './codex-speech-sessions';
+import { createCodexSpeechSessions, type CodexSpeechOperationObserver } from './codex-speech-sessions';
 
 export type CodexNativeDialog = {
   showOpenDialog(options: {
@@ -47,6 +47,8 @@ export type CodexNativeMainOptions = IpcSenderPolicy & {
   maxAudioBytes?: number;
   maxImagePreviewBytes?: number;
   startSpeechSession?: typeof startAppleSpeechSession;
+  /** Best-effort streaming operation observation; receives no recording content or identity. */
+  onSpeechOperation?: CodexSpeechOperationObserver;
   transcribeAudio?: (
     audioData: Buffer,
     options?: AppleSpeechTranscriptionOptions,

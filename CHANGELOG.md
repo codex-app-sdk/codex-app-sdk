@@ -10,6 +10,8 @@
   from local turn usage and telemetry.
 - Observe cumulative execution usage when lifecycle and counter evidence permit
   attribution, retaining unknowns, late corrections, and model reroutes.
+- Observe native streaming dictation operation outcomes through an optional
+  content-free hook, without coupling recording to observation or consent.
 
 ## 0.15.1
 

@@ -75,6 +75,7 @@ type CodexNativeMainOptions = {
   maxAudioBytes?: number;
   maxImagePreviewBytes?: number;
   startSpeechSession?: typeof startAppleSpeechSession;
+  onSpeechOperation?: CodexSpeechOperationObserver;
   transcribeAudio?: (audioData, options?) => Promise<AppleSpeechTranscriptionResult>;
 };
 ```
@@ -122,6 +123,38 @@ For source-mode development, point `appleSpeechAssetsPath` (or
 `CODEX_APP_SDK_ASSETS_PATH`) at the source SDK's `packages/backend/assets` so
 the native helper matches the source API. Packaged apps should use the helper
 from the same SDK version as their bridge.
+
+### Speech operation observation
+
+`registerCodexNativeIpc` accepts an optional main-process observer, also available
+through `registerCodexElectronMain({ native: { onSpeechOperation } })`:
+
+```ts
+type CodexSpeechOperation = 'start' | 'stop' | 'cancel';
+type CodexSpeechOperationOutcome = 'succeeded' | 'failed' | 'cancelled';
+type CodexSpeechOperationObserver = (
+  operation: CodexSpeechOperation,
+) => ((outcome: CodexSpeechOperationOutcome) => void) | void;
+```
+
+The observer runs immediately before each actual streaming adapter operation.
+Its returned closure receives exactly one outcome when that operation settles.
+Concurrent operations have separate closures; duplicate stop/cancel requests
+do not create duplicate adapter operations or observations. Automatic cleanup
+cancellation is included. Invalid or untrusted requests, audio chunks, and
+batch transcription are not observed.
+
+`failed` covers rejected operations and stop results with an `error`.
+`cancelled` covers successful cancellation and start/stop interrupted by session
+cancellation. The original result, error, and cancellation behavior are preserved;
+observer failures cannot alter them. No audio, transcript, session or renderer
+identifier, locale, error message, or additional properties cross this hook.
+
+Callbacks must be fast and nonblocking. They are never awaited; thrown errors
+and rejected promises are ignored. Return nothing when observation is disabled
+or consent is unknown. This suppresses observation only, never dictation. Hosts
+own consent and may bind a permission epoch in the completion closure without
+adding identifiers to this API.
 
 `CodexNativeRendererApi.readImagePreview?(reference)` lazily requests a bounded,
 non-SVG local image as a renderer-safe data URL. It returns `null` when the file

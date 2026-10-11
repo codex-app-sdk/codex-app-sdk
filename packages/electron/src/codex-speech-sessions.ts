@@ -4,6 +4,12 @@ import { codexNativeChannels as channels, codexSpeechEventChannel, type CodexNat
 import type { IpcMainHandlers } from './typed-ipc';
 import type { WebContentsDidStartNavigationEventParams } from 'electron';
 
+export type CodexSpeechOperation = 'start' | 'stop' | 'cancel';
+export type CodexSpeechOperationOutcome = 'succeeded' | 'failed' | 'cancelled';
+export type CodexSpeechOperationObserver = (
+  operation: CodexSpeechOperation,
+) => ((outcome: CodexSpeechOperationOutcome) => void) | void;
+
 type Owner = {
   sender: {
     on(name: string, listener: (...args: unknown[]) => void): unknown;
@@ -26,9 +32,29 @@ export function createCodexSpeechSessions(options: {
   maxAudioBytes: number;
   appleSpeechAssetsPath?: string;
   startSpeechSession?: typeof startAppleSpeechSession;
+  onSpeechOperation?: CodexSpeechOperationObserver;
 }): { handlers: IpcMainHandlers<Pick<CodexNativeRequests, SpeechChannels>>; dispose(): void } {
   const sessions = new Map<string, Entry>();
   const start = options.startSpeechSession ?? startAppleSpeechSession;
+  async function observe<T>(
+    operation: CodexSpeechOperation,
+    execute: () => Promise<T>,
+    cancelled: () => boolean = () => false,
+    failed: (result: T) => boolean = () => false,
+  ): Promise<T> {
+    const finish = safelyObserve(() => options.onSpeechOperation?.(operation));
+    const report = (outcome: CodexSpeechOperationOutcome) => {
+      if (typeof finish === 'function') safelyObserve(() => finish(outcome));
+    };
+    try {
+      const result = await execute();
+      report(cancelled() || operation === 'cancel' ? 'cancelled' : failed(result) ? 'failed' : 'succeeded');
+      return result;
+    } catch (error) {
+      report(cancelled() ? 'cancelled' : 'failed');
+      throw error;
+    }
+  }
   function owner(value: unknown): Owner {
     const event = value as Partial<Owner> | null;
     if (!event?.sender?.on || !event.sender.removeListener || !event.senderFrame?.send) {
@@ -49,7 +75,7 @@ export function createCodexSpeechSessions(options: {
     sessions.delete(id);
     entry.cleanup();
     entry.abort.abort();
-    await entry.session.then((session) => session.cancel()).catch(() => undefined);
+    await entry.session.then((session) => observe('cancel', () => session.cancel())).catch(() => undefined);
   }
   return {
     handlers: {
@@ -77,12 +103,12 @@ export function createCodexSpeechSessions(options: {
         const entry: Entry = {
           owner: current, abort, bytes: 0,
           // Defer startup until the entry exists, including synchronous custom adapters.
-          session: Promise.resolve().then(() => start(input, (result) => {
+          session: Promise.resolve().then(() => observe('start', () => start(input, (result) => {
             if (sessions.get(id) !== entry) return;
             try { current.senderFrame.send(codexSpeechEventChannel, result); }
             catch { teardown(); }
             if (result.type === 'error') teardown();
-          }, { assetsPath: options.appleSpeechAssetsPath, signal: abort.signal })),
+          }, { assetsPath: options.appleSpeechAssetsPath, signal: abort.signal }), () => abort.signal.aborted)),
           cleanup: () => {
             for (const name of ['destroyed', 'render-process-gone']) current.sender.removeListener(name, teardown);
             current.sender.removeListener('did-start-navigation', onNavigation);
@@ -110,7 +136,9 @@ export function createCodexSpeechSessions(options: {
       },
       [channels.stopSpeech]: async (event, id) => {
         const entry = get(event, id);
-        entry.stopping ??= entry.session.then((session) => session.stop()).finally(() => {
+        entry.stopping ??= entry.session.then((session) => observe(
+          'stop', () => session.stop(), () => entry.abort.signal.aborted, result => Boolean(result.error),
+        )).finally(() => {
           sessions.delete(id);
           entry.cleanup();
         });
@@ -124,4 +152,15 @@ export function createCodexSpeechSessions(options: {
     },
     dispose: () => { for (const [id, entry] of sessions) void cancel(id, entry); },
   };
+}
+
+/** Observation is best-effort: never await it or let it change speech results. */
+function safelyObserve<T>(callback: () => T): T | undefined {
+  try {
+    const result = callback();
+    void Promise.resolve(result).catch(() => undefined);
+    return result;
+  } catch {
+    return undefined;
+  }
 }

@@ -39,6 +39,11 @@ export {
   type CodexNativeMainOptions,
   type CodexNativeShell,
 } from './codex-native-ipc';
+export type {
+  CodexSpeechOperation,
+  CodexSpeechOperationOutcome,
+  CodexSpeechOperationObserver,
+} from './codex-speech-sessions';
 export {
   CodexElectronAttachmentRegistry,
   type CodexElectronAttachmentRegistration,

@@ -284,6 +284,12 @@ Live dictation favors faster text delivery using Apple's fast-result mode, which
 can trade some recognition accuracy for responsiveness. Review the text before
 sending when accuracy is important; batch transcription retains its standard mode.
 
+Electron hosts can observe streaming start/stop/cancel outcomes through
+[`onSpeechOperation`](/api/electron#speech-operation-observation), without
+receiving recording content or identifiers. Check consent synchronously in that
+main-process hook and return nothing when it is off or unknown; dictation remains
+available either way.
+
 When transcription contributes to a submission, the stock composer includes
 `inputMethod: 'dictated'` in the emitted `CodexRendererSendMessageOptions` and
 resets that provenance after submission. Typed submissions keep the option
