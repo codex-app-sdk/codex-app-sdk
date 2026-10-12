@@ -18,6 +18,7 @@ import type {
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
   ReadCodexRateLimitsOptions,
+  ConsumeCodexRateLimitResetCreditOptions,
   SendCodexMessageOptions,
   StartCodexReviewOptions,
   StartCodexLiveChatOptions,
@@ -41,7 +42,7 @@ type Awaitable<Value> = Value | Promise<Value>;
 type SurfaceOperationFunction<Name extends CodexSurfaceBridgeOperation> = Name extends keyof Required<CodexSurfaceApi>
   ? Extract<Required<CodexSurfaceApi>[Name], (...args: never[]) => unknown>
   : never;
-type OptionalAccountOperation = 'readRateLimits' | 'readAccountUsage';
+type OptionalAccountOperation = 'readRateLimits' | 'readAccountUsage' | 'consumeRateLimitResetCredit';
 type BridgeOperationMethods = {
   [Name in CodexSurfaceBridgeOperation]: (
     ...args: Parameters<SurfaceOperationFunction<Name>>
@@ -255,6 +256,7 @@ export const codexSurfaceBridgeOperations = [
   'startLiveChat', 'stopLiveChat',
   'readRateLimits',
   'readAccountUsage',
+  'consumeRateLimitResetCredit',
 ] as const satisfies readonly CodexSurfaceBridgeOperation[];
 
 const operationSet = new Set<string>(codexSurfaceBridgeOperations);
@@ -271,6 +273,7 @@ export const codexSurfaceBridgeArities: Readonly<
   refreshAccount: [0, 0],
   readRateLimits: [0, 1],
   readAccountUsage: [0, 0],
+  consumeRateLimitResetCredit: [1, 1],
   refreshConversations: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
   resolveApproval: [2, 3], retryTurn: [1, 1], selectConversation: [1, 1],
   sendMessage: [1, 2], setGoal: [1, 2], startChatGptDeviceCodeLogin: [0, 0],
@@ -381,6 +384,11 @@ async function invokeValidated(
       if (!target.readAccountUsage) throw new Error('Account usage reads are not available.');
       return target.readAccountUsage();
     }
+    case 'consumeRateLimitResetCredit': {
+      const options = resetCreditOptions(args[0]);
+      if (!target.consumeRateLimitResetCredit) throw new Error('Rate-limit reset credits are not available.');
+      return target.consumeRateLimitResetCredit(options);
+    }
     case 'refreshConversations': return target.refreshConversations();
     case 'renameConversation': return target.renameConversation(nonEmptyString(args[0], 'Conversation title'));
     case 'respondToClientRequest': return target.respondToClientRequest(clientRequestResponse(args[0]));
@@ -476,6 +484,15 @@ function rateLimitsOptions(value: unknown): ReadCodexRateLimitsOptions | undefin
   onlyKeys(record, ['excludeResetCreditDetails'], 'Rate-limit read options');
   return record.excludeResetCreditDetails === undefined ? {} : {
     excludeResetCreditDetails: booleanValue(record.excludeResetCreditDetails, 'Exclude reset credit details'),
+  };
+}
+
+function resetCreditOptions(value: unknown): ConsumeCodexRateLimitResetCreditOptions {
+  const record = plainObject(value, 'Reset-credit options');
+  onlyKeys(record, ['idempotencyKey', 'creditId'], 'Reset-credit options');
+  return {
+    idempotencyKey: nonEmptyString(record.idempotencyKey, 'Reset-credit idempotency key'),
+    ...(record.creditId === undefined ? {} : { creditId: nonEmptyString(record.creditId, 'Reset credit id') }),
   };
 }
 

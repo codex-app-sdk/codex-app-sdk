@@ -391,6 +391,14 @@ export type CodexSurfaceAccountUsage = {
   dailyUsageBuckets: readonly { startDate: string; tokens: string }[] | null;
 };
 
+export type ConsumeCodexRateLimitResetCreditOptions = {
+  idempotencyKey: string;
+  creditId?: string;
+};
+export type CodexSurfaceRateLimitResetCreditResult = {
+  outcome: 'reset' | 'alreadyRedeemed' | 'nothingToReset' | 'noCredit';
+};
+
 export type CodexSurfaceRateLimits = {
   rateLimits: CodexSurfaceRateLimitSnapshot;
   rateLimitsByLimitId: Record<string, CodexSurfaceRateLimitSnapshot> | null;
@@ -1044,6 +1052,7 @@ export type UpdateCodexConversationSettings = {
 export type CodexSurfaceApi = {
   readRateLimits?(options?: ReadCodexRateLimitsOptions): Promise<CodexSurfaceRateLimits>;
   readAccountUsage?(): Promise<CodexSurfaceAccountUsage>;
+  consumeRateLimitResetCredit?(options: ConsumeCodexRateLimitResetCreditOptions): Promise<CodexSurfaceRateLimitResetCreditResult>;
   startLiveChat?(conversationId: string, options: StartCodexLiveChatOptions): Promise<{ sdp: string }>;
   stopLiveChat?(conversationId: string): Promise<void>;
   connect(): Promise<CodexSurfaceSnapshot>;

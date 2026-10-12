@@ -96,6 +96,12 @@ and web surfaces. It is optional for compatibility with host-supplied APIs.
 `readAccountUsage?()` is likewise optional, returning a normalized
 `CodexSurfaceAccountUsage` without changing surface snapshots.
 
+`consumeRateLimitResetCredit?({ idempotencyKey, creditId? })` is also optional
+across native, Electron, and web APIs. It returns only the provider's normalized
+reset outcome. Host-supplied APIs without it reject as unsupported. See
+[earned resets](/api/node#earned-rate-limit-resets) for confirmation,
+idempotency, uncertain results, and explicit refresh requirements.
+
 `CodexSurfaceRateLimits.rateLimitResetCredits` is either `null` (not provided)
 or a summary with `availableCount: string` and nullable `credits` rows.
 `availableCount` is an exact, nonnegative decimal string. Unsafe numeric counts

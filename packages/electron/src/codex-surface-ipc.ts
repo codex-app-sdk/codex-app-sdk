@@ -17,6 +17,8 @@ import type {
   CodexSurfaceRateLimits,
   CodexSurfaceAccountUsage,
   ReadCodexRateLimitsOptions,
+  ConsumeCodexRateLimitResetCreditOptions,
+  CodexSurfaceRateLimitResetCreditResult,
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
   CreateCodexRendererConversationOptions,
@@ -73,6 +75,7 @@ const channels = {
   refreshAccount: 'codex-surface:refresh-account',
   readRateLimits: 'codex-surface:read-rate-limits',
   readAccountUsage: 'codex-surface:read-account-usage',
+  consumeRateLimitResetCredit: 'codex-surface:consume-rate-limit-reset-credit',
   refreshConversations: 'codex-surface:refresh-conversations',
   renameConversation: 'codex-surface:rename-conversation',
   respondToClientRequest: 'codex-surface:respond-to-client-request',
@@ -124,6 +127,7 @@ type SurfaceRequests = {
   [channels.loadOlderConversationHistory]: IpcRequest<[conversationId?: string], import('@codex-app-sdk/core/surface').CodexConversationHistoryPage>;
   [channels.refreshAccount]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.readRateLimits]: IpcRequest<[options?: ReadCodexRateLimitsOptions], CodexSurfaceRateLimits>;
+  [channels.consumeRateLimitResetCredit]: IpcRequest<[options: ConsumeCodexRateLimitResetCreditOptions], CodexSurfaceRateLimitResetCreditResult>;
   [channels.readAccountUsage]: IpcRequest<[], CodexSurfaceAccountUsage>;
   [channels.refreshConversations]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.renameConversation]: IpcRequest<[title: string], CodexSurfaceSnapshot>;
@@ -222,6 +226,7 @@ export function registerCodexSurfaceIpc(
     [channels.loadOlderConversationHistory]: (_event, ...args) => invoke('loadOlderConversationHistory', args),
     [channels.refreshAccount]: (_event, ...args) => invoke('refreshAccount', args),
     [channels.readRateLimits]: (_event, ...args) => invoke('readRateLimits', args),
+    [channels.consumeRateLimitResetCredit]: (_event, ...args) => invoke('consumeRateLimitResetCredit', args),
     [channels.readAccountUsage]: (_event, ...args) => invoke('readAccountUsage', args),
     [channels.refreshConversations]: (_event, ...args) => invoke('refreshConversations', args),
     [channels.renameConversation]: (_event, ...args) => invoke('renameConversation', args),
@@ -305,6 +310,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     loadOlderConversationHistory: (conversationId) => renderer.invoke(channels.loadOlderConversationHistory, conversationId),
     refreshAccount: () => renderer.invoke(channels.refreshAccount),
     readRateLimits: (options) => renderer.invoke(channels.readRateLimits, options),
+    consumeRateLimitResetCredit: (options) => renderer.invoke(channels.consumeRateLimitResetCredit, options),
     readAccountUsage: () => renderer.invoke(channels.readAccountUsage),
     refreshConversations: () => renderer.invoke(channels.refreshConversations),
     renameConversation: (title) => renderer.invoke(channels.renameConversation, title),

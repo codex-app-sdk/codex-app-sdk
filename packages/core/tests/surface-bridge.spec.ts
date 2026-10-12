@@ -47,6 +47,7 @@ describe('Codex surface bridge', () => {
       refreshAccount: [0, 0], refreshConversations: [0, 0], renameConversation: [1, 1],
       readRateLimits: [0, 1],
       readAccountUsage: [0, 0],
+      consumeRateLimitResetCredit: [1, 1],
       respondToClientRequest: [1, 1], resolveApproval: [2, 3], retryTurn: [1, 1],
       selectConversation: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
       startChatGptDeviceCodeLogin: [0, 0], startChatGptLogin: [0, 0],
@@ -93,6 +94,7 @@ describe('Codex surface bridge', () => {
       { operation: 'refreshAccount', args: [] },
       { operation: 'readRateLimits', args: [{ excludeResetCreditDetails: false }] },
       { operation: 'readAccountUsage', args: [] },
+      { operation: 'consumeRateLimitResetCredit', args: [{ idempotencyKey: 'logical-attempt', creditId: 'opaque-id' }] },
       { operation: 'refreshConversations', args: [] },
       { operation: 'renameConversation', args: ['New title'] },
       {
@@ -186,7 +188,7 @@ describe('Codex surface bridge', () => {
     });
   });
 
-  it('supports optional account reads without requiring older hosts to implement them', async () => {
+  it('supports optional account operations without requiring older hosts to implement them', async () => {
     const { calls, target } = recordingTarget();
     await invokeCodexSurfaceBridgeOperation(target, 'readRateLimits', []);
     await invokeCodexSurfaceBridgeOperation(target, 'readRateLimits', [{}]);
@@ -197,6 +199,11 @@ describe('Codex surface bridge', () => {
     delete target.readAccountUsage;
     await expect(invokeCodexSurfaceBridgeOperation(target, 'readAccountUsage', []))
       .rejects.toThrow('Account usage reads are not available.');
+    await invokeCodexSurfaceBridgeOperation(target, 'consumeRateLimitResetCredit', [{ idempotencyKey: 'provider-selects' }]);
+    expect(calls.get('consumeRateLimitResetCredit')).toStrictEqual([[{ idempotencyKey: 'provider-selects' }]]);
+    delete target.consumeRateLimitResetCredit;
+    await expect(invokeCodexSurfaceBridgeOperation(target, 'consumeRateLimitResetCredit', [{ idempotencyKey: 'attempt' }]))
+      .rejects.toThrow('Rate-limit reset credits are not available.');
   });
 
   it('rejects malformed arity and non-serializable nested values', async () => {
@@ -300,6 +307,10 @@ describe('Codex surface bridge', () => {
   });
 
   it.each([
+    ['consumeRateLimitResetCredit', [{}], 'Reset-credit idempotency key must be a non-empty string'],
+    ['consumeRateLimitResetCredit', [{ idempotencyKey: ' ' }], 'Reset-credit idempotency key must be a non-empty string'],
+    ['consumeRateLimitResetCredit', [{ idempotencyKey: 'key', creditId: null }], 'Reset credit id must be a non-empty string'],
+    ['consumeRateLimitResetCredit', [{ idempotencyKey: 'key', accountId: 'account' }], 'Reset-credit options contains unsupported property "accountId"'],
     ['readRateLimits', [{ excludeResetCreditDetails: 'yes' }], 'Exclude reset credit details must be a boolean'],
     ['readRateLimits', [{ threadId: 'thread' }], 'Rate-limit read options contains unsupported property "threadId"'],
     ['startLiveChat', ['thread', { sdp: '' }], 'SDP offer must be a non-empty string'],

@@ -56,6 +56,11 @@ local turns. Use `readRateLimits({ excludeResetCreditDetails: false })` for
 fresh earned-reset details. See [execution usage](/api/events#execution-usage)
 and [account reads](/api/node#account-rate-limits) for exact contracts.
 
+For a confirmed reset action, call `consumeRateLimitResetCredit()` once with a
+key retained for that logical attempt, then explicitly re-read limits. A timeout
+or account change leaves the outcome uncertain; never automatically retry with
+a new key. See [earned resets](/api/node#earned-rate-limit-resets).
+
 ## Conversation-scoped subscription
 
 Node conversation handles filter the same stream by identity:

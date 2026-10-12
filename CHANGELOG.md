@@ -4,6 +4,8 @@
 
 ### Added
 
+- Redeem an earned reset through an explicit, idempotency-keyed API, with
+  normalized outcomes, stale-account protection, and no automatic retries.
 - Read fresh account rate limits and earned-reset details through native,
   Electron, and web surfaces, with exact counts and stale-account rejection.
 - Read account-wide token summaries and daily buckets explicitly, separately

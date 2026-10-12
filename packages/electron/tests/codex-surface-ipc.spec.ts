@@ -110,6 +110,7 @@ describe('Codex surface Electron bridge', () => {
         summary: { lifetimeTokens: '42', peakDailyTokens: null, longestRunningTurnSec: null, currentStreakDays: null, longestStreakDays: null },
         dailyUsageBuckets: null,
       })),
+      consumeRateLimitResetCredit: vi.fn(async () => ({ outcome: 'alreadyRedeemed' as const })),
       readRateLimits: vi.fn(async () => ({
         rateLimits: { limitId: 'codex', limitName: null, primary: null, secondary: null,
           credits: null, individualLimit: null, planType: null, rateLimitReachedType: null },
@@ -161,6 +162,12 @@ describe('Codex surface Electron bridge', () => {
       rateLimitResetCredits: { availableCount: '2', credits: null },
     });
     expect(surface.readRateLimits).toHaveBeenCalledWith({ excludeResetCreditDetails: true });
+    await expect(liveApi.consumeRateLimitResetCredit!({ idempotencyKey: 'logical-attempt', creditId: 'opaque-id' }))
+      .resolves.toStrictEqual({ outcome: 'alreadyRedeemed' });
+    expect(surface.consumeRateLimitResetCredit).toHaveBeenCalledExactlyOnceWith({ idempotencyKey: 'logical-attempt', creditId: 'opaque-id' });
+    Reflect.deleteProperty(surface, 'consumeRateLimitResetCredit');
+    await expect(liveApi.consumeRateLimitResetCredit!({ idempotencyKey: 'attempt' }))
+      .rejects.toThrow('Rate-limit reset credits are not available.');
     await expect(liveApi.readAccountUsage!()).resolves.toMatchObject({ summary: { lifetimeTokens: '42' }, dailyUsageBuckets: null });
     Reflect.deleteProperty(surface, 'readAccountUsage');
     await expect(liveApi.readAccountUsage!()).rejects.toThrow('Account usage reads are not available.');
@@ -177,6 +184,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:clear-goal',
       'codex-surface:compact-conversation',
       'codex-surface:connect',
+      'codex-surface:consume-rate-limit-reset-credit',
       'codex-surface:continue-interrupted-turn',
       'codex-surface:create-conversation',
       'codex-surface:delete-conversation',

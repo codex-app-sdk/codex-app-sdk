@@ -22,7 +22,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Client → app-server requests | 162 | 49 | 0 | 0 | 113 |
+| Client → app-server requests | 162 | 50 | 0 | 0 | 112 |
 | App-server → client notifications | 83 | 43 | 0 | 29 | 11 |
 | App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
@@ -163,7 +163,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `account/login/cancel` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
 | `account/logout` | High-level SDK | `packages/backend/src/node/codex-surface-authentication-controller.ts` |
 | `account/rateLimits/read` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts`<br>`packages/backend/src/node/codex-surface.ts` |
-| `account/rateLimitResetCredit/consume` | Typed client only | — |
+| `account/rateLimitResetCredit/consume` | High-level SDK | `packages/backend/src/node/codex-surface.ts` |
 | `account/usage/read` | High-level SDK | `packages/backend/src/node/codex-surface.ts` |
 | `account/workspaceMessages/read` | Typed client only | — |
 | `account/sendAddCreditsNudgeEmail` | Typed client only | — |

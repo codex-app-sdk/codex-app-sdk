@@ -20,6 +20,8 @@ import type {
   CodexSurfaceModel,
   CodexSurfaceRateLimits,
   CodexSurfaceAccountUsage,
+  ConsumeCodexRateLimitResetCreditOptions,
+  CodexSurfaceRateLimitResetCreditResult,
   ReadCodexRateLimitsOptions,
   CodexSurfaceSnapshot,
   CodexSurfaceSkill,
@@ -515,7 +517,7 @@ export class CodexSurface {
 
   /** Reads fresh account limits; errors leave the last successful snapshot intact. */
   async readRateLimits(options?: ReadCodexRateLimitsOptions): Promise<CodexSurfaceRateLimits> {
-    return this.readForAccount(() => this.client.request('account/rateLimits/read', options), response => {
+    return this.requestForAccount(() => this.client.request('account/rateLimits/read', options), response => {
       const rateLimits = surfaceRateLimits(response);
       this.patch({ rateLimits });
       this.emitEvent('action', { type: 'rateLimits.changed', payload: { rateLimits: structuredClone(rateLimits) } });
@@ -525,7 +527,24 @@ export class CodexSurface {
 
   /** Account-wide, on-demand usage; never collects thread estimates or changes surface state. */
   async readAccountUsage(): Promise<CodexSurfaceAccountUsage> {
-    return this.readForAccount(() => this.client.request('account/usage/read', {}), surfaceAccountUsage);
+    return this.requestForAccount(() => this.client.request('account/usage/read', {}), surfaceAccountUsage);
+  }
+
+  /** One explicit reset attempt; never retries or infers refreshed limits. */
+  async consumeRateLimitResetCredit(options: ConsumeCodexRateLimitResetCreditOptions): Promise<CodexSurfaceRateLimitResetCreditResult> {
+    if (!options || typeof options.idempotencyKey !== 'string' || !options.idempotencyKey.trim()
+      || (options.creditId !== undefined && (typeof options.creditId !== 'string' || !options.creditId.trim()))) {
+      throw new TypeError('Reset-credit options require non-empty identifiers');
+    }
+    const params = { idempotencyKey: options.idempotencyKey,
+      ...(options.creditId === undefined ? {} : { creditId: options.creditId }) };
+    return this.requestForAccount(() => this.client.request('account/rateLimitResetCredit/consume', params), result => {
+      switch (result?.outcome) {
+        case 'reset': case 'alreadyRedeemed': case 'nothingToReset': case 'noCredit':
+          return { outcome: result.outcome };
+        default: throw new Error('Invalid reset-credit outcome');
+      }
+    });
   }
 
   async startChatGptLogin(): Promise<CodexSurfaceChatGptLogin> {
@@ -1233,17 +1252,17 @@ export class CodexSurface {
   }
 
 
-  private async readForAccount<Response, Result>(
-    read: () => Promise<Response>, project: (response: Response) => Result,
+  private async requestForAccount<Response, Result>(
+    request: () => Promise<Response>, project: (response: Response) => Result,
   ): Promise<Result> {
     await this.ensureConnected();
     await this.authentication.pendingRefresh();
     const generation = this.accountGeneration;
     const identity = surfaceAuthenticationIdentityKey(this.state.authentication);
-    const result = await read();
+    const result = await request();
     if (this.closed || generation !== this.accountGeneration
       || identity !== surfaceAuthenticationIdentityKey(this.state.authentication)) {
-      throw new Error('Account changed while reading account data');
+      throw new Error('Account changed during account operation');
     }
     return project(result);
   }
