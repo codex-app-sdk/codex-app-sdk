@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.16.1
+
+### Fixed
+
+- Keep message actions available on completed replies containing only tool
+  activity, without requiring a written final answer.
+- Preserve the reading position when offscreen message layout changes while
+  scrolling, including in WebKit-based views.
+
 ## 0.16.0
 
 ### Added
