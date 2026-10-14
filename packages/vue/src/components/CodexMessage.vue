@@ -307,6 +307,12 @@ const assistantWithoutMessageActions = computed(() => (
   chatMessage.value.role === 'assistant'
   && blocks.value.length > 0
   && blocks.value.every((block) => block.type === 'work-group' || block.type === 'media')
+  && (
+    chatMessage.value.streaming === true
+    || workActive.value === true
+    || messageTurnState.value?.finalStarted.value === true
+    || !blocks.value.some((block) => block.type === 'work-group')
+  )
 ))
 const hideCollapsedTurnDetail = computed(() => {
   if (

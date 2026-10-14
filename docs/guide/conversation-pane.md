@@ -315,7 +315,9 @@ creates and selects the fork.
 
 The SDK offers turn mutations on every terminal turn when the host supplies the
 corresponding global capability. Delete, Edit, and Retry may target completed,
-failed, or interrupted turns; Fork requires successful completion. The active
+failed, or interrupted turns; Fork requires successful completion.
+Completed replies containing only tool activity still offer message actions;
+no written final answer is required. The active
 turn never exposes mutation controls, and all historical mutation controls are
 disabled while another turn is running. Acting on an older turn truncates the
 conversation from that turn: Delete stops there, while Edit and Retry resubmit

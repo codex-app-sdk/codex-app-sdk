@@ -627,7 +627,9 @@ the complete turn mounted instead of rendering a partial turn.
 
 Turn mutations are offered on every terminal turn. Delete, Edit, and Retry are
 available for completed, failed, and interrupted turns; Fork requires successful
-completion. The active turn never exposes mutation controls. Historical actions
+completion. Completed work-only replies expose their action bar even without
+answer text; work preceding a final answer keeps its action bar on that answer.
+The active turn never exposes mutation controls. Historical actions
 use normal Codex rollback semantics: Delete removes the selected turn and every
 later turn, while Edit and Retry truncate that suffix before resubmitting the
 edited or original prompt. Copy and Quote remain message-level actions. While an

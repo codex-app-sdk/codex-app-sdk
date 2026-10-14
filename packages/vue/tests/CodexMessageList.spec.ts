@@ -874,7 +874,7 @@ describe('CodexMessageList', () => {
     expect(restored.text()).not.toContain('host.internal');
   });
 
-  it('shows completed work directly when a turn has no final answer', () => {
+  it('shows completed work and actions directly when a turn has no final answer', () => {
     const wrapper = mount(CodexMessageList, {
       props: {
         messages: [
@@ -912,7 +912,37 @@ describe('CodexMessageList', () => {
     expect(wrapper.text()).toContain('The docs are current.');
     expect(wrapper.text()).not.toContain('Also check the docs.');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
-    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(2);
+  });
+
+  it('makes tool-only reply actions available on completion without requiring answer text', async () => {
+    const message: SurfaceMessage = {
+      id: 'tool-only', role: 'assistant', status: 'streaming', turnId: 'tool-turn',
+      parts: [
+        { type: 'reasoning', summary: 'Checking deployment', itemId: 'reasoning', summaryIndex: 0 },
+        { type: 'tool', id: 'deploy', title: 'Deploy companion', status: 'completed' },
+      ],
+    };
+    const wrapper = mount(CodexMessageList, { props: {
+      activeTurnId: 'tool-turn', busy: true, canForkTurn: true, messages: [message],
+      turns: [turnLifecycle('tool-turn', 'inProgress')],
+    } });
+    expect(wrapper.find('.chat-message__actions').exists()).toBe(false);
+
+    await wrapper.setProps({
+      activeTurnId: null, busy: false, messages: [{ ...message, status: 'complete' }],
+      turns: [turnLifecycle('tool-turn', 'completed')],
+    });
+    expect(wrapper.find('.chat-message-block--text').exists()).toBe(false);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+    expect(wrapper.get('.chat-message--assistant').classes()).toContain('chat-message--actions-visible');
+    for (const action of ['Retry', 'Fork', 'Delete']) {
+      await wrapper.get(`[aria-label="${action}"]`).trigger('click');
+    }
+    expect(wrapper.emitted('retry-turn')).toStrictEqual([['tool-turn']]);
+    expect(wrapper.emitted('fork-turn')).toStrictEqual([['tool-turn']]);
+    expect(wrapper.emitted('delete-turn')).toStrictEqual([['tool-turn']]);
+    wrapper.unmount();
   });
 
   it('shows an interrupted work-only turn as stopped and initially expanded', async () => {
