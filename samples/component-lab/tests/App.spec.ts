@@ -337,7 +337,7 @@ describe('component lab', () => {
       .toStrictEqual(['Done · View details']);
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(0);
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(4);
-    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(3);
     expect(wrapper.text()).toContain('The completed turn is compact.');
     expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')).toBeNull();
     expect(wrapper.get('.chat-media-block').isVisible()).toBe(true);
@@ -347,7 +347,7 @@ describe('component lab', () => {
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
     expect(wrapper.findAll('.chat-message--steer-below')).toHaveLength(2);
     expect(wrapper.findAll('.chat-message--assistant')).toHaveLength(5);
-    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message__actions')).toHaveLength(3);
     expect(wrapper.get('.chat-media-block').element.closest('.chat-fold')).toBeNull();
     expect(wrapper.get('.chat-media-block').isVisible()).toBe(true);
 
@@ -374,7 +374,7 @@ describe('component lab', () => {
     expect(noSummaryTurn).toBeDefined();
     expect(noSummaryTurn!.find('.chat-work-group__header').exists()).toBe(false);
     expect(noSummaryTurn!.findAll('.chat-message--steer-below')).toHaveLength(0);
-    expect(noSummaryTurn!.findAll('.chat-message__actions')).toHaveLength(0);
+    expect(noSummaryTurn!.findAll('.chat-message__actions')).toHaveLength(2);
   });
 
   it('submits multiline prompts without a backend', async () => {
