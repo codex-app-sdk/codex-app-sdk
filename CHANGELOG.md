@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.16.0
+
 ### Added
 
 - Redeem an earned reset through an explicit, idempotency-keyed API, with
