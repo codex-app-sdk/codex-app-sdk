@@ -51,8 +51,10 @@ JSDOM cannot prove, such as selection, clipboard, and scrolling. Loading a
 stylesheet into the test document is setup, not an assertion on its source text.
 
 Run the component lab's scrolling regression with `npm run test:browser -w
-@codex-app-sdk/component-lab`. Install its Chromium runtime once with
-`npx playwright install chromium` (or `--with-deps chromium` on Linux CI).
+@codex-app-sdk/component-lab`. Install its Chromium and WebKit runtimes once with
+`npx playwright install chromium webkit` (add `--with-deps` on Linux CI).
+The scrolling regression runs in both engines, including offscreen message
+layout changes that can shift the reading position in iOS WebViews.
 
 ## Put checks in the right tool
 

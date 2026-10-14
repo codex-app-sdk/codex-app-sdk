@@ -838,11 +838,9 @@ defineExpose({ scrollToBottom })
   display: contents;
 }
 
-.codex-message-list__content :deep(.chat-message),
-.codex-message-list__content :deep(.chat-compaction-message) {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 120px;
-}
+/* Keep mounted messages at their measured height. content-visibility estimates
+   can change during a gesture and move the reading position in WebKit; the
+   lazy message window above already defers rendering older history. */
 
 .codex-message-list__empty {
   margin: auto;

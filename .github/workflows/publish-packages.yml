@@ -53,7 +53,7 @@ jobs:
         run: npm install --global @openai/codex@0.154.0
 
       - name: Install browser test dependencies
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Verify packages
         run: npm run check
