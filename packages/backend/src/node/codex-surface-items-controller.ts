@@ -9,7 +9,7 @@ import type {
   SurfaceMessageToolPartUpdate,
 } from '@codex-app-sdk/core/surface';
 import {
-  codexItemToMediaPart,
+  codexItemToMediaParts,
   codexItemToQuestionPart,
   codexItemToSurfaceMessage,
   codexItemToToolPart,
@@ -484,15 +484,15 @@ export class CodexSurfaceItemsController {
 
     const includeCommandOutput = this.shouldForwardCommandOutput(params.threadId, completed, params.item);
     const toolPart = codexItemToToolPart(params.item, { includeCommandOutput, cwd: runtime.cwd });
-    const mediaPart = codexItemToMediaPart(params.item);
-    if (!toolPart && !mediaPart) return;
-    const mediaChanged = mediaPart ? !runtime.messages.some((message) => (
+    const mediaParts = codexItemToMediaParts(params.item);
+    if (!toolPart && !mediaParts.length) return;
+    const mediaChanged = mediaParts.some(mediaPart => !runtime.messages.some((message) => (
       message.parts.some((part) => part.type === 'media' && surfaceMediaPartsEqual(part, mediaPart))
-    )) : false;
+    )));
     let messages = toolPart
       ? upsertAssistantToolPart(runtime.messages, params.threadId, params.turnId, toolPart)
       : [...runtime.messages];
-    if (mediaPart) messages = upsertAssistantMediaPart(messages, params.threadId, params.turnId, mediaPart);
+    for (const mediaPart of mediaParts) messages = upsertAssistantMediaPart(messages, params.threadId, params.turnId, mediaPart, params.item.id);
     this.host.patchRuntime(params.threadId, { messages });
     const message = toolPart
       ? this.host.messageContainingTool(params.threadId, params.turnId, toolPart.id)
@@ -513,7 +513,7 @@ export class CodexSurfaceItemsController {
         runtime.cwd,
       );
     }
-    if (message && mediaPart && mediaChanged) this.host.emitEvent('notification', {
+    if (message && mediaChanged) this.host.emitEvent('notification', {
       type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
       payload: { message: structuredClone(message) },
     });

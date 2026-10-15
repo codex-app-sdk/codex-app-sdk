@@ -1,5 +1,12 @@
 # Conversation pane integration
 
+Image links use the host's `openLink` action, and image opening uses `openImage`.
+Hosts that display conversations from another machine can supply
+`CodexHostCapabilities.readImagePreview` through `provideCodexHostCapabilities` to
+resolve local Markdown, attachment and media image references on their owning host.
+Tool-result images render as image media independently of bounded tool-text output,
+including when conversation history is restored.
+
 `CodexConversationPane` supports two primary integration modes. Use the bound
 surface mode when the SDK owns the Codex runtime. Use the controlled adapter when
 the host already owns conversation state and transport.

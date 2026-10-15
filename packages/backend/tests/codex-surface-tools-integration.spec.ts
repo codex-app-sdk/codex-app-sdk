@@ -4,6 +4,29 @@ import type { v2 } from '../src/codex';
 import { createSurface, lastResponse, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it.each(['mcp', 'dynamic'] as const)('keeps %s image results visible through streaming, duplicate completion and history reload', async kind => {
+    const { surface, transport } = createSurface();
+    await surface.connect();
+    const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+    surface.onConversationEvent('thread-existing', event => replica.apply(event));
+    const small = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+    const data = Buffer.concat([Buffer.from(small, 'base64'), Buffer.alloc(36_000)]).toString('base64');
+    const url = `data:image/png;base64,${data}`;
+    const item: v2.ThreadItem = kind === 'mcp'
+      ? { type: 'mcpToolCall', id: 'screenshots', server: 'tools', tool: 'screenshot', status: 'completed', arguments: {}, appContext: null, pluginId: null, readOnlyHint: true,
+          result: { content: [{ type: 'text', text: 'Captured' }, { type: 'image', mimeType: 'image/png', data }, { type: 'image', mimeType: 'image/png', data: small }], structuredContent: null, _meta: null }, error: null, durationMs: 1 }
+      : { type: 'dynamicToolCall', id: 'screenshots', namespace: 'functions', tool: 'exec', arguments: {}, status: 'completed', success: true, durationMs: 1,
+          contentItems: [{ type: 'inputText', text: 'Captured' }, { type: 'inputImage', imageUrl: url }, { type: 'inputImage', imageUrl: `data:image/png;base64,${small}` }] };
+    transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-images', 'inProgress', []) });
+    const completed = { threadId: 'thread-existing', turnId: 'turn-images', item, completedAtMs: 2 };
+    transport.emitNotification('item/completed', completed);
+    transport.emitNotification('item/completed', completed);
+    const media = (messages: ReturnType<typeof replica.getSnapshot>['messages']) => messages.flatMap(message => message.parts).filter(part => part.type === 'media');
+    expect(media(replica.getSnapshot().messages).map(part => part.media.url)).toStrictEqual([url, `data:image/png;base64,${small}`]);
+    expect(media(surface.getConversationSnapshot('thread-existing').messages)).toStrictEqual(media(replica.getSnapshot().messages));
+    const { codexTurnToSurfaceMessages } = await import('../src/node/codex-conversation-history');
+    expect(media(codexTurnToSurfaceMessages('thread-existing', turn('turn-images', 'completed', [item])))).toStrictEqual(media(replica.getSnapshot().messages));
+  });
   it.each([
     ['item/completed', true], ['thread/compacted', true],
     ['item/completed', false], ['thread/compacted', false],

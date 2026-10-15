@@ -9,7 +9,7 @@
       <img
         class="chat-media-block__image"
         :alt="media.alt || generatedAltLabel"
-        :src="media.url"
+        :src="previewSource"
       >
     </button>
     <figcaption class="chat-media-block__footer">
@@ -25,7 +25,7 @@
         />
         <ChatIconButton
           :download="downloadName"
-          :href="media.url"
+          :href="previewSource"
           :label="downloadLabel"
           @click.stop
         >
@@ -46,7 +46,7 @@
       :alt="media.alt || generatedAltLabel"
       :label="media.title || generatedLabel"
       :open="fullscreenOpen"
-      :src="media.url"
+      :src="previewSource || media.url"
       :theme-source="rootElement"
       @close="closeFullscreen"
     />
@@ -62,6 +62,7 @@ import ChatImageLightbox from './ChatImageLightbox.vue'
 import ChatIconButton from './ChatIconButton.vue'
 import type { CodexMessageImageOpenHandler, CodexMessageImageOpenIntent } from './message-image'
 import type { MessageMedia } from './types'
+import { useHostImageSource } from './host-image-previews'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
@@ -78,6 +79,7 @@ const generatedAltLabel = 'Generated media'
 const generatedLabel = 'Generated media'
 const promptLabel = 'Prompt'
 const openLabel = computed(() => `Open ${props.media.title || props.media.alt || generatedLabel}`)
+const previewSource = useHostImageSource(() => props.media.url)
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
 const rootElement = ref<HTMLElement | null>(null)
@@ -89,7 +91,7 @@ async function handleImageAction(intent: CodexMessageImageOpenIntent) {
     kind: 'media',
     mimeType: props.media.mimeType,
     name: props.media.title,
-    src: props.media.url,
+    src: previewSource.value || props.media.url,
     title: props.media.title || generatedLabel,
   } as const
   if (await props.openImage?.(image, { intent }) === true) return
@@ -101,7 +103,7 @@ function closeFullscreen() {
 }
 
 async function copyImage() {
-  const blob = await fetch(props.media.url).then((response) => response.blob())
+  const blob = await fetch(previewSource.value || props.media.url).then((response) => response.blob())
   const mimeType = blob.type || props.media.mimeType || 'image/png'
   await navigator.clipboard.write([
     new ClipboardItem({ [mimeType]: blob }),

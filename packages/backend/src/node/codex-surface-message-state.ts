@@ -261,6 +261,7 @@ export function upsertAssistantMediaPart(
   threadId: string,
   turnId: string,
   mediaPart: SurfaceMessageMediaPart,
+  sourceItemId = mediaPart.itemId,
 ): SurfaceMessage[] {
   let next = [...messages];
   let messageIndex = next.findIndex((message) => (
@@ -272,7 +273,7 @@ export function upsertAssistantMediaPart(
     messageIndex = next.findIndex((message) => (
       message.role === 'assistant'
       && message.metadata?.turnId === turnId
-      && message.parts.some((part) => part.type === 'tool' && part.id === mediaPart.itemId)
+      && message.parts.some((part) => part.type === 'tool' && part.id === sourceItemId)
     ));
   }
   if (messageIndex < 0) {

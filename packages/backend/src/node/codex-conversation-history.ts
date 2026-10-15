@@ -209,10 +209,10 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       sawAssistantActivity = true;
       assistantParts.push(toolPart);
     }
-    const mediaPart = codexItemToMediaPart(item);
-    if (mediaPart) {
+    const mediaParts = codexItemToMediaParts(item);
+    if (mediaParts.length) {
       sawAssistantActivity = true;
-      assistantParts.push(mediaPart);
+      assistantParts.push(...mediaParts);
     }
   }
 
@@ -302,8 +302,7 @@ export function codexItemToSurfaceMessage(
   const parts: SurfaceMessagePart[] = [];
   const toolPart = codexThreadItemToToolPart(item);
   if (toolPart) parts.push(toolPart);
-  const mediaPart = codexItemToMediaPart(item);
-  if (mediaPart) parts.push(mediaPart);
+  parts.push(...codexItemToMediaParts(item));
   const message: SurfaceMessage | null = parts.length > 0 ? {
     id: `assistant-${item.id}`,
     role: 'assistant',
@@ -392,6 +391,30 @@ export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart 
       ...(prompt ? { prompt } : {}),
     },
   };
+}
+
+/** Tool result images are media, independently of the small text/JSON tool-output budget. */
+export function codexItemToMediaParts(item: ThreadItem): SurfaceMessageMediaPart[] {
+  const generated = codexItemToMediaPart(item);
+  if (generated) return [generated];
+  const content = item.type === 'mcpToolCall' && item.status === 'completed' ? item.result?.content
+    : item.type === 'dynamicToolCall' && item.status === 'completed' ? item.contentItems : undefined;
+  if (!Array.isArray(content)) return [];
+  const parts: SurfaceMessageMediaPart[] = [];
+  let remaining = 20 * 1024 * 1024;
+  for (const entry of content) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || parts.length >= 8) continue;
+    const value = entry as Record<string, unknown>;
+    const source = value.type === 'image' && typeof value.data === 'string' ? value.data
+      : value.type === 'inputImage' && typeof value.imageUrl === 'string' ? value.imageUrl : '';
+    if (source.length > remaining) continue;
+    const image = codexImageDataUrl(source);
+    if (!image) continue;
+    remaining -= image.url.length;
+    parts.push({ type: 'media', itemId: parts.length ? `${item.id}:image:${parts.length}` : item.id,
+      media: { url: image.url, mimeType: image.mimeType, alt: 'Tool image', title: 'Tool image' } });
+  }
+  return parts;
 }
 
 function userMessageParts(item: Extract<ThreadItem, { type: 'userMessage' }>): SurfaceMessagePart[] {

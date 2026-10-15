@@ -76,15 +76,16 @@ watch(previewSource, () => {
 
 let previewRequest = 0
 watch(
-  () => [props.attachment.kind, props.attachment.path, props.attachment.url] as const,
+  [() => props.attachment.kind, () => props.attachment.path, () => props.attachment.url],
   async ([kind, path, url]) => {
     const request = ++previewRequest
     nativePreviewSource.value = undefined
-    if (kind !== 'image' || !path || isSafeImageSource(url)) return
+    const reference = path || url
+    if (kind !== 'image' || !reference || isSafeImageSource(url)) return
     const readImagePreview = hostCapabilities?.readImagePreview
     if (!readImagePreview) return
     try {
-      const source = await readImagePreview(path)
+      const source = await readImagePreview(reference)
       if (request === previewRequest && source && isSafeImageSource(source)) {
         nativePreviewSource.value = source
       }
@@ -117,7 +118,7 @@ async function handleImageOpen() {
 
 function isSafeImageSource(value: string | undefined): value is string {
   if (!value) return false
-  if (/^(?:\.\.?\/|\/(?!\/))/.test(value)) return true
+  if (/^(?:\.\.?\/|\/(?!\/))/.test(value)) return !hostCapabilities?.readImagePreview
   return /^(?:https?:|blob:)/i.test(value)
     || /^data:image\/(?:avif|bmp|gif|heic|heif|jpe?g|png|webp);base64,/i.test(value)
 }

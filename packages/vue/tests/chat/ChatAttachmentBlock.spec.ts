@@ -259,6 +259,23 @@ describe('ChatAttachmentBlock', () => {
     }
   });
 
+  it('keeps a loaded preview mounted when transcript updates recreate the same attachment', async () => {
+    const pending = deferred<string>();
+    const readImagePreview = vi.fn().mockResolvedValueOnce('data:image/png;base64,YQ==').mockReturnValue(pending.promise);
+    Object.defineProperty(window, 'codexAppSdkNative', { configurable: true, value: { readImagePreview } });
+    const wrapper = mount(ChatAttachmentBlock, { props: { attachment: attachment({ path: '/tmp/photo.jpg' }) } });
+    try {
+      await flushPromises();
+      const image = wrapper.get('img').element;
+      for (let update = 0; update < 3; update++) {
+        await wrapper.setProps({ attachment: attachment({ path: '/tmp/photo.jpg' }) });
+        expect(wrapper.find('img').element).toBe(image);
+        expect(wrapper.find('.chat-attachment-block--chip').exists()).toBe(false);
+      }
+      expect(readImagePreview).toHaveBeenCalledOnce();
+    } finally { wrapper.unmount(); }
+  });
+
   it('invalidates a pending native preview when unmounted', async () => {
     const pending = deferred<string>();
     const readImagePreview = vi.fn(() => pending.promise);

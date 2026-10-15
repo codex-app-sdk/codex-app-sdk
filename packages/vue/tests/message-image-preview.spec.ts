@@ -39,7 +39,62 @@ const messages: CodexChatMessage[] = [
 
 describe('conversation message image previews', () => {
   afterEach(() => {
+    vi.unstubAllGlobals()
     document.body.querySelectorAll('.chat-image-lightbox').forEach((element) => element.remove())
+  })
+
+  it('resolves local Markdown and generated-media images through the host capability before display', async () => {
+    const readImagePreview = vi.fn(async (_reference: string) => imageUrl)
+    vi.stubGlobal('codexAppSdkNative', { readImagePreview, capabilities: { attachments: false, clipboard: false, externalLinks: false, transcription: false } })
+    const wrapper = mount(CodexConversationPane, { props: { messages: [{ id: 'local-images', role: 'assistant', content: '', parts: [
+      { type: 'text', content: 'Here is ![Screenshot](/tmp/screenshot.png).' },
+      { type: 'media', media: { title: 'Generated', url: 'file:///tmp/generated.png' } },
+    ] }] } })
+    await flushPromises()
+    expect(readImagePreview.mock.calls.map(([reference]) => reference).sort()).toStrictEqual(['/tmp/screenshot.png', 'file:///tmp/generated.png'])
+    expect(wrapper.findAll('img').map(image => image.attributes('src'))).toStrictEqual([imageUrl, imageUrl])
+    wrapper.unmount()
+  })
+
+  it('discards image resolutions after the displayed message changes or unmounts', async () => {
+    const pending: ((value: string) => void)[] = []
+    const readImagePreview = vi.fn((_reference: string) => new Promise<string>(resolve => pending.push(resolve)))
+    vi.stubGlobal('codexAppSdkNative', { readImagePreview, capabilities: { attachments: false, clipboard: false, externalLinks: false, transcription: false } })
+    const message = (name: string): CodexChatMessage => ({ id: 'changing', role: 'assistant', content: '', parts: [
+      { type: 'text', content: `See ![Preview](/tmp/${name}.png) here.` },
+      { type: 'media', media: { title: 'Media', url: `/tmp/${name}.png` } },
+    ] })
+    const wrapper = mount(CodexConversationPane, { props: { messages: [message('old')] } })
+    await flushPromises()
+    await wrapper.setProps({ messages: [message('new')] })
+    await flushPromises()
+    pending.slice(0, 2).forEach(resolve => resolve(imageUrl))
+    await flushPromises()
+    expect(wrapper.get('button[aria-label="Open Preview"] img').attributes('src')).toBeUndefined()
+    expect(wrapper.get('button[aria-label="Open Media"] img').attributes('src')).toBeUndefined()
+    const detachedImage = wrapper.get('button[aria-label="Open Preview"] img').element
+    wrapper.unmount()
+    pending.slice(2).forEach(resolve => resolve(imageUrl))
+    await flushPromises()
+    expect(detachedImage.getAttribute('src')).toBeNull()
+  })
+
+  it.each(['failed', 'missing', 'unsafe'] as const)('keeps %s host previews out of the rendered media and lets opening fall back to the host', async outcome => {
+    const readImagePreview = vi.fn(async () => {
+      if (outcome === 'failed') throw new Error('Laptop disconnected')
+      return outcome === 'missing' ? null : 'file:///private/unsafe.png'
+    })
+    const openImage = vi.fn(() => true)
+    vi.stubGlobal('codexAppSdkNative', { readImagePreview, capabilities: { attachments: false, clipboard: false, externalLinks: false, transcription: false } })
+    const wrapper = mount(CodexConversationPane, { props: { openImage, messages: [{ id: 'unavailable', role: 'assistant', content: '', parts: [
+      { type: 'text', content: 'See ![Missing](/tmp/missing.png) here.' },
+      { type: 'media', media: { title: 'Unavailable', url: '/tmp/missing.png' } },
+    ] }] } })
+    await flushPromises()
+    expect(wrapper.findAll('img').map(image => image.attributes('src'))).toStrictEqual([undefined, undefined])
+    await wrapper.get('[aria-label="Open Unavailable"]').trigger('click')
+    expect(openImage).toHaveBeenCalledWith(expect.objectContaining({ src: '/tmp/missing.png' }), expect.objectContaining({ intent: 'open' }))
+    wrapper.unmount()
   })
 
   it('opens user attachments and assistant media in the SDK lightbox by default', async () => {
