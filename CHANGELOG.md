@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.16.2
+
+### Fixed
+
+- Preserve images returned by tools in live conversations and restored history.
+- Resolve host-owned image paths in attachments and generated media, keeping
+  previews stable across conversation updates.
+
 ## 0.16.1
 
 ### Fixed
