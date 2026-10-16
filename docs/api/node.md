@@ -525,5 +525,85 @@ The command reports startup and first-text latency. Pass an optional maximum
 first-text time in milliseconds after the fixture path to enforce a local latency
 budget. Compare the same fixture on the same Mac; timings include its leading silence.
 
+### Local Sherpa streaming speech
+
+`createSherpaSpeechService(options)` creates an opt-in, offline streaming
+transducer service. It uses one child process and recognizer, with a separate
+stream for each recording. Constructing it allocates no model memory; the first
+`startSession` loads the recognizer. Successive sessions reuse it until the last
+session has been stopped or cancelled for `idleTimeoutMs` (30 seconds by default).
+Idle shutdown exits the process and releases its native allocations. A start
+racing shutdown waits for exit and creates a new helper.
+
+```ts
+import { createSherpaSpeechService } from '@codex-app-sdk/backend';
+
+const speech = createSherpaSpeechService({
+  model: {
+    encoder: '/local/models/english/encoder.onnx',
+    decoder: '/local/models/english/decoder.onnx',
+    joiner: '/local/models/english/joiner.onnx',
+    tokens: '/local/models/english/tokens.txt',
+    language: 'en',
+  },
+  idleTimeoutMs: 30_000,
+});
+const session = await speech.startSession(
+  { sessionId: 'recording-1', sampleRate: 16000, locale: 'en-US' },
+  (event) => { /* Replace the transcript snapshot on each correction. */ },
+  { signal: abortController.signal },
+);
+await session.append(monoFloat32Pcm);
+const { text, error } = await session.stop();
+await speech.dispose(); // At host shutdown, not after every recording.
+```
+
+`startSession` has the same append/stop/cancel and snapshot semantics as Apple
+streaming speech. PCM input can be 8–96 kHz; the native recognizer resamples to the
+model's `sampleRate` (default 16 kHz). Await each append to preserve ordering and
+backpressure; chunks must be nonempty, Float32 little-endian, and at most 256 KiB.
+Each session ID must be unique among active recordings. Concurrent sessions share
+the recognizer but have independent streams. `stop()` returns one authoritative
+final result, including on repeated calls. `cancel()` discards the result and
+suppresses late events. An optional AbortSignal cancels startup or recording.
+Helper failure discards affected streams and allows a subsequent cold restart.
+
+`model` requires absolute paths to compatible streaming transducer encoder,
+decoder, joiner, and token files. Models stay outside the SDK package. The host
+chooses and provisions them explicitly, including any required license notices;
+the SDK performs no downloads or hosted transcription. `language`, when supplied,
+checks the session locale's language against the model; locale alone does not
+select a model or translate speech. For example, the upstream [English Zipformer
+2023-06-26 model](https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26)
+is labeled Apache-2.0 and works with its chunk16-left128 int8 encoder/joiner and
+fp32 decoder. This provider returns the model's text without adding punctuation.
+
+Other options are `numThreads` (default 2, CPU greedy decoding),
+`requestTimeoutMs` (default 120 seconds for loading and individual operations),
+`helperPath` (an explicit unpacked helper location), and `executablePath`
+(a Node-compatible executable, default `process.execPath`). Timeouts must be
+bounded positive integers; `idleTimeoutMs` also permits zero for immediate
+retirement. Explicit `preload()` can anticipate a recording and starts the same
+idle timer; it is never called automatically at application startup.
+`processId` is available for process diagnostics. `dispose()` rejects new starts,
+cancels active sessions, terminates the helper, and waits for process exit.
+
+The package publishes `assets/sherpa-speech-helper.cjs` and declares
+`sherpa-onnx-node@1.13.8` as an optional dependency. The [upstream runtime](https://github.com/k2-fsa/sherpa-onnx)
+is Apache-2.0; its published native packages cover macOS arm64/x64, Linux
+arm64/x64, and Windows x64/ia32. This SDK path has been exercised on macOS arm64;
+Windows/Linux execution and physical microphone acceptance remain separate host
+validation. Missing optional/native packages or local model files cause startup
+to reject; they do not silently select another service. Hosts should expose a
+streaming capability only when their configured runtime and model are available.
+
+`resolveSherpaSpeechHelperPath()` resolves the helper in source and installed
+packages, preferring an existing `.asar.unpacked` copy. Electron hosts must unpack
+the SDK helper, `sherpa-onnx-node`, and the matching `sherpa-onnx-*` native package
+(including shared libraries). Custom `extraResources` layouts can set `helperPath`;
+keep the runtime package resolvable from that helper's location. Electron's
+`RunAsNode` fuse must permit `ELECTRON_RUN_AS_NODE`, or `executablePath` must point
+to a separate Node runtime. The helper exits if its owning process disconnects.
+
 See the [surface guide](/guide/surface), [conversations](/guide/conversations),
 and [extensions](/guide/extensions).

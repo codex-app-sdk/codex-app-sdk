@@ -1,0 +1,125 @@
+{
+  "runs": [
+    {
+      "pass": 1,
+      "cold": {
+        "fixture": "0",
+        "kind": "human",
+        "sessionId": "cold-0",
+        "pid": 76105,
+        "startupMs": 834.4,
+        "clickToFirstTextMs": 2053.2,
+        "captureToFirstTextMs": 1218.9,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6625,
+        "finalizationMs": 11.5,
+        "transcriptEvents": 17,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 18,
+        "text": "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS"
+      },
+      "warm": {
+        "fixture": "0",
+        "kind": "human",
+        "sessionId": "warm-0",
+        "pid": 76105,
+        "startupMs": 0.4,
+        "clickToFirstTextMs": 1220.3,
+        "captureToFirstTextMs": 1219.9,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6625,
+        "finalizationMs": 13,
+        "transcriptEvents": 17,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 18,
+        "text": "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 75902,
+          "alive": true,
+          "rssMiB": 129,
+          "footprintMiB": 95,
+          "peakFootprintMiB": 95
+        },
+        "recordingCold": {
+          "pid": 76105,
+          "alive": true,
+          "rssMiB": 263.2,
+          "footprintMiB": 126.7,
+          "peakFootprintMiB": 202.7
+        },
+        "recordingWarm": {
+          "pid": 76105,
+          "alive": true,
+          "rssMiB": 264.7,
+          "footprintMiB": 127,
+          "peakFootprintMiB": 202.7
+        },
+        "warmIdle": {
+          "pid": 76105,
+          "alive": true,
+          "rssMiB": 265,
+          "footprintMiB": 128.3,
+          "peakFootprintMiB": 202.7
+        },
+        "postTermination": {
+          "pid": 76105,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 75902,
+          "alive": true,
+          "rssMiB": 59.3,
+          "footprintMiB": 24.9,
+          "peakFootprintMiB": 95.7
+        }
+      }
+    }
+  ],
+  "baselines": [
+    {
+      "pid": 76075,
+      "alive": true,
+      "rssMiB": 36.7,
+      "footprintMiB": 10.7,
+      "peakFootprintMiB": 10.7
+    }
+  ],
+  "bindingBaselines": [
+    {
+      "pid": 76100,
+      "alive": true,
+      "rssMiB": 46.4,
+      "footprintMiB": 13.4,
+      "peakFootprintMiB": 13.4
+    }
+  ],
+  "checks": [
+    {
+      "name": "cancel, immediate same-ID restart, no old events, one final",
+      "passed": true
+    },
+    {
+      "name": "idle exit and cold restart",
+      "passed": true
+    },
+    {
+      "name": "unexpected native process exit produces one error",
+      "passed": true
+    },
+    {
+      "name": "native/helper input error and recovery",
+      "passed": true
+    }
+  ]
+}

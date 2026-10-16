@@ -1,4 +1,4 @@
-import { startAppleSpeechSession, type AppleSpeechSession } from '@codex-app-sdk/backend';
+import { createSherpaSpeechService, startAppleSpeechSession, type AppleSpeechSession, type SherpaSpeechOptions } from '@codex-app-sdk/backend';
 import type { CodexSpeechSessionOptions, CodexSpeechTranscriptionResult } from '@codex-app-sdk/core/native';
 import { codexNativeChannels as channels, codexSpeechEventChannel, type CodexNativeRequests } from './codex-native-renderer';
 import type { IpcMainHandlers } from './typed-ipc';
@@ -25,10 +25,13 @@ type SpeechChannels = typeof channels.startSpeech | typeof channels.appendSpeech
 export function createCodexSpeechSessions(options: {
   maxAudioBytes: number;
   appleSpeechAssetsPath?: string;
+  sherpaSpeech?: SherpaSpeechOptions;
   startSpeechSession?: typeof startAppleSpeechSession;
 }): { handlers: IpcMainHandlers<Pick<CodexNativeRequests, SpeechChannels>>; dispose(): void } {
   const sessions = new Map<string, Entry>();
-  const start = options.startSpeechSession ?? startAppleSpeechSession;
+  if (options.sherpaSpeech && options.startSpeechSession) throw new TypeError('Choose sherpaSpeech or startSpeechSession.');
+  const sherpa = options.sherpaSpeech ? createSherpaSpeechService(options.sherpaSpeech) : undefined;
+  const start = options.startSpeechSession ?? sherpa?.startSession ?? startAppleSpeechSession;
   function owner(value: unknown): Owner {
     const event = value as Partial<Owner> | null;
     if (!event?.sender?.on || !event.sender.removeListener || !event.senderFrame?.send) {
@@ -122,6 +125,9 @@ export function createCodexSpeechSessions(options: {
         await cancel(id, get(event, id));
       },
     },
-    dispose: () => { for (const [id, entry] of sessions) void cancel(id, entry); },
+    dispose: () => {
+      for (const [id, entry] of sessions) void cancel(id, entry);
+      void sherpa?.dispose();
+    },
   };
 }

@@ -70,6 +70,7 @@ that never ask keep receiving snapshots.
 ```ts
 type CodexNativeMainOptions = {
   appleSpeechAssetsPath?: string;
+  sherpaSpeech?: SherpaSpeechOptions;
   maxAttachmentBytes?: number;
   maxTotalAttachmentBytes?: number;
   maxAudioBytes?: number;
@@ -122,6 +123,41 @@ For source-mode development, point `appleSpeechAssetsPath` (or
 `CODEX_APP_SDK_ASSETS_PATH`) at the source SDK's `packages/backend/assets` so
 the native helper matches the source API. Packaged apps should use the helper
 from the same SDK version as their bridge.
+
+For local Sherpa streaming, configure `sherpaSpeech` on the main bridge and
+explicitly enable the matching renderer capability:
+
+```ts
+registerCodexNativeIpc(dependencies, {
+  sherpaSpeech: {
+    model: {
+      encoder: '/local/models/encoder.onnx', decoder: '/local/models/decoder.onnx',
+      joiner: '/local/models/joiner.onnx', tokens: '/local/models/tokens.txt',
+      language: 'en',
+    },
+    idleTimeoutMs: 30_000,
+  },
+});
+// In preload, after the host has confirmed runtime/model availability:
+exposeCodexNativeRendererApi(contextBridge, ipcRenderer, {
+  transcription: true, streamingTranscription: true,
+});
+```
+
+The bridge owns one lazy Sherpa service shared across renderer recordings.
+Disposing the bridge cancels recordings and terminates that service.
+`sherpaSpeech` and `startSpeechSession` are mutually exclusive. Without either
+option, Apple SpeechAnalyzer remains the macOS default. Sherpa affects streaming
+only: `transcribeAudio` and custom batch services retain their existing behavior.
+On Windows/Linux, provide a batch `transcribeAudio` service as well if the host
+also offers a batch workflow; otherwise advertise only the configured streaming
+workflow to your UI. The shared composer uses streaming when available and
+preserves the current draft and attachments.
+
+See [Sherpa model configuration and packaging](./node#local-sherpa-streaming-speech)
+for explicit local model provisioning, optional runtime packages, unpacked
+Electron assets, runtime requirements, and native platform validation scope.
+No new renderer contract is required.
 
 `CodexNativeRendererApi.readImagePreview?(reference)` lazily requests a bounded,
 non-SVG local image as a renderer-safe data URL. It returns `null` when the file

@@ -375,3 +375,13 @@ usage before the model selector. Customize visibility through
 See [Native capabilities](/guide/native-capabilities),
 [Conversation pane integration](/guide/conversation-pane), and the
 [Vue API](/api/vue).
+
+### Local streaming dictation
+
+Electron hosts can opt into local Sherpa dictation through
+[`sherpaSpeech`](/api/electron#streaming-dictation) with explicitly provisioned
+local model files. The existing `streamingTranscription` capability delivers
+correction snapshots and a final result to the shared composer. Recordings reuse
+a recognizer briefly; idle process termination releases model memory. Apple
+SpeechAnalyzer stays the default on macOS, and custom batch transcription remains
+available. Hosts choose which capability to expose after checking availability.

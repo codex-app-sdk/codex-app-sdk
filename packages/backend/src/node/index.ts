@@ -83,3 +83,4 @@ export {
   type AppleSpeechTranscriptionResult,
 } from './apple-speech-transcription';
 export { startAppleSpeechSession, type AppleSpeechSession } from './apple-speech-session';
+export { createSherpaSpeechService, resolveSherpaSpeechHelperPath, type SherpaSpeechOptions, type SherpaSpeechService, type SherpaSpeechSession } from './sherpa-speech-session';

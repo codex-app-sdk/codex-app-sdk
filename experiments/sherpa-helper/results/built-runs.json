@@ -1,0 +1,1016 @@
+{
+  "runs": [
+    {
+      "pass": 1,
+      "cold": {
+        "fixture": "0",
+        "kind": "human",
+        "sessionId": "cold-0",
+        "pid": 51861,
+        "startupMs": 891.2,
+        "clickToFirstTextMs": 2108,
+        "captureToFirstTextMs": 1216.8,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6625,
+        "finalizationMs": 12.3,
+        "transcriptEvents": 17,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 18,
+        "text": "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS"
+      },
+      "warm": {
+        "fixture": "0",
+        "kind": "human",
+        "sessionId": "warm-0",
+        "pid": 51861,
+        "startupMs": 0.4,
+        "clickToFirstTextMs": 1212.8,
+        "captureToFirstTextMs": 1212.4,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6625,
+        "finalizationMs": 11.2,
+        "transcriptEvents": 17,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 18,
+        "text": "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 129,
+          "footprintMiB": 95.3,
+          "peakFootprintMiB": 95.3
+        },
+        "recordingCold": {
+          "pid": 51861,
+          "alive": true,
+          "rssMiB": 391.1,
+          "footprintMiB": 196.7,
+          "peakFootprintMiB": 261
+        },
+        "recordingWarm": {
+          "pid": 51861,
+          "alive": true,
+          "rssMiB": 392.2,
+          "footprintMiB": 196.8,
+          "peakFootprintMiB": 261
+        },
+        "warmIdle": {
+          "pid": 51861,
+          "alive": true,
+          "rssMiB": 392.4,
+          "footprintMiB": 197.9,
+          "peakFootprintMiB": 261
+        },
+        "postTermination": {
+          "pid": 51861,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 59.3,
+          "footprintMiB": 24.2,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 2,
+      "cold": {
+        "fixture": "1",
+        "kind": "human",
+        "sessionId": "cold-1",
+        "pid": 52230,
+        "startupMs": 893.6,
+        "clickToFirstTextMs": 2104.8,
+        "captureToFirstTextMs": 1211.2,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 16715,
+        "finalizationMs": 23.3,
+        "transcriptEvents": 48,
+        "finalResults": 1,
+        "errors": 1,
+        "words": 48,
+        "text": "GOD AS A DIRECT CONSEQUENCE OF THE SIN WHICH MAN THUS PUNISHED HAD GIVEN HER A LOVELY CHILD WHOSE PLACE WAS ON THAT SAME DISHONORED BOSOM TO CONNECT HER PARENT FOR EVER WITH THE RACE AND DESCENT OF MORTALS AND TO BE FINALLY A BLESSED SOUL IN HEAVEN"
+      },
+      "warm": {
+        "fixture": "1",
+        "kind": "human",
+        "sessionId": "warm-1",
+        "pid": 52230,
+        "startupMs": 0.4,
+        "clickToFirstTextMs": 1213.4,
+        "captureToFirstTextMs": 1213,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 16715,
+        "finalizationMs": 21.3,
+        "transcriptEvents": 48,
+        "finalResults": 1,
+        "errors": 1,
+        "words": 48,
+        "text": "GOD AS A DIRECT CONSEQUENCE OF THE SIN WHICH MAN THUS PUNISHED HAD GIVEN HER A LOVELY CHILD WHOSE PLACE WAS ON THAT SAME DISHONORED BOSOM TO CONNECT HER PARENT FOR EVER WITH THE RACE AND DESCENT OF MORTALS AND TO BE FINALLY A BLESSED SOUL IN HEAVEN"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 59.5,
+          "footprintMiB": 24.3,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 52230,
+          "alive": true,
+          "rssMiB": 327.3,
+          "footprintMiB": 190.4,
+          "peakFootprintMiB": 203.6
+        },
+        "recordingWarm": {
+          "pid": 52230,
+          "alive": true,
+          "rssMiB": 330.6,
+          "footprintMiB": 160.4,
+          "peakFootprintMiB": 203.6
+        },
+        "warmIdle": {
+          "pid": 52230,
+          "alive": true,
+          "rssMiB": 330.7,
+          "footprintMiB": 124.9,
+          "peakFootprintMiB": 203.6
+        },
+        "postTermination": {
+          "pid": 52230,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 60.5,
+          "footprintMiB": 25.2,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 3,
+      "cold": {
+        "fixture": "8k",
+        "kind": "human",
+        "sessionId": "cold-2",
+        "pid": 53503,
+        "startupMs": 889.7,
+        "clickToFirstTextMs": 2100.7,
+        "captureToFirstTextMs": 1211.1,
+        "firstBeforeEof": true,
+        "sampleRate": 8000,
+        "durationMs": 4825,
+        "finalizationMs": 20.3,
+        "transcriptEvents": 13,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 11,
+        "text": "YET THESE THOUGHTS AFFECTED HESTER PRYNNE LESS WITH HOPE THAN APPREHENSION"
+      },
+      "warm": {
+        "fixture": "8k",
+        "kind": "human",
+        "sessionId": "warm-2",
+        "pid": 53503,
+        "startupMs": 0.3,
+        "clickToFirstTextMs": 1213.3,
+        "captureToFirstTextMs": 1213,
+        "firstBeforeEof": true,
+        "sampleRate": 8000,
+        "durationMs": 4825,
+        "finalizationMs": 20.3,
+        "transcriptEvents": 13,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 11,
+        "text": "YET THESE THOUGHTS AFFECTED HESTER PRYNNE LESS WITH HOPE THAN APPREHENSION"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 60.7,
+          "footprintMiB": 25.3,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 53503,
+          "alive": true,
+          "rssMiB": 375.9,
+          "footprintMiB": 192.6,
+          "peakFootprintMiB": 250.2
+        },
+        "recordingWarm": {
+          "pid": 53503,
+          "alive": true,
+          "rssMiB": 377.5,
+          "footprintMiB": 194.1,
+          "peakFootprintMiB": 250.2
+        },
+        "warmIdle": {
+          "pid": 53503,
+          "alive": true,
+          "rssMiB": 377.5,
+          "footprintMiB": 194.1,
+          "peakFootprintMiB": 250.2
+        },
+        "postTermination": {
+          "pid": 53503,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 61.3,
+          "footprintMiB": 25.9,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 4,
+      "cold": {
+        "fixture": "dictation",
+        "kind": "English TTS",
+        "sessionId": "cold-3",
+        "pid": 53989,
+        "startupMs": 880.9,
+        "clickToFirstTextMs": 2106.4,
+        "captureToFirstTextMs": 1225.5,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6871.2,
+        "finalizationMs": 11.8,
+        "transcriptEvents": 20,
+        "finalResults": 1,
+        "errors": 3,
+        "words": 21,
+        "text": "CHECKED THE LATEST CHANGES AND RUN THE TESTS BEFORE COMMITTING KEEP THE CURRENT DRAUGHT AND ATTACHMENTS WHEN I STOP RECORDING"
+      },
+      "warm": {
+        "fixture": "dictation",
+        "kind": "English TTS",
+        "sessionId": "warm-3",
+        "pid": 53989,
+        "startupMs": 0.3,
+        "clickToFirstTextMs": 1224.4,
+        "captureToFirstTextMs": 1224,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6871.2,
+        "finalizationMs": 11.7,
+        "transcriptEvents": 20,
+        "finalResults": 1,
+        "errors": 3,
+        "words": 21,
+        "text": "CHECKED THE LATEST CHANGES AND RUN THE TESTS BEFORE COMMITTING KEEP THE CURRENT DRAUGHT AND ATTACHMENTS WHEN I STOP RECORDING"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 61.4,
+          "footprintMiB": 26,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 53989,
+          "alive": true,
+          "rssMiB": 390.7,
+          "footprintMiB": 197,
+          "peakFootprintMiB": 260.6
+        },
+        "recordingWarm": {
+          "pid": 53989,
+          "alive": true,
+          "rssMiB": 390.9,
+          "footprintMiB": 197,
+          "peakFootprintMiB": 260.6
+        },
+        "warmIdle": {
+          "pid": 53989,
+          "alive": true,
+          "rssMiB": 392,
+          "footprintMiB": 198.3,
+          "peakFootprintMiB": 260.6
+        },
+        "postTermination": {
+          "pid": 53989,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 61.7,
+          "footprintMiB": 26.2,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 5,
+      "cold": {
+        "fixture": "accent-en",
+        "kind": "Indian English TTS",
+        "sessionId": "cold-4",
+        "pid": 54355,
+        "startupMs": 836.1,
+        "clickToFirstTextMs": 2355.3,
+        "captureToFirstTextMs": 1519.3,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6218.4,
+        "finalizationMs": 25.6,
+        "transcriptEvents": 15,
+        "finalResults": 1,
+        "errors": 4,
+        "words": 21,
+        "text": "A SPEECH RECOGNITION TO BE FAST THE WORDS SHOULD APPEAR WHILE I SPEAK AND STOPPING SHOULD PRESERVE MY DRAUGH"
+      },
+      "warm": {
+        "fixture": "accent-en",
+        "kind": "Indian English TTS",
+        "sessionId": "warm-4",
+        "pid": 54355,
+        "startupMs": 0.4,
+        "clickToFirstTextMs": 1522.3,
+        "captureToFirstTextMs": 1521.9,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6218.4,
+        "finalizationMs": 39,
+        "transcriptEvents": 15,
+        "finalResults": 1,
+        "errors": 4,
+        "words": 21,
+        "text": "A SPEECH RECOGNITION TO BE FAST THE WORDS SHOULD APPEAR WHILE I SPEAK AND STOPPING SHOULD PRESERVE MY DRAUGH"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 61.8,
+          "footprintMiB": 26.3,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 54355,
+          "alive": true,
+          "rssMiB": 390.9,
+          "footprintMiB": 197,
+          "peakFootprintMiB": 260.7
+        },
+        "recordingWarm": {
+          "pid": 54355,
+          "alive": true,
+          "rssMiB": 392.4,
+          "footprintMiB": 197.6,
+          "peakFootprintMiB": 260.7
+        },
+        "warmIdle": {
+          "pid": 54355,
+          "alive": true,
+          "rssMiB": 391.8,
+          "footprintMiB": 197.7,
+          "peakFootprintMiB": 260.7
+        },
+        "postTermination": {
+          "pid": 54355,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 61.9,
+          "footprintMiB": 26.4,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 6,
+      "cold": {
+        "fixture": "0",
+        "kind": "human",
+        "sessionId": "cold-5",
+        "pid": 54672,
+        "startupMs": 845.3,
+        "clickToFirstTextMs": 2073.2,
+        "captureToFirstTextMs": 1227.9,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6625,
+        "finalizationMs": 13.5,
+        "transcriptEvents": 17,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 18,
+        "text": "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS"
+      },
+      "warm": {
+        "fixture": "0",
+        "kind": "human",
+        "sessionId": "warm-5",
+        "pid": 54672,
+        "startupMs": 0.3,
+        "clickToFirstTextMs": 1219.6,
+        "captureToFirstTextMs": 1219.3,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6625,
+        "finalizationMs": 17.1,
+        "transcriptEvents": 17,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 18,
+        "text": "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 62,
+          "footprintMiB": 26.5,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 54672,
+          "alive": true,
+          "rssMiB": 392,
+          "footprintMiB": 197.6,
+          "peakFootprintMiB": 260.4
+        },
+        "recordingWarm": {
+          "pid": 54672,
+          "alive": true,
+          "rssMiB": 393,
+          "footprintMiB": 197.5,
+          "peakFootprintMiB": 260.4
+        },
+        "warmIdle": {
+          "pid": 54672,
+          "alive": true,
+          "rssMiB": 393.3,
+          "footprintMiB": 198.8,
+          "peakFootprintMiB": 260.4
+        },
+        "postTermination": {
+          "pid": 54672,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 62.2,
+          "footprintMiB": 26.7,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 7,
+      "cold": {
+        "fixture": "1",
+        "kind": "human",
+        "sessionId": "cold-6",
+        "pid": 55012,
+        "startupMs": 900.4,
+        "clickToFirstTextMs": 2123.5,
+        "captureToFirstTextMs": 1223.1,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 16715,
+        "finalizationMs": 35,
+        "transcriptEvents": 48,
+        "finalResults": 1,
+        "errors": 1,
+        "words": 48,
+        "text": "GOD AS A DIRECT CONSEQUENCE OF THE SIN WHICH MAN THUS PUNISHED HAD GIVEN HER A LOVELY CHILD WHOSE PLACE WAS ON THAT SAME DISHONORED BOSOM TO CONNECT HER PARENT FOR EVER WITH THE RACE AND DESCENT OF MORTALS AND TO BE FINALLY A BLESSED SOUL IN HEAVEN"
+      },
+      "warm": {
+        "fixture": "1",
+        "kind": "human",
+        "sessionId": "warm-6",
+        "pid": 55012,
+        "startupMs": 0.3,
+        "clickToFirstTextMs": 1222.9,
+        "captureToFirstTextMs": 1222.6,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 16715,
+        "finalizationMs": 37.5,
+        "transcriptEvents": 48,
+        "finalResults": 1,
+        "errors": 1,
+        "words": 48,
+        "text": "GOD AS A DIRECT CONSEQUENCE OF THE SIN WHICH MAN THUS PUNISHED HAD GIVEN HER A LOVELY CHILD WHOSE PLACE WAS ON THAT SAME DISHONORED BOSOM TO CONNECT HER PARENT FOR EVER WITH THE RACE AND DESCENT OF MORTALS AND TO BE FINALLY A BLESSED SOUL IN HEAVEN"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 62.3,
+          "footprintMiB": 26.8,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 55012,
+          "alive": true,
+          "rssMiB": 390.3,
+          "footprintMiB": 196.4,
+          "peakFootprintMiB": 260.4
+        },
+        "recordingWarm": {
+          "pid": 55012,
+          "alive": true,
+          "rssMiB": 392.1,
+          "footprintMiB": 163.1,
+          "peakFootprintMiB": 260.4
+        },
+        "warmIdle": {
+          "pid": 55012,
+          "alive": true,
+          "rssMiB": 392.1,
+          "footprintMiB": 132.9,
+          "peakFootprintMiB": 260.4
+        },
+        "postTermination": {
+          "pid": 55012,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 63.5,
+          "footprintMiB": 28,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 8,
+      "cold": {
+        "fixture": "8k",
+        "kind": "human",
+        "sessionId": "cold-7",
+        "pid": 55671,
+        "startupMs": 837.5,
+        "clickToFirstTextMs": 2060.1,
+        "captureToFirstTextMs": 1222.7,
+        "firstBeforeEof": true,
+        "sampleRate": 8000,
+        "durationMs": 4825,
+        "finalizationMs": 30.1,
+        "transcriptEvents": 13,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 11,
+        "text": "YET THESE THOUGHTS AFFECTED HESTER PRYNNE LESS WITH HOPE THAN APPREHENSION"
+      },
+      "warm": {
+        "fixture": "8k",
+        "kind": "human",
+        "sessionId": "warm-7",
+        "pid": 55671,
+        "startupMs": 0.3,
+        "clickToFirstTextMs": 1223.6,
+        "captureToFirstTextMs": 1223.3,
+        "firstBeforeEof": true,
+        "sampleRate": 8000,
+        "durationMs": 4825,
+        "finalizationMs": 35.7,
+        "transcriptEvents": 13,
+        "finalResults": 1,
+        "errors": 0,
+        "words": 11,
+        "text": "YET THESE THOUGHTS AFFECTED HESTER PRYNNE LESS WITH HOPE THAN APPREHENSION"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 63.6,
+          "footprintMiB": 28,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 55671,
+          "alive": true,
+          "rssMiB": 390.5,
+          "footprintMiB": 196.5,
+          "peakFootprintMiB": 260.7
+        },
+        "recordingWarm": {
+          "pid": 55671,
+          "alive": true,
+          "rssMiB": 392.1,
+          "footprintMiB": 198.1,
+          "peakFootprintMiB": 260.7
+        },
+        "warmIdle": {
+          "pid": 55671,
+          "alive": true,
+          "rssMiB": 392.2,
+          "footprintMiB": 198.1,
+          "peakFootprintMiB": 260.7
+        },
+        "postTermination": {
+          "pid": 55671,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 63.7,
+          "footprintMiB": 28.2,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 9,
+      "cold": {
+        "fixture": "dictation",
+        "kind": "English TTS",
+        "sessionId": "cold-8",
+        "pid": 56061,
+        "startupMs": 832.9,
+        "clickToFirstTextMs": 2056.9,
+        "captureToFirstTextMs": 1224,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6871.2,
+        "finalizationMs": 14.3,
+        "transcriptEvents": 20,
+        "finalResults": 1,
+        "errors": 3,
+        "words": 21,
+        "text": "CHECKED THE LATEST CHANGES AND RUN THE TESTS BEFORE COMMITTING KEEP THE CURRENT DRAUGHT AND ATTACHMENTS WHEN I STOP RECORDING"
+      },
+      "warm": {
+        "fixture": "dictation",
+        "kind": "English TTS",
+        "sessionId": "warm-8",
+        "pid": 56061,
+        "startupMs": 0.2,
+        "clickToFirstTextMs": 1225.1,
+        "captureToFirstTextMs": 1224.8,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6871.2,
+        "finalizationMs": 12.9,
+        "transcriptEvents": 20,
+        "finalResults": 1,
+        "errors": 3,
+        "words": 21,
+        "text": "CHECKED THE LATEST CHANGES AND RUN THE TESTS BEFORE COMMITTING KEEP THE CURRENT DRAUGHT AND ATTACHMENTS WHEN I STOP RECORDING"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 63.8,
+          "footprintMiB": 28.3,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 56061,
+          "alive": true,
+          "rssMiB": 327.4,
+          "footprintMiB": 191,
+          "peakFootprintMiB": 203.2
+        },
+        "recordingWarm": {
+          "pid": 56061,
+          "alive": true,
+          "rssMiB": 328.5,
+          "footprintMiB": 191.9,
+          "peakFootprintMiB": 203.2
+        },
+        "warmIdle": {
+          "pid": 56061,
+          "alive": true,
+          "rssMiB": 329.7,
+          "footprintMiB": 193.1,
+          "peakFootprintMiB": 203.2
+        },
+        "postTermination": {
+          "pid": 56061,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 63.9,
+          "footprintMiB": 28.4,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    },
+    {
+      "pass": 10,
+      "cold": {
+        "fixture": "accent-en",
+        "kind": "Indian English TTS",
+        "sessionId": "cold-9",
+        "pid": 56996,
+        "startupMs": 839.6,
+        "clickToFirstTextMs": 2365.3,
+        "captureToFirstTextMs": 1525.7,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6218.4,
+        "finalizationMs": 28.6,
+        "transcriptEvents": 15,
+        "finalResults": 1,
+        "errors": 4,
+        "words": 21,
+        "text": "A SPEECH RECOGNITION TO BE FAST THE WORDS SHOULD APPEAR WHILE I SPEAK AND STOPPING SHOULD PRESERVE MY DRAUGH"
+      },
+      "warm": {
+        "fixture": "accent-en",
+        "kind": "Indian English TTS",
+        "sessionId": "warm-9",
+        "pid": 56996,
+        "startupMs": 0.4,
+        "clickToFirstTextMs": 1522.6,
+        "captureToFirstTextMs": 1522.2,
+        "firstBeforeEof": true,
+        "sampleRate": 16000,
+        "durationMs": 6218.4,
+        "finalizationMs": 34.1,
+        "transcriptEvents": 15,
+        "finalResults": 1,
+        "errors": 4,
+        "words": 21,
+        "text": "A SPEECH RECOGNITION TO BE FAST THE WORDS SHOULD APPEAR WHILE I SPEAK AND STOPPING SHOULD PRESERVE MY DRAUGH"
+      },
+      "snapshots": {
+        "parentBefore": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 64.1,
+          "footprintMiB": 28.5,
+          "peakFootprintMiB": 95.6
+        },
+        "recordingCold": {
+          "pid": 56996,
+          "alive": true,
+          "rssMiB": 390.5,
+          "footprintMiB": 196.6,
+          "peakFootprintMiB": 261.3
+        },
+        "recordingWarm": {
+          "pid": 56996,
+          "alive": true,
+          "rssMiB": 392.4,
+          "footprintMiB": 197.6,
+          "peakFootprintMiB": 261.3
+        },
+        "warmIdle": {
+          "pid": 56996,
+          "alive": true,
+          "rssMiB": 391.8,
+          "footprintMiB": 197.6,
+          "peakFootprintMiB": 261.3
+        },
+        "postTermination": {
+          "pid": 56996,
+          "alive": false,
+          "psExitCode": 1,
+          "psOutput": "",
+          "helperRssMiB": 0,
+          "helperFootprintMiB": 0,
+          "explanation": "Exited PID has no vmmap address space or resident pages; zero is absent process, not a vmmap reading."
+        },
+        "parentAfter": {
+          "pid": 51402,
+          "alive": true,
+          "rssMiB": 64.2,
+          "footprintMiB": 28.7,
+          "peakFootprintMiB": 95.6
+        }
+      }
+    }
+  ],
+  "baselines": [
+    {
+      "pid": 51672,
+      "alive": true,
+      "rssMiB": 36.7,
+      "footprintMiB": 10.7,
+      "peakFootprintMiB": 10.7
+    },
+    {
+      "pid": 52200,
+      "alive": true,
+      "rssMiB": 36.7,
+      "footprintMiB": 10.7,
+      "peakFootprintMiB": 10.7
+    },
+    {
+      "pid": 53463,
+      "alive": true,
+      "rssMiB": 36.7,
+      "footprintMiB": 10.7,
+      "peakFootprintMiB": 10.7
+    },
+    {
+      "pid": 53838,
+      "alive": true,
+      "rssMiB": 36.9,
+      "footprintMiB": 10.9,
+      "peakFootprintMiB": 10.9
+    },
+    {
+      "pid": 54327,
+      "alive": true,
+      "rssMiB": 36.7,
+      "footprintMiB": 10.7,
+      "peakFootprintMiB": 10.7
+    },
+    {
+      "pid": 54640,
+      "alive": true,
+      "rssMiB": 36.8,
+      "footprintMiB": 10.7,
+      "peakFootprintMiB": 10.7
+    },
+    {
+      "pid": 54983,
+      "alive": true,
+      "rssMiB": 36.7,
+      "footprintMiB": 10.7,
+      "peakFootprintMiB": 10.7
+    },
+    {
+      "pid": 55640,
+      "alive": true,
+      "rssMiB": 36.8,
+      "footprintMiB": 10.8,
+      "peakFootprintMiB": 10.8
+    },
+    {
+      "pid": 55809,
+      "alive": true,
+      "rssMiB": 36.8,
+      "footprintMiB": 10.8,
+      "peakFootprintMiB": 10.8
+    },
+    {
+      "pid": 56968,
+      "alive": true,
+      "rssMiB": 36.8,
+      "footprintMiB": 10.8,
+      "peakFootprintMiB": 10.8
+    }
+  ],
+  "bindingBaselines": [
+    {
+      "pid": 51746,
+      "alive": true,
+      "rssMiB": 46.4,
+      "footprintMiB": 13.4,
+      "peakFootprintMiB": 13.4
+    },
+    {
+      "pid": 52205,
+      "alive": true,
+      "rssMiB": 46.7,
+      "footprintMiB": 13.6,
+      "peakFootprintMiB": 13.6
+    },
+    {
+      "pid": 53471,
+      "alive": true,
+      "rssMiB": 46.3,
+      "footprintMiB": 13.3,
+      "peakFootprintMiB": 13.3
+    },
+    {
+      "pid": 53870,
+      "alive": true,
+      "rssMiB": 46.7,
+      "footprintMiB": 13.7,
+      "peakFootprintMiB": 13.7
+    },
+    {
+      "pid": 54330,
+      "alive": true,
+      "rssMiB": 46.4,
+      "footprintMiB": 13.3,
+      "peakFootprintMiB": 13.3
+    },
+    {
+      "pid": 54664,
+      "alive": true,
+      "rssMiB": 46.3,
+      "footprintMiB": 13.3,
+      "peakFootprintMiB": 13.3
+    },
+    {
+      "pid": 54986,
+      "alive": true,
+      "rssMiB": 46.4,
+      "footprintMiB": 13.4,
+      "peakFootprintMiB": 13.4
+    },
+    {
+      "pid": 55643,
+      "alive": true,
+      "rssMiB": 46.3,
+      "footprintMiB": 13.3,
+      "peakFootprintMiB": 13.3
+    },
+    {
+      "pid": 55814,
+      "alive": true,
+      "rssMiB": 46.4,
+      "footprintMiB": 13.4,
+      "peakFootprintMiB": 13.4
+    },
+    {
+      "pid": 56971,
+      "alive": true,
+      "rssMiB": 46.4,
+      "footprintMiB": 13.4,
+      "peakFootprintMiB": 13.4
+    }
+  ],
+  "checks": [
+    {
+      "name": "cancel, immediate same-ID restart, no old events, one final",
+      "passed": true
+    },
+    {
+      "name": "idle exit and cold restart",
+      "passed": true
+    },
+    {
+      "name": "unexpected native process exit produces one error",
+      "passed": true
+    },
+    {
+      "name": "native/helper input error and recovery",
+      "passed": true
+    }
+  ]
+}

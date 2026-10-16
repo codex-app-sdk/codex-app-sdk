@@ -1,6 +1,13 @@
 import { access, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+
+const { resolveSherpaSpeechHelperPath } = await import('../packages/backend/dist/index.js');
+const sherpaHelper = resolveSherpaSpeechHelperPath();
+if (!(await stat(sherpaHelper)).isFile()) throw new Error('Missing packaged Sherpa speech helper.');
+execFileSync(process.execPath, ['--check', sherpaHelper]);
+console.log('verified packaged Sherpa speech helper');
 
 if (process.platform !== 'darwin') {
   console.log(`skipping macOS-only Apple speech helper validation on ${process.platform}`);

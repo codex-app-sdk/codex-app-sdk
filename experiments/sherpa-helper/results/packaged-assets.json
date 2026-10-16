@@ -1,0 +1,8 @@
+{
+  "entry": "/Users/nbonamy/src/codex-app-sdk-sherpa-helper-lifecycle/experiments/sherpa-helper/results/consumer/node_modules/@codex-app-sdk/backend/dist/index.js",
+  "helper": "/Users/nbonamy/src/codex-app-sdk-sherpa-helper-lifecycle/experiments/sherpa-helper/results/consumer/node_modules/@codex-app-sdk/backend/assets/sherpa-speech-helper.cjs",
+  "wrapper": "/Users/nbonamy/src/codex-app-sdk-sherpa-helper-lifecycle/experiments/sherpa-helper/results/consumer/node_modules/sherpa-onnx-node/sherpa-onnx.js",
+  "native": "/Users/nbonamy/src/codex-app-sdk-sherpa-helper-lifecycle/experiments/sherpa-helper/results/consumer/node_modules/sherpa-onnx-darwin-arm64/sherpa-onnx.node",
+  "nativeBytes": 644448,
+  "assertion": "Backend, helper, Sherpa wrapper and native binary resolve inside the separately installed packed consumer, without fallback to workspace dependencies."
+}

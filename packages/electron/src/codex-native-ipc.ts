@@ -11,6 +11,7 @@ import {
   transcribeWithAppleSpeechAnalyzer,
   type AppleSpeechTranscriptionOptions,
   type AppleSpeechTranscriptionResult,
+  type SherpaSpeechOptions,
 } from '@codex-app-sdk/backend';
 import {
   registerIpcMainHandlers,
@@ -42,6 +43,8 @@ export type CodexNativeShell = {
 
 export type CodexNativeMainOptions = IpcSenderPolicy & {
   appleSpeechAssetsPath?: string;
+  /** Opt-in local streaming recognizer; leaves batch transcription unchanged. */
+  sherpaSpeech?: SherpaSpeechOptions;
   maxAttachmentBytes?: number;
   maxTotalAttachmentBytes?: number;
   maxAudioBytes?: number;

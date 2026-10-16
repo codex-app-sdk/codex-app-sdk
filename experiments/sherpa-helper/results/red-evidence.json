@@ -1,0 +1,31 @@
+[
+  {
+    "defect": "idle helper never exits",
+    "test": "reuses one preloaded helper",
+    "status": 1,
+    "failure": " FAIL  tests/sherpa-speech-session.spec.ts > reuses one preloaded helper across sessions, replaces partials and finalizes once\nAssertionError: expected 64061 to be undefined\n\n- Expected:\nundefined\n\n+ Received:\n64061\n\n ❯ tests/sherpa-speech-session.spec.ts:41:49\n     39|   expect(host.processId).toBe(pid);\n     40|   await next.cancel();\n     41|   await vi.waitFor(() => expect(host.processId).toBeUndefined());\n       |                                                 ^\n     42|   expect(() => process.kill(pid!, 0)).toThrow();\n     43|   const restarted = await host.startSession(input('restart'), () => {}…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
+  },
+  {
+    "defect": "old tokens routed to the new stream",
+    "test": "isolates simultaneous streams",
+    "status": 1,
+    "failure": " FAIL  tests/sherpa-speech-session.spec.ts > isolates simultaneous streams, cancellation and late events during rapid restart\nAssertionError: expected [ 'a cat', 'a cap', …(1) ] to deeply equal [ 'a cat', 'a cap' ]\n\n- Expected\n+ Received\n\n  [\n    \"a cat\",\n    \"a cap\",\n+   \"late cancelled words\",\n  ]\n\n ❯ tests/sherpa-speech-session.spec.ts:58:71\n     56|   await fresh.append(pcm(1));\n     57|   await new Promise((resolve) => setTimeout(resolve, 120));\n     58|   expect(events.map((e) => e.type === 'transcript' && e.partialText)).…\n       |                                                                       ^\n     59|   expect(host.processId).toBeDefined(); // Other sessions block idle r…\n     60|   expect(await old.stop()).toEqual({ text: '', error: 'Speech recordin…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
+  },
+  {
+    "defect": "start reuses a retiring helper",
+    "test": "waits for idle retirement",
+    "status": 1,
+    "failure": " FAIL  tests/sherpa-speech-session.spec.ts > waits for idle retirement before a racing start and cancels startup/disposal without publishing late text\nAssertionError: expected 64347 not to be 64347 // Object.is equality\n ❯ tests/sherpa-speech-session.spec.ts:95:30\n     93|   await new Promise((resolve) => setTimeout(resolve, 15));\n     94|   const next = await host.startSession(input('race'), () => {});\n     95|   expect(host.processId).not.toBe(oldPid);\n       |                              ^\n     96|   expect(() => process.kill(oldPid!, 0)).toThrow();\n     97|   await next.cancel();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
+  },
+  {
+    "defect": "cancel sends a command to an already finalizing stream",
+    "test": "discards a finalizing session",
+    "status": 1,
+    "failure": " FAIL  tests/sherpa-speech-session.spec.ts > discards a finalizing session on cancel without cancelling another shared stream\nAssertionError: expected { text: 'A cap.' } to deeply equal { text: '', …(1) }\n\n- Expected\n+ Received\n\n  {\n-   \"error\": \"Speech recording cancelled.\",\n-   \"text\": \"\",\n+   \"text\": \"A cap.\",\n  }\n\n ❯ tests/sherpa-speech-session.spec.ts:84:26\n     82|   const stopping = first.stop();\n     83|   await Promise.all([first.cancel(), first.cancel()]);\n     84|   expect(await stopping).toEqual({ text: '', error: 'Speech recording …\n       |                          ^\n     85|   await other.append(pcm(1));\n     86|   expect(await other.stop()).toEqual({ text: 'A cap.' });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
+  },
+  {
+    "defect": "bridge disposal leaves the shared helper alive",
+    "status": 1,
+    "failure": " FAIL  tests/streaming-speech.spec.ts > selects the configured shared Sherpa provider through native IPC and retains custom batch transcription\nAssertionError: expected [Function] to throw an error\n ❯ tests/streaming-speech.spec.ts:152:61\n    150|   expect(await first.transcribeAudio(new ArrayBuffer(4))).toEqual({ te…\n    151|   h.dispose();\n    152|   await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());\n       |                                                             ^\n    153|   expect(() => runtime({ sherpaSpeech: {\n    154|     model: { encoder: '/a', decoder: '/b', joiner: '/c', tokens: '/d' …\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
+  }
+]

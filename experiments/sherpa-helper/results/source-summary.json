@@ -1,0 +1,293 @@
+{
+  "measuredAt": "2026-10-10T14:11:55.469Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "release": "27.0.0",
+  "node": "v22.19.0",
+  "hardware": {
+    "cpu": "Apple M2 Max",
+    "logicalCpus": 12,
+    "totalMemoryGiB": 64
+  },
+  "entry": "SDK TypeScript source",
+  "sherpaVersion": "1.13.8",
+  "method": "1 fresh helper processes; one human fixture per cold/warm cohort. Capture begins after startSession resolves. Click timer begins before startSession and includes helper fork/native/model loading. Filesystem caches are not flushed. Mono PCM 8/16kHz with native resampling to 16kHz, paced 100ms chunks, 500ms EOF padding. vmmap physical footprint/peak, ps RSS. No parent-side Sherpa/native binding or GC tricks.",
+  "config": {
+    "model": "English Zipformer 2023-06-26 chunk16-left128, int8 encoder/joiner, fp32 decoder",
+    "numThreads": 2,
+    "provider": "cpu",
+    "decodingMethod": "greedy_search",
+    "idleTimeoutMs": 1500
+  },
+  "modelFiles": [
+    {
+      "file": "encoder.onnx",
+      "bytes": 71083163,
+      "sha256": "563fde436d16cf7607cf408cd6b30909819d03162652ef389c2450ced3f45ac1"
+    },
+    {
+      "file": "decoder.onnx",
+      "bytes": 2092621,
+      "sha256": "7bf787f90b194b307e5a4ad6a34fadb4e748304c35f78a8d66358a05b13ee6ef"
+    },
+    {
+      "file": "joiner.onnx",
+      "bytes": 259335,
+      "sha256": "d944208d660d67c8d72cd2acaeac971fa5ceb8c80e76c1968148846fedd6e297"
+    },
+    {
+      "file": "tokens.txt",
+      "bytes": 5048,
+      "sha256": "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb"
+    }
+  ],
+  "fixtures": [
+    {
+      "name": "0",
+      "reference": "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID QUARTER OF THE BROTHELS",
+      "kind": "human",
+      "sha256": "6bc58a4efdf20daac252b6b1502632601a71efe0308f6757dc1eda34891a7e4f"
+    },
+    {
+      "name": "1",
+      "reference": "GOD AS A DIRECT CONSEQUENCE OF THE SIN WHICH MAN THUS PUNISHED HAD GIVEN HER A LOVELY CHILD WHOSE PLACE WAS ON THAT SAME DISHONOURED BOSOM TO CONNECT HER PARENT FOR EVER WITH THE RACE AND DESCENT OF MORTALS AND TO BE FINALLY A BLESSED SOUL IN HEAVEN",
+      "kind": "human",
+      "sha256": "5143a6ba93c4b274e2c4ac22deb75c2c48936c853f0519add1de828b6c79cc5a"
+    },
+    {
+      "name": "8k",
+      "reference": "YET THESE THOUGHTS AFFECTED HESTER PRYNNE LESS WITH HOPE THAN APPREHENSION",
+      "kind": "human",
+      "sha256": "f6f3c8b33e2534cdc154fe773ad2750f1f6a2ca5096179cdf037ae782456613e"
+    },
+    {
+      "name": "dictation",
+      "kind": "English TTS",
+      "reference": "Please check the latest changes and run the tests before committing. Keep the current draft and attachments when I stop recording.",
+      "sha256": "cc8dd2c0efa166d50cc45a8cd210e7bc707a1c679c4688b1064a29eb6720ca93"
+    },
+    {
+      "name": "accent-en",
+      "kind": "Indian English TTS",
+      "reference": "I want live speech recognition to be fast. The words should appear while I speak, and stopping should preserve my draft.",
+      "sha256": "39b9b7ed7e268ed99f68a60f79de76940cd14958d0cb404fb74ce7a77cd15289"
+    }
+  ],
+  "checks": [
+    {
+      "name": "cancel, immediate same-ID restart, no old events, one final",
+      "passed": true
+    },
+    {
+      "name": "idle exit and cold restart",
+      "passed": true
+    },
+    {
+      "name": "unexpected native process exit produces one error",
+      "passed": true
+    },
+    {
+      "name": "native/helper input error and recovery",
+      "passed": true
+    }
+  ],
+  "baseline": {
+    "runtime": {
+      "rssMiB": {
+        "count": 1,
+        "mean": 36.8,
+        "median": 36.8,
+        "p90": 36.8,
+        "min": 36.8,
+        "max": 36.8
+      },
+      "footprintMiB": {
+        "count": 1,
+        "mean": 10.8,
+        "median": 10.8,
+        "p90": 10.8,
+        "min": 10.8,
+        "max": 10.8
+      }
+    },
+    "runtimeAndBinding": {
+      "rssMiB": {
+        "count": 1,
+        "mean": 46.6,
+        "median": 46.6,
+        "p90": 46.6,
+        "min": 46.6,
+        "max": 46.6
+      },
+      "footprintMiB": {
+        "count": 1,
+        "mean": 13.6,
+        "median": 13.6,
+        "p90": 13.6,
+        "min": 13.6,
+        "max": 13.6
+      }
+    }
+  },
+  "metrics": {
+    "cold": {
+      "startupMs": {
+        "count": 1,
+        "mean": 846.1,
+        "median": 846.1,
+        "p90": 846.1,
+        "min": 846.1,
+        "max": 846.1
+      },
+      "clickToFirstTextMs": {
+        "count": 1,
+        "mean": 2071.1,
+        "median": 2071.1,
+        "p90": 2071.1,
+        "min": 2071.1,
+        "max": 2071.1
+      },
+      "captureToFirstTextMs": {
+        "count": 1,
+        "mean": 1225,
+        "median": 1225,
+        "p90": 1225,
+        "min": 1225,
+        "max": 1225
+      },
+      "finalizationMs": {
+        "count": 1,
+        "mean": 14.9,
+        "median": 14.9,
+        "p90": 14.9,
+        "min": 14.9,
+        "max": 14.9
+      }
+    },
+    "warm": {
+      "startupMs": {
+        "count": 1,
+        "mean": 0.5,
+        "median": 0.5,
+        "p90": 0.5,
+        "min": 0.5,
+        "max": 0.5
+      },
+      "clickToFirstTextMs": {
+        "count": 1,
+        "mean": 1222.4,
+        "median": 1222.4,
+        "p90": 1222.4,
+        "min": 1222.4,
+        "max": 1222.4
+      },
+      "captureToFirstTextMs": {
+        "count": 1,
+        "mean": 1221.9,
+        "median": 1221.9,
+        "p90": 1221.9,
+        "min": 1221.9,
+        "max": 1221.9
+      },
+      "finalizationMs": {
+        "count": 1,
+        "mean": 12.2,
+        "median": 12.2,
+        "p90": 12.2,
+        "min": 12.2,
+        "max": 12.2
+      }
+    }
+  },
+  "memory": {
+    "recordingCold": {
+      "rssMiB": {
+        "count": 1,
+        "mean": 372.3,
+        "median": 372.3,
+        "p90": 372.3,
+        "min": 372.3,
+        "max": 372.3
+      },
+      "footprintMiB": {
+        "count": 1,
+        "mean": 193.5,
+        "median": 193.5,
+        "p90": 193.5,
+        "min": 193.5,
+        "max": 193.5
+      },
+      "peakFootprintMiB": {
+        "count": 1,
+        "mean": 245.1,
+        "median": 245.1,
+        "p90": 245.1,
+        "min": 245.1,
+        "max": 245.1
+      }
+    },
+    "recordingWarm": {
+      "rssMiB": {
+        "count": 1,
+        "mean": 373.4,
+        "median": 373.4,
+        "p90": 373.4,
+        "min": 373.4,
+        "max": 373.4
+      },
+      "footprintMiB": {
+        "count": 1,
+        "mean": 193.5,
+        "median": 193.5,
+        "p90": 193.5,
+        "min": 193.5,
+        "max": 193.5
+      },
+      "peakFootprintMiB": {
+        "count": 1,
+        "mean": 245.1,
+        "median": 245.1,
+        "p90": 245.1,
+        "min": 245.1,
+        "max": 245.1
+      }
+    },
+    "warmIdle": {
+      "rssMiB": {
+        "count": 1,
+        "mean": 373.6,
+        "median": 373.6,
+        "p90": 373.6,
+        "min": 373.6,
+        "max": 373.6
+      },
+      "footprintMiB": {
+        "count": 1,
+        "mean": 194.7,
+        "median": 194.7,
+        "p90": 194.7,
+        "min": 194.7,
+        "max": 194.7
+      },
+      "peakFootprintMiB": {
+        "count": 1,
+        "mean": 245.1,
+        "median": 245.1,
+        "p90": 245.1,
+        "min": 245.1,
+        "max": 245.1
+      }
+    }
+  },
+  "accuracy": {
+    "cold": {
+      "errors": 0,
+      "words": 18
+    },
+    "warm": {
+      "errors": 0,
+      "words": 18
+    }
+  },
+  "limitations": "Prerecorded playback; no physical microphone/permissions or Windows/Linux execution. Process-cold, filesystem-warm. In-recording vmmap briefly perturbs pacing after first text. RSS and footprint are different accounting metrics; absent PID is process-memory reclamation, not global free-memory growth."
+}

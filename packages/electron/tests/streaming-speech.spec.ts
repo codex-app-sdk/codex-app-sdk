@@ -123,3 +123,34 @@ it('reports recognizer errors and permits retry after a failed startup', async (
   await vi.waitFor(() => expect(session.cancel).toHaveBeenCalledOnce());
   h.dispose();
 });
+
+it('selects the configured shared Sherpa provider through native IPC and retains custom batch transcription', async () => {
+  const batch = vi.fn(async () => ({ text: 'Custom batch.' }));
+  const h = runtime({
+    sherpaSpeech: {
+      model: { encoder: '/local/encoder', decoder: '/local/decoder', joiner: '/local/joiner', tokens: '/local/tokens' },
+      helperPath: new URL('../../backend/tests/fixtures/sherpa-helper.cjs', import.meta.url).pathname,
+      idleTimeoutMs: 10_000,
+    },
+    transcribeAudio: batch,
+  });
+  const first = h.renderer().api;
+  const second = h.renderer().api;
+  const events: CodexSpeechSessionEvent[] = [];
+  first.streamingTranscription!.onEvent((event) => events.push(event));
+  await first.streamingTranscription!.start({ sessionId: 'sherpa-one', sampleRate: 16000 });
+  await second.streamingTranscription!.start({ sessionId: 'sherpa-two', sampleRate: 16000 });
+  await first.streamingTranscription!.append('sherpa-one', new Float32Array([8]).buffer);
+  await second.streamingTranscription!.append('sherpa-two', new Float32Array([8]).buffer);
+  expect(events.map((event) => event.type === 'transcript' && event.partialText)).toEqual(['a cat', 'a cap']);
+  const result = await first.streamingTranscription!.stop('sherpa-one');
+  expect(await second.streamingTranscription!.stop('sherpa-two')).toEqual(result);
+  const pid = Number(result.text); // Fixture-only receipt identifies the child handling both owners.
+  expect(pid).toBeGreaterThan(0);
+  expect(await first.transcribeAudio(new ArrayBuffer(4))).toEqual({ text: 'Custom batch.' });
+  h.dispose();
+  await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
+  expect(() => runtime({ sherpaSpeech: {
+    model: { encoder: '/a', decoder: '/b', joiner: '/c', tokens: '/d' },
+  }, startSpeechSession: async () => ({ append: async () => {}, stop: async () => ({ text: '' }), cancel: async () => {} }) })).toThrow('Choose');
+});
