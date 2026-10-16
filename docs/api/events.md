@@ -74,7 +74,11 @@ with stable `conversationId` and `turnId`. Each observation includes:
 - `model`: `null` without authoritative whole-execution model evidence.
 
 `execution` is computed only from a known prior thread-counter baseline and an
-observed start. Missing baselines, decreasing or synthetic context-only
+observed start. A successful SDK `thread/start` establishes a zero baseline for
+the new empty conversation, allowing its first turn to be attributed. Provider
+counters already observed before that response are preserved. Resumed and
+forked conversations do not assume a zero baseline.
+Missing baselines, decreasing or synthetic context-only
 counters, overlapping late turns, and history replacement leave attribution
 unknown. Absent cache-write counts remain `null`, not zero. These observations
 do not classify provider packets as independently verified live or replayed

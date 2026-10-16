@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
-import { MockCodexAppServer, turn } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 const baseline: v2.TokenUsageBreakdown = {
   totalTokens: 100, inputTokens: 60, cachedInputTokens: 20, cacheWriteInputTokens: 5,
@@ -21,9 +21,19 @@ const execution = {
   outputTokens: 20, reasoningOutputTokens: 5,
 };
 
-async function setup() {
+async function setup(notifyStarted = false, priorUsage?: v2.TokenUsageBreakdown) {
   let nextTurn = 0;
-  const transport = new MockCodexAppServer({ 'turn/start': () => ({ turn: turn(`turn-${++nextTurn}`, 'inProgress', []) }) });
+  const transport: MockCodexAppServer = new MockCodexAppServer({
+    'thread/start': () => {
+      const created = thread('thread-new', false);
+      if (notifyStarted) transport.emitNotification('thread/started', { thread: created });
+      if (priorUsage) usage(transport, 'turn-history', priorUsage, created.id);
+      return resumeResponse(created);
+    },
+    'thread/fork': params => resumeResponse({ ...thread('thread-new', false), forkedFromId: params.threadId }),
+    'thread/settings/update': () => ({}),
+    'turn/start': () => ({ turn: turn(`turn-${++nextTurn}`, 'inProgress', []) }),
+  });
   const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
   const events: CodexSurfaceEvent[] = [];
   surface.onEvent(event => events.push(event));
@@ -31,13 +41,55 @@ async function setup() {
   return { surface, events, transport };
 }
 
-function usage(transport: MockCodexAppServer, turnId: string, counts = total) {
+function usage(transport: MockCodexAppServer, turnId: string, counts = total, threadId = 'thread-existing') {
   transport.emitNotification('thread/tokenUsage/updated', {
-    threadId: 'thread-existing', turnId, tokenUsage: { total: counts, last, modelContextWindow: 2000 },
+    threadId, turnId, tokenUsage: { total: counts, last, modelContextWindow: 2000 },
   });
 }
 
 describe('CodexSurface execution usage', () => {
+  it.each([false, true])('attributes a new conversation’s first execution (early thread notification: %s)', async notifyStarted => {
+    const { surface, transport, events } = await setup(notifyStarted);
+    try {
+      await surface.createConversation();
+      await surface.sendMessage('First prompt');
+      usage(transport, 'turn-1', baseline, 'thread-new');
+      usage(transport, 'turn-1', total, 'thread-new');
+      transport.emitNotification('turn/completed', { threadId: 'thread-new', turn: turn('turn-1', 'completed', []) });
+      expect(events.filter(event => event.type === 'conversation.executionUsageChanged').map(event => event.payload.usage))
+        .toStrictEqual([
+          { last, total: baseline, execution: baseline, model: null, observedStart: true },
+          { last, total, execution: total, model: null, observedStart: true },
+        ]);
+      expect(events.find(event => event.type === 'turn.completed')?.payload.executionUsage)
+        .toStrictEqual({ last, total, execution: total, model: null, observedStart: true });
+      expect(surface.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage?.execution)
+        .toStrictEqual(total);
+    } finally { await surface.close(); }
+  });
+
+  it('does not assume a zero baseline for a newly forked conversation', async () => {
+    const { surface, transport, events } = await setup();
+    try {
+      const fork = await surface.forkConversation('thread-existing');
+      await fork.conversation.sendMessage('Continue the fork');
+      usage(transport, 'turn-1', total, fork.conversationId);
+      expect(events.filter(event => event.type === 'conversation.executionUsageChanged').at(-1)?.payload.usage)
+        .toStrictEqual({ last, total, execution: null, model: null, observedStart: true });
+    } finally { await surface.close(); }
+  });
+
+  it('preserves provider counters received before the new thread response', async () => {
+    const { surface, transport, events } = await setup(false, baseline);
+    try {
+      await surface.createConversation();
+      await surface.sendMessage('After earlier provider usage');
+      usage(transport, 'turn-1', total, 'thread-new');
+      expect(events.filter(event => event.type === 'conversation.executionUsageChanged').at(-1)?.payload.usage)
+        .toStrictEqual({ last, total, execution, model: null, observedStart: true });
+    } finally { await surface.close(); }
+  });
+
   it('does not use counters already containing a new turn as that turn’s starting baseline', async () => {
     const { surface, transport, events } = await setup();
     try {

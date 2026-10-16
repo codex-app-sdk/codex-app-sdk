@@ -64,6 +64,7 @@ export interface CodexSurfaceLifecycleHost {
   ensureConnected(): Promise<void>;
   getSnapshot(): CodexSurfaceSnapshot;
   getState(): CodexSurfaceSnapshot;
+  observeEmptyConversation(threadId: string): void;
   patch(patch: Partial<CodexSurfaceSnapshot>): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
@@ -170,6 +171,7 @@ export class CodexSurfaceLifecycleController {
       ...(options.threadSource === undefined ? {} : { threadSource: options.threadSource }),
       serviceName: 'codex_app_sdk',
     });
+    this.host.observeEmptyConversation(response.thread.id);
     const selection = sessionSelection(response, state.models, state);
     if (requestedReasoningEffort) {
       await this.client.request('thread/settings/update', {

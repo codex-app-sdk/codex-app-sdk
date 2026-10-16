@@ -46,7 +46,10 @@ The matching snapshot mutation is applied before the event is emitted.
 Use `conversation.executionUsageChanged` for turn-key replacements, not
 `contextUsage` as a consumption metric. Store `usage.execution` only for
 observed starts, and retain `null` as unknown. Repeated observations replace
-the same turn; they are not increments. A terminal event carries the latest
+the same turn; they are not increments. Conversations created through the SDK
+can attribute their first turn from a known zero baseline; resumed or forked
+conversations need a prior provider-counter observation.
+A terminal event carries the latest
 usage, but later corrections can invalidate it. Keep this revisable evidence
 local rather than sending irreversible usage totals.
 

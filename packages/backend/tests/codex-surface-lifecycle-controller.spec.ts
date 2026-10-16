@@ -589,6 +589,7 @@ function setupLifecycle(options: Record<string, unknown> = {}) {
     emitConversationSettings: vi.fn(), emitConversationSkills: vi.fn(),
     emitHistoryReplaced: vi.fn(), emitSelected: vi.fn(), emitSummaryUpserted: vi.fn(),
     ensureConnected: vi.fn(async () => undefined), getSnapshot: vi.fn(() => state),
+    observeEmptyConversation: vi.fn(),
     getState: vi.fn(() => state), patch: vi.fn((patch: Partial<CodexSurfaceSnapshot>) => Object.assign(state, patch)),
     patchRuntime: vi.fn((threadId: string, patch: ThreadRuntimePatch) => {
       const runtime = runtimes.get(threadId);

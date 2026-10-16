@@ -367,6 +367,7 @@ export class CodexSurface {
         ensureConnected: () => this.ensureConnected(),
         getSnapshot: () => this.getSnapshot(),
         getState: () => this.state,
+        observeEmptyConversation: (threadId) => this.usage.observeEmptyConversation(threadId),
         patch: (patch) => this.patch(patch),
         patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
         requireRuntime: (threadId) => this.requireRuntime(threadId),

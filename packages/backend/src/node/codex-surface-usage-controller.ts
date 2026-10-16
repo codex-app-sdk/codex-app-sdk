@@ -19,6 +19,16 @@ export class CodexSurfaceUsageController {
 
   clear(): void { this.threads.clear(); }
 
+  /** A successful thread/start establishes zero prior consumption, unlike resume or fork. */
+  observeEmptyConversation(id: string): void {
+    // Preserve any provider evidence that arrived before the start response.
+    if (this.threads.has(id)) return;
+    this.thread(id).total = {
+      totalTokens: 0, inputTokens: 0, cachedInputTokens: 0, cacheWriteInputTokens: 0,
+      outputTokens: 0, reasoningOutputTokens: 0,
+    };
+  }
+
   observe(origin: CodexSurfaceEventOrigin, input: EventInput): EventInput {
     if (!('conversationId' in input)) return input;
     const id = input.conversationId;
