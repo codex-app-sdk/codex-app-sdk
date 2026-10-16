@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.16.3
+
+### Fixed
+
+- Attribute token usage for the first turn of a newly created conversation,
+  preserving prior provider evidence and unknown baselines for resumed or
+  forked conversations.
+- Generate Electron and web applications with SDK dependencies that include
+  the latest fixes.
+
 ## 0.16.2
 
 ### Fixed
