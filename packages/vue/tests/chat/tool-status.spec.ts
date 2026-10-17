@@ -621,18 +621,24 @@ describe('tool status helpers', () => {
     expect(defaultToolTranslate('Unknown {missing} value')).toBe('Unknown  value');
   });
 
-  it('uses the generic fallback for app-specific tools', () => {
+  it.each([
+    ['mcp__github__add_comment_to_pending_review', 'add comment to pending review'],
+    ['mcp__github__add__comment-to-pending_review', 'add comment to pending review'],
+    ['github.Add_Comment-to_pending_review', 'add comment to pending review'],
+    ['REFRESH-cache_status', 'refresh cache status'],
+    ['team.send-message', 'send message'],
+  ])('humanizes the fallback title for %s', (name, label) => {
     const tool: MessageToolCall = {
       args: { to: 'Manny' },
-      done: true,
-      function: 'team.send-message',
+      done: false,
+      function: name,
       id: 'tool',
       result: undefined,
-      state: 'completed',
-      status: 'completed',
+      state: 'running',
     };
 
-    expect(getToolDisplayTitle(tool, undefined)).toBe('Ran team.send-message');
+    expect(getToolDisplayTitle(tool, undefined)).toBe(`Running ${label}`);
+    expect(getToolDisplayTitle({ ...tool, done: true, state: 'completed' }, undefined)).toBe(`Ran ${label}`);
   });
 
   it('lets hosts register and dispose exact tool title presenters', () => {
@@ -656,6 +662,6 @@ describe('tool status helpers', () => {
     expect(getToolDisplayTitle(tool, undefined)).toBe('fallback presenter');
     unregisterFallback();
     unregisterMiss();
-    expect(getToolDisplayTitle(tool, undefined)).toBe('Running host.display');
+    expect(getToolDisplayTitle(tool, undefined)).toBe('Running display');
   });
 });

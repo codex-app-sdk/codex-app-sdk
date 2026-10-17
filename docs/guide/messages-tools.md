@@ -212,6 +212,13 @@ Image generation uses the photo icon and activity labels such as
 `Generating image` and `Generated image`. A host presentation resolver can
 still replace either default.
 
+Unknown tools use readable fallback titles. Both
+`mcp__github__add_comment_to_pending_review` and
+`github.add_comment_to_pending_review` display as
+`Running add comment to pending review`, then `Ran add comment to pending review`.
+Plain tool names also replace underscores and hyphens with spaces and use
+lowercase. Shell command text is preserved. Host-provided titles take precedence.
+
 Customize app-owned MCP or dynamic tools once for a Vue subtree:
 
 ```ts

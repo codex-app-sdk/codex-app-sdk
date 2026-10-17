@@ -526,6 +526,14 @@ action icon, a stable kind fallback, then the generic tool icon. Only an
 explicit `presentation.icon` value of `null` suppresses the icon. Image
 generation uses the photo icon and human-readable activity titles by default.
 
+Generic tool titles strip an optional `mcp__` prefix and the server namespace
+through the first `__` or `.` separator, then replace underscores and hyphens
+with spaces and lowercase the remaining name. They use the existing
+`chat.tool.fallback.running` / `.completed` translations with that readable
+`name`, for example `Running add comment to pending review` / `Ran add comment
+to pending review`. Calls with `kind: 'command'` preserve their literal command
+text. Explicit host titles take precedence.
+
 `CodexScrollToBottom` is also rendered by `CodexMessageList` whenever the
 transcript is scrolled away from the bottom. It accepts an optional accessible
 `label` and emits `click`; use it directly when composing a custom message

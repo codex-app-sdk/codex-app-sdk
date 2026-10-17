@@ -178,8 +178,16 @@ export function getToolDisplayTargetParts(
 
 export function getToolFallbackTitle(toolCall: MessageToolCall, t: Translate = defaultToolTranslate) {
   const isRunning = !toolCall.done && toolCall.state !== 'completed';
+  let name = getMessageToolCallName(toolCall);
+  if (toolCall.kind !== 'command') {
+    name = name
+      .replace(/^mcp__/u, '')
+      .replace(/^.*?(?:__|\.)/u, '')
+      .replace(/[_-]+/gu, ' ')
+      .toLowerCase();
+  }
   return t(`chat.tool.fallback.${isRunning ? 'running' : 'completed'}`, {
-    name: getMessageToolCallName(toolCall),
+    name,
   });
 }
 

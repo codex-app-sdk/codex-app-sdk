@@ -408,7 +408,7 @@ describe('ported id8 chat components', () => {
         },
       },
     });
-    expect(structuredResult.text()).toContain('Ran team.set-status');
+    expect(structuredResult.text()).toContain('Ran set status');
     await structuredResult.get('.chat-tool-call__header').trigger('click');
     expect(structuredResult.text()).toContain('"status": "Registered and idle"');
 
@@ -425,7 +425,7 @@ describe('ported id8 chat components', () => {
         },
       },
     });
-    expect(completedWorkItem.text()).toContain('Ran team.mark-work-item-completed');
+    expect(completedWorkItem.text()).toContain('Ran mark work item completed');
   });
 
   it('enables raw tool details once for a provided component subtree', async () => {
@@ -468,7 +468,7 @@ describe('ported id8 chat components', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('Ran mcp__team__display-markdown');
+    expect(wrapper.text()).toContain('Ran display markdown');
   });
 
   it('renders headerless, summary-only, descriptor, and bare tool states', async () => {
@@ -857,7 +857,7 @@ describe('ported id8 chat components', () => {
 
     expect(wrapper.find('.chat-tool-confirmation').exists()).toBe(true);
     expect(wrapper.find('.chat-tool-group__header').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain('Running team.register-agent');
+    expect(wrapper.text()).not.toContain('Running register agent');
   });
 
   it('summarizes completed tool groups and handles an empty group', async () => {

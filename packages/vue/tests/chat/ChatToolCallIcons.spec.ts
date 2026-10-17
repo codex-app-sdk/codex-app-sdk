@@ -597,6 +597,6 @@ describe('ChatToolCall action icons', () => {
     const wrapper = mount(Host);
 
     expect(wrapper.find('.chat-tool-call__title svg').exists()).toBe(false);
-    expect(wrapper.get('.chat-tool-call__title').text()).toBe('Ran quiet_tool');
+    expect(wrapper.get('.chat-tool-call__title').text()).toBe('Ran quiet tool');
   });
 });

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.16.4
+
+### Fixed
+
+- Show readable running and completed titles for unknown MCP and plain tools,
+  removing server prefixes and replacing underscores and hyphens with spaces.
+
 ## 0.16.3
 
 ### Fixed
