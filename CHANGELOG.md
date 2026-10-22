@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.16.5
+
+### Fixed
+
+- Keep question cards inside expanded tool groups sized to the conversation
+  width as sidebars and windows resize.
+
 ## 0.16.4
 
 ### Fixed
