@@ -31,6 +31,8 @@ defineProps<{
 }
 
 .chat-fold__inner {
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
