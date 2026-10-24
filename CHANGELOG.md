@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.16.6
+
+### Added
+
+- Accept suggested follow-ups into an empty draft with Right Arrow or Space,
+  alongside Tab, without sending the message.
+
 ## 0.16.5
 
 ### Fixed
