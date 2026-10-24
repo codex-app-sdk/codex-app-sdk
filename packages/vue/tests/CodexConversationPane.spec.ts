@@ -90,7 +90,9 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
-  it.each(['props', 'controller'] as const)('accepts a changing custom placeholder with Tab through %s without submitting', async (mode) => {
+  it.each(
+    ['Tab', 'ArrowRight', ' '].flatMap(key => ['props', 'controller'].map(mode => ({ key, mode }))),
+  )('accepts a changing custom placeholder with $key through $mode without submitting', async ({ key, mode }) => {
     const state = reactive<CodexConversationPaneState>({ identity: { messages: [] }, composer: {} });
     const submit = vi.fn();
     const updateComposerState = vi.fn((next) => { state.composer = { ...state.composer, state: next }; });
@@ -99,32 +101,33 @@ describe('CodexConversationPane', () => {
       : {},
     });
     const editor = wrapper.get('[role="textbox"]');
-    const tab = () => {
-      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    const accept = () => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
       editor.element.dispatchEvent(event);
       return event;
     };
-    expect(tab().defaultPrevented).toBe(false);
+    expect(accept().defaultPrevented).toBe(false);
     for (const placeholder of ['Review the changes', 'Write a release summary']) {
       if (mode === 'controller') state.composer = { placeholder };
       else await wrapper.setProps({ placeholder });
       await nextTick();
       expect(editor.attributes('data-placeholder')).toBe(placeholder);
     }
-    for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }, { isComposing: true }]) {
-      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, ...modifier });
+    for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }, { isComposing: true },
+      ...(key === 'Tab' ? [] : [{ shiftKey: true }])]) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...modifier });
       editor.element.dispatchEvent(event);
       expect(event.defaultPrevented).toBe(false);
       expect(editor.element.textContent).toBe('');
     }
-    expect(tab().defaultPrevented).toBe(true);
+    expect(accept().defaultPrevented).toBe(true);
     await nextTick();
     expect(editor.element.textContent).toBe('Write a release summary');
     expect(mode === 'controller' ? state.composer?.state : wrapper.emitted('update:composerState')?.at(-1)?.[0])
       .toMatchObject({ text: 'Write a release summary' });
     expect(wrapper.emitted('send')).toBeUndefined();
     expect(submit).not.toHaveBeenCalled();
-    expect(tab().defaultPrevented).toBe(false);
+    expect(accept().defaultPrevented).toBe(false);
     wrapper.unmount();
   });
 
@@ -135,18 +138,20 @@ describe('CodexConversationPane', () => {
     { placeholder: 'Suggested follow-up', modelValue: 'My draft' },
     { placeholder: 'Suggested follow-up', modelValue: ' ' },
     { placeholder: 'Suggested follow-up', composerState: { text: '', selectionStart: 0, selectionEnd: 0, activeCommandId: 'codex.goal' } },
-  ])('leaves Tab alone when the placeholder is not an available suggestion: %j', async (props) => {
+  ])('leaves acceptance keys alone when the placeholder is not an available suggestion: %j', async (props) => {
     const wrapper = mount(CodexConversationPane, { props: {
       placeholder: props.placeholder, disabled: props.disabled,
       modelValue: props.modelValue, composerState: props.composerState,
     } });
     const editor = wrapper.get('[role="textbox"]');
     const text = editor.element.textContent;
-    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
-    editor.element.dispatchEvent(event);
-    await nextTick();
-    expect(event.defaultPrevented).toBe(false);
-    expect(editor.element.textContent).toBe(text);
+    for (const key of ['Tab', 'ArrowRight', ' ']) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      editor.element.dispatchEvent(event);
+      await nextTick();
+      expect(event.defaultPrevented).toBe(false);
+      expect(editor.element.textContent).toBe(text);
+    }
     wrapper.unmount();
   });
 
