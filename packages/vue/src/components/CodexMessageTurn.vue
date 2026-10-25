@@ -27,8 +27,10 @@ type TurnEntry = {
 const props = defineProps<{
   active?: boolean
   answeredClientRequestIds?: ReadonlySet<string>
+  durationMs?: number | null
   entries: readonly TurnEntry[]
   showToolBlocks: boolean
+  startedAt?: string | null
   status?: CodexSurfaceTurnStatus
   turnId?: string
 }>()
@@ -70,6 +72,8 @@ const active = computed(() => !finalStarted.value && (props.active ?? messages.v
   message.role === 'assistant' && message.streaming === true
 ))))
 const status = computed(() => props.status)
+const startedAt = computed(() => props.startedAt)
+const durationMs = computed(() => props.durationMs)
 const stoppedWithoutFinal = computed(() => (
   !active.value
   && !finalStarted.value
@@ -105,6 +109,8 @@ provide(assistantWorkTurnKey, {
   headerMessageIndex,
   latestStreamingAssistantIndex,
   phased,
+  startedAt,
+  durationMs,
   status,
   turnId,
   toggle() {

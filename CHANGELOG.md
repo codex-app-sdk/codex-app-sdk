@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Show elapsed time in the work disclosure: a live `Working · 1m 12s` while a
+  turn runs and `Done · 4m 38s · View details` once it finishes, including the
+  stopped and failed variants.
+
 ## 0.16.6
 
 ### Added

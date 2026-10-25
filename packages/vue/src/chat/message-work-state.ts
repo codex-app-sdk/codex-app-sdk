@@ -13,6 +13,8 @@ export type AssistantWorkTurnContext = {
   headerMessageIndex: ComputedRef<number | undefined>
   latestStreamingAssistantIndex: ComputedRef<number | undefined>
   phased: ComputedRef<boolean>
+  startedAt?: ComputedRef<string | null | undefined>
+  durationMs?: ComputedRef<number | null | undefined>
   status: ComputedRef<CodexSurfaceTurnStatus | undefined>
   turnId: ComputedRef<string | undefined>
   toggle: () => void

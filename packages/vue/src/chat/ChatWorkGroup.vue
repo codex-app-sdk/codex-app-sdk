@@ -34,11 +34,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, onScopeDispose, ref, watch } from 'vue'
 import { ChevronDown, ChevronRightIcon } from '../icons/app-icons'
 import { useCodexChatTranslate } from './chat-i18n'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import { assistantWorkMessageIndexKey, assistantWorkTurnKey } from './message-work-state'
+import { formatWorkDuration } from './work-duration'
 
 const props = defineProps<{
   active: boolean
@@ -74,15 +75,33 @@ const showHeader = computed(() => (
   && !completedWithoutFinal.value
   && (!usesTurn.value || assistantWorkTurn!.headerMessageIndex.value === messageIndex!.value)
 ))
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | undefined
+watch(active, (isActive) => {
+  clearInterval(ticker)
+  ticker = undefined
+  if (!isActive) return
+  now.value = Date.now()
+  ticker = setInterval(() => { now.value = Date.now() }, 1000)
+}, { immediate: true })
+onScopeDispose(() => clearInterval(ticker))
+
+const duration = computed(() => {
+  if (!usesTurn.value) return ''
+  if (!active.value) return formatWorkDuration(assistantWorkTurn!.durationMs?.value)
+  const startedAt = assistantWorkTurn!.startedAt?.value
+  return startedAt ? formatWorkDuration(now.value - Date.parse(startedAt)) : ''
+})
 const label = computed(() => {
-  if (active.value) return t('chat.work.working')
-  if (assistantWorkTurn?.status.value === 'interrupted') {
-    return t(expanded.value ? 'chat.work.stoppedHideDetails' : 'chat.work.stoppedViewDetails')
-  }
-  if (assistantWorkTurn?.status.value === 'failed') {
-    return t(expanded.value ? 'chat.work.failedHideDetails' : 'chat.work.failedViewDetails')
-  }
-  return t(expanded.value ? 'chat.work.doneHideDetails' : 'chat.work.doneViewDetails')
+  const params = { duration: duration.value }
+  const timed = duration.value !== ''
+  const state = active.value ? 'working'
+    : assistantWorkTurn?.status.value === 'interrupted' ? 'stopped'
+    : assistantWorkTurn?.status.value === 'failed' ? 'failed'
+    : 'done'
+  if (state === 'working') return t(timed ? 'chat.work.workingFor' : 'chat.work.working', params)
+  const action = expanded.value ? 'HideDetails' : 'ViewDetails'
+  return t(`chat.work.${state}${action}${timed ? 'For' : ''}`, params)
 })
 
 watch(

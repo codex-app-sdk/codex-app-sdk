@@ -548,7 +548,7 @@ describe('CodexMessageList', () => {
     });
 
     expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
-      .toStrictEqual(['Done · View details', 'Working']);
+      .toStrictEqual(['Done · 1s · View details', 'Working']);
     expect(wrapper.findAll('.chat-message__stream-dot')).toHaveLength(1);
 
     await wrapper.setProps({
@@ -565,7 +565,7 @@ describe('CodexMessageList', () => {
     });
 
     expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
-      .toStrictEqual(['Done · View details']);
+      .toStrictEqual(['Done · 1s · View details']);
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(false);
     expect(wrapper.text()).toContain('Later answer.');
   });
@@ -590,7 +590,7 @@ describe('CodexMessageList', () => {
       },
     });
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · 1s · View details');
     expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
 
     const resumedMessages: SurfaceMessage[] = [
@@ -632,7 +632,7 @@ describe('CodexMessageList', () => {
     ));
     await wrapper.setProps({ busy: false, messages: finishedMessages });
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · 1s · View details');
     expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
     expect(wrapper.text()).toContain('The local workflow is ready.');
   });
@@ -961,13 +961,13 @@ describe('CodexMessageList', () => {
       },
     });
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · Hide details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · 1s · Hide details');
     expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('true');
     expect(wrapper.text()).toContain('Partial verification.');
 
     await wrapper.get('.chat-work-group__header').trigger('click');
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · View details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · 1s · View details');
     expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
   });
 
@@ -990,14 +990,14 @@ describe('CodexMessageList', () => {
       },
     });
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · View details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · 1s · View details');
     expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('false');
     expect(wrapper.get('.chat-work-group .chat-fold').classes()).not.toContain('chat-fold--open');
     expect(wrapper.text()).toContain('Partial result.');
 
     await wrapper.get('.chat-work-group__header').trigger('click');
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · Hide details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · 1s · Hide details');
     expect(wrapper.get('.chat-work-group .chat-fold').classes()).toContain('chat-fold--open');
     expect(wrapper.text()).toContain('Checking the repository.');
   });
@@ -1018,7 +1018,7 @@ describe('CodexMessageList', () => {
       },
     });
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Failed · Hide details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Failed · 1s · Hide details');
     expect(wrapper.text()).toContain('The command failed.');
   });
 
@@ -1045,7 +1045,7 @@ describe('CodexMessageList', () => {
     });
 
     expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
-      .toStrictEqual(['Stopped · Hide details', 'Working']);
+      .toStrictEqual(['Stopped · 1s · Hide details', 'Working']);
     expect(wrapper.text()).toContain('Work before interruption.');
     expect(wrapper.text()).toContain('Continuing now.');
   });

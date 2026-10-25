@@ -23,6 +23,8 @@
           :active="activeOverrideForGroup(group)"
           :show-tool-blocks="effectivePresentation.messages.toolBlocks"
           :status="group.turnId ? turnStatusById.get(group.turnId) : undefined"
+          :started-at="group.turnId ? turnTimingById.get(group.turnId)?.startedAt : undefined"
+          :duration-ms="group.turnId ? turnTimingById.get(group.turnId)?.durationMs : undefined"
           :turn-id="group.turnId"
         >
           <template v-for="entry in group.entries" :key="entry.key">
@@ -381,6 +383,18 @@ const inferredActiveTurnId = computed(() => {
 const turnStatusById = computed(() => new Map(
   props.turns?.map((turn) => [turn.id, turn.status] as const) ?? [],
 ))
+const turnTimingById = computed(() => new Map(
+  props.turns?.map((turn) => [turn.id, {
+    startedAt: turn.startedAt,
+    durationMs: turn.durationMs ?? elapsedBetween(turn.startedAt, turn.completedAt),
+  }] as const) ?? [],
+))
+
+function elapsedBetween(startedAt: string | null, completedAt: string | null): number | null {
+  if (!startedAt || !completedAt) return null
+  const elapsed = Date.parse(completedAt) - Date.parse(startedAt)
+  return Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null
+}
 
 function isTerminalTurn(turnId: string | undefined): boolean {
   if (!turnId || turnId === inferredActiveTurnId.value) return false
