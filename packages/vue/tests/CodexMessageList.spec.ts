@@ -524,6 +524,40 @@ describe('CodexMessageList', () => {
     expect(idle.text()).toContain('Checking.');
   });
 
+  it('uses timestamp-derived work duration only when authoritative timing is unavailable', async () => {
+    const timing = {
+      ...turnLifecycle('timed-turn', 'completed'),
+      startedAt: '2026-08-01T12:00:00Z',
+      completedAt: '2026-08-01T12:00:08Z',
+      durationMs: null,
+    };
+    const wrapper = mount(CodexMessageList, { props: {
+      messages: [{ id: 'timed-assistant', role: 'assistant', status: 'complete', turnId: 'timed-turn', parts: [
+        { type: 'text', text: 'Checking the repository.', phase: 'commentary' },
+        { type: 'text', text: 'Finished checking.', phase: 'final_answer' },
+      ] }] as SurfaceMessage[],
+      turns: [timing],
+    } });
+    try {
+      expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · 8s · View details');
+      await wrapper.setProps({ turns: [{ ...timing, durationMs: 2_000 }] });
+      expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · 2s · View details');
+
+      // Missing or unusable timestamps must not manufacture a duration.
+      for (const timestamps of [
+        { startedAt: null },
+        { completedAt: null },
+        { completedAt: 'invalid date' },
+        { completedAt: '2026-08-01T11:59:59Z' },
+      ]) {
+        await wrapper.setProps({ turns: [{ ...timing, ...timestamps }] });
+        expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
+      }
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it('does not show stale progress on a completed earlier turn during or after a later turn', async () => {
     const previousAssistant: SurfaceMessage = {
       id: 'previous-assistant', role: 'assistant', status: 'streaming', turnId: 'turn-previous',

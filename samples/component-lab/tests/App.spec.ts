@@ -285,6 +285,8 @@ describe('component lab', () => {
   });
 
   it('shows one work disclosure for a turn with multiple steers and assistant segments', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-01T12:00:03Z'));
     const wrapper = mount(App);
     const busyButton = wrapper.findAll('nav button')
       .find((button) => button.text().includes('Busy and queued'));
@@ -292,7 +294,7 @@ describe('component lab', () => {
     await busyButton!.trigger('click');
 
     expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
-      .toStrictEqual(['Working']);
+      .toStrictEqual(['Working · 3s']);
     expect(wrapper.get('.chat-work-group__header').attributes('disabled')).toBeDefined();
     expect(wrapper.find('.chat-work-group__header svg').exists()).toBe(false);
     expect(wrapper.text()).toContain('Check the message-list boundary too.');
@@ -308,20 +310,22 @@ describe('component lab', () => {
   });
 
   it('demonstrates restart-safe continuation without adding a user prompt', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-01T12:03:05Z'));
     const wrapper = mount(App);
     const scenarioButton = wrapper.findAll('nav button')
       .find((button) => button.text().includes('Interrupted turn'));
     expect(scenarioButton).toBeDefined();
     await scenarioButton!.trigger('click');
 
-    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · Hide details');
+    expect(wrapper.get('.chat-work-group__title').text()).toBe('Stopped · 5s · Hide details');
     expect(wrapper.get('button[aria-label="Continue"]').attributes()).not.toHaveProperty('disabled');
     expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
 
     await wrapper.get('button[aria-label="Continue"]').trigger('click');
 
     expect(wrapper.findAll('.chat-work-group__title').map((title) => title.text()))
-      .toStrictEqual(['Stopped · Hide details', 'Working']);
+      .toStrictEqual(['Stopped · 5s · Hide details', 'Working']);
     expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
     expect(wrapper.text()).toContain('Continuation started without a new prompt');
   });
