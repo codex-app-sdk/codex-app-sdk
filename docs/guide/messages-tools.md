@@ -46,6 +46,11 @@ answer, including images embedded in `final_answer` text, remain visible. If str
 tool activity arrives before the first phased text or reasoning summary,
 `CodexMessageList` opens the `Working` section immediately.
 
+When turn timing is available, work labels include elapsed time, such as
+`Working · 1m 12s` and `Done · 4m 38s · View details`. The working timer updates
+each second. Completed, stopped, and failed work retains its final duration.
+Labels omit the duration when timing is unknown or less than one second.
+
 The accepted-but-not-yet-streaming gap is part of the active turn as well. The
 stock `Thinking` placeholder inherits the latest visible `turnId`, keeping the
 shared `Working` section open until the next assistant segment arrives.

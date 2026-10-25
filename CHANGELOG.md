@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.16.7
+
 ### Added
 
 - Show elapsed time in the work disclosure: a live `Working · 1m 12s` while a

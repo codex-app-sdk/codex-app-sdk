@@ -613,6 +613,10 @@ ordinary text retain the flat rendering path.
 
 Pass `activeTurnId` and `turns` when controlling the list, or put them in
 `controller.state.identity`. Surface-bound panes wire both automatically.
+Work labels use `turns[].startedAt` for the live elapsed timer. Final labels
+prefer `durationMs`, falling back to the difference between valid `startedAt`
+and `completedAt` timestamps. Missing, invalid, negative, or subsecond durations
+leave the label untimed.
 `activeTurnId` is authoritative for completed message groups; `busy` remains
 the broader conversation-level pending state used by the composer and Thinking
 placeholder. A real streaming assistant segment reopens its own turn even when
