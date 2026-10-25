@@ -646,6 +646,7 @@ export type CodexSurfaceTurn = {
   status: CodexSurfaceTurnStatus;
   error: CodexSurfaceTurnError | null;
   willRetry: boolean;
+  /** Provider start time, or the observed live start when the provider omits it. */
   startedAt: string | null;
   completedAt: string | null;
   durationMs: number | null;

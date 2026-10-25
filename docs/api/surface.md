@@ -50,6 +50,11 @@ error, retry intent, timestamps, and duration. `activeTurnId` identifies the
 single currently running turn without requiring renderers to infer lifecycle
 from message streaming flags.
 
+For a live turn whose start is observed by the SDK, `startedAt` falls back to
+the observed start time if Codex omits its timestamp. Later provider timestamps
+take precedence, and null updates preserve the known start. Restored turns
+without a known start remain untimed.
+
 `CodexConversationSnapshot` narrows the conversation ID to non-null and adds
 `turnIds`, the chronological IDs of all turns known to that conversation
 runtime. The `turns` array follows that same chronological order.

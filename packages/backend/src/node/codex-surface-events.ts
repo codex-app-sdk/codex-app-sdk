@@ -56,7 +56,7 @@ export function upsertSurfaceTurn(
   const index = turns.findIndex((candidate) => candidate.id === turn.id);
   if (index < 0) return [...turns, turn];
   const next = [...turns];
-  next.splice(index, 1, turn);
+  next.splice(index, 1, { ...turn, startedAt: turn.startedAt ?? turns[index]!.startedAt });
   return next;
 }
 

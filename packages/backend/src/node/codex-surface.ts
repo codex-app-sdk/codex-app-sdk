@@ -1270,6 +1270,16 @@ export class CodexSurface {
 
   private emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void {
     input = this.usage.observe(origin, input);
+    if (input.type === 'turn.started' && origin !== 'lifecycle') {
+      const runtime = this.runtimeState.get(input.conversationId);
+      const turnId = input.turnId;
+      const startedAt = input.payload.startedAt;
+      if (runtime?.turns.some(turn => turn.id === turnId && turn.startedAt === null)) {
+        this.patchRuntime(input.conversationId, {
+          turns: runtime.turns.map(turn => turn.id === turnId ? { ...turn, startedAt } : turn),
+        });
+      }
+    }
     if (input.type === 'conversation.executionUsageChanged' || input.type === 'turn.completed') {
       const runtime = this.runtimeState.get(input.conversationId);
       const executionUsage = input.type === 'turn.completed' ? input.payload.executionUsage : input.payload.usage;

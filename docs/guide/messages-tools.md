@@ -48,7 +48,8 @@ tool activity arrives before the first phased text or reasoning summary,
 
 When turn timing is available, work labels include elapsed time, such as
 `Working · 1m 12s` and `Done · 4m 38s · View details`. The working timer updates
-each second. Completed, stopped, and failed work retains its final duration.
+each second, using the observed start when Codex omits its timestamp. Completed,
+stopped, and failed work retains its final duration.
 Labels omit the duration when timing is unknown or less than one second.
 
 The accepted-but-not-yet-streaming gap is part of the active turn as well. The

@@ -6,6 +6,54 @@ import { CodexSurface } from '../src/node';
 import { MockCodexAppServer, createSurface, deferred, lastRequest, resumeResponse, testGoal, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it.each(['response-first', 'notification-first'] as const)(
+    'retains observed live turn timing until provider timing arrives (%s)', async (order) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-25T19:00:00Z'));
+      const live = { ...turn('turn-clock', 'inProgress', []), startedAt: null };
+      const transport = new MockCodexAppServer({
+        'thread/resume': () => {
+          const restored = thread('thread-existing', true);
+          restored.turns[0]!.startedAt = null;
+          return resumeResponse(restored);
+        },
+        'turn/start': () => {
+          if (order === 'notification-first') {
+            transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: live });
+          }
+          return { turn: live };
+        },
+      });
+      const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+      try {
+        await surface.connect();
+        expect(surface.getSnapshot().turns.find(candidate => candidate.id === 'turn-history')?.startedAt).toBeNull();
+        await surface.sendMessage('Show elapsed work time');
+        const current = () => surface.getSnapshot().turns.find(candidate => candidate.id === live.id);
+        expect(current()).toMatchObject({ status: 'inProgress', startedAt: '2026-10-25T19:00:00.000Z' });
+
+        vi.setSystemTime(new Date('2026-10-25T19:00:10Z'));
+        transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: live });
+        expect(current()?.startedAt).toBe('2026-10-25T19:00:00.000Z');
+
+        const providerStart = Date.parse('2026-10-25T18:59:58Z') / 1000;
+        transport.emitNotification('turn/started', {
+          threadId: 'thread-existing', turn: { ...live, startedAt: providerStart },
+        });
+        expect(current()?.startedAt).toBe('2026-10-25T18:59:58.000Z');
+        transport.emitNotification('turn/completed', {
+          threadId: 'thread-existing', turn: { ...live, status: 'completed', durationMs: 29_000 },
+        });
+        expect(current()).toMatchObject({
+          status: 'completed', startedAt: '2026-10-25T18:59:58.000Z', durationMs: 29_000,
+        });
+      } finally {
+        await surface.close();
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it('delivers an attachment-only file as model-visible text and restores its chip from history', async () => {
     const { surface, transport } = createSurface('turn/start');
     await surface.connect();

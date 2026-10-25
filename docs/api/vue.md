@@ -613,7 +613,8 @@ ordinary text retain the flat rendering path.
 
 Pass `activeTurnId` and `turns` when controlling the list, or put them in
 `controller.state.identity`. Surface-bound panes wire both automatically.
-Work labels use `turns[].startedAt` for the live elapsed timer. Final labels
+Work labels use `turns[].startedAt` for the live elapsed timer. Surface-bound
+live turns use the SDK-observed start when Codex omits its start timestamp. Final labels
 prefer `durationMs`, falling back to the difference between valid `startedAt`
 and `completedAt` timestamps. Missing, invalid, negative, or subsecond durations
 leave the label untimed.
