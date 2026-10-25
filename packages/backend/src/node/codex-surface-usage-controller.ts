@@ -1,10 +1,21 @@
 import type {
-  CodexSurfaceEvent, CodexSurfaceEventOrigin, CodexSurfaceExecutionUsage, CodexSurfaceTokenUsage,
+  CodexSurfaceEvent, CodexSurfaceEventOrigin, CodexSurfaceExecutionUsage, CodexSurfaceRequestUsage, CodexSurfaceTokenUsage,
 } from '@codex-app-sdk/core/surface';
 
 type EventInput = CodexSurfaceEvent extends infer Event
   ? Event extends CodexSurfaceEvent ? Omit<Event, 'seq' | 'occurredAt' | 'origin'> : never
   : never;
+const unavailableRequestUsage: CodexSurfaceRequestUsage = {
+  status: 'unavailable',
+  reason: 'public-runtime-request-evidence-unavailable',
+  unavailableFields: [
+    'requestIdentity', 'timestamp', 'actualModel', 'actualProvider', 'requestTokenUsage',
+    'cacheWriteLifetimes', 'cacheWriteInputInclusion', 'pricingContext',
+    'requestedModel', 'requestedServiceTier', 'reportedServiceTier', 'finality',
+  ],
+  requests: null,
+};
+
 type Execution = { baseline: CodexSurfaceTokenUsage | null; latest: CodexSurfaceExecutionUsage | null };
 type ThreadUsage = {
   total: CodexSurfaceTokenUsage | null;
@@ -66,7 +77,10 @@ export class CodexSurfaceUsageController {
       || (record.latest && !nondecreasing(record.latest.total, incoming.total)))) record.baseline = null;
     const execution = record?.baseline ? difference(record.baseline, incoming.total) : null;
     if (record && execution === null) record.baseline = null;
-    const usage: CodexSurfaceExecutionUsage = { ...incoming, execution, observedStart: Boolean(record) };
+    const usage: CodexSurfaceExecutionUsage = {
+      ...incoming, execution, observedStart: Boolean(record),
+      requestUsage: structuredClone(unavailableRequestUsage),
+    };
     if (record) record.latest = structuredClone(usage);
     thread.total = !overlapping && validCounts(incoming.total) ? structuredClone(incoming.total) : null;
     thread.lastUsageTurnId = input.turnId;

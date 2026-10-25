@@ -53,6 +53,13 @@ A terminal event carries the latest
 usage, but later corrections can invalidate it. Keep this revisable evidence
 local rather than sending irreversible usage totals.
 
+For request-aware pricing, inspect `usage.requestUsage`. The current public
+app-server protocol reports `status: 'unavailable'` with `requests: null`:
+thread/turn counters cannot identify independently billable requests or their
+actual model and served tier. Keep that coverage unknown. Selected model/tier
+settings and local event timestamps do not supply missing request evidence.
+See the [field capability matrix](/api/events#public-runtime-field-capability-matrix).
+
 Account-wide summaries are separate: call `readAccountUsage()` explicitly
 for an account settings screen, never once per observing agent or as a sum of
 local turns. Use `readRateLimits({ excludeResetCreditDetails: false })` for

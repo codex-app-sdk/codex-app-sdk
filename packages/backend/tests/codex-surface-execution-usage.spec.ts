@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { CodexAppServerClient, type v2 } from '../src/codex';
 import { CodexSurface } from '../src/node';
+import { createCodexConversationReplica } from '@codex-app-sdk/core/conversation-replica';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { MockCodexAppServer, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
+
+const requestUsage = {
+  status: 'unavailable',
+  reason: 'public-runtime-request-evidence-unavailable',
+  unavailableFields: [
+    'requestIdentity', 'timestamp', 'actualModel', 'actualProvider', 'requestTokenUsage',
+    'cacheWriteLifetimes', 'cacheWriteInputInclusion', 'pricingContext',
+    'requestedModel', 'requestedServiceTier', 'reportedServiceTier', 'finality',
+  ],
+  requests: null,
+};
 
 const baseline: v2.TokenUsageBreakdown = {
   totalTokens: 100, inputTokens: 60, cachedInputTokens: 20, cacheWriteInputTokens: 5,
@@ -58,11 +70,11 @@ describe('CodexSurface execution usage', () => {
       transport.emitNotification('turn/completed', { threadId: 'thread-new', turn: turn('turn-1', 'completed', []) });
       expect(events.filter(event => event.type === 'conversation.executionUsageChanged').map(event => event.payload.usage))
         .toStrictEqual([
-          { last, total: baseline, execution: baseline, model: null, observedStart: true },
-          { last, total, execution: total, model: null, observedStart: true },
+          { last, total: baseline, execution: baseline, model: null, requestUsage, observedStart: true },
+          { last, total, execution: total, model: null, requestUsage, observedStart: true },
         ]);
       expect(events.find(event => event.type === 'turn.completed')?.payload.executionUsage)
-        .toStrictEqual({ last, total, execution: total, model: null, observedStart: true });
+        .toStrictEqual({ last, total, execution: total, model: null, requestUsage, observedStart: true });
       expect(surface.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage?.execution)
         .toStrictEqual(total);
     } finally { await surface.close(); }
@@ -75,7 +87,7 @@ describe('CodexSurface execution usage', () => {
       await fork.conversation.sendMessage('Continue the fork');
       usage(transport, 'turn-1', total, fork.conversationId);
       expect(events.filter(event => event.type === 'conversation.executionUsageChanged').at(-1)?.payload.usage)
-        .toStrictEqual({ last, total, execution: null, model: null, observedStart: true });
+        .toStrictEqual({ last, total, execution: null, model: null, requestUsage, observedStart: true });
     } finally { await surface.close(); }
   });
 
@@ -86,7 +98,7 @@ describe('CodexSurface execution usage', () => {
       await surface.sendMessage('After earlier provider usage');
       usage(transport, 'turn-1', total, 'thread-new');
       expect(events.filter(event => event.type === 'conversation.executionUsageChanged').at(-1)?.payload.usage)
-        .toStrictEqual({ last, total, execution, model: null, observedStart: true });
+        .toStrictEqual({ last, total, execution, model: null, requestUsage, observedStart: true });
     } finally { await surface.close(); }
   });
 
@@ -117,7 +129,7 @@ describe('CodexSurface execution usage', () => {
       await surface.sendMessage('Legacy usage');
       emit('turn-1', total);
       expect(surface.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage)
-        .toStrictEqual({ last: { ...last, cacheWriteInputTokens: null }, total: { ...total, cacheWriteInputTokens: null }, execution: { ...execution, cacheWriteInputTokens: null }, model: null, observedStart: true });
+        .toStrictEqual({ last: { ...last, cacheWriteInputTokens: null }, total: { ...total, cacheWriteInputTokens: null }, execution: { ...execution, cacheWriteInputTokens: null }, model: null, requestUsage, observedStart: true });
       usage(transport, 'turn-1', { totalTokens: 2000, inputTokens: 0, cachedInputTokens: 0, cacheWriteInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 });
       expect(events.filter(event => event.type === 'conversation.executionUsageChanged').at(-1)?.payload.usage.execution).toBeNull();
     } finally { await surface.close(); }
@@ -132,9 +144,9 @@ describe('CodexSurface execution usage', () => {
       usage(transport, 'turn-1');
       const samples = events.filter(event => event.type === 'conversation.executionUsageChanged');
       expect(samples.map(event => event.payload.usage)).toStrictEqual([
-        { last, total: baseline, execution: null, model: null, observedStart: false },
-        { last, total, execution, model: null, observedStart: true },
-        { last, total, execution, model: null, observedStart: true },
+        { last, total: baseline, execution: null, model: null, requestUsage, observedStart: false },
+        { last, total, execution, model: null, requestUsage, observedStart: true },
+        { last, total, execution, model: null, requestUsage, observedStart: true },
       ]);
       transport.emitNotification('model/rerouted', {
         threadId: 'thread-existing', turnId: 'turn-1', fromModel: 'gpt-5', toModel: 'gpt-mini', reason: 'highRiskCyberActivity',
@@ -150,6 +162,45 @@ describe('CodexSurface execution usage', () => {
       usage(transport, 'turn-1', { ...total, totalTokens: 170, outputTokens: 70 });
       expect(surface.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage?.execution)
         .toStrictEqual({ ...execution, totalTokens: 70, outputTokens: 30 });
+    } finally { await surface.close(); }
+  });
+
+  it('keeps request evidence unavailable across internal completions, retries and replica replay', async () => {
+    const { surface, transport, events } = await setup();
+    try {
+      await surface.updateConversationSettings({ modelId: 'gpt-5', serviceTier: 'priority' });
+      await surface.sendMessage('Numeric fixture');
+      const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+      usage(transport, 'turn-1', baseline);
+      usage(transport, 'turn-1', total);
+      // Neither a duplicate internal response nor opaque metadata is a public billing contract.
+      const raw: v2.RawResponseCompletedNotification = {
+        threadId: 'thread-existing', turnId: 'turn-1', responseId: 'response-fixture', usage: last,
+        usageMetadata: { amount: '0.01', metadata: { model: 'unverified', service_tier: 'flex' } },
+      };
+      transport.emitNotification('rawResponse/completed', raw);
+      transport.emitNotification('rawResponse/completed', raw);
+      transport.emitNotification('rawResponse/completed', { ...raw, responseId: 'retry-fixture' });
+      transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-1', 'completed', []) });
+      usage(transport, 'turn-1', { ...total, totalTokens: 170, outputTokens: 70 });
+      usage(transport, 'turn-1', { ...total, totalTokens: 170, outputTokens: 70 });
+      const samples = events.filter(event => event.type === 'conversation.executionUsageChanged');
+      expect(samples.map(event => event.payload.usage)).toStrictEqual([
+        { last, total: baseline, execution: null, model: null, observedStart: true, requestUsage },
+        { last, total, execution: null, model: null, observedStart: true, requestUsage },
+        ...Array.from({ length: 2 }, () => ({ last, total: { ...total, totalTokens: 170, outputTokens: 70 },
+          execution: null, model: null, observedStart: true, requestUsage })),
+      ]);
+      for (const event of events) {
+        if ('conversationId' in event && event.conversationId === 'thread-existing') replica.apply(event);
+      }
+      const expected = surface.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage;
+      expect(expected).toStrictEqual(samples.at(-1)?.payload.usage);
+      expect(replica.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage).toStrictEqual(expected);
+      // Re-delivery of the same semantic event cannot manufacture another observation.
+      replica.apply(samples.at(-1)!);
+      expect(replica.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage).toStrictEqual(expected);
+      expect(surface.getSnapshot()).toMatchObject({ selectedModelId: 'gpt-5', selectedServiceTier: 'priority' });
     } finally { await surface.close(); }
   });
 
