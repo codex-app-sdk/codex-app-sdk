@@ -309,10 +309,27 @@ export type CodexSurfaceTokenUsage = {
   reasoningOutputTokens: number;
 };
 
+/** Fields lacking public, request-attributable evidence in the supported app-server protocol. */
+export type CodexSurfaceRequestUsageField =
+  | 'requestIdentity' | 'timestamp' | 'actualModel' | 'actualProvider' | 'requestTokenUsage'
+  | 'cacheWriteLifetimes' | 'cacheWriteInputInclusion' | 'pricingContext'
+  | 'requestedModel' | 'requestedServiceTier' | 'reportedServiceTier' | 'finality';
+
+/**
+ * Public app-server counters cannot establish independently billable requests.
+ * Null requests means unknown coverage, never an empty list or zero consumption.
+ */
+export type CodexSurfaceRequestUsage = {
+  status: 'unavailable';
+  reason: 'public-runtime-request-evidence-unavailable';
+  unavailableFields: readonly CodexSurfaceRequestUsageField[];
+  requests: null;
+};
+
 export type CodexSurfaceExecutionUsage = {
   /** This surface instance observed the turn start, rather than only its replayed counters. */
   observedStart: boolean;
-  /** Latest provider request, not the complete turn. */
+  /** Latest provider counters; no stable request identity or finality is supplied. */
   last: CodexSurfaceTokenUsage;
   /** Provider thread counters; may be replayed or reset. */
   total: CodexSurfaceTokenUsage;
@@ -320,6 +337,8 @@ export type CodexSurfaceExecutionUsage = {
   execution: CodexSurfaceTokenUsage | null;
   /** Unknown unless the provider supplies authoritative whole-execution evidence. */
   model: string | null;
+  /** Request-pricing capability. Absent on older SDK projections means unknown support. */
+  requestUsage?: CodexSurfaceRequestUsage;
 };
 
 export type CodexSurfaceGoal = {
