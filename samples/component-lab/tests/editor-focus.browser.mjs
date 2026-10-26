@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
@@ -52,10 +54,15 @@ const fixturePlugin = {
   },
 };
 
+const cacheDir = await mkdtemp(path.join(tmpdir(), 'sdk-editor-focus-'));
 const server = await createServer({
   configFile: false,
   plugins: [vue(), fixturePlugin],
   root,
+  cacheDir,
+  // The virtual entry is not crawlable before navigation. Prebundle its known
+  // dependencies so late discovery cannot reload the page during selection checks.
+  optimizeDeps: { noDiscovery: true, include: ['vue', '@tabler/icons-vue'] },
   server: { port: 0 },
 });
 let browser;
@@ -106,4 +113,5 @@ try {
 } finally {
   await browser?.close();
   await server.close();
+  await rm(cacheDir, { recursive: true, force: true });
 }
