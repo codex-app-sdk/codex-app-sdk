@@ -408,6 +408,17 @@ The exported `CodexComposerShelf` exposes the same position as its `actions`
 slot with the same scope. Empty slot output does not mount an action row or
 shelf. Slot content does not alter SDK conversation state.
 
+Use `composer-drawers` for host-owned items that belong beside queued prompts.
+Its scope is `{ disabled: boolean }`. Render `CodexComposerDrawer` containing
+`CodexComposerDrawerRow` components; these are the same components used by queued
+prompts, including borders, spacing, separators, and typography. A row exposes
+its text through the default slot, optional author or icon through `leading`, and
+host-owned buttons through `actions`. Place a heavier author name in `leading`
+while inheriting the row's font size. The lower-level `CodexComposerShelf` exposes
+this position through its `drawers` slot, after turn diff information and before
+queued prompts and the active goal. Empty output does not create a shelf. Hosts
+own item state and actions; custom drawers do not enter the SDK prompt queue.
+
 ## Leaf components
 
 ### Composer and menus

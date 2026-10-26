@@ -232,6 +232,17 @@ The exported `CodexComposerShelf` exposes the same row through its lower-level
 `actions` slot. When the slot renders no content, the SDK omits the row and does
 not leave an empty shelf above the composer.
 
+Use `composer-drawers` for host-owned items that belong beside queued prompts.
+Its scope is `{ disabled: boolean }`. Render `CodexComposerDrawer` containing
+`CodexComposerDrawerRow` components; these are the same components used by queued
+prompts, including borders, spacing, separators, and typography. A row exposes
+its text through the default slot, optional author or icon through `leading`, and
+host-owned buttons through `actions`. Place a heavier author name in `leading`
+while inheriting the row's font size. The lower-level `CodexComposerShelf` exposes
+this position through its `drawers` slot, after turn diff information and before
+queued prompts and the active goal. Empty output does not create a shelf. Hosts
+own item state and actions; custom drawers do not enter the SDK prompt queue.
+
 ## State groups
 
 | Group | Contents |

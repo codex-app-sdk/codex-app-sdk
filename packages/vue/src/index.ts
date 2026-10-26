@@ -35,6 +35,8 @@ export { default as CodexCompactionMessage } from './chat/ChatCompactionMessage.
 export { default as CodexComposerActionMenu } from './chat/ChatComposerActionMenu.vue';
 export { default as CodexComposerActiveModes } from './chat/ChatComposerActiveModes.vue';
 export { default as CodexComposerFileMentionMenu } from './chat/ChatComposerFileMentionMenu.vue';
+export { default as CodexComposerDrawer } from './chat/ChatComposerDrawer.vue';
+export { default as CodexComposerDrawerRow } from './chat/ChatComposerDrawerRow.vue';
 export { default as CodexComposerShelf } from './chat/ChatComposerShelf.vue';
 export { default as CodexComposerSkillMenu } from './chat/ChatComposerSkillMenu.vue';
 export { default as CodexComposerPluginMenu } from './chat/ChatComposerPluginMenu.vue';

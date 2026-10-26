@@ -3491,6 +3491,7 @@ describe('CodexConversationPane', () => {
         message: '<div class="message-slot">Message slot</div>',
         'composer-after-input': '<div class="input-slot">Input slot</div>',
         'composer-after': '<div class="after-slot">After slot</div>',
+        'composer-drawers': ({ disabled }: { disabled: boolean }) => h('button', { class: 'drawer-slot', disabled }, 'Suggestion'),
         'composer-shelf-actions': ({ disabled }: { disabled: boolean }) => h(
           'button',
           { class: 'shelf-action-slot', disabled },
@@ -3505,6 +3506,7 @@ describe('CodexConversationPane', () => {
     await wrapper.setProps({ approvals: [] });
     expect(wrapper.get('.input-slot').text()).toBe('Input slot');
     expect(wrapper.get('.after-slot').text()).toBe('After slot');
+    expect(wrapper.get<HTMLButtonElement>('.drawer-slot').element.disabled).toBe(true);
     expect(wrapper.get<HTMLButtonElement>('.shelf-action-slot').element.disabled).toBe(true);
     expect(wrapper.get('.footer-slot').text()).toBe('Footer slot');
   });
@@ -3512,7 +3514,7 @@ describe('CodexConversationPane', () => {
   it('does not mount an empty composer shelf when a host shelf slot has no content', () => {
     const wrapper = mount(CodexConversationPane, {
       props: { messages: [], modelValue: '' },
-      slots: { 'composer-shelf-actions': () => null },
+      slots: { 'composer-drawers': () => null, 'composer-shelf-actions': () => null },
     });
 
     expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);

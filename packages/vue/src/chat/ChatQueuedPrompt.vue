@@ -1,43 +1,48 @@
 <template>
-  <div class="codex-chat-theme chat-queued-prompt" aria-label="Queued prompt">
-    <TerminalIcon class="chat-queued-prompt__icon" aria-hidden="true" />
+  <ChatComposerDrawerRow class="chat-queued-prompt" aria-label="Queued prompt">
+    <template #leading>
+      <TerminalIcon class="chat-queued-prompt__icon" aria-hidden="true" />
+    </template>
     <span class="chat-queued-prompt__text">{{ prompt.text }}</span>
-    <div class="chat-queued-prompt__actions">
-      <button
-        class="chat-queued-prompt__action"
-        type="button"
-        aria-label="Steer queued prompt now"
-        title="Steer now"
-        :disabled="steerDisabled"
-        @click="emit('steer', prompt.id)"
-      >
-        <SteeringWheelIcon aria-hidden="true" />
-        <span>Steer</span>
-      </button>
-      <button
-        class="chat-queued-prompt__action"
-        type="button"
-        aria-label="Edit queued prompt"
-        title="Edit"
-        :disabled="editDisabled"
-        @click="emit('edit', prompt.id)"
-      >
-        <PencilIcon aria-hidden="true" />
-      </button>
-      <button
-        class="chat-queued-prompt__action"
-        type="button"
-        aria-label="Delete queued prompt"
-        title="Delete"
-        @click="emit('delete', prompt.id)"
-      >
-        <Trash2Icon aria-hidden="true" />
-      </button>
-    </div>
-  </div>
+    <template #actions>
+      <div class="chat-queued-prompt__actions">
+        <button
+          class="chat-queued-prompt__action"
+          type="button"
+          aria-label="Steer queued prompt now"
+          title="Steer now"
+          :disabled="steerDisabled"
+          @click="emit('steer', prompt.id)"
+        >
+          <SteeringWheelIcon aria-hidden="true" />
+          <span>Steer</span>
+        </button>
+        <button
+          class="chat-queued-prompt__action"
+          type="button"
+          aria-label="Edit queued prompt"
+          title="Edit"
+          :disabled="editDisabled"
+          @click="emit('edit', prompt.id)"
+        >
+          <PencilIcon aria-hidden="true" />
+        </button>
+        <button
+          class="chat-queued-prompt__action"
+          type="button"
+          aria-label="Delete queued prompt"
+          title="Delete"
+          @click="emit('delete', prompt.id)"
+        >
+          <Trash2Icon aria-hidden="true" />
+        </button>
+      </div>
+    </template>
+  </ChatComposerDrawerRow>
 </template>
 
 <script setup lang="ts">
+import ChatComposerDrawerRow from './ChatComposerDrawerRow.vue';
 import { PencilIcon, SteeringWheelIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
 import type { QueuedChatPrompt } from './queued-prompts';
 
@@ -57,34 +62,9 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-.chat-queued-prompt {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-6);
-  border-bottom: 0.5px solid var(--color-border);
-  color: var(--color-text-muted);
-}
-
-.chat-queued-prompt:last-of-type {
-  border-bottom: none;
-}
-
 .chat-queued-prompt__icon {
   width: var(--icon-sm);
   height: var(--icon-sm);
-}
-
-.chat-queued-prompt__text {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-xlight);
-  line-height: var(--line-height-18);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .chat-queued-prompt__actions {

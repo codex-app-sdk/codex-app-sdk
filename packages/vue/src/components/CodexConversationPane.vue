@@ -135,6 +135,9 @@
             @edit-goal="editGoal"
             @steer-queued-prompt="steerQueuedPrompt"
           >
+            <template v-if="$slots['composer-drawers']" #drawers="scope">
+              <slot name="composer-drawers" v-bind="scope" />
+            </template>
             <template v-if="$slots['composer-shelf-actions']" #actions="scope">
               <slot name="composer-shelf-actions" v-bind="scope" />
             </template>
@@ -473,6 +476,7 @@ defineSlots<{
     index: number;
   }): unknown;
   'composer-context'(props: { disabled: boolean }): unknown;
+  'composer-drawers'(props: { disabled: boolean }): unknown;
   'composer-shelf-actions'(props: { disabled: boolean }): unknown;
   empty(props: { description: string; title: string }): unknown;
   'menu-icon'(props: { item: CodexComposerMenuItem<Payload> }): unknown;

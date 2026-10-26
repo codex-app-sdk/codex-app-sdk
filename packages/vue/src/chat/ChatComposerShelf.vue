@@ -4,6 +4,7 @@
       v-if="visibleTurnGitDiff"
       :diff="visibleTurnGitDiff"
     />
+    <slot name="drawers" :disabled="effectiveDisabled" />
     <ChatQueuedPrompts
       v-if="showQueuedPrompts"
       :edit-disabled="queuedPromptEditDisabled"
@@ -45,6 +46,7 @@ const props = defineProps<{
 }>();
 
 const slots = defineSlots<{
+  drawers(props: { disabled: boolean }): unknown;
   actions(props: { disabled: boolean }): unknown;
 }>();
 
@@ -69,11 +71,13 @@ const visibleTurnGitDiff = computed(() => (
   props.presentation?.turnGitDiff === false ? null : props.turnGitDiff ?? null
 ));
 const effectiveDisabled = computed(() => props.disabled ?? false);
+const showDrawers = computed(() => hasSlotContent(slots.drawers?.({ disabled: effectiveDisabled.value })));
 const showActions = computed(() => hasSlotContent(slots.actions?.({ disabled: effectiveDisabled.value })));
 const visible = computed(() => (
   showGoal.value
   || showQueuedPrompts.value
   || Boolean(visibleTurnGitDiff.value)
+  || showDrawers.value
   || showActions.value
 ));
 
@@ -99,7 +103,7 @@ function hasSlotContent(content: unknown): boolean {
   flex-direction: column;
 }
 
-.chat-composer-shelf:has(.chat-queued-prompts) {
+.chat-composer-shelf:has(.chat-composer-drawer) {
   &:deep() {
     .chat-goal {
       border-top-left-radius: 0;

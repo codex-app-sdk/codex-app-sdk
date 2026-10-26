@@ -3,6 +3,8 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h, nextTick, ref } from 'vue';
 import { describe, expect, it } from 'vitest';
+import ChatComposerDrawer from '../../src/chat/ChatComposerDrawer.vue';
+import ChatComposerDrawerRow from '../../src/chat/ChatComposerDrawerRow.vue';
 import ChatComposerShelf from '../../src/chat/ChatComposerShelf.vue';
 import ChatQueuedPrompts from '../../src/chat/ChatQueuedPrompts.vue';
 import ChatAnimatedDiffStat from '../../src/chat/ChatAnimatedDiffStat.vue';
@@ -218,6 +220,31 @@ describe('ported id8 chat components', () => {
     expect(wrapper.emitted('steer')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('edit')).toStrictEqual([['prompt-1']]);
     expect(wrapper.emitted('delete')).toStrictEqual([['prompt-1']]);
+  });
+
+  it('stacks host drawer rows with their own content and actions without turning them into queued prompts', async () => {
+    const visible = ref(true);
+    const Host = defineComponent(() => () => h(ChatComposerShelf, { goal: null, queuedPrompts: [], disabled: true }, {
+      drawers: ({ disabled }: { disabled: boolean }) => visible.value ? h(ChatComposerDrawer, { 'aria-label': 'Suggestions' }, () => [
+        h(ChatComposerDrawerRow, {}, {
+          leading: () => h('strong', 'Alex'),
+          default: () => 'Inspect retries',
+          actions: () => h('button', { disabled }, 'Edit suggestion'),
+        }),
+        h(ChatComposerDrawerRow, {}, {
+          default: () => 'Run checks',
+          actions: () => h('button', { onClick: () => { visible.value = false; } }, 'Delete suggestion'),
+        }),
+      ]) : null,
+    }));
+    const wrapper = mount(Host);
+    expect(wrapper.get('[aria-label="Suggestions"]').text()).toContain('Alex');
+    expect(wrapper.text()).toContain('Inspect retries');
+    expect(wrapper.find('[aria-label="Steer queued prompt now"]').exists()).toBe(false);
+    expect(wrapper.findAll('button')[0]!.element.disabled).toBe(true);
+    await wrapper.findAll('button')[1]!.trigger('click');
+    expect(wrapper.find('[aria-label="Suggestions"]').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
   });
 
   it('stacks built-in sections before a disabled-aware host action row', async () => {
