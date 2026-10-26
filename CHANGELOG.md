@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.16.9
+
+### Added
+
+- Add reusable composer drawers and rows, plus a `composer-drawers` slot, so
+  hosts can display their own items beside queued prompts with consistent styling.
+
+### Fixed
+
+- Prevent dependency optimization from reloading the browser focus test during
+  selection checks.
+
 ## 0.16.8
 
 ### Added
