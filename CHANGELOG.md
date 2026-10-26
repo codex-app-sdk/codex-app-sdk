@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.16.8
+
+### Added
+
+- Expose request-usage availability and missing evidence so analytics consumers
+  can distinguish unknown request costs from zero consumption.
+
+### Fixed
+
+- Keep live work timers running when Codex omits the turn start timestamp,
+  preserving the observed start until provider timing becomes available.
+
 ## 0.16.7
 
 ### Added
