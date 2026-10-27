@@ -304,7 +304,11 @@ files are also read through app-server, validated, bounded, and replaced with
 renderer-safe data URLs. This keeps restored images working in both Electron
 and Web surfaces without exposing a backend filesystem URL to the renderer.
 Markdown, syntax highlighting, KaTeX, and Mermaid rendering share the same
-message block pipeline.
+message block pipeline. Code highlighting starts with Shiki and uses Highlights
+when WebAssembly initializes; Shiki remains available if it is blocked or
+unavailable. Hosts that
+use a Content Security Policy can allow WebAssembly compilation with
+`'wasm-unsafe-eval'` in `script-src` to enable Highlights.
 
 ### Interactive HTML previews
 

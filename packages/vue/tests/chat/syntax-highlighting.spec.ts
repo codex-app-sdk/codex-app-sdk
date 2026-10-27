@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { languageForFilePath, renderCodeBlock } from '../../src/chat/syntax-highlighting';
 
 describe('syntax highlighting', () => {
@@ -63,10 +63,23 @@ describe('syntax highlighting', () => {
   it('renders known languages with both packaged themes', () => {
     const html = renderCodeBlock('const answer = 42', ' typescript extra ');
 
-    expect(html).toContain('class="shiki shiki-themes');
-    expect(html).toContain('--shiki-light');
-    expect(html).toContain('--shiki-dark');
+    expect(html).toMatch(/--(?:shiki|hls)-light/);
+    expect(html).toMatch(/--(?:shiki|hls)-dark/);
     expect(html).toContain('const');
     expect(html).toContain('answer');
   });
+  it('highlights code with line-preserving escaped output after initialization', async () => {
+    const input = '<script>\nconst answer = 42 & 7';
+    await vi.waitFor(() => {
+      const container = document.createElement('div');
+      container.innerHTML = renderCodeBlock(input, 'typescript');
+      expect(container.querySelector('pre.highlights')).not.toBeNull();
+      const lines = [...container.querySelectorAll('pre > code > .line')];
+      expect(lines.map((line) => line.textContent).join('\n')).toBe(input);
+      expect(container.querySelector('script')).toBeNull();
+      expect(container.innerHTML).toContain('--hls-light');
+      expect(container.innerHTML).toContain('--hls-dark');
+    });
+  });
+
 });

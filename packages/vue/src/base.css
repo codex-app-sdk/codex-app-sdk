@@ -60,6 +60,27 @@
 .codex-markdown .shiki {
   background: var(--color-surface-low) !important;
 }
+/* Highlights emits the same themes under its own CSS variables. */
+.codex-markdown .highlights,
+.codex-markdown .highlights span {
+  color: var(--hls-light);
+}
+
+:where(.codex-chat-theme--dark, [data-codex-theme="dark"]) .codex-markdown .highlights,
+:where(.codex-chat-theme--dark, [data-codex-theme="dark"]) .codex-markdown .highlights span {
+  color: var(--hls-dark);
+}
+
+@media (prefers-color-scheme: dark) {
+  :where(.codex-chat-theme--system, [data-codex-theme="system"]) .codex-markdown .highlights,
+  :where(.codex-chat-theme--system, [data-codex-theme="system"]) .codex-markdown .highlights span {
+    color: var(--hls-dark);
+  }
+}
+
+.codex-markdown .highlights {
+  background: var(--color-surface-low) !important;
+}
 /* stylelint-enable lyliya/value-no-unknown-custom-properties */
 
 .codex-markdown .katex {

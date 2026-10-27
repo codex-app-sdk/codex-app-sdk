@@ -1,3 +1,4 @@
+import { shallowRef } from 'vue'
 import { createHighlighterCoreSync } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import css from '@shikijs/langs/css'
@@ -50,11 +51,55 @@ const highlighter = createHighlighterCoreSync({
 })
 
 const loadedLanguages = new Set(highlighter.getLoadedLanguages())
+const highlightsReady = shallowRef(false)
+let highlights: typeof import('@pierre/highlights') | undefined
+let lightTheme: typeof import('@pierre/highlights/themes/light-plus').default | undefined
+let darkTheme: typeof import('@pierre/highlights/themes/dark-plus').default | undefined
+let initialization: Promise<void> | undefined
+
+function initializeHighlights() {
+  initialization ??= Promise.all([
+    import('@pierre/highlights'),
+    import('@pierre/highlights/themes/light-plus'),
+    import('@pierre/highlights/themes/dark-plus'),
+  ]).then(([engine, light, dark]) => {
+    highlights = engine
+    lightTheme = light.default
+    darkTheme = dark.default
+    highlightsReady.value = true
+  }).catch(() => {
+    // Wasm may be blocked by the host CSP or unavailable in its runtime.
+  })
+}
+
+function renderHighlights(code: string, lang: string): string | undefined {
+  if (!highlights || !lightTheme || !darkTheme || !highlights.isSupportedLanguage(lang)) return undefined
+  const result = highlights.codeToTokens(code, {
+    lang,
+    themes: { light: lightTheme, dark: darkTheme },
+    defaultColor: false,
+  })
+  const lines = result.tokens.map((line) => `<span class="line">${line.map((token) => {
+    const style = Object.entries(token.htmlStyle ?? {}).map(([key, value]) => `${key}:${value}`).join(';')
+    return `<span style="${escapeAttribute(style)}">${escapeHtml(token.content)}</span>`
+  }).join('')}</span>`).join('\n')
+  return `<pre class="highlights" style="${escapeAttribute(result.rootStyle || '')}"><code>${lines}</code></pre>`
+}
 
 export function renderCodeBlock(code: string, language: string | undefined) {
   const lang = normalizeLanguage(language)
   if (!lang || !loadedLanguages.has(lang)) {
     return renderPlainCodeBlock(code, language)
+  }
+
+  initializeHighlights()
+  // Track initialization in Vue computed renderers, keeping the public API synchronous.
+  void highlightsReady.value
+  try {
+    const highlighted = renderHighlights(code, lang)
+    if (highlighted !== undefined) return highlighted
+  } catch {
+    // Fall back to the existing JavaScript engine for unsupported environments.
   }
 
   try {

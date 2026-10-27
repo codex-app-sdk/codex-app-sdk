@@ -126,11 +126,8 @@ describe('message markdown rendering', () => {
   it('syntax-highlights fenced code blocks with a known language', () => {
     const html = renderMarkdown('```ts\nconst ok = true\n```');
 
-    expect(html).toContain('class="shiki shiki-themes');
-    expect(html).toContain('light-plus');
-    expect(html).toContain('dark-plus');
-    expect(html).toContain('--shiki-light');
-    expect(html).toContain('--shiki-dark');
+    expect(html).toMatch(/--(?:shiki|hls)-light/);
+    expect(html).toMatch(/--(?:shiki|hls)-dark/);
     expect(html).toContain('const');
   });
 

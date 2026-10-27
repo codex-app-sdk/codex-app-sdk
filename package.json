@@ -142,6 +142,7 @@
     "@codex-app-sdk/core": "0.17.0",
     "@codex-app-sdk/electron": "0.17.0",
     "@codex-app-sdk/vue": "0.17.0",
+    "@pierre/highlights": "^0.2.0",
     "@shikijs/langs": "^4.2.0",
     "@shikijs/themes": "^4.2.0",
     "@tabler/icons-vue": "^3.44.0",
