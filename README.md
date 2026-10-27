@@ -175,7 +175,7 @@ npm run preview:docs
 ```
 
 The checked-in generated protocol bindings currently target
-`codex-cli 0.154.0`. See the
+`codex-cli 0.164.0`. See the
 [development guide](https://codex-app-sdk.github.io/codex-app-sdk/guide/development.html)
 before updating them.
 

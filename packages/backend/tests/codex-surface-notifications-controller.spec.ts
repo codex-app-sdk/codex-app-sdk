@@ -17,7 +17,7 @@ describe('CodexSurfaceNotificationsController', () => {
     handle(setup, 'thread/started', { thread: started });
 
     expect(setup.host.createRuntime).toHaveBeenCalledExactlyOnceWith('new-thread', {
-      historyMode: 'legacy',
+      historyMode: 'paginated',
       threadStatus: { type: 'active', activeFlags: [] },
     });
     expect(setup.state.conversations).toEqual(expect.arrayContaining([

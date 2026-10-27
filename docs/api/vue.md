@@ -654,7 +654,7 @@ available for completed, failed, and interrupted turns; Fork requires successful
 completion. Completed work-only replies expose their action bar even without
 answer text; work preceding a final answer keeps its action bar on that answer.
 The active turn never exposes mutation controls. Historical actions
-use normal Codex rollback semantics: Delete removes the selected turn and every
+use Codex history-revert semantics for paginated conversations: Delete removes the selected turn and every
 later turn, while Edit and Retry truncate that suffix before resubmitting the
 edited or original prompt. Copy and Quote remain message-level actions. While an
 asynchronous Delete action is pending, the stock action bar keeps the turn

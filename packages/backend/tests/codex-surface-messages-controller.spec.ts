@@ -462,7 +462,7 @@ function messagesController(options: {
 }
 
 function codexTurn(id: string, status: 'inProgress' | 'completed') {
-  return {
+  return { rootTurnId: null,
     id, status, items: [], itemsView: 'full', error: null,
     startedAt: 1_700_000_000, completedAt: null, durationMs: null,
   };

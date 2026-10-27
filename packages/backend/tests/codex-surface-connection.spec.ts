@@ -102,7 +102,7 @@ describe('CodexSurface', () => {
       type: 'chatgpt', email: 'before@example.test', planType: 'pro',
     };
     const transport = new MockCodexAppServer({
-      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+      'account/read': () => ({ workspaceRouting: null, account, requiresOpenaiAuth: true }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -229,7 +229,7 @@ describe('CodexSurface', () => {
 
   it('exposes the installed plugin catalog with canonical ids and renderer-safe presentation metadata', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [
           thread('thread-existing', false),
           { ...thread('thread-other', false), cwd: '/workspace/other' },
@@ -328,7 +328,7 @@ describe('CodexSurface', () => {
   it('connects signed out and becomes fully usable after managed ChatGPT login completes', async () => {
     let account: v2.Account | null = null;
     const transport = new MockCodexAppServer({
-      'account/read': () => ({ account, requiresOpenaiAuth: true }),
+      'account/read': () => ({ workspaceRouting: null, account, requiresOpenaiAuth: true }),
       'account/login/start': () => ({
         type: 'chatgpt',
         loginId: 'login-1',
@@ -394,7 +394,7 @@ describe('CodexSurface', () => {
     };
     const requirements = configRequirements({ allowRemoteControl: true });
     const transport = new MockCodexAppServer({
-      'configRequirements/read': () => ({ requirements }),
+      'configRequirements/read': () => ({ supportsIndependentSpeedModes: null, requirements }),
       'remoteControl/status/read': () => status,
       'remoteControl/enable': () => ({ ...status, status: 'connecting' as const }),
       'remoteControl/disable': () => ({ ...status, status: 'disabled' as const, environmentId: null }),

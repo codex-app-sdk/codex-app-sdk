@@ -194,16 +194,18 @@ notifications. The compact action only requests the operation, so a host
 replica receives one provider-authored lifecycle marker even when the item
 arrives after the request resolves.
 
-Delete, edit, retry, and fork all use one stable turn-ID contract. The SDK
-selects app-server's paginated `thread/revert` operation or the legacy
-`thread/rollback` operation internally and reconciles the retained history page
-and cursor for the host. Deleting a turn removes that turn and every later turn;
-the standard pane exposes the destructive control on the latest eligible turn,
+Delete, edit, retry, and fork all use one stable turn-ID contract. Delete, edit,
+and retry use app-server's `thread/revert` operation for paginated conversations
+and reconcile the retained history page and cursor for the host. Legacy
+conversations remain readable and can receive new prompts, but app-server
+0.164.0 no longer supports deleting, editing, or retrying their turns. These
+actions reject without changing history; start a new conversation to use them.
+Deleting a turn removes that turn and every later turn; the standard pane exposes the destructive control on the latest eligible turn,
 where it behaves as a single-turn delete.
 
-Rollback and revert are treated as long-running mutations. The default client
-keeps them correlated for up to 120 seconds (instead of the ordinary 15-second
-request deadline), then applies the returned thread before publishing the
+Revert is treated as a long-running mutation. The default client keeps it
+correlated for up to 120 seconds (instead of the ordinary 15-second request
+deadline), then applies the returned thread before publishing the
 updated surface snapshot.
 
 Handles also expose edit, retry, delete-turn, steering, reviews, goals,

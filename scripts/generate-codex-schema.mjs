@@ -14,6 +14,9 @@ const checkOnly = process.argv.includes('--check');
 // Most generated FooParams types pair with FooResponse. These are the protocol's
 // response type naming exceptions; they do not override values or runtime behavior.
 const responseTypeNameExceptions = {
+  'account/gatewayOAuth/cancel': 'GatewayOAuthCancelResponse',
+  'account/gatewayOAuth/login': 'GatewayOAuthLoginResponse',
+  'account/gatewayOAuth/read': 'GatewayOAuthReadResponse',
   'account/logout': 'LogoutAccountResponse',
   'account/rateLimits/read': 'GetAccountRateLimitsResponse',
   'account/usage/read': 'GetAccountTokenUsageResponse',

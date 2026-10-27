@@ -390,7 +390,7 @@ export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart 
   const savedPath = savedPathMimeType && supportedGeneratedImageMimeTypes.has(savedPathMimeType)
     ? candidatePath
     : null;
-  const result = typeof item.result === 'string' ? item.result.trim() : '';
+  const result = 'result' in item && typeof item.result === 'string' ? item.result.trim() : '';
   const inlineImage = codexImageDataUrl(result);
   const url = inlineImage?.url ?? (savedPath ? pathToFileURL(savedPath).href : undefined);
   if (!url) return null;

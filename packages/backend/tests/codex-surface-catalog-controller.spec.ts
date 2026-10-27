@@ -676,7 +676,7 @@ function setupCatalog(request: ReturnType<typeof vi.fn>, options: {
 }
 
 function model(id: string, isDefault: boolean) {
-  return {
+  return { availableAccessPrograms: { cyber: [] },
     id, model: id, displayName: id, description: 'Model', hidden: false,
     supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
     defaultReasoningEffort: 'medium', isDefault, inputModalities: ['text'], serviceTiers: [],

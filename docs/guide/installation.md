@@ -9,7 +9,7 @@
 - A compatible Codex executable available to discovery, or an explicit
   transport command
 
-The checked-in app-server bindings currently target `codex-cli 0.154.0`.
+The checked-in app-server bindings currently target `codex-cli 0.164.0`.
 
 During connection, `CodexSurface` negotiates the runtime features used by its
 high-level behavior. It enables `compaction_image_budget` for image-aware

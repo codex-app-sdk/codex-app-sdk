@@ -531,7 +531,7 @@ describe('codexThreadToSurfaceMessages', () => {
       turns: [{
         id: 'turn-large-tool-output', status: 'completed', startedAt: 1, completedAt: 2,
         items: [
-          {
+          { mcpAppUi: null,
             type: 'mcpToolCall', id: 'large-tool', server: 'images', tool: 'inspect', status: 'completed',
             arguments: { path: '/tmp/input.png' }, error: null, appContext: null, pluginId: null,
             readOnlyHint: true, durationMs: 1, result: {

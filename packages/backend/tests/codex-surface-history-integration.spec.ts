@@ -227,7 +227,7 @@ describe('CodexSurface', () => {
         ...resumeResponse(thread('thread-existing', false)),
         initialTurnsPage: { data: [initialTurn], nextCursor: 'older-page', backwardsCursor: null },
       }),
-      'thread/read': () => ({ thread: thread('thread-existing', false) }),
+      'thread/read': () => ({ readState: null, thread: thread('thread-existing', false) }),
       'thread/turns/list': (params) => {
         expect(params).toMatchObject({
           threadId: 'thread-existing',
@@ -423,7 +423,7 @@ describe('CodexSurface', () => {
       });
     transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-live', startedAtMs: 1,
-        item: { readOnlyHint: null,
+        item: { mcpAppUi: null, readOnlyHint: null,
           type: 'mcpToolCall', id: 'mcp-live', server: 'tools', tool: 'run', status: 'inProgress',
           arguments: {}, appContext: null, pluginId: null, result: null, error: null, durationMs: null,
         },

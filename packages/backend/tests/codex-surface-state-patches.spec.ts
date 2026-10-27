@@ -13,7 +13,7 @@ describe('CodexSurface state patches', () => {
     ];
     let page = 0;
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, ...pages[page++ % pages.length]! }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, ...pages[page++ % pages.length]! }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), autoSelectFirstConversation: false });
 
@@ -51,7 +51,7 @@ describe('CodexSurface state patches', () => {
     const listed = Array.from({ length: 50 }, (_, index) => thread(`thread-${index}`, false));
     let current: v2.Thread[] = listed;
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: current, nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: current, nextCursor: null }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), autoSelectFirstConversation: false });
     await surface.connect();

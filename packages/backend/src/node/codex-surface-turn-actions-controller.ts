@@ -7,7 +7,7 @@ import type {
   StartCodexReviewOptions,
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface';
-import { codexThreadToSurfaceMessages, codexTurnToSurfaceMessages, preserveHistoricalMessagePresentation } from './codex-conversation-history';
+import { codexTurnToSurfaceMessages } from './codex-conversation-history';
 import {
   messageTurnIdOrNull,
   surfaceMessageAttachments,
@@ -207,37 +207,16 @@ export class CodexSurfaceTurnActionsController {
   async rollbackToTurn(threadId: string, turnId: string): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     if (runtime.busy) throw new Error('Cannot roll back while Codex is responding');
+    if (runtime.historyMode !== 'paginated') {
+      throw new Error('Legacy conversation history does not support deleting, editing, or retrying turns with app-server 0.164.0. Start a new conversation to use these actions.');
+    }
     let targetIndex = runtime.turnIds.indexOf(turnId);
     if (targetIndex < 0) {
       await this.host.hydrateCompleteHistory(threadId);
       targetIndex = runtime.turnIds.indexOf(turnId);
     }
     if (targetIndex < 0) throw new Error(`Cannot roll back to unknown Codex turn '${turnId}'`);
-    if (runtime.historyMode === 'paginated') {
-      await this.revertPaginatedThread(threadId, turnId, targetIndex, runtime);
-      return;
-    }
-    const response = await this.client.request('thread/rollback', {
-      threadId, numTurns: runtime.turnIds.length - targetIndex,
-    });
-    if (response.thread.id !== threadId) {
-      throw new Error(`Codex thread/rollback returned '${response.thread.id}' for requested thread '${threadId}'`);
-    }
-    runtime.turnIds = response.thread.turns.map((turn) => turn.id);
-    runtime.turns = response.thread.turns.map((turn) => surfaceTurn(turn));
-    runtime.activeTurnId = null;
-    const summary = threadToSummary(response.thread);
-    this.host.patch({
-      conversations: upsertConversation(this.host.getState().conversations, summary),
-    });
-    this.host.patchRuntime(threadId, {
-      messages: preserveHistoricalMessagePresentation(runtime.messages, codexThreadToSurfaceMessages(response.thread)),
-      answeredClientRequestIds: [], busy: false, turnStartPending: false, error: null,
-      contextUsage: null, turnGitDiff: null,
-    });
-    this.host.emitSummaryUpserted(summary, 'updated', 'action');
-    this.host.emitHistoryReplaced(threadId, 'rollback', 'action');
-    this.host.emitConversationActivity(threadId, 'action');
+    await this.revertPaginatedThread(threadId, turnId, targetIndex, runtime);
   }
 
   private async revertPaginatedThread(

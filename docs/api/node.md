@@ -374,6 +374,9 @@ terminal notification is missing retains its last-known status. See
 - approval and app-server client-request responses
 - `setGoal(objective, tokenBudget?)` / `clearGoal()`
 
+Delete, edit, and retry require paginated conversation history. With app-server
+0.164.0, legacy-history turns reject these mutations without changing history.
+
 ## `CodexConversation`
 
 Stable Node handle for one conversation:

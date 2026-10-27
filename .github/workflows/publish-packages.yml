@@ -50,7 +50,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Install schema-compatible Codex app-server
-        run: npm install --global @openai/codex@0.154.0
+        run: npm install --global @openai/codex@0.164.0
 
       - name: Install browser test dependencies
         run: npx playwright install --with-deps chromium webkit

@@ -53,7 +53,7 @@ export type MessageAttachment = {
   mimeType?: string;
 };
 
-export type MessagePhase = 'commentary' | 'final_answer';
+export type MessagePhase = 'commentary' | 'partial_answer' | 'final_answer';
 
 export type MessagePart =
   | { type: 'attachment'; attachment: MessageAttachment }

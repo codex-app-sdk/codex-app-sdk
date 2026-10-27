@@ -89,7 +89,7 @@ describe('CodexSurface', () => {
       });
     transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-subagent', completedAtMs: 2,
-        item: {
+        item: { model: null, reasoningEffort: null,
           type: 'subAgentActivity', id: 'activity-1', kind: 'interacted',
           agentThreadId: 'thread-child', agentPath: '/root/scout',
         },
@@ -164,7 +164,7 @@ describe('CodexSurface', () => {
     transport.emitNotification('item/plan/delta', { threadId: 'thread-existing', turnId: 'turn-plan', itemId: 'plan-item', delta: 'draft' });
     transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-plan', startedAtMs: 1,
-        item: { readOnlyHint: null,
+        item: { mcpAppUi: null, readOnlyHint: null,
           type: 'mcpToolCall', id: 'mcp-orphan', server: 'tools', tool: 'run', status: 'inProgress',
           arguments: {}, appContext: null, pluginId: null, result: null, error: null, durationMs: null,
         },
@@ -272,7 +272,7 @@ describe('CodexSurface', () => {
     const transport = new MockCodexAppServer({
       'thread/list': () => {
         if (failRefresh) throw new Error('refresh unavailable');
-        return { backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null };
+        return { readStates: null, backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null };
       },
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });

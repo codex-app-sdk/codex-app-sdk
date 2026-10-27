@@ -46,7 +46,7 @@ describe('CodexSurfaceForkController', () => {
     });
     expect(paramsFor(setup.request, 'thread/goal/get')).toStrictEqual({ threadId: 'forked' });
     expect(setup.createdRuntime).toMatchObject({
-      threadId: 'forked', hydrated: true, historyMode: 'legacy', loadingStrategy: 'lazy', historyCursor: null,
+      threadId: 'forked', hydrated: true, historyMode: 'paginated', loadingStrategy: 'lazy', historyCursor: null,
       historyHasOlder: false, historyLoadingOlder: false, fullHistoryHydrated: true, cwd: '/forked',
       activeTurnId: null, turnIds: ['history'], busy: false, goal: { objective: 'Ship' },
     });

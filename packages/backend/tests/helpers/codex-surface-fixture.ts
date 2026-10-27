@@ -53,20 +53,20 @@ const standardMutationHandlers = {
     turn: turn('turn-review', 'inProgress', []),
     reviewThreadId: 'thread-existing',
   }),
-  'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
+  'thread/revert': () => ({ thread: thread('thread-existing', false), turnsBackwardsCursor: null, itemsBackwardsCursor: null }),
 } satisfies MockCodexAppServerHandlers;
 
 const defaultHandlers: MockCodexAppServerHandlers = {
   initialize: () => ({
     userAgent: 'test', codexHome: '/tmp/codex', platformFamily: 'unix', platformOs: 'macos',
   }),
-  'account/read': () => ({
+  'account/read': () => ({ workspaceRouting: null,
       account: { type: 'chatgpt', email: 'test@example.test', planType: 'pro' },
       requiresOpenaiAuth: true,
     }),
   'model/list': () => ({
       data: [
-        {
+        { availableAccessPrograms: { cyber: [] },
           id: 'gpt-5', model: 'gpt-5', upgrade: null, upgradeInfo: null, availabilityNux: null,
           displayName: 'GPT-5', description: 'Test model', modelSpecialty: null, hidden: false,
           supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
@@ -74,7 +74,7 @@ const defaultHandlers: MockCodexAppServerHandlers = {
           multiAgentVersion: null,
           additionalSpeedTiers: [], serviceTiers: [{ id: 'priority', name: 'Priority', description: 'Fast mode' }], defaultServiceTier: null, isDefault: true,
         },
-        {
+        { availableAccessPrograms: { cyber: [] },
           id: 'gpt-mini', model: 'gpt-mini-runtime', upgrade: null, upgradeInfo: null, availabilityNux: null,
           displayName: 'GPT Mini', description: 'Fast model', modelSpecialty: null, hidden: false,
           supportedReasoningEfforts: [
@@ -110,8 +110,8 @@ const defaultHandlers: MockCodexAppServerHandlers = {
       }],
       nextCursor: null,
     }),
-  'configRequirements/read': () => ({ requirements: null }),
-  'thread/list': () => ({ data: [thread('thread-existing', false)], nextCursor: null, backwardsCursor: null }),
+  'configRequirements/read': () => ({ supportsIndependentSpeedModes: null, requirements: null }),
+  'thread/list': () => ({ readStates: null, data: [thread('thread-existing', false)], nextCursor: null, backwardsCursor: null }),
   'thread/turns/list': (params) => ({
         data: thread(params.threadId, true).turns,
         nextCursor: null,
@@ -133,7 +133,7 @@ export function thread(id: string, includeHistory: boolean): v2.Thread {
     section: null,
     sectionEnteredAt: null,
     projectId: null,
-    historyMode: 'legacy',
+    historyMode: 'paginated',
     modelProvider: 'openai',
     model: 'gpt-5',
     reasoningEffort: 'medium',
@@ -161,7 +161,7 @@ export function thread(id: string, includeHistory: boolean): v2.Thread {
 }
 
 export function turn(id: string, status: v2.TurnStatus, items: v2.ThreadItem[]): v2.Turn {
-  return {
+  return { rootTurnId: null,
     id, status, items, itemsView: 'full',
     startedAt: 1_700_000_000, completedAt: null, durationMs: null, error: null,
   };
@@ -170,6 +170,8 @@ export function turn(id: string, status: v2.TurnStatus, items: v2.ThreadItem[]):
 export function resumeResponse(value: v2.Thread): v2.ThreadResumeResponse {
   const turns = value.turns;
   return {
+    disabledPluginIds: [],
+    collaborationMode: null,
     thread: { ...value, turns: [] },
     initialTurnsPage: { data: [...turns].reverse(), nextCursor: null, backwardsCursor: null },
     model: 'gpt-5',
@@ -210,6 +212,9 @@ export function configRequirements(
   overrides: Partial<v2.ConfigRequirements> = {},
 ): v2.ConfigRequirements {
   return {
+    modelProvider: null,
+    modelProviders: null,
+    allowedLoginMethods: null,
     cliAuthCredentialsStore: null,
     chatgptBaseUrl: null,
     additionalDeveloperInstructions: null,
@@ -240,13 +245,12 @@ export function configRequirements(
     checkForUpdateOnStartup: null,
     allowLoginShell: null,
     feedback: null,
-    windowsSandboxPrivateDesktop: null,
     ...overrides,
   };
 }
 
 export function testModel(id: string, model: string, isDefault: boolean): v2.Model {
-  return {
+  return { availableAccessPrograms: { cyber: [] },
     id,
     model,
     upgrade: null,
@@ -319,6 +323,7 @@ export function pluginSummary(
 
 export function threadSettings(overrides: Partial<v2.ThreadSettings> = {}): v2.ThreadSettings {
   return {
+    disabledPluginIds: [],
     cwd: '/tmp/project',
     approvalPolicy: 'on-request',
     approvalsReviewer: 'user',

@@ -54,7 +54,7 @@ describe('Codex surface event values', () => {
   });
 
   it('projects complete turn lifecycle data and replaces updates without reordering turns', () => {
-    const projected = surfaceTurn({
+    const projected = surfaceTurn({ rootTurnId: null,
       id: 'turn-2',
       status: 'failed',
       items: [],

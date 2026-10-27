@@ -88,7 +88,7 @@ describe('CodexSurfaceLifecycleController', () => {
       },
     });
     expect(setup.runtimes.get('thread-new')).toMatchObject({
-      hydrated: true, historyMode: 'legacy', cwd: '/tmp/project', activeTurnId: null, turnIds: [], messages: [],
+      hydrated: true, historyMode: 'paginated', cwd: '/tmp/project', activeTurnId: null, turnIds: [], messages: [],
       answeredClientRequestIds: [], selectedModelId: 'fast-id', selectedReasoningEffort: 'high',
       selectedServiceTier: 'priority', approvalPreset: 'ask-for-approval',
     });
@@ -277,7 +277,7 @@ describe('CodexSurfaceLifecycleController', () => {
     });
     expect(setup.client.request).not.toHaveBeenCalledWith('thread/settings/update', expect.anything());
     expect(setup.runtimes.get('thread-new')).toMatchObject({
-      historyMode: 'legacy', cwd: '/response-cwd', selectedModelId: null, selectedReasoningEffort: 'medium',
+      historyMode: 'paginated', cwd: '/response-cwd', selectedModelId: null, selectedReasoningEffort: 'medium',
       selectedServiceTier: null, approvalPreset: 'ask-for-approval',
     });
   });
@@ -400,7 +400,7 @@ describe('CodexSurfaceLifecycleController', () => {
     });
     expect(setup.host.activateRuntime).toHaveBeenCalledWith(runtime);
     expect(runtime).toMatchObject({
-      hydrated: true, historyMode: 'legacy', historyLoading: false, activeTurnId: 'turn-live',
+      hydrated: true, historyMode: 'paginated', historyLoading: false, activeTurnId: 'turn-live',
       turnIds: ['turn-old', 'turn-live'], loadingStrategy: 'eager', historyCursor: null,
       historyHasOlder: false, historyLoadingOlder: false, fullHistoryHydrated: true,
       busy: true, threadStatus: { type: 'idle' },
@@ -456,7 +456,7 @@ describe('CodexSurfaceLifecycleController', () => {
     const running = turn('turn-live', 'inProgress', [
       { type: 'agentMessage', id: 'agent-live', text: 'Working', phase: null, memoryCitation: null, delivery: null, questions: null },
     ]);
-    const resumedThread = thread('target', false);
+    const resumedThread = { ...thread('target', false), historyMode: 'legacy' as const };
     resumedThread.status = { type: 'active', activeFlags: [] };
     const response = resumeResponse(resumedThread) as unknown as Record<string, unknown>;
     delete response.initialTurnsPage;
@@ -518,7 +518,7 @@ describe('CodexSurfaceLifecycleController', () => {
       initialTurnsPage: { limit: 5, sortDirection: 'desc', itemsView: 'full' },
     });
     expect(setup.runtimes.get('terminal')).toMatchObject({
-      historyMode: 'legacy', historyCursor: null, historyHasOlder: false,
+      historyMode: 'paginated', historyCursor: null, historyHasOlder: false,
       fullHistoryHydrated: true, loadingStrategy: 'lazy',
     });
     expect(setup.conversations.hydrateCompleteHistory).not.toHaveBeenCalled();

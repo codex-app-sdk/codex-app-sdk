@@ -385,10 +385,9 @@ describe('CodexSurfaceTurnActionsController', () => {
     hydrated.host.hydrateCompleteHistory.mockImplementation(async () => {
       hydrated.runtime.turnIds.unshift('turn-old');
     });
-    hydrated.rollbackThread = { ...thread('thread-1', false), turns: [] };
     await hydrated.controller.rollbackToTurn('thread-1', 'turn-old');
     expect(hydrated.host.hydrateCompleteHistory).toHaveBeenCalledWith('thread-1');
-    expect(paramsFor(hydrated.request, 'thread/rollback')).toStrictEqual({ threadId: 'thread-1', numTurns: 2 });
+    expect(paramsFor(hydrated.request, 'thread/revert')).toStrictEqual({ threadId: 'thread-1', beforeTurnId: 'turn-old' });
 
     const missing = createController({ turnIds: ['turn-known'] });
     await expect(missing.controller.rollbackToTurn('thread-1', 'missing'))
@@ -402,56 +401,11 @@ describe('CodexSurfaceTurnActionsController', () => {
 
   it('does not hydrate a rollback target already present at index zero', async () => {
     const setup = createController({ turnIds: ['turn-first', 'turn-second'] });
-    setup.rollbackThread = { ...thread('thread-1', false), turns: [] };
 
     await setup.controller.rollbackToTurn('thread-1', 'turn-first');
 
     expect(setup.host.hydrateCompleteHistory).not.toHaveBeenCalled();
-    expect(paramsFor(setup.request, 'thread/rollback')).toStrictEqual({ threadId: 'thread-1', numTurns: 2 });
-  });
-
-  it('rejects rollback responses for a different thread without mutating history', async () => {
-    const setup = createController({ turnIds: ['turn-1'], rollbackThread: thread('other', false) });
-    const before = structuredClone(setup.runtime.messages);
-
-    await expect(setup.controller.rollbackToTurn('thread-1', 'turn-1'))
-      .rejects.toThrow("returned 'other' for requested thread 'thread-1'");
-
-    expect(setup.runtime.messages).toStrictEqual(before);
-    expect(setup.host.emitHistoryReplaced).not.toHaveBeenCalled();
-  });
-
-  it('replaces rollback state and emits every public update in order', async () => {
-    const rolledBack = {
-      ...thread('thread-1', false),
-      turns: [turn('remaining', 'completed', [{
-        type: 'userMessage', id: 'remaining-user', clientId: null,
-        content: [{ type: 'text', text: 'Remaining', text_elements: [] }],
-      }])],
-    };
-    const setup = createController({
-      activeTurnId: 'turn-2', busy: false, turnIds: ['remaining', 'turn-2'],
-      messages: [userMessage('old', 'turn-2', 'Old')], rollbackThread: rolledBack,
-    });
-    setup.runtime.answeredClientRequestIds = ['request'];
-    setup.runtime.contextUsage = { totalTokens: 1 } as never;
-    setup.runtime.turnGitDiff = { turnId: 'turn-2' } as never;
-
-    await setup.controller.rollbackToTurn('thread-1', 'turn-2');
-
-    expect(paramsFor(setup.request, 'thread/rollback')).toStrictEqual({ threadId: 'thread-1', numTurns: 1 });
-    expect(setup.runtime).toMatchObject({
-      turnIds: ['remaining'], activeTurnId: null, answeredClientRequestIds: [], busy: false,
-      turnStartPending: false, error: null, contextUsage: null, turnGitDiff: null,
-    });
-    expect(setup.runtime.messages).toEqual([
-      expect.objectContaining({ role: 'user', turnId: 'remaining' }),
-    ]);
-    expect(setup.host.emitSummaryUpserted).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'thread-1', turnCount: 1 }), 'updated', 'action',
-    );
-    expect(setup.host.emitHistoryReplaced).toHaveBeenCalledExactlyOnceWith('thread-1', 'rollback', 'action');
-    expect(setup.host.emitConversationActivity).toHaveBeenCalledWith('thread-1', 'action');
+    expect(paramsFor(setup.request, 'thread/revert')).toStrictEqual({ threadId: 'thread-1', beforeTurnId: 'turn-first' });
   });
 
   it('reverts paginated history while retaining only earlier turns and turnless messages', async () => {
@@ -564,7 +518,6 @@ type ControllerOptions = {
   messages?: SurfaceMessage[];
   rejectReview?: unknown;
   reviewResponse?: unknown;
-  rollbackThread?: Record<string, unknown>;
   revertResponse?: Record<string, unknown>;
   turnIds?: string[];
 };
@@ -576,20 +529,16 @@ function createController(options: ControllerOptions = {}) {
   const runtime = createThreadRuntime('thread-1', state, {
     activeTurnId: options.activeTurnId ?? null,
     busy: options.busy ?? false,
-    historyMode: options.historyMode ?? 'legacy',
+    historyMode: options.historyMode ?? 'paginated',
     messages: options.messages ?? [],
     turnIds: options.turnIds ?? [],
   });
-  const setup = { rollbackThread: options.rollbackThread };
   const request = vi.fn(async (method: string): Promise<unknown> => {
     if (method === 'review/start') {
       if (options.rejectReview !== undefined) throw options.rejectReview;
       return options.reviewResponse ?? {
         reviewThreadId: 'thread-1', turn: turn('review-turn', 'inProgress', []),
       };
-    }
-    if (method === 'thread/rollback') {
-      return { thread: setup.rollbackThread ?? { ...thread('thread-1', false), turns: [] } };
     }
     if (method === 'thread/revert') {
       return options.revertResponse ?? {
@@ -622,7 +571,7 @@ function createController(options: ControllerOptions = {}) {
     { request } as unknown as CodexAppServerClient,
     host,
   );
-  return Object.assign({ controller, host, request, runtime, state }, setup);
+  return { controller, host, request, runtime, state };
 }
 
 function summary(id: string) {

@@ -143,9 +143,8 @@ should retain unavailable coverage rather than charge counters as requests.
 
 #### Public runtime field capability matrix
 
-The SDK bindings target `codex-cli 0.154.0`. The same usage shapes and
-internal-only marker were also inspected in `codex-cli 0.164.0`. This is schema
-and protocol-fixture evidence, not a claim of measured live API billing.
+The SDK bindings target `codex-cli 0.164.0`. The capability matrix reflects
+schema and protocol-fixture evidence, not measured live API billing.
 
 | Evidence | Available public field | Request-pricing capability |
 | --- | --- | --- |
@@ -169,18 +168,17 @@ The generated schema includes internal-only notifications even without
 supported public capability. `ThreadStartParams.experimentalRawEvents` is also
 explicitly for internal use. The SDK does not opt into raw events for pricing.
 
-Reproduce the schema inspection outside the checkout (use either inspected
-version):
+Reproduce the schema inspection outside the checkout:
 
 ```sh
-npx --yes --package @openai/codex@0.154.0 codex app-server generate-ts --out /tmp/codex-usage-public
+npx --yes --package @openai/codex@0.164.0 codex app-server generate-ts --out /tmp/codex-usage-public
 ```
 
 Inspect `v2/ThreadTokenUsageUpdatedNotification.ts`, `ThreadTokenUsage.ts`,
 `TokenUsageBreakdown.ts`, `RawResponseCompletedNotification.ts`,
 `ResponseUsageMetadata.ts`, and `ThreadStartParams.ts` in that output. Add
 `--experimental` to compare the full generated surface. `npm run check:schema`
-checks the committed full bindings against the installed CLI; use 0.154.0 for
+checks the committed full bindings against the installed CLI; use 0.164.0 for
 that repository check.
 
 #### Numeric protocol fixtures
@@ -211,7 +209,7 @@ npm test -w @codex-app-sdk/backend -- codex-surface-execution-usage.spec.ts
 ```
 
 `message.delta` includes `messageId`, `itemId`, `delta`, and an optional
-`phase: 'commentary' | 'final_answer'`. Completed reasoning summaries arrive
+`phase: 'commentary' | 'partial_answer' | 'final_answer'`. Completed reasoning summaries arrive
 through the full message carried by `message.updated`, avoiding a second
 streaming protocol for reasoning content.
 

@@ -21,7 +21,7 @@ import {
 describe('CodexSurface', () => {
   it('forgets local conversation state without deleting the thread and recreates it on load', async () => {
     const transport = new MockCodexAppServer({
-      'thread/read': (params) => ({ thread: thread(String((params as { threadId: string }).threadId), false) }),
+      'thread/read': (params) => ({ readState: null, thread: thread(String((params as { threadId: string }).threadId), false) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -262,7 +262,7 @@ describe('CodexSurface', () => {
 
   it('enforces active-conversation defaults through the public factory', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
     });
@@ -325,7 +325,7 @@ describe('CodexSurface', () => {
   it('keeps live runtime, approvals, client requests, and queued drains isolated per thread', async () => {
     let turnNumber = 0;
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -403,7 +403,7 @@ describe('CodexSurface', () => {
 
   it('hydrates an uncached background thread before projecting its live status', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -425,7 +425,7 @@ describe('CodexSurface', () => {
 
   it('runs independent conversation handles concurrently and delivers background state and approvals', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -537,7 +537,7 @@ describe('CodexSurface', () => {
 
   it('bridges concurrent conversation mutations and streams without selection cross-talk', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)],
         nextCursor: null,
       }),
@@ -624,7 +624,7 @@ describe('CodexSurface', () => {
       }],
     }));
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
@@ -684,7 +684,7 @@ describe('CodexSurface', () => {
 
   it('applies typed main-process MCP servers on conversation start and resume', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
@@ -734,7 +734,7 @@ describe('CodexSurface', () => {
 
   it('supports stdio MCP definitions and per-conversation replacement or disabling', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [thread('thread-existing', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
@@ -785,7 +785,7 @@ describe('CodexSurface', () => {
 
   it('validates typed MCP definitions and raw-config collisions', async () => {
     const client = () => new CodexAppServerClient(new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
     }));
     expect(() => new CodexSurface({
       client: client(),

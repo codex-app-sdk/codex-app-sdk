@@ -24,7 +24,7 @@ describe('five active long conversations', () => {
   bench('cold-loads history and routes interleaved app-server deltas', async () => {
     const histories = new Map(threadIds.map((threadId) => [threadId, longThread(threadId)]));
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: threadIds.map((threadId) => thread(threadId, false)),
         nextCursor: null,
       }),

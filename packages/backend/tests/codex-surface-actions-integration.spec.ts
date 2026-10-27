@@ -385,7 +385,7 @@ describe('CodexSurface', () => {
     expect(replica.getSnapshot().messages.filter((message) => message.kind === 'compaction')).toHaveLength(1);
   });
 
-  it('exposes skills, goals, context usage, diffs, and rollback-backed turn deletion', async () => {
+  it('exposes skills, goals, context usage, diffs, and revert-backed turn deletion', async () => {
     const transport = new MockCodexAppServer({
       'skills/list': () => ({
         data: [{
@@ -395,7 +395,7 @@ describe('CodexSurface', () => {
           }],
         }],
       }),
-      'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
+      'thread/revert': () => ({ thread: thread('thread-existing', false), turnsBackwardsCursor: null, itemsBackwardsCursor: null }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
     await surface.connect();
@@ -426,37 +426,42 @@ describe('CodexSurface', () => {
       turnGitDiff: { addedLines: 2, removedLines: 1 },
     });
     await surface.conversation('thread-existing').deleteTurn('turn-history');
-    expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
-      params: { threadId: 'thread-existing', numTurns: 1 },
+    expect(lastRequest(transport, 'thread/revert')).toMatchObject({
+      params: { threadId: 'thread-existing', beforeTurnId: 'turn-history' },
     });
     expect(surface.getSnapshot().messages).toStrictEqual([]);
     expect(replica.getSnapshot()).toMatchObject({ messages: [], turnIds: [], turns: [] });
   });
 
-  it('waits beyond the ordinary request timeout for rollback before replacing conversation history', async () => {
-    vi.useFakeTimers();
-    let resolveRollback!: (value: v2.ThreadRollbackResponse) => void;
-    const rollbackResponse = new Promise<v2.ThreadRollbackResponse>((resolve) => {
-      resolveRollback = resolve;
-    });
+  it('rejects legacy-history mutations without changing or submitting conversation content', async () => {
+    const legacy = { ...thread('thread-existing', true), historyMode: 'legacy' as const };
     const transport = new MockCodexAppServer({
-      'thread/rollback': () => rollbackResponse,
+      'thread/resume': () => resumeResponse(legacy),
+      'turn/start': () => ({ turn: turn('turn-continued', 'inProgress', []) }),
     });
-    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
-
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     try {
       await surface.connect();
-      const deletion = surface.conversation('thread-existing').deleteTurn('turn-history');
-      const completion = expect(deletion).resolves.toMatchObject({ messages: [] });
-
-      await vi.advanceTimersByTimeAsync(15_001);
-      expect(surface.getSnapshot().messages).not.toStrictEqual([]);
-
-      resolveRollback({ thread: thread('thread-existing', false) });
-      await completion;
-      expect(surface.getSnapshot().messages).toStrictEqual([]);
+      const conversation = surface.conversation('thread-existing');
+      await vi.waitFor(() => expect(surface.getSnapshot().pluginCatalogStatus).toBe('loaded'));
+      const before = conversation.getSnapshot();
+      const requestCount = transport.sent.length;
+      for (const action of [
+        () => conversation.deleteTurn('turn-history'),
+        () => conversation.editTurn('turn-history', 'Replacement'),
+        () => conversation.retryTurn('turn-history'),
+      ]) {
+        await expect(action()).rejects.toThrow('Legacy conversation history does not support deleting, editing, or retrying turns');
+        expect(conversation.getSnapshot()).toStrictEqual(before);
+        expect(transport.sent).toHaveLength(requestCount);
+      }
+      await conversation.sendMessage('Continue this conversation');
+      expect(lastRequest(transport, 'turn/start')).toMatchObject({
+        params: { threadId: legacy.id, input: [{ type: 'text', text: 'Continue this conversation' }] },
+      });
+      expect(conversation.getSnapshot().turnIds).toStrictEqual(['turn-history', 'turn-continued']);
+      expect(conversation.getSnapshot().messages.slice(0, before.messages.length)).toStrictEqual(before.messages);
     } finally {
-      vi.useRealTimers();
       await surface.close();
     }
   });
@@ -491,7 +496,6 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'thread/revert')).toMatchObject({
       params: { threadId: 'thread-existing', beforeTurnId: 'turn-second' },
     });
-    expect(lastRequest(transport, 'thread/rollback')).toBeUndefined();
     expect(lastRequest(transport, 'thread/turns/list')).toBeUndefined();
     expect(surface.conversation('thread-existing').getSnapshot()).toMatchObject({
       turnIds: ['turn-first'],
@@ -552,7 +556,7 @@ describe('CodexSurface', () => {
     const goal = testGoal({ threadId: 'thread-new', objective: 'Ship' });
     const transport = new MockCodexAppServer({
       'skills/list': () => { throw new Error('skills unavailable'); },
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/goal/set': () => ({ goal }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
@@ -608,7 +612,7 @@ describe('CodexSurface', () => {
   it('creates zero-config conversations only for slash commands that need a thread', async () => {
     const goal = testGoal({ threadId: 'thread-new', objective: 'Ship it' });
     const goalTransport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
       'thread/goal/set': () => ({ goal }),
@@ -627,7 +631,7 @@ describe('CodexSurface', () => {
     expect(lastRequest(goalTransport, 'turn/start')).toBeUndefined();
 
     const reviewTransport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
       'review/start': () => ({
@@ -682,7 +686,7 @@ describe('CodexSurface', () => {
 
   it('inherits zero-thread UI selections when the first normal prompt creates a conversation', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
       'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
@@ -736,7 +740,7 @@ describe('CodexSurface', () => {
 
   it('uses an explicitly switched model default instead of inheriting incompatible reasoning', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
     });
@@ -759,7 +763,7 @@ describe('CodexSurface', () => {
   });
 
   it('backs edit, retry, delete, and queued prompt actions with real surface operations', async () => {
-    const edited = createSurface('thread/rollback', 'turn/start');
+    const edited = createSurface('thread/revert', 'turn/start');
     await edited.surface.connect();
     const editedReplica = createCodexConversationReplica(
       edited.surface.conversation('thread-existing').getSnapshot(),
@@ -771,7 +775,7 @@ describe('CodexSurface', () => {
     await expect(edited.surface.editTurn('missing', 'Nope')).rejects.toThrow("user prompt for Codex turn 'missing'");
     await expect(edited.surface.editTurn('turn-history', '   ')).rejects.toThrow('empty content');
     await edited.surface.conversation('thread-existing').editTurn('turn-history', 'Edited prompt');
-    expect(lastRequest(edited.transport, 'thread/rollback')).toMatchObject({ params: { numTurns: 1 } });
+    expect(lastRequest(edited.transport, 'thread/revert')).toMatchObject({ params: { beforeTurnId: 'turn-history' } });
     expect(lastRequest(edited.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Edited prompt' }] },
     });
@@ -785,15 +789,15 @@ describe('CodexSurface', () => {
       ],
     });
 
-    const retried = createSurface('thread/rollback', 'turn/start');
+    const retried = createSurface('thread/revert', 'turn/start');
     await retried.surface.connect();
     await retried.surface.conversation('thread-existing').retryTurn('turn-history');
-    expect(lastRequest(retried.transport, 'thread/rollback')).toMatchObject({ params: { numTurns: 1 } });
+    expect(lastRequest(retried.transport, 'thread/revert')).toMatchObject({ params: { beforeTurnId: 'turn-history' } });
     expect(lastRequest(retried.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Hello' }] },
     });
 
-    const retriedThroughSurface = createSurface('thread/rollback', 'turn/start');
+    const retriedThroughSurface = createSurface('thread/revert', 'turn/start');
     await retriedThroughSurface.surface.connect();
     await retriedThroughSurface.surface.retryTurn('turn-history');
     expect(lastRequest(retriedThroughSurface.transport, 'turn/start')).toMatchObject({

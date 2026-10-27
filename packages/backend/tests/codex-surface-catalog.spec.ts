@@ -13,7 +13,7 @@ import {
 
 describe('Codex surface catalog codecs', () => {
   it('maps every model catalog field', () => {
-    const model = {
+    const model = { availableAccessPrograms: { cyber: [] },
       id: 'model-id',
       model: 'gpt-model',
       displayName: 'GPT Model',
@@ -50,7 +50,7 @@ describe('Codex surface catalog codecs', () => {
   });
 
   it('omits empty model tiers and publishes an explicit default tier', () => {
-    const base = {
+    const base = { availableAccessPrograms: { cyber: [] },
       id: 'model-id', model: 'gpt-model', displayName: 'GPT Model', description: 'Description',
       hidden: false, supportedReasoningEfforts: [], defaultReasoningEffort: 'medium', isDefault: false,
       inputModalities: ['text'], supportsPersonality: false, upgrade: null, upgradeInfo: null,

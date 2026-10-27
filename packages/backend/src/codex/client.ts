@@ -46,7 +46,6 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const LONG_MUTATION_REQUEST_TIMEOUT_MS = 120_000;
 const requestTimeoutByMethod: Partial<Record<MethodName, number>> = {
   'thread/revert': LONG_MUTATION_REQUEST_TIMEOUT_MS,
-  'thread/rollback': LONG_MUTATION_REQUEST_TIMEOUT_MS,
 };
 
 export type CodexServerRequestResponder<Method extends ServerRequestMethod> = {

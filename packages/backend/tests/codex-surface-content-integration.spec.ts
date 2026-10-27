@@ -10,8 +10,8 @@ describe('CodexSurface', () => {
     let sent: v2.TurnStartParams | undefined;
     const transport = new MockCodexAppServer({
       'turn/start': params => { sent = params; return { turn: turn('authored-turn', 'inProgress', []) }; },
-      'thread/read': () => ({ thread: thread('thread-existing', false) }),
-      'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
+      'thread/read': () => ({ readState: null, thread: thread('thread-existing', false) }),
+      'thread/revert': () => ({ thread: thread('thread-existing', false), turnsBackwardsCursor: null, itemsBackwardsCursor: null }),
       'thread/turns/list': () => ({ data: sent ? [turn('authored-turn', 'completed', [{
         type: 'userMessage', id: 'provider-user', clientId: sent.clientUserMessageId ?? null, content: sent.input,
       }])] : [], nextCursor: null, backwardsCursor: null }),
@@ -418,7 +418,7 @@ describe('CodexSurface', () => {
 
   it('creates a conversation when review starts before bootstrap without a selected thread', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
       'review/start': (params) => ({
@@ -460,7 +460,7 @@ describe('CodexSurface', () => {
         },
       }),
       'thread/turns/list': () => ({ data: [oldTurn], nextCursor: null, backwardsCursor: null }),
-      'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
+      'thread/revert': () => ({ thread: thread('thread-existing', false), turnsBackwardsCursor: null, itemsBackwardsCursor: null }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -470,8 +470,8 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'thread/turns/list')).toMatchObject({
       params: { threadId: 'thread-existing', cursor: 'older-page', itemsView: 'full' },
     });
-    expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
-      params: { threadId: 'thread-existing', numTurns: 2 },
+    expect(lastRequest(transport, 'thread/revert')).toMatchObject({
+      params: { threadId: 'thread-existing', beforeTurnId: 'turn-old' },
     });
     await surface.close();
   });
@@ -517,7 +517,7 @@ describe('CodexSurface', () => {
 
   it('provides scoped conversation discovery, skill catalogs, attachments, and turn deletion', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': (params) => ({ backwardsCursor: null,
+      'thread/list': (params) => ({ readStates: null, backwardsCursor: null,
         data: [{ ...thread('thread-existing', true), cwd: String((params as { cwd?: string }).cwd ?? '/tmp/project') }],
         nextCursor: null,
       }),
@@ -536,7 +536,7 @@ describe('CodexSurface', () => {
       },
       'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
       'turn/steer': () => ({ turnId: 'turn-live' }),
-      'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
+      'thread/revert': () => ({ thread: thread('thread-existing', false), turnsBackwardsCursor: null, itemsBackwardsCursor: null }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
     const events: CodexSurfaceEvent[] = [];
@@ -605,8 +605,8 @@ describe('CodexSurface', () => {
     }));
     events.length = 0;
     const rolledBack = await conversation.deleteTurn('turn-history');
-    expect(lastRequest(transport, 'thread/rollback')).toMatchObject({
-      params: { threadId: 'thread-existing', numTurns: 2 },
+    expect(lastRequest(transport, 'thread/revert')).toMatchObject({
+      params: { threadId: 'thread-existing', beforeTurnId: 'turn-history' },
     });
     expect(rolledBack).toMatchObject({ activeConversationId: 'thread-existing', activeTurnId: null, turnIds: [] });
     expect(surface.getSnapshot().conversations).toContainEqual(expect.objectContaining({
@@ -633,7 +633,7 @@ describe('CodexSurface', () => {
   });
 
   it('preserves structured attachments when retrying and editing user messages', async () => {
-    const { surface, transport } = createSurface('turn/start', 'thread/rollback');
+    const { surface, transport } = createSurface('turn/start', 'thread/revert');
     await surface.connect();
     const attachments = [
       {
@@ -678,7 +678,7 @@ describe('CodexSurface', () => {
       { type: 'agentMessage', id: 'agent-running', text: 'Hello', phase: null, memoryCitation: null, delivery: null, questions: null },
     ])];
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-running', false)], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [thread('thread-running', false)], nextCursor: null }),
       'thread/resume': () => resumeResponse(runningThread),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -795,9 +795,9 @@ describe('CodexSurface', () => {
           const running = thread(threadId, false);
           running.status = { type: 'active', activeFlags: [] };
           running.turns = [turn('turn-running-read', 'inProgress', [])];
-          return { thread: running };
+          return { readState: null, thread: running };
         }
-        return { thread: thread(threadId, true) };
+        return { readState: null, thread: thread(threadId, true) };
       },
       'thread/turns/list': (params) => {
         const threadId = (params as { threadId: string }).threadId;
@@ -946,7 +946,7 @@ describe('CodexSurface', () => {
 
   it('keeps plan mode selection isolated per thread across refreshed idle histories', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null, data: [thread('thread-a', false), thread('thread-b', false)], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [thread('thread-a', false), thread('thread-b', false)], nextCursor: null }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, true)),
       'thread/settings/update': () => ({}),
     });
@@ -965,7 +965,7 @@ describe('CodexSurface', () => {
 
   it('keeps multiple conversation handles active and readable at the same time', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [thread('thread-a', false), thread('thread-b', false)], nextCursor: null,
       }),
       'thread/resume': (params) => resumeResponse(thread((params as { threadId: string }).threadId, false)),
@@ -1013,7 +1013,7 @@ describe('CodexSurface', () => {
     const resumeB = deferred<v2.ThreadResumeResponse>();
     const resumeC = deferred<v2.ThreadResumeResponse>();
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [thread('thread-existing', false), thread('thread-b', false), thread('thread-c', false)],
         nextCursor: null,
       }),
@@ -1045,7 +1045,7 @@ describe('CodexSurface', () => {
 
   it('reads child metadata without loading turns or mutating surface state', async () => {
     const transport = new MockCodexAppServer({
-      'thread/read': (params) => ({
+      'thread/read': (params) => ({ readState: null,
         thread: {
           ...thread(String((params as { threadId: string }).threadId), false),
           sessionId: 'session-root',
@@ -1092,7 +1092,7 @@ describe('CodexSurface', () => {
 
   it('rejects a summary returned for a different conversation', async () => {
     const transport = new MockCodexAppServer({
-      'thread/read': () => ({ thread: thread('thread-other', false) }),
+      'thread/read': () => ({ readState: null, thread: thread('thread-other', false) }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();

@@ -90,7 +90,7 @@ describe('CodexSurface', () => {
         data: [testModel('gpt-5.6-terra', 'gpt-5.6-terra', true)],
         nextCursor: null,
       }),
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
       'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
@@ -198,7 +198,7 @@ describe('CodexSurface', () => {
     const transport = new MockCodexAppServer({
       'model/list': () => ({ data: [], nextCursor: null }),
       'permissionProfile/list': () => ({ data: [], nextCursor: null }),
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
       'thread/start': () => resumeResponse(thread('thread-new', false)),
       'thread/settings/update': () => ({}),
       'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
@@ -229,7 +229,7 @@ describe('CodexSurface', () => {
     const transport = new MockCodexAppServer({
       'model/list': () => { throw new Error('models unavailable'); },
       'permissionProfile/list': () => { throw new Error('profiles unavailable'); },
-      'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }),
+      'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
 
@@ -261,15 +261,15 @@ describe('CodexSurface', () => {
             data: [{ id: ':workspace', description: 'Project files', allowed: true }],
             nextCursor: 'profiles-2',
           },
-      'configRequirements/read': () => ({
+      'configRequirements/read': () => ({ supportsIndependentSpeedModes: null,
         requirements: configRequirements({
           allowedApprovalPolicies: ['on-request'],
           allowedApprovalsReviewers: ['user'],
         }),
       }),
       'thread/list': (params) => (params as { cursor?: string | null }).cursor
-        ? { backwardsCursor: null, data: [thread('thread-second-page', false)], nextCursor: null }
-        : { backwardsCursor: null, data: [thread('thread-first-page', false)], nextCursor: 'threads-2' },
+        ? { readStates: null, backwardsCursor: null, data: [thread('thread-second-page', false)], nextCursor: null }
+        : { readStates: null, backwardsCursor: null, data: [thread('thread-first-page', false)], nextCursor: 'threads-2' },
     });
     const surface = new CodexSurface({
       approvalPreset: 'full-access',
@@ -410,7 +410,7 @@ describe('CodexSurface', () => {
     ];
 
     for (const entry of cases) {
-      const transport = new MockCodexAppServer({ 'thread/list': () => ({ backwardsCursor: null, data: [], nextCursor: null }) });
+      const transport = new MockCodexAppServer({ 'thread/list': () => ({ readStates: null, backwardsCursor: null, data: [], nextCursor: null }) });
       const surface = new CodexSurface({
         ...entry.options,
         client: new CodexAppServerClient(transport),

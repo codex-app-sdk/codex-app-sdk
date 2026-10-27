@@ -73,9 +73,9 @@ run, in-flight requests are unaffected, and the error goes to `onListenerError`
 error.
 
 Without an explicit `requestTimeoutMs`, ordinary requests use a 15-second
-deadline. The mutating `thread/rollback` and `thread/revert` operations use a
-120-second deadline so their authoritative response remains correlated and the
-surface can reconcile conversation history after a slow rollback. An explicit
+deadline. The mutating `thread/revert` operation uses a 120-second deadline so
+its authoritative response remains correlated and the surface can reconcile
+conversation history after a slow revert. An explicit
 `requestTimeoutMs` overrides both defaults.
 
 ## Generated exports
@@ -87,7 +87,7 @@ surface can reconcile conversation history after a slow rollback. An explicit
 - `RpcRemoteError` and `RpcTransportProtocolError`;
 - `codexSchemaCliVersion`.
 
-The current checked-in schema version is `codex-cli 0.154.0`.
+The current checked-in schema version is `codex-cli 0.164.0`.
 
 See the [JSON-RPC coverage inventory](./json-rpc) for every generated request,
 notification, and server request, including whether the high-level SDK projects it.

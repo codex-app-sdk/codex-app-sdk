@@ -13,7 +13,7 @@ describe('CodexSurface', () => {
     const data = Buffer.concat([Buffer.from(small, 'base64'), Buffer.alloc(36_000)]).toString('base64');
     const url = `data:image/png;base64,${data}`;
     const item: v2.ThreadItem = kind === 'mcp'
-      ? { type: 'mcpToolCall', id: 'screenshots', server: 'tools', tool: 'screenshot', status: 'completed', arguments: {}, appContext: null, pluginId: null, readOnlyHint: true,
+      ? { mcpAppUi: null, type: 'mcpToolCall', id: 'screenshots', server: 'tools', tool: 'screenshot', status: 'completed', arguments: {}, appContext: null, pluginId: null, readOnlyHint: true,
           result: { content: [{ type: 'text', text: 'Captured' }, { type: 'image', mimeType: 'image/png', data }, { type: 'image', mimeType: 'image/png', data: small }], structuredContent: null, _meta: null }, error: null, durationMs: 1 }
       : { type: 'dynamicToolCall', id: 'screenshots', namespace: 'functions', tool: 'exec', arguments: {}, status: 'completed', success: true, durationMs: 1,
           contentItems: [{ type: 'inputText', text: 'Captured' }, { type: 'inputImage', imageUrl: url }, { type: 'inputImage', imageUrl: `data:image/png;base64,${small}` }] };
@@ -137,7 +137,7 @@ describe('CodexSurface', () => {
       const itemId = `mcp-${id}`;
       transport.emitNotification('item/started', {
           threadId: 'thread-existing', turnId: 'turn-stream', startedAtMs: 1,
-          item: { readOnlyHint: null,
+          item: { mcpAppUi: null, readOnlyHint: null,
             type: 'mcpToolCall', id: itemId, server: 'tools', tool: 'Run', status: 'inProgress',
             arguments: { path: 'README.md' }, appContext: null, pluginId: null, result: null,
             error: null, durationMs: null,
@@ -161,7 +161,7 @@ describe('CodexSurface', () => {
       await surface.respondToClientRequest({ id, payload: { decision } });
       transport.emitNotification('item/completed', {
           threadId: 'thread-existing', turnId: 'turn-stream', completedAtMs: 2,
-          item: { readOnlyHint: null,
+          item: { mcpAppUi: null, readOnlyHint: null,
             type: 'mcpToolCall', id: itemId, server: 'tools', tool: 'Run',
             status: decision === 'deny' ? 'failed' : 'completed', arguments: { path: 'README.md' },
             appContext: null, pluginId: null, result: null, error: null, durationMs: 1,

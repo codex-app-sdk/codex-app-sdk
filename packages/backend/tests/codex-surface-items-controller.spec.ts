@@ -425,7 +425,7 @@ describe('CodexSurfaceItemsController', () => {
 
     setup.controller.applyTurnCompleted({
       threadId: 'thread-1',
-      turn: {
+      turn: { rootTurnId: null,
         id: 'turn-1', status: 'failed', items: [], itemsView: 'full',
         error: { message: 'boom', additionalDetails: null, codexErrorInfo: null, misalignment: null },
         startedAt: 1_700_000_000, completedAt: 1_700_000_002, durationMs: 2_000,
@@ -567,7 +567,7 @@ describe('CodexSurfaceItemsController', () => {
 
     setup.controller.applyTurnCompleted({
       threadId: 'thread-1',
-      turn: {
+      turn: { rootTurnId: null,
         id: 'turn-1', status: 'completed', items: [], itemsView: 'full', error: null,
         startedAt: null, completedAt: null, durationMs: null,
       },
@@ -837,7 +837,7 @@ describe('CodexSurfaceItemsController', () => {
     setup.state.conversations = [summary('other'), summary('thread-1')];
     setup.controller.applyTurnCompleted({
       threadId: 'thread-1',
-      turn: {
+      turn: { rootTurnId: null,
         id: 'turn-1', status: 'completed', items: [], itemsView: 'full', error: null,
         startedAt: null, completedAt: null, durationMs: null,
       },

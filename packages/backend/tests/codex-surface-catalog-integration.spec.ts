@@ -50,7 +50,7 @@ describe('CodexSurface', () => {
 
   it('does not bootstrap plugins while authentication is required', async () => {
     const transport = new MockCodexAppServer({
-      'account/read': () => ({ account: null, requiresOpenaiAuth: true }),
+      'account/read': () => ({ workspaceRouting: null, account: null, requiresOpenaiAuth: true }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
 
@@ -290,7 +290,7 @@ describe('CodexSurface', () => {
     let includeSecondCwd = false;
     const pluginScopes: unknown[] = [];
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [
           thread('thread-existing', false),
           ...(includeSecondCwd ? [{ ...thread('thread-new-cwd', false), cwd: '/workspace/new' }] : []),
@@ -455,7 +455,7 @@ describe('CodexSurface', () => {
 
   it('removes a background conversation without disturbing active state and rejects its pending work', async () => {
     const transport = new MockCodexAppServer({
-      'thread/list': () => ({ backwardsCursor: null,
+      'thread/list': () => ({ readStates: null, backwardsCursor: null,
         data: [thread('thread-existing', false), thread('thread-background', false)],
         nextCursor: null,
       }),

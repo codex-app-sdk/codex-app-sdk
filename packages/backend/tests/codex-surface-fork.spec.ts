@@ -299,7 +299,7 @@ function forkTransport(overrides: {
   return new MockCodexAppServer({
     'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     'thread/settings/update': () => ({}),
-    'thread/fork': () => ({
+    'thread/fork': () => ({ disabledPluginIds: [],
       thread: thread('thread-forked', false),
       model: overrides.model ?? 'gpt-5',
       modelProvider: 'openai',

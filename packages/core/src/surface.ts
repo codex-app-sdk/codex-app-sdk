@@ -6,7 +6,7 @@ export type SurfaceMessageTextPart = {
   type: 'text';
   text: string;
   itemId?: string;
-  phase?: 'commentary' | 'final_answer';
+  phase?: 'commentary' | 'partial_answer' | 'final_answer';
 };
 
 export type SurfaceMessageReasoningPart = {
