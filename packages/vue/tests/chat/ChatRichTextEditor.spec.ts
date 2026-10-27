@@ -51,50 +51,6 @@ describe('ChatRichTextEditor', () => {
     wrapper.unmount();
   });
 
-  it('renders canonical plugin, skill, and file tokens as editable chips', () => {
-    const wrapper = mount(ChatRichTextEditor, {
-      props: {
-        files: [{ name: 'README.md', path: 'README.md' }],
-        modelValue: 'Gmail Commit-Push (cp) /cp README.md',
-        content: [
-          { type: 'mention', kind: 'plugin', id: 'gmail@remote', value: 'gmail', label: 'Gmail' },
-          { type: 'text', text: ' ' },
-          { type: 'mention', kind: 'skill', id: skill.path, value: 'cp', label: skill.name },
-          { type: 'text', text: ' /cp ' },
-          { type: 'mention', kind: 'file', id: 'README.md', value: 'README.md', label: 'README.md' },
-        ],
-        plugins: [{ id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', enabled: true }],
-        skills: [skill],
-      },
-    });
-
-    expect(wrapper.find('[data-plugin-name="gmail"]').text()).toContain('Gmail');
-    expect(wrapper.find('[data-skill-name="cp"]').text()).toContain('Commit-Push (cp)');
-    expect(wrapper.find('[data-file-mention="README.md"]').text()).toContain('README.md');
-    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText())
-      .toBe('Gmail Commit-Push (cp) /cp README.md');
-  });
-
-  it('renders host mentions with a custom composer chip while preserving stable text', () => {
-    const wrapper = mount(ChatRichTextEditor, {
-      props: {
-        mentionGroups: [{
-          id: 'threads',
-          label: 'Threads',
-          items: [{ id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' }],
-        }],
-        modelValue: 'Ask codex-claw',
-        content: [{ type: 'text', text: 'Ask ' }, { type: 'mention', kind: 'custom', id: 'thread-1', value: 'thread:019abc', label: 'codex-claw', groupId: 'threads' }],
-      },
-      slots: {
-        mention: ({ item }: { item: { label: string } }) => h('span', { class: 'host-thread-chip' }, `🤖 ${item.label}`),
-      },
-    });
-
-    expect(wrapper.get('[data-mention-value="thread:019abc"]').text()).toBe('🤖 codex-claw');
-    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('Ask codex-claw');
-  });
-
   it('mounts the exported mention chip', () => {
     const wrapper = mount(ChatMentionChip, {
       props: { kind: 'skill', name: 'Commit-Push (cp)' },
@@ -119,19 +75,17 @@ describe('ChatRichTextEditor', () => {
       .toContain('chat-composer-at-menu__item--active');
   });
 
-  it('keeps plain mention-like text literal when catalogs arrive', async () => {
-    const wrapper = mount(ChatRichTextEditor, {
-      props: { modelValue: '@gmail $cp' },
-    });
+  it('keeps typed and code-wrapped triggers literal with present and arriving catalogs', async () => {
+    const text = '`@shared` @missing @shared $missing $cp';
+    const wrapper = mount(ChatRichTextEditor, { props: {
+      modelValue: text, files: [{ name: 'shared', path: 'shared' }],
+      plugins: [{ id: 'shared@remote', name: 'shared', displayName: 'Shared plugin', enabled: true }],
+    } });
     expect(wrapper.find('.chat-mention-chip').exists()).toBe(false);
-
-    await wrapper.setProps({
-      plugins: [{ id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', enabled: true }],
-      skills: [skill],
-    });
-
-    expect(wrapper.findAll('.chat-mention-chip')).toHaveLength(0);
-    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('@gmail $cp');
+    await wrapper.setProps({ skills: [skill] });
+    expect(wrapper.find('.chat-mention-chip').exists()).toBe(false);
+    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe(text);
+    wrapper.unmount();
   });
 
   it('preserves canonical offsets when inserting beside chips', async () => {
@@ -201,21 +155,6 @@ describe('ChatRichTextEditor', () => {
       else Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect');
       wrapper.unmount();
     }
-  });
-
-  it('keeps typed and code-wrapped triggers literal even with matching catalogs', () => {
-    const wrapper = mount(ChatRichTextEditor, {
-      props: {
-        files: [{ name: 'shared', path: 'shared' }],
-        modelValue: '`@shared` @missing @shared $missing',
-        plugins: [{ id: 'shared@remote', name: 'shared', displayName: 'Shared plugin', enabled: true }],
-      },
-    });
-
-    expect(wrapper.findAll('[data-plugin-name="shared"]')).toHaveLength(0);
-    expect(wrapper.find('[data-file-mention="shared"]').exists()).toBe(false);
-    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText())
-      .toBe('`@shared` @missing @shared $missing');
   });
 
   it('supports disabled editors, focus-free text replacement, and invalid external selections', () => {

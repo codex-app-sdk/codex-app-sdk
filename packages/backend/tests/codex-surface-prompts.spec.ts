@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CodexSurfaceSkill, SurfaceMessage, SurfaceMessageToolPart } from '@codex-app-sdk/core/surface';
+import type { SurfaceMessage, SurfaceMessageToolPart } from '@codex-app-sdk/core/surface';
 import {
   argumentsPreview,
   errorMessage,
@@ -13,9 +13,7 @@ import {
   parsePlanSlashCommand,
   parseReviewSlashCommand,
   persistSupports,
-  promptSkillInputsFromContent,
   stringValue,
-  validateSkillInputs,
 } from '../src/node/codex-surface-prompts';
 
 describe('Codex surface prompt policy', () => {
@@ -71,28 +69,7 @@ describe('Codex surface prompt policy', () => {
     });
   });
 
-  it('derives, validates, and deduplicates catalog-backed skill inputs', () => {
-    const catalog: CodexSurfaceSkill[] = [
-      { name: 'cp', path: '/skills/cp/SKILL.md', enabled: true },
-      { name: 'review', path: '/skills/review/SKILL.md', enabled: true },
-      { name: 'disabled', path: '/skills/disabled/SKILL.md', enabled: false },
-      { name: 'pathless', path: '', enabled: true },
-    ];
-
-    expect(promptSkillInputsFromContent([
-      { type: 'text', text: '$disabled /pathless' },
-      { type: 'mention', kind: 'skill', id: '/skills/cp/SKILL.md', value: 'cp', label: 'Commit and push' },
-      { type: 'mention', kind: 'skill', id: '/skills/review/SKILL.md', value: 'review', label: 'Review' },
-    ])).toStrictEqual([
-      { name: 'cp', path: '/skills/cp/SKILL.md' },
-      { name: 'review', path: '/skills/review/SKILL.md' },
-    ]);
-    expect(validateSkillInputs([{ name: 'cp', path: '/skills/cp/SKILL.md' }], catalog))
-      .toStrictEqual([{ name: 'cp', path: '/skills/cp/SKILL.md' }]);
-    expect(() => validateSkillInputs([{ name: 'cp', path: '/wrong' }], catalog))
-      .toThrow("Skill 'cp' is not an enabled skill in the Codex catalog");
-    expect(() => validateSkillInputs([{ name: 'disabled', path: '/skills/disabled/SKILL.md' }], catalog))
-      .toThrow("Skill 'disabled' is not an enabled skill in the Codex catalog");
+  it('deduplicates skills by name and path', () => {
     expect(mergeSkillInputs(
       [{ name: 'cp', path: '/skills/cp/SKILL.md' }],
       [{ name: 'cp', path: '/skills/cp/SKILL.md' }, { name: 'cp', path: '/other/SKILL.md' }],
@@ -100,17 +77,6 @@ describe('Codex surface prompt policy', () => {
       { name: 'cp', path: '/skills/cp/SKILL.md' },
       { name: 'cp', path: '/other/SKILL.md' },
     ]);
-  });
-
-  it('requires both the catalog skill name and path to match explicit input', () => {
-    const catalog: CodexSurfaceSkill[] = [
-      { name: 'actual', path: '/skills/shared/SKILL.md', enabled: true },
-    ];
-    expect(() => validateSkillInputs([
-      { name: 'spoofed', path: '/skills/shared/SKILL.md' },
-    ], catalog)).toThrowError(
-      new Error("Skill 'spoofed' is not an enabled skill in the Codex catalog"),
-    );
   });
 
   it('matches pending MCP tools by metadata, title, suffix, or unambiguous fallback', () => {

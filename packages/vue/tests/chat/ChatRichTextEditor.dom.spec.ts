@@ -185,8 +185,6 @@ describe('ChatRichTextEditor DOM contract', () => {
     outside.remove();
   });
 
-
-
   it('publishes exact chip accessibility, editability, icon, and trigger attributes', () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: {
@@ -215,6 +213,7 @@ describe('ChatRichTextEditor DOM contract', () => {
     for (const host of [pluginHost, fileHost, skillHost, customHost]) {
       expect(host.classes()).toContain('chat-rich-text-editor__chip-token-host');
       expect((host.element as HTMLElement).contentEditable).toBe('false');
+      expect(host.text()).toBe(host.attributes('aria-label'));
     }
     expect(pluginHost.attributes('aria-label')).toBe('Gmail');
     expect(fileHost.attributes('aria-label')).toBe('README.md');
@@ -222,7 +221,7 @@ describe('ChatRichTextEditor DOM contract', () => {
       'aria-label': 'Commit-Push (cp)',
     });
     expect(customHost.attributes('aria-label')).toBe('Thread one');
-    expect(customHost.text()).toBe('Thread one');
+    expect(api(wrapper).readText()).toBe('Gmail README.md Commit-Push (cp) Thread one');
     expect(fileHost.get('svg').classes()).toContain('tabler-icon-file-text');
     expect(skillHost.get('svg').classes()).toContain('tabler-icon-sparkle-highlight');
     expect(customHost.get('svg').classes()).toContain('tabler-icon-plug-connected');
@@ -249,6 +248,7 @@ describe('ChatRichTextEditor DOM contract', () => {
       slots: { mention: () => h(HostedChip) },
     });
     expect(wrapper.text()).toContain('hosted chip');
+    expect(api(wrapper).readText()).toBe('Thread one');
 
     api(wrapper).setText('plain', 5, { focus: false });
 

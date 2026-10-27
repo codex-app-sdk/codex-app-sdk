@@ -3,7 +3,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import ChatMessageEditor from '../../src/chat/ChatMessageEditor.vue';
-import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../src/chat/ChatRichTextEditor.vue';
 
 function mountEditor(content = 'Old prompt') {
   return mount(ChatMessageEditor, {
@@ -17,20 +16,7 @@ function mountEditor(content = 'Old prompt') {
 }
 
 describe('ChatMessageEditor', () => {
-  it('retains an explicitly selected skill when editing and resubmitting without catalogs', async () => {
-    const part = { type: 'mention' as const, kind: 'skill' as const, id: '/skills/cp/SKILL.md', label: 'Commit-Push', value: 'cp' };
-    const wrapper = mount(ChatMessageEditor, { props: {
-      cancelLabel: 'Cancel', content: 'Commit-Push', promptContent: [part], inputLabel: 'Edit prompt', saveLabel: 'Resubmit',
-    } });
-    expect(wrapper.get('[role="textbox"]').text()).toBe('Commit-Push');
-    const editor = wrapper.findComponent(ChatRichTextEditor).vm as unknown as CodexRichTextEditorExpose;
-    editor.setCaret('Commit-Push'.length);
-    editor.insertTextAtSelection(' now');
-    await wrapper.get('.chat-message__edit-button--primary').trigger('click');
-    expect(wrapper.emitted('save')).toStrictEqual([['Commit-Push now', { content: [part, { type: 'text', text: ' now' }] }]]);
-  });
-
-  it('focuses a structured edit and keeps IME, multiline paste, cancellation and keyboard saves intact', async () => {
+  it('preserves a catalog-free selected skill through focus, IME, paste, button and keyboard resubmission', async () => {
     const part = { type: 'mention' as const, kind: 'skill' as const, id: '/skills/cp/SKILL.md', label: 'Commit-Push', value: 'cp' };
     const wrapper = mount(ChatMessageEditor, { attachTo: document.body, props: {
       cancelLabel: 'Cancel', content: 'Commit-Push', promptContent: [part], inputLabel: 'Edit prompt', saveLabel: 'Resubmit',
@@ -46,12 +32,14 @@ describe('ChatMessageEditor', () => {
       await textbox.trigger('paste', { clipboardData: { getData: () => '' } });
       await textbox.trigger('paste', { clipboardData: { getData: () => '<b>literal</b>' } });
       expect(textbox.find('b').exists()).toBe(false);
-      await textbox.trigger('keydown', { key: 'Enter', ctrlKey: true });
+      await wrapper.get('.chat-message__edit-button--primary').trigger('click');
       expect(wrapper.emitted('save')).toStrictEqual([['Commit-Push\n<b>literal</b>', {
         content: [part, { type: 'text', text: '\n<b>literal</b>' }],
       }]]);
-      await textbox.trigger('keydown', { key: 'Enter', metaKey: true });
-      expect(wrapper.emitted('save')).toHaveLength(2);
+      for (const modifier of ['ctrlKey', 'metaKey']) {
+        await textbox.trigger('keydown', { key: 'Enter', [modifier]: true });
+      }
+      expect(wrapper.emitted('save')).toHaveLength(3);
       await textbox.trigger('keydown', { key: 'Escape' });
       expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
     } finally {

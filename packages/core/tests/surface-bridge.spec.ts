@@ -31,19 +31,6 @@ async function expectRejected(
 }
 
 describe('Codex surface bridge', () => {
-  it('carries explicit authored content through send, steer, edit and queued-message boundaries', async () => {
-    const { calls, target } = recordingTarget();
-    const content = [{ type: 'text', text: '$cp ' }, { type: 'mention', kind: 'custom', id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' }];
-    for (const operation of ['sendMessage', 'steerMessage', 'editTurn', 'updateQueuedPrompt', 'steerQueuedPrompt'] as const) {
-      const args = operation === 'sendMessage' || operation === 'steerMessage'
-        ? ['$cp Alex', { content, inputMethod: 'dictated' }] : ['item-1', '$cp Alex', { content }];
-      await invokeCodexSurfaceBridgeOperation(target, operation, args);
-      expect(calls.get(operation)).toStrictEqual([args]);
-    }
-    await invokeCodexSurfaceBridgeOperation(target, 'sendMessage', ['Literal', { inputMethod: 'typed' }]);
-    expect(calls.get('sendMessage')?.at(-1)).toStrictEqual(['Literal', { inputMethod: 'typed' }]);
-    await expectRejected('sendMessage', ['Literal', { inputMethod: 'unknown' }], 'Message input method must be typed or dictated');
-  });
   it('recognizes every supported operation without accepting inherited names', () => {
     expect(codexSurfaceBridgeOperations).toContain('sendMessage');
     expect(isCodexSurfaceBridgeOperation('sendMessage')).toBe(true);
@@ -73,6 +60,8 @@ describe('Codex surface bridge', () => {
 
   it('routes every supported operation with validated arguments', async () => {
     const { calls, target } = recordingTarget();
+    const prompt = '$cp Alex';
+    const authored = { content: [{ type: 'text', text: '$cp ' }, { type: 'mention', kind: 'custom', id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' }] };
     const resolveAttachment = vi.fn(async (attachment: { type: 'file' | 'image' }) => attachment.type === 'image'
       ? { type: 'image' as const, path: '/srv/image.png', name: 'image.png', mimeType: 'image/png' }
       : { type: 'file' as const, path: '/srv/notes.md', name: 'notes.md', mimeType: 'text/markdown' });
@@ -91,7 +80,7 @@ describe('Codex surface bridge', () => {
       { operation: 'deleteConversation', args: ['conversation-1'] },
       { operation: 'deleteTurn', args: ['turn-1'] },
       { operation: 'deleteQueuedPrompt', args: ['queued-1'] },
-      { operation: 'editTurn', args: ['turn-2', 'Updated'], expected: ['turn-2', 'Updated', undefined] },
+      { operation: 'editTurn', args: ['turn-2', prompt, authored] },
       { operation: 'forkTurn', args: ['turn-1'] },
       { operation: 'getSnapshot', args: [] },
       { operation: 'interrupt', args: [] },
@@ -126,7 +115,8 @@ describe('Codex surface bridge', () => {
       { operation: 'selectConversation', args: ['conversation-1'] },
       {
         operation: 'sendMessage',
-        args: ['Hello', {
+        args: [prompt, {
+          ...authored, inputMethod: 'dictated',
           attachments: [
             { type: 'image', reference: 'attachment:image', detail: 'high' },
             { type: 'file', reference: 'attachment:file' },
@@ -138,7 +128,8 @@ describe('Codex surface bridge', () => {
           skills: [{ name: 'review', path: '/skills/review' }],
           outputSchema: { type: 'object', required: ['result'], nullable: null },
         }],
-        expected: ['Hello', {
+        expected: [prompt, {
+          ...authored, inputMethod: 'dictated',
           attachments: [
             { type: 'image', path: '/srv/image.png', name: 'image.png', mimeType: 'image/png', detail: 'high' },
             { type: 'file', path: '/srv/notes.md', name: 'notes.md', mimeType: 'text/markdown' },
@@ -157,14 +148,14 @@ describe('Codex surface bridge', () => {
       { operation: 'startChatGptDeviceCodeLogin', args: [] },
       { operation: 'startChatGptLogin', args: [] },
       { operation: 'startReview', args: [{ target: { type: 'custom', instructions: 'Focus on errors' } }] },
-      { operation: 'steerMessage', args: ['Use the other approach'], expected: ['Use the other approach', undefined] },
-      { operation: 'steerQueuedPrompt', args: ['queued-1', 'Edited steer'], expected: ['queued-1', 'Edited steer', undefined] },
+      { operation: 'steerMessage', args: [prompt, { ...authored, inputMethod: 'typed' }] },
+      { operation: 'steerQueuedPrompt', args: ['queued-1', prompt, authored] },
       { operation: 'unarchiveConversation', args: ['conversation-1'] },
       {
         operation: 'updateConversationSettings',
         args: [{ modelId: 'gpt-5', reasoningEffort: 'high', serviceTier: null, approvalPreset: 'approve-for-me', planMode: false }],
       },
-      { operation: 'updateQueuedPrompt', args: ['queued-1', 'Edited queue item'], expected: ['queued-1', 'Edited queue item', undefined] },
+      { operation: 'updateQueuedPrompt', args: ['queued-1', prompt, authored] },
     ];
 
     expect(cases.map(({ operation }) => operation).sort()).toStrictEqual([...codexSurfaceBridgeOperations].sort());
@@ -320,6 +311,7 @@ describe('Codex surface bridge', () => {
   });
 
   it.each([
+    ['sendMessage', ['Literal', { inputMethod: 'unknown' }], 'Message input method must be typed or dictated'],
     ['consumeRateLimitResetCredit', [{}], 'Reset-credit idempotency key must be a non-empty string'],
     ['consumeRateLimitResetCredit', [{ idempotencyKey: ' ' }], 'Reset-credit idempotency key must be a non-empty string'],
     ['consumeRateLimitResetCredit', [{ idempotencyKey: 'key', creditId: null }], 'Reset credit id must be a non-empty string'],

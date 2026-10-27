@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { createCodexConversationReplica } from '@codex-app-sdk/core';
 import { CodexAppServerClient, type v2 } from '../src/codex';
@@ -714,18 +714,20 @@ describe('CodexSurface', () => {
       'turn/steer': () => ({ turnId: 'turn-live' }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    onTestFinished(() => surface.close());
     await surface.connect();
     expect(surface.getSnapshot().skills).toStrictEqual([
       expect.objectContaining({ name: 'pdf', enabled: true }),
     ]);
 
-    await expect(surface.sendMessage('bad', {
-      skills: [{ name: 'pdf', path: '/tmp/attacker/SKILL.md' }],
-    })).rejects.toThrow("Skill 'pdf' is not an enabled skill");
-    expect(lastRequest(transport, 'turn/start')).toBeUndefined();
-    await expect(surface.sendMessage('bad', {
-      skills: [{ name: 'disabled', path: '/trusted/disabled/SKILL.md' }],
-    })).rejects.toThrow("Skill 'disabled' is not an enabled skill");
+    for (const skill of [
+      { name: 'pdf', path: '/tmp/attacker/SKILL.md' },
+      { name: 'disabled', path: '/trusted/disabled/SKILL.md' },
+      { name: 'spoofed', path: '/trusted/pdf/SKILL.md' },
+    ]) {
+      await expect(surface.sendMessage('bad', { skills: [skill] })).rejects.toThrow('is not an enabled skill');
+      expect(lastRequest(transport, 'turn/start')).toBeUndefined();
+    }
 
     await surface.sendMessage('Use $pdf and /pdf');
     expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: {
@@ -740,32 +742,26 @@ describe('CodexSurface', () => {
     const context = '\n\n<context>Keep PDF tools and $pdf exactly here.</context>';
     const visible = 'Literal $pdf then PDF toolsREADME.mdGmail';
     const dispatched = 'Literal $pdf then [$pdf](/trusted/pdf/SKILL.md)@/project/README.md@gmail';
-    await surface.steerMessage(visible + context, { content });
-    expect(lastRequest(transport, 'turn/steer')).toMatchObject({ params: { input: [
+    const input = [
       { type: 'text', text: dispatched + context, text_elements: [] },
       { type: 'mention', name: 'README.md', path: '/project/README.md' },
       { type: 'mention', name: 'Gmail', path: 'plugin://gmail@remote' },
       { type: 'skill', name: 'pdf', path: '/trusted/pdf/SKILL.md' },
-    ] } });
-    expect(surface.getSnapshot().messages.find(message => message.kind === 'steer')?.metadata?.promptContent).toStrictEqual(content);
-    expect(surface.getSnapshot().messages.find(message => message.kind === 'steer')?.parts).toStrictEqual([{ type: 'text', text: visible }]);
-    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
-    await surface.sendMessage(dispatched + context, { content });
-    expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: { input: [
-      { type: 'text', text: dispatched + context, text_elements: [] },
-      { type: 'mention', name: 'README.md', path: '/project/README.md' },
-      { type: 'mention', name: 'Gmail', path: 'plugin://gmail@remote' },
-      { type: 'skill', name: 'pdf', path: '/trusted/pdf/SKILL.md' },
-    ] } });
-    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
-    await surface.sendMessage(visible + context, { content });
-    expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: { input: [
-      { type: 'text', text: dispatched + context, text_elements: [] },
-      { type: 'mention', name: 'README.md', path: '/project/README.md' },
-      { type: 'mention', name: 'Gmail', path: 'plugin://gmail@remote' },
-      { type: 'skill', name: 'pdf', path: '/trusted/pdf/SKILL.md' },
-    ] } });
-    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
+    ];
+    for (const [method, prompt, skills] of [
+      ['turn/steer', visible + context, undefined],
+      ['turn/start', dispatched + context, [{ name: 'pdf', path: '/trusted/pdf/SKILL.md' }]],
+      ['turn/start', visible + context, undefined],
+    ] as const) {
+      const options = { content, skills };
+      if (method === 'turn/steer') await surface.steerMessage(prompt, options);
+      else await surface.sendMessage(prompt, options);
+      expect(lastRequest(transport, method)).toMatchObject({ params: { input } });
+      expect(surface.getSnapshot().messages.filter(message => message.role === 'user').at(-1)).toMatchObject({
+        parts: [{ type: 'text', text: visible }], metadata: { promptContent: content },
+      });
+      transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
+    }
     await surface.sendMessage('Use $pdf and /pdf', {
       skills: [{ name: 'pdf', path: '/trusted/pdf/SKILL.md' }],
     });
