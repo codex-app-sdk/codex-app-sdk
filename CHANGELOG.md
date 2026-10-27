@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.17.0
+
+### Added
+
+- Preserve explicitly selected skills, plugins, files, and host mentions through
+  drafts, queued prompts, message editing, retries, and conversation rendering.
+- Share serializable prompt content and text-editing helpers across desktop,
+  web, and native clients without requiring Vue or a mention catalog for display.
+
+### Changed
+
+- Keep typed or pasted `$skill` and `@name` text literal; accepting a suggestion
+  creates a selected mention with a saved label and stable target.
+- Send selected skills as canonical Markdown references for the model while
+  retaining native skill inputs and the friendly labels displayed to the user.
+
+### Fixed
+
+- Prevent WebKit undo and redo from replaying a submitted chip into another
+  draft while editing a message.
+
 ## 0.16.9
 
 ### Added
