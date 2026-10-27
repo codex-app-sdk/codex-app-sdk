@@ -69,6 +69,7 @@ export type MessageSuggestedPrompt = {
 };
 
 export type Message = {
+  promptContent?: readonly import('@codex-app-sdk/core/surface').CodexPromptPart[];
   compactionStatus?: 'completed' | 'running';
   role: 'user' | 'assistant';
   content: string;

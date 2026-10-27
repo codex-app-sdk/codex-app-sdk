@@ -249,6 +249,7 @@ Renderer-safe subset: model, reasoning effort, service tier, and advertised appr
 
 ```ts
 type SendCodexMessageOptions = {
+  content?: readonly CodexPromptPart[];
   attachments?: readonly CodexSurfaceAttachment[];
   inputMethod?: 'typed' | 'dictated';
   model?: string;
@@ -259,6 +260,45 @@ type SendCodexMessageOptions = {
   outputSchema?: CodexSurfaceJsonValue;
 };
 ```
+
+`content` preserves what the user authored as ordered text and explicitly selected
+mentions. A mention has `{ type: 'mention', kind, id, label, value, groupId? }`;
+`kind` is `skill`, `plugin`, `file`, or `custom`. `id` identifies the selected
+target, `label` is its saved visible chip text, and `value` is the selected catalog
+name/value without an added `$` or `@` prefix. `groupId` identifies a custom
+mention group. Text parts have `{ type: 'text', text }`.
+
+Core exports `promptContentText(content)`, which joins text and saved labels
+verbatim without adding prefixes or spaces. `promptContentDispatchText(content)`
+produces model-facing text: selected skills use `[$value](id)`, files use `@id`,
+and plugins/custom mentions use `@value`; text parts remain verbatim. Skill link
+names are Markdown-escaped and paths are URI-encoded. Pass an optional second
+argument, `promptContentDispatchText(content, prompt)`, to replace the authored
+visible prefix while retaining appended host context verbatim. Already projected
+text and custom prompts without that prefix are unchanged. Hosts can use this
+helper before adding their provider-specific context on desktop and mobile.
+Native Codex send and steer apply this projection and include explicit
+skill/mention input items alongside prompt text. Codex loads selected skill
+instructions through its native skill input; the SDK does not inline skill files.
+Literal `$skill` and `@name` text never creates those items. Explicit
+programmatic `options.skills` is still supported and validated against the catalog.
+
+Submitted user messages retain their parts in `metadata.promptContent`. The
+visible message uses that content, while the transport prompt may include
+host-owned hidden context. Hosts must persist authored parts alongside messages
+and restore them by stable message identity; displaying saved mentions does not
+require a catalog.
+
+`normalizePromptContent` validates and copies transport content.
+`trimPromptContent` removes surrounding whitespace in text parts.
+`slicePromptContent(content, start, end?)` and
+`replacePromptContentRange(content, start, end, replacement)` use UTF-16 offsets
+in the visible text. Fully selected mentions remain structured; partial mentions
+become literal label text. These helpers do not mutate their inputs.
+
+`updateQueuedPrompt`, `steerQueuedPrompt`, and `editTurn` accept an optional third
+send-options argument, including `content`. Editing without content produces a
+plain-text prompt. Retrying a message preserves its saved authored content.
 
 This trusted-host form carries resolved filesystem `path` values. Renderer
 boundaries instead use opaque references:

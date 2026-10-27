@@ -49,15 +49,15 @@ describe('createCodexConversationHandle', () => {
     });
     expect(operations.interrupt).toHaveBeenCalledOnce();
     expect(operations.deleteTurn).toHaveBeenCalledWith('turn-2');
-    expect(operations.editTurn).toHaveBeenCalledWith('turn-1', 'Edited');
+    expect(operations.editTurn).toHaveBeenCalledWith('turn-1', 'Edited', undefined);
     expect(operations.retryTurn).toHaveBeenCalledWith('turn-3');
     expect(operations.deleteQueuedPrompt).toHaveBeenCalledWith('prompt-1');
     expect(operations.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     expect(operations.respondToClientRequest).toHaveBeenCalledWith(response);
     expect(operations.setGoal).toHaveBeenCalledWith('Ship it', 500);
     expect(operations.clearGoal).toHaveBeenCalledOnce();
-    expect(operations.updateQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited queue');
-    expect(operations.steerQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited steer');
+    expect(operations.updateQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited queue', undefined);
+    expect(operations.steerQueuedPrompt).toHaveBeenCalledWith('prompt-2', 'Edited steer', undefined);
     expect(operations.getSnapshot).toHaveBeenCalledTimes(19);
   });
 

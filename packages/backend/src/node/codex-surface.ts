@@ -805,8 +805,8 @@ export class CodexSurface {
     return this.turnActions.deleteTurn(turnId);
   }
 
-  async editTurn(turnId: string, content: string): Promise<CodexSurfaceSnapshot> {
-    return this.turnActions.editTurn(turnId, content);
+  async editTurn(turnId: string, content: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot> {
+    return this.turnActions.editTurn(turnId, content, options);
   }
 
   async retryTurn(turnId: string): Promise<CodexSurfaceSnapshot> {
@@ -825,12 +825,12 @@ export class CodexSurface {
     return this.messagesController.deleteQueuedPrompt(promptId);
   }
 
-  async updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot> {
-    return this.messagesController.updateQueuedPrompt(promptId, prompt);
+  async updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot> {
+    return this.messagesController.updateQueuedPrompt(promptId, prompt, options);
   }
 
-  async steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot> {
-    return this.messagesController.steerQueuedPrompt(promptId, prompt);
+  async steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot> {
+    return this.messagesController.steerQueuedPrompt(promptId, prompt, options);
   }
 
   async respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<CodexSurfaceSnapshot> {
@@ -857,8 +857,8 @@ export class CodexSurface {
       continueInterruptedTurn: () => this.messagesController.continueInterruptedTurnForThread(id),
       deleteTurn: (turnId) => this.turnActions.deleteTurnForThread(id, turnId),
       deleteQueuedPrompt: (promptId) => this.messagesController.deleteQueuedPromptForThread(id, promptId),
-      updateQueuedPrompt: (promptId, prompt) => this.messagesController.updateQueuedPromptForThread(id, promptId, prompt),
-      editTurn: (turnId, content) => this.turnActions.editTurnForThread(id, turnId, content),
+      updateQueuedPrompt: (promptId, prompt, options) => this.messagesController.updateQueuedPromptForThread(id, promptId, prompt, options),
+      editTurn: (turnId, content, options) => this.turnActions.editTurnForThread(id, turnId, content, options),
       fork: (options, hostOptions) => this.forkConversation(id, options, hostOptions),
       forkTurn: (turnId, options, hostOptions) => (
         this.forkConversationAtTurn(id, turnId, options, hostOptions)
@@ -883,7 +883,7 @@ export class CodexSurface {
       startRealtime: (options) => this.startRealtimeForThread(id, options),
       startReview: (options) => this.turnActions.startReviewForThread(id, options),
       steerMessage: (prompt, options) => this.messagesController.steerForThread(id, prompt, options),
-      steerQueuedPrompt: (promptId, prompt) => this.messagesController.steerQueuedPromptForThread(id, promptId, prompt),
+      steerQueuedPrompt: (promptId, prompt, options) => this.messagesController.steerQueuedPromptForThread(id, promptId, prompt, options),
       updateSettings: (settings) => this.conversationSettings.updateForThread(id, settings),
     });
     this.conversationHandles.set(id, handle);

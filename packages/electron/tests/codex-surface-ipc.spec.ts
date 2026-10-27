@@ -549,7 +549,7 @@ describe('Codex surface Electron bridge', () => {
     expect(surface.deleteConversation).toHaveBeenCalledWith('thread-delete');
     expect(surface.deleteTurn).toHaveBeenCalledWith('turn-2');
     expect(surface.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
-    expect(surface.editTurn).toHaveBeenCalledWith('turn-1', 'Replacement');
+    expect(surface.editTurn).toHaveBeenCalledWith('turn-1', 'Replacement', undefined);
     expect(surface.forkTurn).toHaveBeenCalledWith('turn-4');
     expect(surface.getSnapshot).toHaveBeenCalledOnce();
     expect(surface.interrupt).toHaveBeenCalledOnce();
@@ -598,12 +598,12 @@ describe('Codex surface Electron bridge', () => {
         type: 'file', path: '/tmp/notes.md', name: 'Notes', mimeType: 'text/markdown',
       }],
     });
-    expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited steer');
+    expect(surface.steerQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited steer', undefined);
     expect(surface.unarchiveConversation).toHaveBeenCalledWith('thread-unarchive');
     expect(surface.updateConversationSettings).toHaveBeenCalledWith({
       modelId: 'gpt-5', reasoningEffort: 'high', approvalPreset: 'full-access', planMode: true,
     });
-    expect(surface.updateQueuedPrompt).toHaveBeenCalledWith('queued-1', 'Edited queue');
+    expect(surface.updateQueuedPrompt).toHaveBeenCalledWith('queued-1', 'Edited queue', undefined);
     await expect(main.call('codex-surface:get-versioned-snapshot')).resolves.toBeNull();
     stateListener?.(snapshot);
     eventListener?.(surfaceEvent);
@@ -631,7 +631,8 @@ describe('Codex surface Electron bridge', () => {
     await api.deleteConversation('thread-delete');
     await api.deleteTurn('turn-2');
     await api.deleteQueuedPrompt('queued-1');
-    await api.editTurn('turn-1', 'Replacement');
+    const authoredOptions = { content: [{ type: 'mention' as const, kind: 'custom' as const, id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' }] };
+    await api.editTurn('turn-1', 'Replacement', authoredOptions);
     await api.forkTurn('turn-4');
     await api.readConversationHistory('thread-2');
     await api.readConversationPromptHistory('thread-2');
@@ -654,10 +655,10 @@ describe('Codex surface Electron bridge', () => {
     await api.steerMessage('Keep going', {
       attachments: [{ type: 'file', reference: 'attachment:notes' }],
     });
-    await api.steerQueuedPrompt('queued-2', 'Edited steer');
+    await api.steerQueuedPrompt('queued-2', 'Edited steer', authoredOptions);
     await api.unarchiveConversation('thread-unarchive');
     await api.updateConversationSettings({ modelId: 'gpt-5', approvalPreset: 'ask-for-approval' });
-    await api.updateQueuedPrompt('queued-1', 'Edited queue');
+    await api.updateQueuedPrompt('queued-1', 'Edited queue', authoredOptions);
     await api.interrupt();
     await api.getSnapshot();
     renderer.emit('codex-surface:event', surfaceEvent);
@@ -675,7 +676,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:delete-conversation', 'thread-delete'],
       ['codex-surface:delete-turn', 'turn-2'],
       ['codex-surface:delete-queued-prompt', 'queued-1'],
-      ['codex-surface:edit-turn', 'turn-1', 'Replacement'],
+      ['codex-surface:edit-turn', 'turn-1', 'Replacement', authoredOptions],
       ['codex-surface:fork-turn', 'turn-4'],
       ['codex-surface:read-conversation-history', 'thread-2'],
       ['codex-surface:read-conversation-prompt-history', 'thread-2'],
@@ -698,10 +699,10 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:steer-message', 'Keep going', {
         attachments: [{ type: 'file', reference: 'attachment:notes' }],
       }],
-      ['codex-surface:steer-queued-prompt', 'queued-2', 'Edited steer'],
+      ['codex-surface:steer-queued-prompt', 'queued-2', 'Edited steer', authoredOptions],
       ['codex-surface:unarchive-conversation', 'thread-unarchive'],
       ['codex-surface:update-conversation-settings', { modelId: 'gpt-5', approvalPreset: 'ask-for-approval' }],
-      ['codex-surface:update-queued-prompt', 'queued-1', 'Edited queue'],
+      ['codex-surface:update-queued-prompt', 'queued-1', 'Edited queue', authoredOptions],
       ['codex-surface:interrupt'],
       ['codex-surface:get-snapshot'],
     ]);

@@ -185,80 +185,7 @@ describe('ChatRichTextEditor DOM contract', () => {
     outside.remove();
   });
 
-  it('uses leading mentions before built-ins and trailing mentions only after them', () => {
-    const groups = [
-      {
-        id: 'leading',
-        label: 'Leading',
-        placement: 'before' as const,
-        items: [
-          { id: 'leading-shared', value: 'shared', label: 'Leading shared' },
-          { id: 'leading-gmail', value: 'gmail', label: 'Leading Gmail' },
-        ],
-      },
-      {
-        id: 'trailing',
-        label: 'Trailing',
-        placement: 'after' as const,
-        items: [
-          { id: 'trailing-shared', value: 'shared', label: 'Trailing shared' },
-          { id: 'trailing-plugin', value: 'slack', label: 'Trailing Slack' },
-          { id: 'trailing-file', value: 'README.md', label: 'Trailing README' },
-          { id: 'trailing-only', value: 'tail', label: 'Trailing only' },
-        ],
-      },
-    ];
-    const wrapper = mount(ChatRichTextEditor, {
-      props: {
-        files: [{ name: 'README.md', path: 'README.md' }],
-        mentionGroups: groups,
-        modelValue: '@shared @gmail @slack @README.md @tail',
-        plugins: [
-          plugin,
-          { id: 'slack@remote', name: 'slack', displayName: 'Slack', enabled: true },
-        ],
-      },
-      slots: {
-        mention: ({ group, item, surface }) => h(
-          'span',
-          { class: 'host-mention' },
-          `${surface}:${group.id}:${item.id}`,
-        ),
-      },
-    });
 
-    expect(wrapper.get('[data-mention-value="shared"]').text())
-      .toBe('composer:leading:leading-shared');
-    expect(wrapper.get('[data-mention-value="gmail"]').text())
-      .toBe('composer:leading:leading-gmail');
-    expect(wrapper.find('[data-plugin-name="gmail"]').exists()).toBe(false);
-    expect(wrapper.get('[data-plugin-name="slack"]').text()).toContain('Slack');
-    expect(wrapper.get('[data-file-mention="README.md"]').text()).toContain('README.md');
-    expect(wrapper.get('[data-mention-value="tail"]').text())
-      .toBe('composer:trailing:trailing-only');
-    expect(wrapper.findAll('.host-mention')).toHaveLength(3);
-    expect(api(wrapper).readText()).toBe('@shared @gmail @slack @README.md @tail');
-  });
-
-  it('matches files by exact path or exact name without selecting an earlier file', () => {
-    const wrapper = mount(ChatRichTextEditor, {
-      props: {
-        files: [
-          { name: 'other.txt', path: 'src/other.txt' },
-          { name: 'target.txt', path: 'src/target.txt' },
-        ],
-        modelValue: '@src/target.txt @target.txt @missing.txt',
-      },
-    });
-
-    const hosts = wrapper.findAll('[data-file-mention]');
-    expect(hosts).toHaveLength(2);
-    expect(hosts.map((host) => host.attributes('data-file-mention')))
-      .toStrictEqual(['src/target.txt', 'target.txt']);
-    expect(hosts.map((host) => host.attributes('aria-label')))
-      .toStrictEqual(['target.txt', 'target.txt']);
-    expect(api(wrapper).readText()).toBe('@src/target.txt @target.txt @missing.txt');
-  });
 
   it('publishes exact chip accessibility, editability, icon, and trigger attributes', () => {
     const wrapper = mount(ChatRichTextEditor, {
@@ -269,7 +196,13 @@ describe('ChatRichTextEditor DOM contract', () => {
           label: 'Threads',
           items: [{ id: 'thread-1', value: 'thread', label: 'Thread one' }],
         }],
-        modelValue: '@gmail @README.md $cp @thread',
+        modelValue: 'Gmail README.md Commit-Push (cp) Thread one',
+        content: [
+          { type: 'mention', kind: 'plugin', id: plugin.id, value: plugin.name, label: 'Gmail' }, { type: 'text', text: ' ' },
+          { type: 'mention', kind: 'file', id: 'README.md', value: 'README.md', label: 'README.md' }, { type: 'text', text: ' ' },
+          { type: 'mention', kind: 'skill', id: skill.path, value: 'cp', label: skill.name }, { type: 'text', text: ' ' },
+          { type: 'mention', kind: 'custom', id: 'thread-1', value: 'thread', label: 'Thread one', groupId: 'threads' },
+        ],
         plugins: [plugin],
         skills: [skill],
       },
@@ -287,7 +220,6 @@ describe('ChatRichTextEditor DOM contract', () => {
     expect(fileHost.attributes('aria-label')).toBe('README.md');
     expect(skillHost.attributes()).toMatchObject({
       'aria-label': 'Commit-Push (cp)',
-      'data-skill-trigger': '$',
     });
     expect(customHost.attributes('aria-label')).toBe('Thread one');
     expect(customHost.text()).toBe('Thread one');
@@ -311,7 +243,8 @@ describe('ChatRichTextEditor DOM contract', () => {
           label: 'Threads',
           items: [{ id: 'thread-1', value: 'thread', label: 'Thread one' }],
         }],
-        modelValue: '@thread',
+        modelValue: 'Thread one',
+        content: [{ type: 'mention', kind: 'custom', id: 'thread-1', value: 'thread', label: 'Thread one', groupId: 'threads' }],
       },
       slots: { mention: () => h(HostedChip) },
     });
@@ -330,7 +263,8 @@ describe('ChatRichTextEditor DOM contract', () => {
           label: 'Threads',
           items: [{ id: 'thread-1', value: 'thread', label: 'Thread one' }],
         }],
-        modelValue: '@thread',
+        modelValue: 'Thread one',
+        content: [{ type: 'mention', kind: 'custom', id: 'thread-1', value: 'thread', label: 'Thread one', groupId: 'threads' }],
       },
       slots: { mention: () => h(HostedChip) },
     });
@@ -438,10 +372,11 @@ describe('ChatRichTextEditor DOM contract', () => {
     wrapper.unmount();
   });
 
-  it('refreshes an existing chip after an in-place catalog change', async () => {
+  it('keeps a selected chip label stable after an in-place catalog change', async () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: {
-        modelValue: '@gmail',
+        modelValue: 'Gmail',
+        content: [{ type: 'mention', kind: 'plugin', id: plugin.id, value: plugin.name, label: 'Gmail' }],
         plugins: [plugin],
       },
     });
@@ -450,8 +385,8 @@ describe('ChatRichTextEditor DOM contract', () => {
     currentPlugin.displayName = 'Google Mail';
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.get('[data-plugin-name="gmail"]').text()).toContain('Google Mail');
-    expect(api(wrapper).readText()).toBe('@gmail');
+    expect(wrapper.get('[data-plugin-name="gmail"]').text()).toContain('Gmail');
+    expect(api(wrapper).readText()).toBe('Gmail');
   });
 
   it('removes the exact selection listener installed for its mounted lifetime', () => {

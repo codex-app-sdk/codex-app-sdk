@@ -9,7 +9,7 @@ export type MessageBlock =
   | { type: 'attachment'; attachment: MessageAttachment }
   | Extract<MessagePart, { type: 'question' }>
   | ({ type: 'text'; content: string } & PhasedMessageBlock)
-  | { type: 'user-text'; content: string }
+  | { type: 'user-text'; content: string; promptContent?: Message['promptContent'] }
   | ({ type: 'reasoning'; content: string } & PhasedMessageBlock)
   | ({ type: 'mermaid'; code: string } & PhasedMessageBlock)
   | ({ type: 'html'; source: string; title?: string; complete: boolean } & PhasedMessageBlock)
@@ -45,6 +45,12 @@ const ungroupedToolNames = new Set([
 
 export function computeMessageBlocks(message: Message): MessageBlock[] {
   if (message.role !== 'assistant') {
+    if (message.promptContent) return [
+      { type: 'user-text', content: message.content, promptContent: message.promptContent },
+      ...(message.parts ?? []).flatMap((part): MessageBlock[] => part.type === 'attachment'
+        ? [{ type: 'attachment', attachment: part.attachment }]
+        : part.type === 'media' ? [{ type: 'media', media: part.media }] : []),
+    ];
     if ((message.parts?.length ?? 0) > 0) {
       return message.parts!.flatMap((part): MessageBlock[] => {
         if (part.type === 'attachment') {

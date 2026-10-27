@@ -7,7 +7,7 @@ import type {
 } from '@codex-app-sdk/core/surface';
 import {
   codexTurnToSurfaceMessages,
-  preserveHistoricalAttachmentPreviews,
+  preserveHistoricalMessagePresentation,
 } from './codex-conversation-history';
 import { normalizedConversationId, errorMessage } from './codex-surface-prompts';
 import { reuseUnchangedItems, threadToSummary, upsertConversation } from './codex-surface-data';
@@ -332,7 +332,7 @@ export class CodexSurfaceConversationsController {
     const preservedMessages = current.messages.filter((message) => (
       message.turnId === undefined || !replaceableTurnIds.has(message.turnId)
     ));
-    const historyMessages = preserveHistoricalAttachmentPreviews(
+    const historyMessages = preserveHistoricalMessagePresentation(
       current.messages,
       historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn)),
     );

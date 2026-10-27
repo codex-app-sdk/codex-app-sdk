@@ -167,6 +167,7 @@
 </template>
 
 <script setup lang="ts">
+import { normalizePromptContent } from '@codex-app-sdk/core/surface';
 import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue';
 import LiveChatLab from './LiveChatLab.vue';
 import { chartHtmlChunks, inlineHtmlChunks } from './inline-html-demo';
@@ -288,10 +289,17 @@ const scenarios: [Scenario, ...Scenario[]] = [
     messages: [
       {
         id: 'conversation-user', role: 'user', status: 'complete', createdAt: '2026-08-01T12:00:00Z', parts: [
-          { type: 'text', text: 'Use $cp after checking @gmail and compare these artifacts.' },
+          { type: 'text', text: 'Use Commit-Push after checking Gmail and compare these artifacts.' },
           { type: 'attachment', attachment: { kind: 'image', name: 'composer-broken.png', path: '/mock/composer-broken.png', url: '/attachment-preview.svg', mimeType: 'image/png' } },
           { type: 'attachment', attachment: { kind: 'file', name: 'layout-notes.md', path: '/mock/layout-notes.md', mimeType: 'text/markdown' } },
         ],
+        metadata: { promptContent: [
+          { type: 'text', text: 'Use ' },
+          { type: 'mention', kind: 'skill', id: '/mock/skills/commit-push/SKILL.md', value: 'Commit-Push (cp)', label: 'Commit-Push' },
+          { type: 'text', text: ' after checking ' },
+          { type: 'mention', kind: 'plugin', id: 'gmail@remote', value: 'gmail', label: 'Gmail' },
+          { type: 'text', text: ' and compare these artifacts.' },
+        ] },
       },
       {
         id: 'conversation-assistant', role: 'assistant', status: 'complete', createdAt: '2026-08-01T12:00:01Z', parts: [
@@ -892,6 +900,7 @@ function submitPrompt(prompt: string, options?: CodexRendererSendMessageOptions)
     status: 'complete',
     createdAt: new Date().toISOString(),
     parts: [{ type: 'text', text: submittedPrompt }, ...attachmentParts],
+    ...(options?.content ? { metadata: { promptContent: normalizePromptContent(options.content) } } : {}),
   });
   activity.value = `Submitted ${submittedPrompt.split('\n').length}-line prompt with ${attachmentParts.length} attachment(s)`;
   draft.value = '';

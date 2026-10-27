@@ -6,6 +6,62 @@ import { CodexSurface } from '../src/node';
 import { MockCodexAppServer, createSurface, deferred, lastRequest, resumeResponse, testGoal, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('retains authored mentions and visible text when provider history replays an enriched prompt', async () => {
+    let sent: v2.TurnStartParams | undefined;
+    const transport = new MockCodexAppServer({
+      'turn/start': params => { sent = params; return { turn: turn('authored-turn', 'inProgress', []) }; },
+      'thread/read': () => ({ thread: thread('thread-existing', false) }),
+      'thread/rollback': () => ({ thread: thread('thread-existing', false) }),
+      'thread/turns/list': () => ({ data: sent ? [turn('authored-turn', 'completed', [{
+        type: 'userMessage', id: 'provider-user', clientId: sent.clientUserMessageId ?? null, content: sent.input,
+      }])] : [], nextCursor: null, backwardsCursor: null }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    try {
+      await surface.connect();
+      const content = [{ type: 'mention' as const, kind: 'custom' as const, id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' }];
+      await surface.sendMessage('Alex\n<context>Selected agent: agent:1</context>', { content });
+      const id = sent!.clientUserMessageId;
+      transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('authored-turn', 'completed', []) });
+      await surface.readConversationHistory('thread-existing');
+      expect(surface.getSnapshot().messages.find(message => message.id === id)).toMatchObject({
+        parts: [{ type: 'text', text: 'Alex' }], metadata: { promptContent: content },
+      });
+      await surface.retryTurn('authored-turn');
+      expect(surface.getSnapshot().messages.find(message => message.id === sent!.clientUserMessageId)?.metadata?.promptContent).toStrictEqual(content);
+      transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('authored-turn', 'completed', []) });
+      const edited = [...content, { type: 'text' as const, text: ' now' }];
+      await surface.editTurn('authored-turn', 'Alex now', { content: edited });
+      expect(surface.getSnapshot().messages.find(message => message.id === sent!.clientUserMessageId)?.metadata?.promptContent).toStrictEqual(edited);
+    } finally {
+      await surface.close();
+    }
+  });
+
+  it('retains selected parts through queue edits and clears them when replaced by plain text', async () => {
+    const { surface, transport } = createSurface('turn/start', 'turn/steer');
+    try {
+      await surface.connect();
+      await surface.sendMessage('Start');
+      const content = [{ type: 'mention' as const, kind: 'custom' as const, id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' }];
+      await surface.sendMessage('Alex', { content });
+      const id = surface.getSnapshot().queuedPrompts[0]!.id;
+      const edited = [...content, { type: 'text' as const, text: ' later' }];
+      await surface.updateQueuedPrompt(id, 'Alex later', { content: edited });
+      expect(surface.getSnapshot().queuedPrompts[0]?.options?.content).toStrictEqual(edited);
+      await surface.steerQueuedPrompt(id);
+      expect(surface.getSnapshot().messages.find(message => message.kind === 'steer')?.metadata?.promptContent).toStrictEqual(edited);
+      await surface.sendMessage('Alex', { content });
+      const plainId = surface.getSnapshot().queuedPrompts[0]!.id;
+      await surface.updateQueuedPrompt(plainId, 'literal @agent:1');
+      expect(surface.getSnapshot().queuedPrompts[0]?.options?.content).toBeUndefined();
+      await surface.steerQueuedPrompt(plainId);
+      expect(lastRequest(transport, 'turn/steer')).toMatchObject({ params: { input: [{ type: 'text', text: 'literal @agent:1', text_elements: [] }] } });
+    } finally {
+      await surface.close();
+    }
+  });
+
   it.each(['response-first', 'notification-first'] as const)(
     'retains observed live turn timing until provider timing arrives (%s)', async (order) => {
       vi.useFakeTimers({ toFake: ['Date'] });
@@ -644,7 +700,7 @@ describe('CodexSurface', () => {
     });
   });
 
-  it('derives skill inputs from plain prompts and rejects renderer-supplied skill paths outside the catalog', async () => {
+  it('dispatches only explicit skills and preserves authored content while rejecting untrusted skill paths', async () => {
     const transport = new MockCodexAppServer({
       'skills/list': () => ({
         data: [{
@@ -655,6 +711,7 @@ describe('CodexSurface', () => {
         }],
       }),
       'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
+      'turn/steer': () => ({ turnId: 'turn-live' }),
     });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     await surface.connect();
@@ -670,6 +727,45 @@ describe('CodexSurface', () => {
       skills: [{ name: 'disabled', path: '/trusted/disabled/SKILL.md' }],
     })).rejects.toThrow("Skill 'disabled' is not an enabled skill");
 
+    await surface.sendMessage('Use $pdf and /pdf');
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: {
+      input: [{ type: 'text', text: 'Use $pdf and /pdf', text_elements: [] }],
+    } });
+    const content = [
+      { type: 'text' as const, text: 'Literal $pdf then ' },
+      { type: 'mention' as const, kind: 'skill' as const, id: '/trusted/pdf/SKILL.md', value: 'pdf', label: 'PDF tools' },
+      { type: 'mention' as const, kind: 'file' as const, id: '/project/README.md', value: '/project/README.md', label: 'README.md' },
+      { type: 'mention' as const, kind: 'plugin' as const, id: 'gmail@remote', value: 'gmail', label: 'Gmail' },
+    ];
+    const context = '\n\n<context>Keep PDF tools and $pdf exactly here.</context>';
+    const visible = 'Literal $pdf then PDF toolsREADME.mdGmail';
+    const dispatched = 'Literal $pdf then [$pdf](/trusted/pdf/SKILL.md)@/project/README.md@gmail';
+    await surface.steerMessage(visible + context, { content });
+    expect(lastRequest(transport, 'turn/steer')).toMatchObject({ params: { input: [
+      { type: 'text', text: dispatched + context, text_elements: [] },
+      { type: 'mention', name: 'README.md', path: '/project/README.md' },
+      { type: 'mention', name: 'Gmail', path: 'plugin://gmail@remote' },
+      { type: 'skill', name: 'pdf', path: '/trusted/pdf/SKILL.md' },
+    ] } });
+    expect(surface.getSnapshot().messages.find(message => message.kind === 'steer')?.metadata?.promptContent).toStrictEqual(content);
+    expect(surface.getSnapshot().messages.find(message => message.kind === 'steer')?.parts).toStrictEqual([{ type: 'text', text: visible }]);
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
+    await surface.sendMessage(dispatched + context, { content });
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: { input: [
+      { type: 'text', text: dispatched + context, text_elements: [] },
+      { type: 'mention', name: 'README.md', path: '/project/README.md' },
+      { type: 'mention', name: 'Gmail', path: 'plugin://gmail@remote' },
+      { type: 'skill', name: 'pdf', path: '/trusted/pdf/SKILL.md' },
+    ] } });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
+    await surface.sendMessage(visible + context, { content });
+    expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: { input: [
+      { type: 'text', text: dispatched + context, text_elements: [] },
+      { type: 'mention', name: 'README.md', path: '/project/README.md' },
+      { type: 'mention', name: 'Gmail', path: 'plugin://gmail@remote' },
+      { type: 'skill', name: 'pdf', path: '/trusted/pdf/SKILL.md' },
+    ] } });
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
     await surface.sendMessage('Use $pdf and /pdf', {
       skills: [{ name: 'pdf', path: '/trusted/pdf/SKILL.md' }],
     });

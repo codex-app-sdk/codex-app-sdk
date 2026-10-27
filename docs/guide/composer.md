@@ -6,17 +6,34 @@ and the standard model/reasoning selector.
 
 ## Canonical prompt syntax
 
-The editor renders rich chips while preserving plain Codex prompt text:
+Typing a trigger opens suggestions. Accepting a suggestion creates a chip;
+typing or pasting the same characters without accepting leaves literal text:
 
 | Prefix | Meaning | Catalog source |
 | --- | --- | --- |
-| `/` | Commands and slash-invoked skills | `commands`, `skills` |
+| `/` | Commands | `commands` |
 | `$` | Codex skill mention | `skills` |
 | `@` | Plugin, file, or host-defined mention | `plugins`, `files`, `mentionGroups` |
 
-`$skill`, `@plugin`, and `@path` remain in the submitted text. The SDK does not
-replace them with private editor markup. File suggestions require a host-supplied
-file catalog, normally backed by a conversation with a working directory.
+Submissions containing chips include `options.content`, a portable sequence of
+text and selected mentions. The prompt string contains the same visible labels
+as the editor. Literal `$cp` stays `$cp`; an accepted skill chip retains its
+saved label and selected target separately. File suggestions require a
+host-supplied file catalog, normally backed by a conversation working directory.
+
+Preserve `CodexComposerState.content` with saved drafts, forward `options.content`
+through send/steer and queued edits, and persist message `metadata.promptContent`.
+Desktop and native clients can render saved labels without loading skill catalogs.
+Use core's `promptContentText`, `slicePromptContent`, and
+`replacePromptContentRange` when manipulating authored content.
+
+Use `promptContentDispatchText(content, prompt)` when constructing model input.
+For example, literal `$cp` followed by a selected skill labeled "Commit and push"
+is sent as `$cp and [$cp](/skills/cp/SKILL.md)`, while the conversation continues
+to display `$cp and Commit and push`. The helper preserves context appended after
+the authored text and accepts already projected prompts without changing them.
+Codex surfaces apply this automatically on send and steer; other provider adapters
+use the same core helper before adding their context.
 
 Clicking a command inserts its slash text, or submits it when `submitOnSelect`
 is set. With the slash menu open, `Enter` executes the highlighted command;

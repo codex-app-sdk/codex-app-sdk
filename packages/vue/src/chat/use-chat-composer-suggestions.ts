@@ -4,11 +4,11 @@ import type {
   CodexCommandSummary,
   CodexSkillSummary,
 } from './contracts'
-import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface'
+import type { CodexPromptMention, CodexSurfacePlugin } from '@codex-app-sdk/core/surface'
 import { findActiveFileMention, findActivePluginMention } from './composer-mentions'
 import { filterFileSearchItems } from './file-search'
 import { filterComposerCommands, findActiveCommandSlash } from './composer-commands'
-import { filterComposerSkills, findActiveSkillTrigger, skillInsertText } from './composer-skills'
+import { filterComposerSkills, findActiveSkillTrigger } from './composer-skills'
 import { filterComposerPlugins } from './composer-plugins'
 import {
   filterComposerMentionGroups,
@@ -36,6 +36,7 @@ type ChatComposerSuggestionOptions<Payload = unknown> = {
   skillsEnabled: () => boolean
   editor: Ref<{
     getSelectionRange: () => { end: number; start: number; valid: boolean }
+    insertMention: (mention: CodexPromptMention, start: number, end: number) => void
   } | null>
 }
 
@@ -220,20 +221,20 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     if (!mention || !options.editor.value) {
       return
     }
-    insert(`@${file.path} `, mention.start, mention.end)
+    insertMention({ type: 'mention', kind: 'file', id: file.path, value: file.path, label: file.name }, mention.start, mention.end)
   }
 
   function selectSkill(skill: CodexSkillSummary): void {
     const mention = activeSkillSlash.value
     if (mention) {
-      insert(`$${skillInsertText(skill)} `, mention.start, mention.end)
+      insertMention({ type: 'mention', kind: 'skill', id: skill.path, value: skill.name, label: skill.displayName || skill.name }, mention.start, mention.end)
     }
   }
 
   function selectPlugin(plugin: CodexSurfacePlugin): void {
     const mention = activePluginMention.value
     if (mention) {
-      insert(`@${plugin.name || plugin.id} `, mention.start, mention.end)
+      insertMention({ type: 'mention', kind: 'plugin', id: plugin.id, value: plugin.name || plugin.id, label: plugin.displayName || plugin.name }, mention.start, mention.end)
     }
   }
 
@@ -243,7 +244,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   ): void {
     const mention = activeFileMention.value
     if (!mention) return
-    insert(`@${item.value} `, mention.start, mention.end)
+    insertMention({ type: 'mention', kind: 'custom', id: item.id, value: item.value, label: item.label, groupId: group.id }, mention.start, mention.end)
     const catalogGroup = options.mentionGroups?.().find((candidate) => candidate.id === group.id) ?? group
     options.onMentionSelected?.(item, catalogGroup)
   }
@@ -251,7 +252,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   function selectSlashSkill(skill: CodexSkillSummary): void {
     const mention = activeCommandSlash.value
     if (mention) {
-      insert(`/${skillInsertText(skill)} `, mention.start, mention.end)
+      insertMention({ type: 'mention', kind: 'skill', id: skill.path, value: skill.name, label: skill.displayName || skill.name }, mention.start, mention.end)
     }
   }
 
@@ -294,6 +295,14 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
     if (skill) {
       selectSlashSkill(skill)
     }
+  }
+
+  function insertMention(part: CodexPromptMention, start: number, end: number): void {
+    options.editor.value?.insertMention(part, start, end)
+    const nextCaret = start + part.label.length + 1
+    options.caretPosition.value = nextCaret
+    close()
+    options.onTextInserted(nextCaret)
   }
 
   function insert(value: string, start: number, end: number): void {

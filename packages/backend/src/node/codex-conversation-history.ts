@@ -1,3 +1,4 @@
+import { normalizePromptContent, promptContentText } from '@codex-app-sdk/core/surface';
 import type { Thread } from '../codex/generated/v2/Thread';
 import type { ThreadItem } from '../codex/generated/v2/ThreadItem';
 import type { Turn } from '../codex/generated/v2/Turn';
@@ -67,6 +68,21 @@ export function preserveHistoricalAttachmentPreviews(
       return { ...part, attachment: { ...part.attachment, url: previewUrl } };
     });
     return changed ? { ...message, parts } : message;
+  });
+}
+
+/** Preserve authored presentation by provider-echoed client identity, never text matching. */
+export function preserveHistoricalMessagePresentation(previous: readonly SurfaceMessage[], history: readonly SurfaceMessage[]): SurfaceMessage[] {
+  const authored = new Map(previous.filter(message => message.role === 'user' && message.metadata?.promptContent)
+    .map(message => [message.id, message.metadata!.promptContent]));
+  return preserveHistoricalAttachmentPreviews(previous, history).map(message => {
+    const saved = authored.get(message.id);
+    if (!saved || message.role !== 'user') return message;
+    const content = normalizePromptContent(saved);
+    return {
+      ...message, metadata: { ...message.metadata, promptContent: content },
+      parts: [{ type: 'text', text: promptContentText(content) }, ...message.parts.filter(part => part.type !== 'text')],
+    };
   });
 }
 

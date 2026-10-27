@@ -94,8 +94,8 @@ describe('useCodexSurface', () => {
     expect(api.deleteConversation).toHaveBeenCalledWith('thread-delete');
     expect(api.deleteTurn).toHaveBeenCalledWith('turn-2');
     expect(api.deleteQueuedPrompt).toHaveBeenCalledWith('queued-1');
-    expect(api.updateQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited queue');
-    expect(api.editTurn).toHaveBeenCalledWith('turn-1', 'Replacement');
+    expect(api.updateQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited queue', undefined);
+    expect(api.editTurn).toHaveBeenCalledWith('turn-1', 'Replacement', undefined);
     expect(api.forkTurn).toHaveBeenCalledWith('turn-4');
     expect(api.readConversationHistory).toHaveBeenCalledWith('thread-1');
     expect(api.renameConversation).toHaveBeenCalledWith('Renamed');
@@ -117,7 +117,7 @@ describe('useCodexSurface', () => {
     expect(api.respondToClientRequest).toHaveBeenCalledWith({ id: 'question-1', payload: { answers: {} } });
     expect(api.resolveApproval).toHaveBeenCalledWith('approval-1', 'approve', 'session');
     expect(api.retryTurn).toHaveBeenCalledWith('turn-3');
-    expect(api.steerQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited steer');
+    expect(api.steerQueuedPrompt).toHaveBeenCalledWith('queued-2', 'Edited steer', undefined);
     scope.stop();
     expect(unsubscribe).toHaveBeenCalledOnce();
   });

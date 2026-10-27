@@ -48,6 +48,7 @@
           v-if="isEditing"
           :cancel-label="t('chat.actions.cancel')"
           :content="visibleUserContent"
+          :prompt-content="chatMessage.promptContent"
           :input-label="t('chat.actions.editPrompt')"
           :save-label="t('chat.actions.resubmit')"
           @cancel="cancelEdit"
@@ -253,7 +254,7 @@ const emit = defineEmits<{
   'open-visualization': [visualization: CodexConversationVisualization]
   'copy-message': [index: number]
   'delete-turn': [turnId: string]
-  'edit-turn': [payload: { content: string; turnId: string }]
+  'edit-turn': [payload: { content: string; turnId: string; options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions }]
   'fork-turn': [turnId: string]
   'quote-message': [index: number]
   'retry-turn': [turnId: string]
@@ -394,10 +395,10 @@ function cancelEdit() {
   isEditing.value = false
 }
 
-function saveEdit(content: string) {
+function saveEdit(content: string, options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions) {
   const turnId = chatMessage.value.turnId
   if (!turnId) return
-  emit('edit-turn', { content, turnId })
+  emit('edit-turn', { content, turnId, ...(options ? { options } : {}) })
   cancelEdit()
 }
 

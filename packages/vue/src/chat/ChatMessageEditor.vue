@@ -1,6 +1,17 @@
 <template>
   <div class="codex-chat-theme chat-message__edit-card">
+    <ChatRichTextEditor
+      v-if="promptContent?.some(part => part.type === 'mention')"
+      ref="richInput"
+      v-model="draft"
+      :content="promptContent"
+      :aria-label="inputLabel"
+      class="chat-message__edit-input"
+      @keydown="handleRichKeydown"
+      @paste="handlePaste"
+    />
     <textarea
+      v-else
       ref="input"
       v-model="draft"
       class="chat-message__edit-input"
@@ -26,11 +37,14 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { trimPromptContent, type CodexPromptPart, type CodexRendererSendMessageOptions } from '@codex-app-sdk/core/surface'
+import ChatRichTextEditor, { type CodexRichTextEditorExpose } from './ChatRichTextEditor.vue'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
   cancelLabel: string
   content: string
+  promptContent?: readonly CodexPromptPart[]
   inputLabel: string
   saveLabel: string
 }>()
@@ -39,11 +53,12 @@ const props = defineProps<{
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const emit = defineEmits<{
   cancel: []
-  save: [content: string]
+  save: [content: string, options?: Pick<CodexRendererSendMessageOptions, 'content'>]
 }>()
 // Stryker restore all
 
 const draft = ref(props.content)
+const richInput = ref<CodexRichTextEditorExpose | null>(null)
 const input = ref<HTMLTextAreaElement | null>(null)
 let focusFrame: number | null = null
 
@@ -53,6 +68,11 @@ watch(() => props.content, (content) => {
 
 onMounted(() => {
   focusFrame = requestAnimationFrame(() => {
+    if (richInput.value) {
+      richInput.value.focusEnd()
+      focusFrame = null
+      return
+    }
     const element = input.value!
     element.focus()
     element.setSelectionRange(element.value.length, element.value.length)
@@ -70,10 +90,27 @@ function cancel(): void {
   emit('cancel')
 }
 
+function handlePaste(event: ClipboardEvent): void {
+  if (!event.clipboardData) return;
+  event.preventDefault();
+  const text = event.clipboardData.getData('text/plain');
+  if (text) richInput.value?.insertTextAtSelection(text);
+}
+
+function handleRichKeydown(event: KeyboardEvent): void {
+  if (event.isComposing) return;
+  if (event.key === 'Escape') { event.preventDefault(); cancel(); }
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  if (event.metaKey || event.ctrlKey) save();
+  else richInput.value?.insertTextAtSelection('\n');
+}
+
 function save(): void {
   const content = draft.value.trim()
   if (content) {
-    emit('save', content)
+    if (richInput.value) emit('save', content, { content: trimPromptContent(richInput.value.readContent()) })
+    else emit('save', content)
   }
 }
 </script>

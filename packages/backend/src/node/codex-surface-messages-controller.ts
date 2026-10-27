@@ -1,3 +1,4 @@
+import { promptContentDispatchText, promptContentText } from '@codex-app-sdk/core/surface';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
@@ -32,7 +33,9 @@ import {
   parseGoalSlashCommand,
   parsePlanSlashCommand,
   parseReviewSlashCommand,
-  promptSkillInputsFromText,
+  authoredPromptContent,
+  promptSkillInputsFromContent,
+  promptMentionInputs,
   validateSkillInputs,
 } from './codex-surface-prompts';
 import { turnSettings } from './codex-surface-settings';
@@ -210,9 +213,11 @@ export class CodexSurfaceMessagesController {
   ): Promise<void> {
     const runtime = this.host.requireRuntime(threadId);
     const normalizedOptions = validatedSendOptions(this.host.snapshotForRuntime(runtime), options);
-    const visibleText = displayText?.trim() || text;
+    const content = authoredPromptContent(normalizedOptions.content);
+    if (content) normalizedOptions.content = content;
+    const visibleText = content ? promptContentText(content) : displayText?.trim() || text;
     const skillInputs = mergeSkillInputs(
-      promptSkillInputsFromText(text, runtime.skills),
+      validateSkillInputs(promptSkillInputsFromContent(content), runtime.skills),
       validateSkillInputs(normalizedOptions.skills ?? [], runtime.skills),
     );
     const attachments = validateAttachments(normalizedOptions.attachments ?? []);
@@ -240,6 +245,7 @@ export class CodexSurfaceMessagesController {
       createdAt: new Date().toISOString(),
       metadata: {
         conversationId: threadId,
+        ...(content ? { promptContent: content } : {}),
         ...(attachments.length > 0 ? { attachments } : {}),
       },
     };
@@ -259,8 +265,9 @@ export class CodexSurfaceMessagesController {
         threadId,
         clientUserMessageId: messageId,
         input: [
-          { type: 'text', text, text_elements: [] },
+          { type: 'text', text: promptContentDispatchText(content ?? [], text), text_elements: [] },
           ...attachments.map(attachmentInput),
+          ...promptMentionInputs(content),
           ...skillInputs.map((skill) => ({ type: 'skill' as const, name: skill.name, path: skill.path })),
         ],
         ...turnSettings(this.host.snapshotForRuntime(runtime), normalizedOptions),
@@ -324,7 +331,12 @@ export class CodexSurfaceMessagesController {
   ): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     const text = prompt.trim();
-    const visibleText = displayText?.trim() || text;
+    const content = authoredPromptContent(options.content);
+    const skillInputs = mergeSkillInputs(
+      validateSkillInputs(promptSkillInputsFromContent(content), runtime.skills),
+      validateSkillInputs(options.skills ?? [], runtime.skills),
+    );
+    const visibleText = content ? promptContentText(content) : displayText?.trim() || text;
     if (!text) throw new Error('Cannot steer with an empty message');
     if (!runtime.activeTurnId) throw new Error('There is no active turn to steer');
     const attachments = validateAttachments(options.attachments ?? []);
@@ -337,6 +349,7 @@ export class CodexSurfaceMessagesController {
       metadata: {
         conversationId: threadId,
         turnId: runtime.activeTurnId,
+        ...(content ? { promptContent: content } : {}),
         ...(attachments.length > 0 ? { attachments } : {}),
       },
     };
@@ -356,8 +369,10 @@ export class CodexSurfaceMessagesController {
         expectedTurnId: runtime.activeTurnId,
         clientUserMessageId: messageId,
         input: [
-          { type: 'text', text, text_elements: [] },
+          { type: 'text', text: promptContentDispatchText(content ?? [], text), text_elements: [] },
           ...attachments.map(attachmentInput),
+          ...promptMentionInputs(content),
+          ...skillInputs.map(skill => ({ type: 'skill' as const, name: skill.name, path: skill.path })),
         ],
       });
       const wasKnownTurn = runtime.turnIds.includes(response.turnId);
@@ -419,13 +434,13 @@ export class CodexSurfaceMessagesController {
     this.emitQueuedPrompts(runtime.threadId);
   }
 
-  async updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot> {
+  async updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.updateQueuedPromptForThread(threadId, promptId, prompt);
+    await this.updateQueuedPromptForThread(threadId, promptId, prompt, options);
     return this.host.getSnapshot();
   }
 
-  async updateQueuedPromptForThread(threadId: string, promptId: string, prompt: string): Promise<void> {
+  async updateQueuedPromptForThread(threadId: string, promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     const text = prompt.trim();
     if (!text) throw new Error('Cannot update a queued prompt with empty content');
@@ -433,20 +448,25 @@ export class CodexSurfaceMessagesController {
     const queuedPrompts = runtime.queuedPrompts.map((candidate) => {
       if (candidate.id !== promptId) return candidate;
       found = true;
-      return { ...candidate, text };
+      const content = authoredPromptContent(options?.content);
+      validateSkillInputs(promptSkillInputsFromContent(content), runtime.skills);
+      const nextOptions = { ...candidate.options, ...options };
+      if (content) nextOptions.content = content;
+      else delete nextOptions.content;
+      return { ...candidate, text, options: nextOptions };
     });
     if (!found) throw new Error(`Unknown queued prompt '${promptId}'`);
     this.host.patchRuntime(runtime.threadId, { queuedPrompts });
     this.emitQueuedPrompts(runtime.threadId);
   }
 
-  async steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot> {
+  async steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.steerQueuedPromptForThread(threadId, promptId, prompt);
+    await this.steerQueuedPromptForThread(threadId, promptId, prompt, options);
     return this.host.getSnapshot();
   }
 
-  async steerQueuedPromptForThread(threadId: string, promptId: string, replacement?: string): Promise<void> {
+  async steerQueuedPromptForThread(threadId: string, promptId: string, replacement?: string, options?: SendCodexMessageOptions): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     const prompt = runtime.queuedPrompts.find((candidate) => candidate.id === promptId);
     if (!prompt) throw new Error(`Unknown queued prompt '${promptId}'`);
@@ -455,8 +475,9 @@ export class CodexSurfaceMessagesController {
     });
     this.emitQueuedPrompts(runtime.threadId);
     const text = replacement ?? prompt.text;
-    if (runtime.busy) await this.steerForThread(threadId, text, prompt.options);
-    else await this.sendToThread(threadId, text, prompt.options);
+    const sendOptions = replacement === undefined ? prompt.options : { ...prompt.options, ...options, content: options?.content };
+    if (runtime.busy) await this.steerForThread(threadId, text, sendOptions);
+    else await this.sendToThread(threadId, text, sendOptions);
   }
 
   async sendNextQueuedPrompt(threadId: string): Promise<void> {

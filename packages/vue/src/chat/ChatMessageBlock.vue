@@ -3,6 +3,7 @@
     <ChatUserText
       class="chat-message-block chat-message-block--text"
       :content="block.content"
+      :prompt-content="block.promptContent"
       :mention-groups="mentionGroups"
       :plugins="plugins"
       :skills="skills"

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import ChatUserText from '../../src/chat/ChatUserText.vue';
 import { humanizeMentionName, parseCodexUserText } from '../../src/chat/user-text';
 import { SparklesIcon } from '../../src/icons/app-icons';
-import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
+import type { CodexPromptMention, CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 
 const gmail: CodexSurfacePlugin = {
   id: 'gmail@openai-curated-remote',
@@ -26,7 +26,25 @@ const bankSkill: CodexSurfaceSkill = {
   enabled: true,
 };
 
+const gmailMention: CodexPromptMention = { type: 'mention', kind: 'plugin', id: gmail.id, value: gmail.name, label: 'Gmail' };
+const bankMention: CodexPromptMention = { type: 'mention', kind: 'skill', id: bankSkill.path, value: bankSkill.name, label: 'Update Bank Balance Sheet' };
+
 describe('ChatUserText', () => {
+  it('renders saved file and agent labels without a catalog and never relabels them from later catalogs', async () => {
+    const wrapper = mount(ChatUserText, { props: {
+      content: 'README.md Alex', promptContent: [
+        { type: 'mention', kind: 'file', id: '/project/README.md', label: 'README.md', value: '/project/README.md' },
+        { type: 'text', text: ' ' },
+        { type: 'mention', kind: 'custom', id: 'agent-1', label: 'Alex', value: 'agent:1', groupId: 'agents' },
+      ],
+    } });
+    expect(wrapper.get('.chat-user-text__mention--file').text()).toBe('README.md');
+    expect(wrapper.get('.chat-user-text__mention--file svg').classes()).toContain('tabler-icon-file-text');
+    expect(wrapper.get('.chat-user-text__mention--custom').text()).toBe('Alex');
+    await wrapper.setProps({ mentionGroups: [{ id: 'agents', label: 'Agents', items: [{ id: 'agent-1', value: 'agent:1', label: 'Renamed agent' }] }] });
+    expect(wrapper.get('.chat-user-text__mention--custom').text()).toBe('Alex');
+    expect(wrapper.text()).not.toContain('/project/');
+  });
   it('renders exact app-server plugin and skill metadata as inert rich mentions', () => {
     const wrapper = mount(ChatUserText, {
       props: {
@@ -36,6 +54,7 @@ describe('ChatUserText', () => {
         ].join('\n'),
         plugins: [gmail],
         skills: [bankSkill],
+        promptContent: [{ type: 'text', text: 'Use ' }, gmailMention, { type: 'text', text: '\nthen ' }, bankMention],
       },
     });
 
@@ -54,27 +73,19 @@ describe('ChatUserText', () => {
     expect(wrapper.text()).not.toContain('/Users/nbonamy');
   });
 
-  it('renders plain skill and plugin prompts as compact inline chips', () => {
-    const wrapper = mount(ChatUserText, {
-      props: {
-        content: 'Use $update-bank-balance-sheet and @gmail',
-        plugins: [gmail],
-        skills: [bankSkill],
-      },
-    });
-
-    const mentions = wrapper.findAll('.chat-user-text__mention');
-    expect(mentions).toHaveLength(2);
-    expect(mentions[0]?.text()).toBe('Update Bank Balance Sheet');
-    expect(mentions[1]?.text()).toBe('Gmail');
-    expect(wrapper.text()).not.toContain('$update-bank-balance-sheet');
-    expect(wrapper.text()).not.toContain('@gmail');
+  it('leaves typed skill and plugin triggers literal despite matching catalogs', () => {
+    const wrapper = mount(ChatUserText, { props: {
+      content: 'Use $update-bank-balance-sheet and @gmail', plugins: [gmail], skills: [bankSkill],
+    } });
+    expect(wrapper.find('.chat-user-text__mention').exists()).toBe(false);
+    expect(wrapper.text()).toBe('Use $update-bank-balance-sheet and @gmail');
   });
 
   it('renders host mentions with app-owned message content', () => {
     const wrapper = mount(ChatUserText, {
       props: {
-        content: 'Ask @thread:019abc',
+        content: 'Ask codex-claw',
+        promptContent: [{ type: 'text', text: 'Ask ' }, { type: 'mention', kind: 'custom', id: 'thread-1', value: 'thread:019abc', label: 'codex-claw', groupId: 'threads' }],
         mentionGroups: [{
           id: 'threads',
           label: 'Threads',
@@ -104,7 +115,8 @@ describe('ChatUserText', () => {
     };
     const wrapper = mount(ChatUserText, {
       props: {
-        content: 'Use $clean-up-dropbox-content',
+        content: 'Use dropbox:clean-up-dropbox-content',
+        promptContent: [{ type: 'text', text: 'Use ' }, { type: 'mention', kind: 'skill', id: cleanup.path, value: cleanup.name, label: 'dropbox:clean-up-dropbox-content' }],
         plugins: [dropbox],
         skills: [cleanup],
       },
@@ -115,31 +127,17 @@ describe('ChatUserText', () => {
     expect(wrapper.text()).not.toContain(dropbox.name);
   });
 
-  it('matches display names and parenthesized skill aliases case-insensitively', () => {
-    const commitPush: CodexSurfaceSkill = {
-      name: 'Commit-Push (cp)',
-      path: '/Users/nbonamy/.codex/skills/commit-push/SKILL.md',
-      enabled: true,
-    };
-    const wrapper = mount(ChatUserText, {
-      props: {
-        content: 'Use $Commit-Push (cp) or $cp',
-        skills: [commitPush],
-      },
-    });
-
-    const mentions = wrapper.findAll('.chat-user-text__mention--skill');
-    expect(mentions).toHaveLength(2);
-    expect(mentions.every((mention) => mention.text() === 'Commit-Push (cp)')).toBe(true);
-  });
-
-  it('falls back immediately and enriches reactively when catalogs arrive', async () => {
+  it('preserves saved labels while optional catalog artwork arrives', async () => {
     const content = [
       'Open [@app-694546cd042881919bb746a8dc300f38]',
       '(plugin://app-694546cd042881919bb746a8dc300f38@openai-curated-remote)',
       'with [$release-check](/skills/release-check/SKILL.md).',
     ].join('');
-    const wrapper = mount(ChatUserText, { props: { content } });
+    const wrapper = mount(ChatUserText, { props: { content, promptContent: [
+      { type: 'mention', kind: 'plugin', id: 'app-694546cd042881919bb746a8dc300f38@openai-curated-remote', value: 'app', label: 'App' },
+      { type: 'text', text: ' with ' },
+      { type: 'mention', kind: 'skill', id: '/skills/release-check/SKILL.md', value: 'release-check', label: 'Release Check' },
+    ] } });
 
     expect(wrapper.get('.chat-user-text__mention--plugin').text()).toBe('App');
     expect(wrapper.get('.chat-user-text__mention--skill').text()).toBe('Release Check');
@@ -160,14 +158,14 @@ describe('ChatUserText', () => {
       }],
     });
 
-    expect(wrapper.get('.chat-user-text__mention--plugin').text()).toBe('Skyscanner');
-    expect(wrapper.get('.chat-user-text__mention--skill').text()).toBe('Release Readiness');
+    expect(wrapper.get('.chat-user-text__mention--plugin').text()).toBe('App');
+    expect(wrapper.get('.chat-user-text__mention--skill').text()).toBe('Release Check');
   });
 
   it('uses a generic icon when a catalog icon cannot load', async () => {
     const wrapper = mount(ChatUserText, {
       props: {
-        content: 'Use [@gmail](plugin://gmail@openai-curated-remote)',
+        content: 'Use Gmail', promptContent: [{ type: 'text', text: 'Use ' }, gmailMention],
         plugins: [gmail],
       },
     });
@@ -181,7 +179,7 @@ describe('ChatUserText', () => {
     const iconSmall = 'data:image/svg+xml;base64,PHN2Zy8+';
     const wrapper = mount(ChatUserText, {
       props: {
-        content: 'Use [$update-bank-balance-sheet](/Users/nbonamy/.codex/skills/update-bank-balance-sheet/SKILL.md)',
+        content: 'Use Update Bank Balance Sheet', promptContent: [{ type: 'text', text: 'Use ' }, bankMention],
         skills: [{ ...bankSkill, iconSmall }],
       },
     });
@@ -195,7 +193,7 @@ describe('ChatUserText', () => {
   it('renders distinct light and dark plugin icons without duplicating identical icons', async () => {
     const wrapper = mount(ChatUserText, {
       props: {
-        content: '@gmail',
+        content: 'Gmail', promptContent: [gmailMention],
         plugins: [{
           ...gmail,
           iconUrl: 'https://files.openai.com/gmail-light.png',
@@ -233,7 +231,7 @@ describe('ChatUserText', () => {
     ['data:image/heic;base64,YQ==', false],
   ])('accepts only a bounded mention icon URL %s: %s', (iconUrl, accepted) => {
     const wrapper = mount(ChatUserText, {
-      props: { content: '@gmail', plugins: [{ ...gmail, iconUrl }] },
+      props: { content: 'Gmail', promptContent: [gmailMention], plugins: [{ ...gmail, iconUrl }] },
     });
 
     expect(wrapper.find('img').exists()).toBe(accepted);
@@ -251,7 +249,7 @@ describe('ChatUserText', () => {
     ['', false],
   ])('accepts only an anchored mention color %s: %s', (brandColor, accepted) => {
     const wrapper = mount(ChatUserText, {
-      props: { content: '@gmail', plugins: [{ ...gmail, brandColor }] },
+      props: { content: 'Gmail', promptContent: [gmailMention], plugins: [{ ...gmail, brandColor }] },
     });
 
     expect(wrapper.get('.chat-user-text__mention').attributes('style')?.includes(brandColor) ?? false)
@@ -261,16 +259,16 @@ describe('ChatUserText', () => {
   it('uses skill-owned color and title precedence independently from plugins', () => {
     const short = mount(ChatUserText, {
       props: {
-        content: '$update-bank-balance-sheet',
+        content: 'Update Bank Balance Sheet', promptContent: [bankMention],
         skills: [{ ...bankSkill, brandColor: '#123abc', shortDescription: 'Short skill summary' }],
       },
     });
     const description = mount(ChatUserText, {
-      props: { content: '$update-bank-balance-sheet', skills: [bankSkill] },
+      props: { content: 'Update Bank Balance Sheet', promptContent: [bankMention], skills: [bankSkill] },
     });
     const fallback = mount(ChatUserText, {
       props: {
-        content: '$update-bank-balance-sheet',
+        content: 'Update Bank Balance Sheet', promptContent: [bankMention],
         skills: [{ ...bankSkill, description: undefined, displayName: undefined }],
       },
     });
@@ -280,7 +278,7 @@ describe('ChatUserText', () => {
     expect(description.get('.chat-user-text__mention').attributes('title'))
       .toBe('Update balances in the workbook');
     expect(fallback.get('.chat-user-text__mention').attributes('title'))
-      .toBe('update-bank-balance-sheet');
+      .toBe('Update Bank Balance Sheet');
   });
 
   it('keeps ordinary Markdown links literal and escapes all user-controlled text', () => {

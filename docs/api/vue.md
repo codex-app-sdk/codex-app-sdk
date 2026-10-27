@@ -730,29 +730,32 @@ An explicit component prop takes precedence over the provided value.
 
 - `renderMarkdown`
 - `renderCodeBlock` and `languageForFilePath`
-- `parseCodexUserText` and `humanizeMentionName`
+- `parseAuthoredUserText` for structured authored content; `parseCodexUserText`
+  and `humanizeMentionName` for explicit provider/legacy markup parsing
 - conversation-link parsing helpers
 - surface-to-chat message adapters
 
-`CodexUserText` recognizes both linked mentions and the composer’s plain
-`$skill` and `@plugin` forms when matching catalogs are supplied,
-rendering recognized names as compact mention chips.
+`CodexUserText` renders saved mentions from its `promptContent` prop. Plain text
+stays literal even when a matching skill, plugin, file, or host catalog exists.
+`CodexComposer` creates a mention only when the user accepts a suggestion, and
+emits the visible text plus `options.content` for submissions containing mentions.
+`CodexComposerState.content` preserves these parts when restoring a draft.
 
-`CodexComposer` uses the same catalog-backed chip renderer while editing. It
-keeps `$skill`, `@plugin`, and `@path` as the canonical submitted prompt text. Slash-prefixed text remains reserved for commands. Plugin and file results share the `@` suggestion menu; files appear only when the host supplies a thread/CWD-backed file catalog.
-Host-defined `CodexComposerMentionGroup` entries share that menu. Their stable
-`item.value` remains in canonical text while `item.label` is used for default
-display. `CodexComposerMentionItem`, `CodexComposerVisibleMentionGroup`,
-`filterComposerMentionGroups`, and `findComposerMention` are exported for
-custom composer implementations.
-When the composer is empty, Up recalls submitted prompts from newest to oldest
-and Down moves forward, returning to an empty prompt after the newest entry.
-Recalled prompts keep the caret at the end, and editing one exits history
-navigation. Arrow keys do not start recall while the composer contains text.
-For plugin-contributed skills whose fallback name starts with an opaque plugin
-ID, the skill picker and user-message chip replace that prefix with the matching
-plugin catalog name (for example, `dropbox:find-dropbox-content`). The original
-skill name and path remain unchanged for prompt submission.
+`CodexPromptPart` and projection/range helpers are exported by SDK core, so
+native clients can preserve and display the same content without Vue or a skill
+catalog. Surface-message adapters read `metadata.promptContent`; direct renderer
+`Message` objects use `promptContent`. Saved labels stay unchanged when catalogs
+are refreshed. Optional catalogs can supply artwork and descriptions.
+
+Plugin, file, and host-defined mention groups share the `@` menu. Their selected
+identity is stored independently from the visible label. Custom rendering slots
+receive the saved label and identity; catalogs may enrich the item payload.
+`CodexComposerMentionItem`, `CodexComposerVisibleMentionGroup`,
+`filterComposerMentionGroups`, and `findComposerMention` support host composers.
+
+When the composer is empty, Up recalls submitted prompt text and Down moves
+forward, returning to an empty prompt after the newest entry. Recalled plain-text
+entries stay literal. Editing one exits history navigation.
 
 Skill suggestions rank IDs, names, display names, and insertion aliases together:
 exact matches first, then whole words, word prefixes, and substrings.

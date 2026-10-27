@@ -8,7 +8,7 @@ import CodexComposerPluginMenu from '../src/chat/ChatComposerPluginMenu.vue';
 import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../src/chat/ChatRichTextEditor.vue';
 import { codexCommands } from '../src/chat/codex-commands';
 import type { CodexCapabilities, CodexContextUsage, CodexFileSearchItem, CodexCommandSummary, CodexConversationPresentation, CodexModelOption, CodexSkillSummary, CodexChatTranscription } from '../src/chat/contracts';
-import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
+import type { CodexPromptPart, CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import type { CodexComposerState } from '../src/composer-state';
 
 type ChatComposerProps = {
@@ -91,6 +91,29 @@ describe('ChatComposer', () => {
 
     expect(wrapper.emitted('send')).toStrictEqual([['ship the ui']]);
     expect(editorValue(wrapper)).toBe('');
+  });
+
+  it('keeps literal skill text distinct from a selected skill through submission and draft restoration', async () => {
+    const wrapper = mountComposer({ skills });
+    await setEditorValue(wrapper, '$frontend-design then $front');
+    expect(wrapper.find('[data-skill-name]').exists()).toBe(false);
+    await editor(wrapper).trigger('keyup');
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
+    const content: CodexPromptPart[] = [
+      { type: 'text', text: '$frontend-design then ' },
+      { type: 'mention', kind: 'skill', id: skills[0]!.path, value: skills[0]!.name, label: 'Frontend Design' },
+    ];
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('send')).toStrictEqual([
+      ['$frontend-design then Frontend Design', { content }],
+    ]);
+    await wrapper.setProps({ composerState: {
+      text: '$frontend-design then Frontend Design', content,
+      selectionStart: 38, selectionEnd: 38,
+    } });
+    await wrapper.setProps({ skills: [] });
+    expect(wrapper.findAll('[data-skill-name]')).toHaveLength(1);
+    expect(editor(wrapper).text()).toContain('$frontend-design then Frontend Design');
   });
 
   it('sends from the shared send button', async () => {
@@ -1253,7 +1276,7 @@ describe('ChatComposer', () => {
 
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect(editorValue(wrapper)).toBe('$frontend-design ');
+    expect(editorValue(wrapper)).toBe('Frontend Design ');
   });
 
   it('does not reopen an escaped slash menu on the Escape keyup', async () => {
@@ -1308,7 +1331,7 @@ describe('ChatComposer', () => {
 
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect(editorValue(wrapper)).toBe('@gmail ');
+    expect(editorValue(wrapper)).toBe('Gmail ');
     expect(editor(wrapper).find('[data-plugin-name="gmail"]').exists()).toBe(true);
   });
 
@@ -1338,7 +1361,7 @@ describe('ChatComposer', () => {
     await editor(wrapper).trigger('keydown', { key: 'ArrowDown' });
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect(editorValue(wrapper)).toBe('$skill-creator ');
+    expect(editorValue(wrapper)).toBe('skill-creator ');
   });
 
   it('shows slash commands before skills and submits Codex compact', async () => {
@@ -1534,7 +1557,7 @@ describe('ChatComposer', () => {
 
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect(editorValue(wrapper)).toBe('read @docs/research.md ');
+    expect(editorValue(wrapper)).toBe('read research.md ');
     expect(editor(wrapper).find('[data-file-mention="docs/research.md"]').exists()).toBe(true);
   });
 
@@ -1546,10 +1569,10 @@ describe('ChatComposer', () => {
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
     await nextTick();
 
-    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 26, end: 26 });
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 20, end: 20 });
     richEditorVm(wrapper).insertTextAtSelection('!');
     await nextTick();
-    expect(editorValue(wrapper)).toBe('inspect @docs/research.md ! then');
+    expect(editorValue(wrapper)).toBe('inspect research.md ! then');
     wrapper.unmount();
   });
 
@@ -1572,7 +1595,7 @@ describe('ChatComposer', () => {
     await editor(wrapper).trigger('keydown', { key: 'ArrowDown' });
     await editor(wrapper).trigger('keydown', { key: 'Enter' });
 
-    expect(editorValue(wrapper)).toBe('inspect @src/beta.ts ');
+    expect(editorValue(wrapper)).toBe('inspect beta.ts ');
   });
 
   it('records audio and inserts the Apple speech transcript at the caret', async () => {

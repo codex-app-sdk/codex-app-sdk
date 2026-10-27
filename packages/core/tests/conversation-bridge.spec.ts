@@ -120,7 +120,7 @@ describe('Codex conversation bridge', () => {
       ['continueInterruptedTurn', [], 'continueInterruptedTurn', []],
       ['deleteTurn', ['turn-1'], 'deleteTurn', ['turn-1']],
       ['deleteQueuedPrompt', ['queue-1'], 'deleteQueuedPrompt', ['queue-1']],
-      ['editTurn', ['turn-2', 'Edited'], 'editTurn', ['turn-2', 'Edited']],
+      ['editTurn', ['turn-2', 'Edited', undefined], 'editTurn', ['turn-2', 'Edited', undefined]],
       ['forkTurn', ['turn-3'], 'forkTurn', ['turn-3']],
       ['getSnapshot', [], 'getSnapshot', []],
       ['interrupt', [], 'interrupt', []],
@@ -135,9 +135,9 @@ describe('Codex conversation bridge', () => {
       ['setGoal', ['Ship it', 500], 'setGoal', ['Ship it', 500]],
       ['startReview', [], 'startReview', [undefined]],
       ['steerMessage', ['Adjust'], 'steerMessage', ['Adjust', undefined]],
-      ['steerQueuedPrompt', ['queue-2'], 'steerQueuedPrompt', ['queue-2', undefined]],
+      ['steerQueuedPrompt', ['queue-2'], 'steerQueuedPrompt', ['queue-2', undefined, undefined]],
       ['updateConversationSettings', [{ planMode: true }], 'updateSettings', [{ planMode: true }]],
-      ['updateQueuedPrompt', ['queue-3', 'Updated'], 'updateQueuedPrompt', ['queue-3', 'Updated']],
+      ['updateQueuedPrompt', ['queue-3', 'Updated', undefined], 'updateQueuedPrompt', ['queue-3', 'Updated', undefined]],
     ] as const;
 
     expect(cases.map(([operation]) => operation)).toStrictEqual([...codexConversationBridgeOperations]);

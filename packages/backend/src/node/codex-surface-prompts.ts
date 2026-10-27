@@ -1,3 +1,4 @@
+import { normalizePromptContent, type CodexPromptPart } from '@codex-app-sdk/core/surface';
 import type { v2 } from '../codex/index';
 import type {
   CodexSurfaceReviewTarget,
@@ -59,19 +60,20 @@ export function normalizeReviewTarget(target: CodexSurfaceReviewTarget): v2.Revi
   return { ...target };
 }
 
-export function promptSkillInputsFromText(
-  text: string,
-  skills: readonly CodexSurfaceSkill[],
-): CodexSurfaceSkillInput[] {
-  const names = new Set<string>();
-  const pattern = /(?:^|[^\w.%+-])[$/]([A-Za-z0-9_.-]+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
-    names.add(match[1]!);
-  }
-  return skills
-    .filter((skill) => skill.enabled && names.has(skill.name) && Boolean(skill.path))
-    .map((skill) => ({ name: skill.name, path: skill.path }));
+export function authoredPromptContent(content?: readonly CodexPromptPart[]): CodexPromptPart[] | undefined {
+  if (content === undefined) return undefined;
+  const normalized = normalizePromptContent(content);
+  return normalized;
+}
+
+export function promptSkillInputsFromContent(content: readonly CodexPromptPart[] = []): CodexSurfaceSkillInput[] {
+  return content.flatMap(part => part.type === 'mention' && part.kind === 'skill'
+    ? [{ name: part.value, path: part.id }] : []);
+}
+
+export function promptMentionInputs(content: readonly CodexPromptPart[] = []): Extract<v2.UserInput, { type: 'mention' }>[] {
+  return content.flatMap(part => part.type === 'mention' && (part.kind === 'file' || part.kind === 'plugin')
+    ? [{ type: 'mention' as const, name: part.label, path: part.kind === 'plugin' ? `plugin://${part.id}` : part.id }] : []);
 }
 
 export function validateSkillInputs(

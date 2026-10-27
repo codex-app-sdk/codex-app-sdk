@@ -5,6 +5,10 @@
         <span v-if="token.type === 'text'">{{ token.text }}</span>
         <code v-else-if="token.type === 'code'">{{ token.text }}</code>
         <br v-else-if="token.type === 'line-break'">
+        <span v-else-if="token.type === 'file-mention'" class="chat-user-text__mention chat-user-text__mention--file" :title="token.displayName">
+          <FileTextIcon class="chat-user-text__mention-icon" aria-hidden="true" />
+          <span class="chat-user-text__mention-label">{{ token.displayName }}</span>
+        </span>
         <slot
           v-else-if="token.type === 'custom-mention'"
           name="mention"
@@ -82,14 +86,15 @@
 
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
-import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
-import { SparklesIcon } from '../icons/app-icons';
-import { parseCodexUserText, type CodexUserTextToken } from './user-text';
+import type { CodexPromptPart, CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
+import { FileTextIcon, SparklesIcon } from '../icons/app-icons';
+import { parseAuthoredUserText, type CodexUserTextToken } from './user-text';
 import type { CodexComposerMentionGroup } from './composer-mentions-custom';
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   content: string;
+  promptContent?: readonly CodexPromptPart[];
   mentionGroups?: readonly CodexComposerMentionGroup[];
   plugins?: readonly CodexSurfacePlugin[];
   skills?: readonly CodexSurfaceSkill[];
@@ -101,7 +106,7 @@ const props = withDefaults(defineProps<{
 // Stryker restore all
 
 const failedIconUrls = reactive(new Set<string>());
-const tokens = computed(() => parseCodexUserText(props.content, props.plugins, props.skills, props.mentionGroups));
+const tokens = computed(() => parseAuthoredUserText(props.content, props.promptContent, props.plugins, props.skills, props.mentionGroups));
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 defineSlots<{

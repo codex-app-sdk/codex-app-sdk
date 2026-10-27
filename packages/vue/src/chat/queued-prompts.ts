@@ -1,6 +1,7 @@
 export type QueuedChatPrompt = {
   id: string;
   text: string;
+  options?: Pick<import('@codex-app-sdk/core/surface').SendCodexMessageOptions, 'content'>;
 };
 
 let nextQueuedPromptId = 0;

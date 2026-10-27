@@ -30,10 +30,12 @@ const fixturePlugin = {
 
       const showBackground = ref(false);
       const skills = ref([]);
+      const backgroundContent = ref([{ type: 'text', text: '$cp' }]);
       window.editorFocusFixture = {
         mountBackground() { showBackground.value = true; },
         refreshBackground() {
-          skills.value = [{ name: 'Commit-Push (cp)', path: '/skills/commit-push/SKILL.md', enabled: true }];
+          skills.value = [{ name: 'cp', displayName: 'Commit-Push (cp)', path: '/skills/commit-push/SKILL.md', enabled: true }];
+          backgroundContent.value = [{ type: 'mention', kind: 'skill', id: '/skills/commit-push/SKILL.md', value: 'cp', label: 'Commit-Push (cp)' }];
         },
       };
       createApp({
@@ -43,7 +45,8 @@ const fixturePlugin = {
             showBackground.value
               ? h(ChatRichTextEditor, {
                   ariaLabel: 'Background editor',
-                  modelValue: '$cp',
+                  modelValue: backgroundContent.value.map(part => part.type === 'text' ? part.text : part.label).join(''),
+                  content: backgroundContent.value,
                   skills: skills.value,
                 })
               : null,

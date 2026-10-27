@@ -30,6 +30,10 @@ describe('ChatRichTextEditor', () => {
       expect(editor.readText()).toBe(expected);
       expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([expected]);
       expect(editor.getSelectionRange()).toEqual({ start: start + value.length, end: start + value.length, valid: true });
+      const mention = { type: 'mention' as const, kind: 'skill' as const, id: skill.path, value: 'cp', label: 'Commit-Push' };
+      editor.insertMention(mention, 0, editor.readText().length);
+      expect(editor.readContent()).toStrictEqual([mention, { type: 'text', text: ' ' }]);
+      expect(editor.readText()).toBe('Commit-Push ');
     } finally {
       wrapper.unmount();
       if (original) Object.defineProperty(document, 'execCommand', original);
@@ -37,11 +41,28 @@ describe('ChatRichTextEditor', () => {
     }
   });
 
+  it('restores a custom chip through the host slot without a catalog or group identifier', () => {
+    const part = { type: 'mention' as const, kind: 'custom' as const, id: 'agent-1', value: 'agent:1', label: 'Saved name' };
+    const wrapper = mount(ChatRichTextEditor, { props: { modelValue: part.label, content: [part] }, slots: {
+      mention: ({ group, item }: { group: { id: string }; item: { label: string } }) => h('span', { class: 'saved-chip' }, `${group.id}:${item.label}`),
+    } });
+    expect(wrapper.get('.saved-chip').text()).toBe(':Saved name');
+    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readContent()).toStrictEqual([part]);
+    wrapper.unmount();
+  });
+
   it('renders canonical plugin, skill, and file tokens as editable chips', () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: {
         files: [{ name: 'README.md', path: 'README.md' }],
-        modelValue: '@gmail $cp /cp @README.md',
+        modelValue: 'Gmail Commit-Push (cp) /cp README.md',
+        content: [
+          { type: 'mention', kind: 'plugin', id: 'gmail@remote', value: 'gmail', label: 'Gmail' },
+          { type: 'text', text: ' ' },
+          { type: 'mention', kind: 'skill', id: skill.path, value: 'cp', label: skill.name },
+          { type: 'text', text: ' /cp ' },
+          { type: 'mention', kind: 'file', id: 'README.md', value: 'README.md', label: 'README.md' },
+        ],
         plugins: [{ id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', enabled: true }],
         skills: [skill],
       },
@@ -51,7 +72,7 @@ describe('ChatRichTextEditor', () => {
     expect(wrapper.find('[data-skill-name="cp"]').text()).toContain('Commit-Push (cp)');
     expect(wrapper.find('[data-file-mention="README.md"]').text()).toContain('README.md');
     expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText())
-      .toBe('@gmail $cp /cp @README.md');
+      .toBe('Gmail Commit-Push (cp) /cp README.md');
   });
 
   it('renders host mentions with a custom composer chip while preserving stable text', () => {
@@ -62,7 +83,8 @@ describe('ChatRichTextEditor', () => {
           label: 'Threads',
           items: [{ id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' }],
         }],
-        modelValue: 'Ask @thread:019abc',
+        modelValue: 'Ask codex-claw',
+        content: [{ type: 'text', text: 'Ask ' }, { type: 'mention', kind: 'custom', id: 'thread-1', value: 'thread:019abc', label: 'codex-claw', groupId: 'threads' }],
       },
       slots: {
         mention: ({ item }: { item: { label: string } }) => h('span', { class: 'host-thread-chip' }, `🤖 ${item.label}`),
@@ -70,7 +92,7 @@ describe('ChatRichTextEditor', () => {
     });
 
     expect(wrapper.get('[data-mention-value="thread:019abc"]').text()).toBe('🤖 codex-claw');
-    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('Ask @thread:019abc');
+    expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('Ask codex-claw');
   });
 
   it('mounts the exported mention chip', () => {
@@ -97,7 +119,7 @@ describe('ChatRichTextEditor', () => {
       .toContain('chat-composer-at-menu__item--active');
   });
 
-  it('enriches plain mentions when catalogs arrive without changing canonical text', async () => {
+  it('keeps plain mention-like text literal when catalogs arrive', async () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: { modelValue: '@gmail $cp' },
     });
@@ -108,22 +130,22 @@ describe('ChatRichTextEditor', () => {
       skills: [skill],
     });
 
-    expect(wrapper.findAll('.chat-mention-chip')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-mention-chip')).toHaveLength(0);
     expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText()).toBe('@gmail $cp');
   });
 
   it('preserves canonical offsets when inserting beside chips', async () => {
     const wrapper = mount(ChatRichTextEditor, {
       attachTo: document.body,
-      props: { modelValue: 'use $cp now', skills: [skill] },
+      props: { modelValue: 'use CP now', content: [{ type: 'text', text: 'use ' }, { type: 'mention', kind: 'skill', id: skill.path, value: 'cp', label: 'CP' }, { type: 'text', text: ' now' }], skills: [skill] },
     });
     const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
-    richEditor.setCaret('use $cp'.length);
+    richEditor.setCaret('use CP'.length);
     richEditor.insertTextAtSelection(' safely');
     await nextTick();
 
-    expect(richEditor.readText()).toBe('use $cp safely now');
-    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['use $cp safely now']);
+    expect(richEditor.readText()).toBe('use CP safely now');
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['use CP safely now']);
     wrapper.unmount();
   });
 
@@ -181,7 +203,7 @@ describe('ChatRichTextEditor', () => {
     }
   });
 
-  it('keeps unmatched and code-wrapped mentions as text and prefers plugins over same-name files', () => {
+  it('keeps typed and code-wrapped triggers literal even with matching catalogs', () => {
     const wrapper = mount(ChatRichTextEditor, {
       props: {
         files: [{ name: 'shared', path: 'shared' }],
@@ -190,7 +212,7 @@ describe('ChatRichTextEditor', () => {
       },
     });
 
-    expect(wrapper.findAll('[data-plugin-name="shared"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-plugin-name="shared"]')).toHaveLength(0);
     expect(wrapper.find('[data-file-mention="shared"]').exists()).toBe(false);
     expect((wrapper.vm as unknown as CodexRichTextEditorExpose).readText())
       .toBe('`@shared` @missing @shared $missing');
@@ -220,7 +242,7 @@ describe('ChatRichTextEditor', () => {
 
   it('emits canonical text when a chip is deleted from the editable DOM', async () => {
     const wrapper = mount(ChatRichTextEditor, {
-      props: { modelValue: 'use $cp now', skills: [skill] },
+      props: { modelValue: 'use CP now', content: [{ type: 'text', text: 'use ' }, { type: 'mention', kind: 'skill', id: skill.path, value: 'cp', label: 'CP' }, { type: 'text', text: ' now' }], skills: [skill] },
     });
     wrapper.get('[data-skill-name="cp"]').element.remove();
     await wrapper.trigger('input');
@@ -276,7 +298,7 @@ describe('ChatRichTextEditor', () => {
     await wrapper.setProps({
       plugins: [{ id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', enabled: true }],
     });
-    expect(wrapper.get('[data-plugin-name="gmail"]').text()).toContain('Gmail');
+    expect(wrapper.find('[data-plugin-name="gmail"]').exists()).toBe(false);
     expect(richEditor.readText()).toBe('@gmail');
     expect(document.activeElement).toBe(outside);
 
@@ -284,17 +306,18 @@ describe('ChatRichTextEditor', () => {
     outside.remove();
   });
 
-  it('renders one canonical chip when text and catalogs arrive together', async () => {
+  it('restores a selected chip when authored content arrives with its catalog', async () => {
     const wrapper = mount(ChatRichTextEditor, { props: { modelValue: '' } });
     const richEditor = wrapper.vm as unknown as CodexRichTextEditorExpose;
 
     await wrapper.setProps({
-      modelValue: '@gmail',
+      modelValue: 'Gmail',
+      content: [{ type: 'mention', kind: 'plugin', id: 'gmail@remote', value: 'gmail', label: 'Gmail' }],
       plugins: [{ id: 'gmail@remote', name: 'gmail', displayName: 'Gmail', enabled: true }],
     });
 
     expect(wrapper.findAll('[data-plugin-name="gmail"]')).toHaveLength(1);
-    expect(richEditor.readText()).toBe('@gmail');
+    expect(richEditor.readText()).toBe('Gmail');
   });
 
   it('publishes document selection changes only while mounted', async () => {

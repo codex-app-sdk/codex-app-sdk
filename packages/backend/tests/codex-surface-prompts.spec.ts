@@ -13,7 +13,7 @@ import {
   parsePlanSlashCommand,
   parseReviewSlashCommand,
   persistSupports,
-  promptSkillInputsFromText,
+  promptSkillInputsFromContent,
   stringValue,
   validateSkillInputs,
 } from '../src/node/codex-surface-prompts';
@@ -79,11 +79,14 @@ describe('Codex surface prompt policy', () => {
       { name: 'pathless', path: '', enabled: true },
     ];
 
-    expect(promptSkillInputsFromText('$cp /review $cp email+review@example.com /disabled $pathless', catalog))
-      .toStrictEqual([
-        { name: 'cp', path: '/skills/cp/SKILL.md' },
-        { name: 'review', path: '/skills/review/SKILL.md' },
-      ]);
+    expect(promptSkillInputsFromContent([
+      { type: 'text', text: '$disabled /pathless' },
+      { type: 'mention', kind: 'skill', id: '/skills/cp/SKILL.md', value: 'cp', label: 'Commit and push' },
+      { type: 'mention', kind: 'skill', id: '/skills/review/SKILL.md', value: 'review', label: 'Review' },
+    ])).toStrictEqual([
+      { name: 'cp', path: '/skills/cp/SKILL.md' },
+      { name: 'review', path: '/skills/review/SKILL.md' },
+    ]);
     expect(validateSkillInputs([{ name: 'cp', path: '/skills/cp/SKILL.md' }], catalog))
       .toStrictEqual([{ name: 'cp', path: '/skills/cp/SKILL.md' }]);
     expect(() => validateSkillInputs([{ name: 'cp', path: '/wrong' }], catalog))
@@ -96,15 +99,6 @@ describe('Codex surface prompt policy', () => {
     )).toStrictEqual([
       { name: 'cp', path: '/skills/cp/SKILL.md' },
       { name: 'cp', path: '/other/SKILL.md' },
-    ]);
-  });
-
-  it('recognizes a unique skill at the beginning of a prompt', () => {
-    const catalog: CodexSurfaceSkill[] = [
-      { name: 'start-only', path: '/skills/start/SKILL.md', enabled: true },
-    ];
-    expect(promptSkillInputsFromText('$start-only and no second mention', catalog)).toStrictEqual([
-      { name: 'start-only', path: '/skills/start/SKILL.md' },
     ]);
   });
 

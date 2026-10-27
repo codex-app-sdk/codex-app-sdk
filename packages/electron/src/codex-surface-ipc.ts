@@ -110,7 +110,7 @@ type SurfaceRequests = {
   [channels.deleteConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.deleteTurn]: IpcRequest<[turnId: string], CodexSurfaceSnapshot>;
   [channels.deleteQueuedPrompt]: IpcRequest<[promptId: string], CodexSurfaceSnapshot>;
-  [channels.editTurn]: IpcRequest<[turnId: string, content: string], CodexSurfaceSnapshot>;
+  [channels.editTurn]: IpcRequest<[turnId: string, content: string, options?: CodexRendererSendMessageOptions], CodexSurfaceSnapshot>;
   [channels.forkTurn]: IpcRequest<[turnId: string], CodexSurfaceSnapshot>;
   [channels.getSnapshot]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.getVersionedSnapshot]: IpcRequest<[], CodexVersionedSurfaceSnapshot | null>;
@@ -150,10 +150,10 @@ type SurfaceRequests = {
     prompt: string,
     options?: CodexRendererSendMessageOptions,
   ], CodexSurfaceSnapshot>;
-  [channels.steerQueuedPrompt]: IpcRequest<[promptId: string, prompt?: string], CodexSurfaceSnapshot>;
+  [channels.steerQueuedPrompt]: IpcRequest<[promptId: string, prompt?: string, options?: CodexRendererSendMessageOptions], CodexSurfaceSnapshot>;
   [channels.unarchiveConversation]: IpcRequest<[conversationId: string], CodexSurfaceSnapshot>;
   [channels.updateConversationSettings]: IpcRequest<[settings: UpdateCodexConversationSettings], CodexSurfaceSnapshot>;
-  [channels.updateQueuedPrompt]: IpcRequest<[promptId: string, prompt: string], CodexSurfaceSnapshot>;
+  [channels.updateQueuedPrompt]: IpcRequest<[promptId: string, prompt: string, options?: CodexRendererSendMessageOptions], CodexSurfaceSnapshot>;
 };
 
 type SurfaceEvents = {
@@ -285,7 +285,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     deleteConversation: (conversationId) => renderer.invoke(channels.deleteConversation, conversationId),
     deleteTurn: (turnId) => renderer.invoke(channels.deleteTurn, turnId),
     deleteQueuedPrompt: (promptId) => renderer.invoke(channels.deleteQueuedPrompt, promptId),
-    editTurn: (turnId, content) => renderer.invoke(channels.editTurn, turnId, content),
+    editTurn: (turnId, content, options) => renderer.invoke(channels.editTurn, turnId, content, options),
     forkTurn: (turnId) => renderer.invoke(channels.forkTurn, turnId),
     getSnapshot: () => renderer.invoke(channels.getSnapshot),
     interrupt: () => renderer.invoke(channels.interrupt),
@@ -326,9 +326,9 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     startChatGptDeviceCodeLogin: () => renderer.invoke(channels.startChatGptDeviceCodeLogin),
     startChatGptLogin: () => renderer.invoke(channels.startChatGptLogin),
     steerMessage: (prompt, options) => renderer.invoke(channels.steerMessage, prompt, options),
-    steerQueuedPrompt: (promptId, prompt) => renderer.invoke(channels.steerQueuedPrompt, promptId, prompt),
+    steerQueuedPrompt: (promptId, prompt, options) => renderer.invoke(channels.steerQueuedPrompt, promptId, prompt, options),
     unarchiveConversation: (conversationId) => renderer.invoke(channels.unarchiveConversation, conversationId),
     updateConversationSettings: (settings) => renderer.invoke(channels.updateConversationSettings, settings),
-    updateQueuedPrompt: (promptId, prompt) => renderer.invoke(channels.updateQueuedPrompt, promptId, prompt),
+    updateQueuedPrompt: (promptId, prompt, options) => renderer.invoke(channels.updateQueuedPrompt, promptId, prompt, options),
   };
 }

@@ -27,8 +27,8 @@ export type CodexConversationHandleOperations = {
   continueInterruptedTurn(): Promise<void>;
   deleteTurn(turnId: string): Promise<void>;
   deleteQueuedPrompt(promptId: string): Promise<void>;
-  updateQueuedPrompt(promptId: string, prompt: string): Promise<void>;
-  editTurn(turnId: string, content: string): Promise<void>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<void>;
+  editTurn(turnId: string, content: string, options?: SendCodexMessageOptions): Promise<void>;
   fork(
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
@@ -60,7 +60,7 @@ export type CodexConversationHandleOperations = {
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   startReview(options?: StartCodexReviewOptions): Promise<void>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<void>;
-  steerQueuedPrompt(promptId: string, prompt?: string): Promise<void>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Promise<void>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<void>;
 };
 
@@ -93,11 +93,11 @@ export function createCodexConversationHandle(
     steerMessage: (prompt, options) => snapshotAfter(() => operations.steerMessage(prompt, options)),
     interrupt: () => snapshotAfter(operations.interrupt),
     deleteTurn: (turnId) => snapshotAfter(() => operations.deleteTurn(turnId)),
-    editTurn: (turnId, content) => snapshotAfter(() => operations.editTurn(turnId, content)),
+    editTurn: (turnId, content, options) => snapshotAfter(() => operations.editTurn(turnId, content, options)),
     retryTurn: (turnId) => snapshotAfter(() => operations.retryTurn(turnId)),
     deleteQueuedPrompt: (promptId) => snapshotAfter(() => operations.deleteQueuedPrompt(promptId)),
-    updateQueuedPrompt: (promptId, prompt) => snapshotAfter(() => operations.updateQueuedPrompt(promptId, prompt)),
-    steerQueuedPrompt: (promptId, prompt) => snapshotAfter(() => operations.steerQueuedPrompt(promptId, prompt)),
+    updateQueuedPrompt: (promptId, prompt, options) => snapshotAfter(() => operations.updateQueuedPrompt(promptId, prompt, options)),
+    steerQueuedPrompt: (promptId, prompt, options) => snapshotAfter(() => operations.steerQueuedPrompt(promptId, prompt, options)),
     respondToClientRequest: (response) => snapshotAfter(() => operations.respondToClientRequest(response)),
     resolveApproval: (approvalId, decision, scope) => snapshotAfter(
       () => operations.resolveApproval(approvalId, decision, scope),

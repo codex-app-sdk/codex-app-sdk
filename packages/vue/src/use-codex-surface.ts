@@ -116,8 +116,8 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     deleteConversation: (conversationId: string) => run(() => api.deleteConversation(conversationId)),
     deleteTurn: (turnId: string) => run(() => api.deleteTurn(turnId)),
     deleteQueuedPrompt: (promptId: string) => run(() => api.deleteQueuedPrompt(promptId)),
-    updateQueuedPrompt: (promptId: string, prompt: string) => run(() => api.updateQueuedPrompt(promptId, prompt)),
-    editTurn: (turnId: string, content: string) => run(() => api.editTurn(turnId, content)),
+    updateQueuedPrompt: (promptId: string, prompt: string, options?: CodexRendererSendMessageOptions) => run(() => api.updateQueuedPrompt(promptId, prompt, options)),
+    editTurn: (turnId: string, content: string, options?: CodexRendererSendMessageOptions) => run(() => api.editTurn(turnId, content, options)),
     forkTurn: (turnId: string) => run(() => api.forkTurn(turnId)),
     interrupt: () => run(() => api.interrupt()),
     listConversations: (options?: ListCodexConversationsOptions) => api.listConversations(options),
@@ -154,7 +154,7 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     startChatGptDeviceCodeLogin: () => api.startChatGptDeviceCodeLogin(),
     startChatGptLogin: () => api.startChatGptLogin(),
     steerMessage: (prompt: string, options?: CodexRendererSendMessageOptions) => run(() => api.steerMessage(prompt, options)),
-    steerQueuedPrompt: (promptId: string, prompt?: string) => run(() => api.steerQueuedPrompt(promptId, prompt)),
+    steerQueuedPrompt: (promptId: string, prompt?: string, options?: CodexRendererSendMessageOptions) => run(() => api.steerQueuedPrompt(promptId, prompt, options)),
     unarchiveConversation: (conversationId: string) => run(() => api.unarchiveConversation(conversationId)),
     updateConversationSettings: (settings: UpdateCodexConversationSettings) => (
       run(() => api.updateConversationSettings(settings))

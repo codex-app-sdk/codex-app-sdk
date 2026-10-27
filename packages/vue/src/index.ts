@@ -122,7 +122,7 @@ export {
   pluginMatchesMention,
 } from './chat/composer-plugins';
 export { renderMarkdown } from './chat/message-markdown';
-export { humanizeMentionName, parseCodexUserText } from './chat/user-text';
+export { humanizeMentionName, parseCodexUserText, parseAuthoredUserText } from './chat/user-text';
 export type { CodexUserTextToken } from './chat/user-text';
 export type {
   CodexMessageImage,

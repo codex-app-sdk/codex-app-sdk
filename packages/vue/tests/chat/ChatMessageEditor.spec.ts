@@ -3,6 +3,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import ChatMessageEditor from '../../src/chat/ChatMessageEditor.vue';
+import ChatRichTextEditor, { type CodexRichTextEditorExpose } from '../../src/chat/ChatRichTextEditor.vue';
 
 function mountEditor(content = 'Old prompt') {
   return mount(ChatMessageEditor, {
@@ -16,6 +17,47 @@ function mountEditor(content = 'Old prompt') {
 }
 
 describe('ChatMessageEditor', () => {
+  it('retains an explicitly selected skill when editing and resubmitting without catalogs', async () => {
+    const part = { type: 'mention' as const, kind: 'skill' as const, id: '/skills/cp/SKILL.md', label: 'Commit-Push', value: 'cp' };
+    const wrapper = mount(ChatMessageEditor, { props: {
+      cancelLabel: 'Cancel', content: 'Commit-Push', promptContent: [part], inputLabel: 'Edit prompt', saveLabel: 'Resubmit',
+    } });
+    expect(wrapper.get('[role="textbox"]').text()).toBe('Commit-Push');
+    const editor = wrapper.findComponent(ChatRichTextEditor).vm as unknown as CodexRichTextEditorExpose;
+    editor.setCaret('Commit-Push'.length);
+    editor.insertTextAtSelection(' now');
+    await wrapper.get('.chat-message__edit-button--primary').trigger('click');
+    expect(wrapper.emitted('save')).toStrictEqual([['Commit-Push now', { content: [part, { type: 'text', text: ' now' }] }]]);
+  });
+
+  it('focuses a structured edit and keeps IME, multiline paste, cancellation and keyboard saves intact', async () => {
+    const part = { type: 'mention' as const, kind: 'skill' as const, id: '/skills/cp/SKILL.md', label: 'Commit-Push', value: 'cp' };
+    const wrapper = mount(ChatMessageEditor, { attachTo: document.body, props: {
+      cancelLabel: 'Cancel', content: 'Commit-Push', promptContent: [part], inputLabel: 'Edit prompt', saveLabel: 'Resubmit',
+    } });
+    try {
+      const textbox = wrapper.get('[role="textbox"]');
+      await vi.waitFor(() => expect(document.activeElement).toBe(textbox.element));
+      await textbox.trigger('keydown', { key: 'Enter', isComposing: true });
+      await textbox.trigger('keydown', { key: 'PageDown' });
+      expect(wrapper.emitted('save')).toBeUndefined();
+      await textbox.trigger('keydown', { key: 'Enter' });
+      await textbox.trigger('paste');
+      await textbox.trigger('paste', { clipboardData: { getData: () => '' } });
+      await textbox.trigger('paste', { clipboardData: { getData: () => '<b>literal</b>' } });
+      expect(textbox.find('b').exists()).toBe(false);
+      await textbox.trigger('keydown', { key: 'Enter', ctrlKey: true });
+      expect(wrapper.emitted('save')).toStrictEqual([['Commit-Push\n<b>literal</b>', {
+        content: [part, { type: 'text', text: '\n<b>literal</b>' }],
+      }]]);
+      await textbox.trigger('keydown', { key: 'Enter', metaKey: true });
+      expect(wrapper.emitted('save')).toHaveLength(2);
+      await textbox.trigger('keydown', { key: 'Escape' });
+      expect(wrapper.emitted('cancel')).toStrictEqual([[]]);
+    } finally {
+      wrapper.unmount();
+    }
+  });
   it('owns its draft and emits trimmed saves', async () => {
     const wrapper = mountEditor();
     expect(wrapper.get('textarea').attributes('aria-label')).toBe('Edit prompt');

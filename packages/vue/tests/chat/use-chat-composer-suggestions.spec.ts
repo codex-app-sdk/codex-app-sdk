@@ -3,7 +3,7 @@
 import { nextTick, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexFileSearchItem, CodexCommandSummary, CodexSkillSummary } from '../../src/chat/contracts';
-import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
+import type { CodexPromptMention, CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { useChatComposerSuggestions } from '../../src/chat/use-chat-composer-suggestions';
 import type { CodexComposerMentionGroup } from '../../src/chat/composer-mentions-custom';
 
@@ -40,13 +40,17 @@ function setup(
 ) {
   const prompt = ref(initialPrompt);
   const caretPosition = ref(initialPrompt.length);
-  const editor = ref(overrides.editor === undefined ? {
+  const editor = ref(overrides.editor === null ? null : {
+    insertMention: (part: CodexPromptMention, start: number, end: number) => {
+      prompt.value = `${prompt.value.slice(0, start)}${part.label} ${prompt.value.slice(end)}`;
+    },
     getSelectionRange: () => ({
       end: caretPosition.value,
       start: caretPosition.value,
       valid: true,
     }),
-  } : overrides.editor);
+    ...overrides.editor,
+  });
   const onCommandSubmitted = vi.fn();
   const onTextInserted = vi.fn();
   const onMentionSelected = vi.fn();
@@ -274,7 +278,7 @@ describe('useChatComposerSuggestions', () => {
     expect(state.suggestions.handleKeydown(key('ArrowDown'))).toBe(true);
     expect(state.suggestions.handleKeydown(key('Enter'))).toBe(true);
 
-    expect(state.prompt.value).toBe('inspect @src/beta.ts ');
+    expect(state.prompt.value).toBe('inspect beta.ts ');
     expect(state.onTextInserted).toHaveBeenCalledWith(state.prompt.value.length);
   });
 
@@ -288,7 +292,7 @@ describe('useChatComposerSuggestions', () => {
 
     expect(state.suggestions.handleKeydown(key('ArrowDown'))).toBe(true);
     expect(state.suggestions.handleKeydown(key('Enter'))).toBe(true);
-    expect(state.prompt.value).toBe('inspect @src/alpha.ts ');
+    expect(state.prompt.value).toBe('inspect alpha.ts ');
   });
 
   it('places host mention groups around built-ins and inserts their stable value', async () => {
@@ -314,7 +318,7 @@ describe('useChatComposerSuggestions', () => {
 
     expect(state.suggestions.atMenuVisible.value).toBe(true);
     expect(state.suggestions.handleKeydown(key('Enter'))).toBe(true);
-    expect(state.prompt.value).toBe('@thread:019abc ');
+    expect(state.prompt.value).toBe('codex-claw ');
     expect(state.onMentionSelected).toHaveBeenCalledWith(leading.items[0], leading);
 
     const trailingState = setup('@person', {
@@ -323,7 +327,7 @@ describe('useChatComposerSuggestions', () => {
     });
     await nextTick();
     expect(trailingState.suggestions.handleKeydown(key('Enter'))).toBe(true);
-    expect(trailingState.prompt.value).toBe('@person:nico ');
+    expect(trailingState.prompt.value).toBe('Nicolas ');
   });
 
   it('navigates the exact host, plugin, file, and trailing-host result order', async () => {
@@ -346,10 +350,10 @@ describe('useChatComposerSuggestions', () => {
     };
     const matchingFile = { name: 'x.ts', path: 'src/x.ts' };
     const expectedPrompts = [
-      '@leading:x ',
-      '@x-plugin ',
-      '@src/x.ts ',
-      '@trailing:x ',
+      'x leading ',
+      'X Plugin ',
+      'x.ts ',
+      'x trailing ',
     ];
 
     for (const [index, expectedPrompt] of expectedPrompts.entries()) {
@@ -385,7 +389,7 @@ describe('useChatComposerSuggestions', () => {
     const enter = key('Enter');
     expect(state.suggestions.handleKeydown(enter)).toBe(true);
     expect(enter.defaultPrevented).toBe(true);
-    expect(state.prompt.value).toBe('@x-three.ts ');
+    expect(state.prompt.value).toBe('x-three.ts ');
   });
 
   it('handles arrow keys but ignores selection when a hint has no result items', async () => {
@@ -435,7 +439,7 @@ describe('useChatComposerSuggestions', () => {
     await nextTick();
     expect(skillState.suggestions.skillMenuVisible.value).toBe(true);
     skillState.suggestions.handleKeydown(key('Enter'));
-    expect(skillState.prompt.value).toBe('$frontend ');
+    expect(skillState.prompt.value).toBe('frontend ');
 
     const commandState = setup('/comp');
     await nextTick();
@@ -449,8 +453,8 @@ describe('useChatComposerSuggestions', () => {
     const skillState = setup('before $front after');
     skillState.suggestions.updateCaretPosition({ end: 'before $front'.length });
     skillState.suggestions.selectSkill(skills[0]!);
-    expect(skillState.prompt.value).toBe('before $frontend  after');
-    expect(skillState.caretPosition.value).toBe('before $frontend '.length);
+    expect(skillState.prompt.value).toBe('before frontend  after');
+    expect(skillState.caretPosition.value).toBe('before frontend '.length);
 
     const command: CodexCommandSummary = {
       id: 'explain',
@@ -466,7 +470,7 @@ describe('useChatComposerSuggestions', () => {
     const slashSkillState = setup('/front later');
     slashSkillState.suggestions.updateCaretPosition({ end: 6 });
     slashSkillState.suggestions.selectSlashSkill(skills[0]!);
-    expect(slashSkillState.prompt.value).toBe('/frontend  later');
+    expect(slashSkillState.prompt.value).toBe('frontend  later');
   });
 
   it('does not mutate text when a direct selection has no matching token', () => {
@@ -516,7 +520,7 @@ describe('useChatComposerSuggestions', () => {
 
     state.suggestions.selectMention(item, staleGroup);
 
-    expect(state.prompt.value).toBe('@person:nico ');
+    expect(state.prompt.value).toBe('Nicolas ');
     expect(state.onMentionSelected).toHaveBeenCalledWith(item, currentGroup);
   });
 
@@ -526,7 +530,7 @@ describe('useChatComposerSuggestions', () => {
     const state = setup('@person', { withMentionCallback: false });
 
     expect(() => state.suggestions.selectMention(item, group)).not.toThrow();
-    expect(state.prompt.value).toBe('@person:nico ');
+    expect(state.prompt.value).toBe('Nicolas ');
   });
 
   it('uses explicit, editor, then prompt-length caret positions', () => {

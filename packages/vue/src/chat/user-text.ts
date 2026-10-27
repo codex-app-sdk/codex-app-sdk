@@ -1,4 +1,4 @@
-import type { CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
+import { normalizePromptContent, type CodexPromptPart, type CodexSurfacePlugin, type CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 import { skillDisplayName, skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';
 import {
@@ -11,6 +11,7 @@ export type CodexUserTextToken =
   | { type: 'text'; text: string }
   | { type: 'code'; text: string }
   | { type: 'line-break' }
+  | { type: 'file-mention'; displayName: string; label: string; href: string }
   | {
     type: 'custom-mention';
     displayName: string;
@@ -32,6 +33,38 @@ export type CodexUserTextToken =
     label: string;
     skill?: CodexSurfaceSkill;
   };
+
+export function parseAuthoredUserText(
+  text: string,
+  content?: readonly CodexPromptPart[],
+  plugins: readonly CodexSurfacePlugin[] = [],
+  skills: readonly CodexSurfaceSkill[] = [],
+  groups: readonly CodexComposerMentionGroup[] = [],
+): CodexUserTextToken[] {
+  return normalizePromptContent(content ?? [{ type: 'text', text }]).flatMap((part): CodexUserTextToken[] => {
+    if (part.type === 'text') {
+      return part.text.split(/(`[^`\n]+`|\n)/g).filter(Boolean).map(value => value === '\n'
+        ? { type: 'line-break' } : value.startsWith('`') && value.endsWith('`')
+          ? { type: 'code', text: value.slice(1, -1) } : { type: 'text', text: value });
+    }
+    if (part.kind === 'skill') return [{
+      type: 'skill-mention', displayName: part.label, label: part.label, href: part.id,
+      skill: skills.find(skill => skill.path === part.id),
+    }];
+    if (part.kind === 'plugin') return [{
+      type: 'plugin-mention', displayName: part.label, label: part.label, href: `plugin://${part.id}`,
+      plugin: plugins.find(plugin => plugin.id === part.id),
+    }];
+    if (part.kind === 'file') return [{ type: 'file-mention', displayName: part.label, label: part.label, href: part.id }];
+    const group = groups.find(group => group.id === part.groupId);
+    const item = group?.items.find(item => item.id === part.id);
+    return [{
+      type: 'custom-mention', displayName: part.label, label: part.label,
+      group: group ?? { id: part.groupId ?? part.kind, label: part.groupId ?? part.kind, items: [] },
+      item: { ...item, id: part.id, value: part.value, label: part.label },
+    }];
+  });
+}
 
 export function parseCodexUserText(
   content: string,

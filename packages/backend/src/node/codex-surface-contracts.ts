@@ -158,11 +158,11 @@ export type CodexConversation = {
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   interrupt(): Promise<CodexConversationSnapshot>;
   deleteTurn(turnId: string): Promise<CodexConversationSnapshot>;
-  editTurn(turnId: string, content: string): Promise<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   retryTurn(turnId: string): Promise<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Promise<CodexConversationSnapshot>;
-  updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexConversationSnapshot>;
-  steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexConversationSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<CodexConversationSnapshot>;
   resolveApproval(
     approvalId: string,

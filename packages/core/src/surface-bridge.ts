@@ -1,3 +1,4 @@
+import { normalizePromptContent } from './prompt-content';
 import type {
   CodexConversationEvent,
   CodexConversationHistory,
@@ -67,7 +68,7 @@ type CodexConversationBridgeOperationFunctions = {
   continueInterruptedTurn(): Awaitable<CodexConversationSnapshot>;
   deleteTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Awaitable<CodexConversationSnapshot>;
-  editTurn(turnId: string, content: string): Awaitable<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string, options?: CodexRendererSendMessageOptions): Awaitable<CodexConversationSnapshot>;
   forkTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
   getSnapshot(): Awaitable<CodexConversationSnapshot>;
   interrupt(): Awaitable<CodexConversationSnapshot>;
@@ -86,9 +87,9 @@ type CodexConversationBridgeOperationFunctions = {
   setGoal(objective: string, tokenBudget?: number | null): Awaitable<CodexConversationSnapshot>;
   startReview(options?: StartCodexReviewOptions): Awaitable<CodexConversationSnapshot>;
   steerMessage(prompt: string, options?: CodexRendererSendMessageOptions): Awaitable<CodexConversationSnapshot>;
-  steerQueuedPrompt(promptId: string, prompt?: string): Awaitable<CodexConversationSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
   updateConversationSettings(settings: UpdateCodexConversationSettings): Awaitable<CodexConversationSnapshot>;
-  updateQueuedPrompt(promptId: string, prompt: string): Awaitable<CodexConversationSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
 };
 
 export const codexConversationBridgeOperations = [
@@ -112,7 +113,7 @@ export type CodexConversationBridgeHandle = {
   continueInterruptedTurn(): Awaitable<CodexConversationSnapshot>;
   deleteTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Awaitable<CodexConversationSnapshot>;
-  editTurn(turnId: string, content: string): Awaitable<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
   forkTurn(turnId: string): Awaitable<{ snapshot: CodexConversationSnapshot }>;
   getSnapshot(): CodexConversationSnapshot;
   interrupt(): Awaitable<CodexConversationSnapshot>;
@@ -133,8 +134,8 @@ export type CodexConversationBridgeHandle = {
   setGoal(objective: string, tokenBudget?: number | null): Awaitable<CodexConversationSnapshot>;
   startReview(options?: StartCodexReviewOptions): Awaitable<CodexConversationSnapshot>;
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
-  steerQueuedPrompt(promptId: string, prompt?: string): Awaitable<CodexConversationSnapshot>;
-  updateQueuedPrompt(promptId: string, prompt: string): Awaitable<CodexConversationSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Awaitable<CodexConversationSnapshot>;
 };
 
@@ -267,7 +268,7 @@ export const codexSurfaceBridgeArities: Readonly<
   archiveConversation: [1, 1], cancelLogin: [0, 1], clearGoal: [0, 0],
   compactConversation: [0, 0], connect: [0, 0], continueInterruptedTurn: [0, 0], createConversation: [0, 1],
   deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
-  editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
+  editTurn: [2, 3], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
   listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
   logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
   refreshAccount: [0, 0],
@@ -278,20 +279,20 @@ export const codexSurfaceBridgeArities: Readonly<
   resolveApproval: [2, 3], retryTurn: [1, 1], selectConversation: [1, 1],
   sendMessage: [1, 2], setGoal: [1, 2], startChatGptDeviceCodeLogin: [0, 0],
   startChatGptLogin: [0, 0], startReview: [0, 1],
-  steerMessage: [1, 2], steerQueuedPrompt: [1, 2], unarchiveConversation: [1, 1],
-  updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 2],
+  steerMessage: [1, 2], steerQueuedPrompt: [1, 3], unarchiveConversation: [1, 1],
+  updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 3],
 };
 
 const conversationArities: Readonly<
   Record<CodexConversationBridgeOperation, readonly [minimum: number, maximum: number]>
 > = {
   clearGoal: [0, 0], compactConversation: [0, 0], continueInterruptedTurn: [0, 0], deleteTurn: [1, 1],
-  deleteQueuedPrompt: [1, 1], editTurn: [2, 2], forkTurn: [1, 1], getSnapshot: [0, 0],
+  deleteQueuedPrompt: [1, 1], editTurn: [2, 3], forkTurn: [1, 1], getSnapshot: [0, 0],
   interrupt: [0, 0], loadOlderConversationHistory: [0, 0], readConversationHistory: [0, 0],
   readConversationPromptHistory: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
   resolveApproval: [2, 3], retryTurn: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
-  startReview: [0, 1], steerMessage: [1, 2], steerQueuedPrompt: [1, 2],
-  updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 2],
+  startReview: [0, 1], steerMessage: [1, 2], steerQueuedPrompt: [1, 3],
+  updateConversationSettings: [1, 1], updateQueuedPrompt: [2, 3],
 };
 
 export function isCodexSurfaceBridgeOperation(value: unknown): value is CodexSurfaceBridgeOperation {
@@ -319,7 +320,7 @@ function conversationOperationTarget(conversation: CodexConversationBridgeHandle
     continueInterruptedTurn: () => conversation.continueInterruptedTurn(),
     deleteTurn: (turnId) => conversation.deleteTurn(turnId),
     deleteQueuedPrompt: (promptId) => conversation.deleteQueuedPrompt(promptId),
-    editTurn: (turnId, content) => conversation.editTurn(turnId, content),
+    editTurn: (turnId, content, options) => conversation.editTurn(turnId, content, options),
     forkTurn: async (turnId) => (await conversation.forkTurn(turnId)).snapshot,
     getSnapshot: () => conversation.getSnapshot(),
     interrupt: () => conversation.interrupt(),
@@ -334,9 +335,9 @@ function conversationOperationTarget(conversation: CodexConversationBridgeHandle
     setGoal: (objective, tokenBudget) => conversation.setGoal(objective, tokenBudget),
     startReview: (options) => conversation.startReview(options),
     steerMessage: (prompt, options) => conversation.steerMessage(prompt, options),
-    steerQueuedPrompt: (promptId, prompt) => conversation.steerQueuedPrompt(promptId, prompt),
+    steerQueuedPrompt: (promptId, prompt, options) => conversation.steerQueuedPrompt(promptId, prompt, options),
     updateConversationSettings: (settings) => conversation.updateSettings(settings),
-    updateQueuedPrompt: (promptId, prompt) => conversation.updateQueuedPrompt(promptId, prompt),
+    updateQueuedPrompt: (promptId, prompt, options) => conversation.updateQueuedPrompt(promptId, prompt, options),
   };
   return target as unknown as CodexSurfaceBridgeTarget;
 }
@@ -362,7 +363,7 @@ async function invokeValidated(
     case 'deleteConversation': return target.deleteConversation(nonEmptyString(args[0], 'Conversation id'));
     case 'deleteTurn': return target.deleteTurn(nonEmptyString(args[0], 'Turn id'));
     case 'deleteQueuedPrompt': return target.deleteQueuedPrompt(nonEmptyString(args[0], 'Queued prompt id'));
-    case 'editTurn': return target.editTurn(nonEmptyString(args[0], 'Turn id'), nonEmptyString(args[1], 'Turn content'));
+    case 'editTurn': return target.editTurn(nonEmptyString(args[0], 'Turn id'), nonEmptyString(args[1], 'Turn content'), await sendOptions(args[2], options.resolveAttachment));
     case 'forkTurn': return target.forkTurn(nonEmptyString(args[0], 'Turn id'));
     case 'getSnapshot': return target.getSnapshot();
     case 'interrupt': return target.interrupt();
@@ -412,11 +413,13 @@ async function invokeValidated(
     case 'steerQueuedPrompt': return target.steerQueuedPrompt(
       nonEmptyString(args[0], 'Queued prompt id'),
       optionalString(args[1], 'Queued prompt'),
+      await sendOptions(args[2], options.resolveAttachment),
     );
     case 'unarchiveConversation': return target.unarchiveConversation(nonEmptyString(args[0], 'Conversation id'));
     case 'updateConversationSettings': return target.updateConversationSettings(settings(args[0]));
     case 'updateQueuedPrompt': return target.updateQueuedPrompt(
       nonEmptyString(args[0], 'Queued prompt id'), nonEmptyString(args[1], 'Queued prompt'),
+      await sendOptions(args[2], options.resolveAttachment),
     );
   }
 }
@@ -562,15 +565,21 @@ async function sendOptions(
 ): Promise<SendCodexMessageOptions | undefined> {
   if (value === undefined) return undefined;
   const record = plainObject(value, 'Message options');
-  onlyKeys(record, ['attachments', 'model', 'reasoningEffort', 'serviceTier', 'planMode', 'skills', 'outputSchema'], 'Message options');
+  onlyKeys(record, ['content', 'inputMethod', 'attachments', 'model', 'reasoningEffort', 'serviceTier', 'planMode', 'skills', 'outputSchema'], 'Message options');
   const attachments = record.attachments === undefined
     ? undefined
     : await attachmentInputs(record.attachments, resolveAttachment);
   const skills = record.skills === undefined ? undefined : skillInputs(record.skills);
+  const inputMethod = record.inputMethod;
+  if (inputMethod !== undefined && inputMethod !== 'typed' && inputMethod !== 'dictated') {
+    throw new TypeError('Message input method must be typed or dictated');
+  }
   if (record.outputSchema !== undefined && !isJsonValue(record.outputSchema)) {
     throw new TypeError('Message output schema must be JSON-serializable');
   }
   return {
+    ...(record.content === undefined ? {} : { content: normalizePromptContent(record.content) }),
+    ...(inputMethod === undefined ? {} : { inputMethod }),
     ...(attachments === undefined ? {} : { attachments }),
     ...(record.model === undefined ? {} : { model: nonEmptyString(record.model, 'Message model') }),
     ...(record.reasoningEffort === undefined ? {} : { reasoningEffort: nonEmptyString(record.reasoningEffort, 'Message reasoning effort') }),

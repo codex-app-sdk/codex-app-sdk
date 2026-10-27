@@ -1,3 +1,4 @@
+import { normalizePromptContent } from '@codex-app-sdk/core/surface';
 import type { CodexAppServerClient } from '../codex/index';
 import type {
   CodexConversationSummary,
@@ -6,7 +7,7 @@ import type {
   StartCodexReviewOptions,
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface';
-import { codexThreadToSurfaceMessages, codexTurnToSurfaceMessages } from './codex-conversation-history';
+import { codexThreadToSurfaceMessages, codexTurnToSurfaceMessages, preserveHistoricalMessagePresentation } from './codex-conversation-history';
 import {
   messageTurnIdOrNull,
   surfaceMessageAttachments,
@@ -158,13 +159,13 @@ export class CodexSurfaceTurnActionsController {
     await this.rollbackToTurn(threadId, turnId);
   }
 
-  async editTurn(turnId: string, content: string): Promise<CodexSurfaceSnapshot> {
+  async editTurn(turnId: string, content: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot> {
     const threadId = this.requiredActiveConversation();
-    await this.editTurnForThread(threadId, turnId, content);
+    await this.editTurnForThread(threadId, turnId, content, options);
     return this.host.getSnapshot();
   }
 
-  async editTurnForThread(threadId: string, turnId: string, content: string): Promise<void> {
+  async editTurnForThread(threadId: string, turnId: string, content: string, options?: SendCodexMessageOptions): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
     const message = runtime.messages.find((candidate) => (
       candidate.role === 'user'
@@ -176,7 +177,7 @@ export class CodexSurfaceTurnActionsController {
     if (!text) throw new Error('Cannot replace a turn prompt with empty content');
     const attachments = surfaceMessageAttachments(message);
     await this.rollbackToTurn(threadId, turnId);
-    await this.host.sendMessageToThread(threadId, text, attachments.length > 0 ? { attachments } : {});
+    await this.host.sendMessageToThread(threadId, text, { ...options, ...(attachments.length > 0 ? { attachments } : {}) });
   }
 
   async retryTurn(turnId: string): Promise<CodexSurfaceSnapshot> {
@@ -197,7 +198,10 @@ export class CodexSurfaceTurnActionsController {
     if (!text) throw new Error('Could not find the user prompt for this turn');
     const attachments = surfaceMessageAttachments(prompt);
     await this.rollbackToTurn(threadId, turnId);
-    await this.host.sendMessageToThread(threadId, text, attachments.length > 0 ? { attachments } : {});
+    await this.host.sendMessageToThread(threadId, text, {
+      ...(prompt.metadata?.promptContent ? { content: normalizePromptContent(prompt.metadata.promptContent) } : {}),
+      ...(attachments.length > 0 ? { attachments } : {}),
+    });
   }
 
   async rollbackToTurn(threadId: string, turnId: string): Promise<void> {
@@ -227,7 +231,7 @@ export class CodexSurfaceTurnActionsController {
       conversations: upsertConversation(this.host.getState().conversations, summary),
     });
     this.host.patchRuntime(threadId, {
-      messages: codexThreadToSurfaceMessages(response.thread),
+      messages: preserveHistoricalMessagePresentation(runtime.messages, codexThreadToSurfaceMessages(response.thread)),
       answeredClientRequestIds: [], busy: false, turnStartPending: false, error: null,
       contextUsage: null, turnGitDiff: null,
     });

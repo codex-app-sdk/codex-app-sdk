@@ -53,8 +53,10 @@
       />
       <ChatRichTextEditor
         v-else
+        :key="editorRevision"
         ref="editorEl"
         v-model="prompt"
+        v-model:content="promptContent"
         class="chat-composer__input"
         :placeholder="effectivePlaceholder"
         :disabled="disabled && !isSending"
@@ -158,7 +160,7 @@
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapabilities, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription, CodexConversationPresentation, ReasoningEffort } from '../chat/contracts';
-import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
+import { promptContentText, trimPromptContent, replacePromptContentRange, type CodexPromptPart, type CodexRendererSendMessageOptions, type CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands } from '../chat/codex-commands';
@@ -226,8 +228,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   continueInterruptedTurn: [];
   error: [message: string | null];
-  send: [prompt: string, options?: { inputMethod: 'dictated' }];
-  steer: [prompt: string, options?: { inputMethod: 'dictated' }];
+  send: [prompt: string, options?: Pick<CodexRendererSendMessageOptions, 'inputMethod' | 'content'>];
+  steer: [prompt: string, options?: Pick<CodexRendererSendMessageOptions, 'inputMethod' | 'content'>];
   steerQueuedPrompt: [promptId: string];
   attach: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
@@ -245,9 +247,11 @@ const emit = defineEmits<{
 const hostCapabilities = useCodexHostCapabilities();
 
 const prompt = ref('');
+const promptContent = ref<readonly CodexPromptPart[]>([]);
 const activeCommandId = ref<string | null>(null);
 const dictatedInput = ref(false);
 const editorEl = ref<CodexRichTextEditorExpose | null>(null);
+const editorRevision = ref(0);
 const caretPosition = ref(0);
 const selectionStart = ref(0);
 const selectionEnd = ref(0);
@@ -510,9 +514,19 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   const submittedPrompt = slashCommand && trimmed
     ? `${slashCommand} ${trimmed}`
     : trimmed || (props.hasAttachments ? '(no user instructions)' : '');
-  const submissionOptions = dictatedInput.value ? { inputMethod: 'dictated' as const } : undefined;
+  const content = trimPromptContent(editorEl.value?.readContent() ?? [{ type: 'text', text: trimmed }]);
+  if (slashCommand && trimmed) content.unshift({ type: 'text', text: `${slashCommand} ` });
+  const hasMentions = content.some(part => part.type === 'mention');
+  const submissionOptions = dictatedInput.value || hasMentions ? {
+    ...(dictatedInput.value ? { inputMethod: 'dictated' as const } : {}),
+    ...(hasMentions ? { content } : {}),
+  } : undefined;
   if (trimmed) rememberSubmittedPrompt(submittedPrompt);
 
+  // A submitted draft is a new editing document. Retire its native undo target
+  // so WebKit cannot replay an old chip insertion into a later restored draft.
+  editorRevision.value += 1;
+  promptContent.value = [];
   prompt.value = '';
   activeCommandId.value = null;
   dictatedInput.value = false;
@@ -520,6 +534,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
   selectionEnd.value = 0;
   caretPosition.value = 0;
   closeComposerMenus();
+  void nextTick(() => editorEl.value?.focusEnd());
   if (intent === 'send') {
     if (submissionOptions) emit('send', submittedPrompt, submissionOptions);
     else emit('send', submittedPrompt);
@@ -544,7 +559,11 @@ async function insertTranscript(text: string): Promise<void> {
   const suffix = after && !/^\s/.test(after) ? ' ' : '';
   const insertion = `${prefix}${transcript}${suffix}`;
   const nextCaret = before.length + insertion.length;
-  prompt.value = `${before}${insertion}${after}`;
+  promptContent.value = replacePromptContentRange(
+    promptContentText(promptContent.value) === prompt.value ? promptContent.value : [{ type: 'text', text: prompt.value }],
+    start, end, [{ type: 'text', text: insertion }],
+  );
+  prompt.value = promptContentText(promptContent.value);
   dictatedInput.value = true;
   caretPosition.value = nextCaret;
   selectionStart.value = nextCaret;
@@ -595,6 +614,7 @@ function restoreComposerState(state: CodexComposerState): void {
   const revision = ++composerRestoreRevision;
   const currentSelection = editorEl.value?.getSelectionRange();
   if (editorEl.value
+    && JSON.stringify(promptContent.value) === JSON.stringify(normalized.content ?? [{ type: 'text', text: normalized.text }])
     && prompt.value === normalized.text
     && editorEl.value.readText() === normalized.text
     && currentSelection?.valid
@@ -609,6 +629,10 @@ function restoreComposerState(state: CodexComposerState): void {
   }
 
   restoringComposerState = true;
+  promptContent.value = normalized.content ?? [{ type: 'text', text: normalized.text }];
+  if (editorEl.value && JSON.stringify(editorEl.value.readContent()) !== JSON.stringify(promptContent.value)) {
+    editorEl.value.setContent(promptContent.value, normalized.selectionEnd);
+  }
   prompt.value = normalized.text;
   selectionStart.value = normalized.selectionStart;
   selectionEnd.value = normalized.selectionEnd;
@@ -633,6 +657,7 @@ function restoreComposerState(state: CodexComposerState): void {
 
 function sameComposerState(left: CodexComposerState, right: CodexComposerState | null): boolean {
   return Boolean(right
+    && JSON.stringify(left.content) === JSON.stringify(right.content)
     && left.text === right.text
     && left.selectionStart === right.selectionStart
     && left.selectionEnd === right.selectionEnd
@@ -737,6 +762,7 @@ function emitComposerState(): void {
   if (restoringComposerState) return;
   const state = normalizeCodexComposerState({
     text: prompt.value,
+    ...(promptContentText(promptContent.value) === prompt.value && promptContent.value.some(part => part.type === 'mention') ? { content: promptContent.value } : {}),
     selectionStart: selectionStart.value,
     selectionEnd: selectionEnd.value,
     activeCommandId: activeCommandId.value,

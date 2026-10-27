@@ -14,14 +14,10 @@
 <script setup lang="ts">
 import { Fragment, h, nextTick, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 import type { CodexFileSearchItem, CodexSkillSummary } from './contracts';
-import type { CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
+import { normalizePromptContent, promptContentText, slicePromptContent, type CodexPromptPart, type CodexPromptMention, type CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import ChatMentionChip from './ChatMentionChip.vue';
-import { skillMatchesMention } from './composer-skills';
-import { pluginMatchesMention } from './composer-plugins';
 import {
-  findComposerMention,
   type CodexComposerMentionGroup,
-  type CodexComposerMentionItem,
 } from './composer-mentions-custom';
 
 export type CodexRichTextEditorExpose = {
@@ -30,6 +26,9 @@ export type CodexRichTextEditorExpose = {
   getSelectionRange: () => { end: number; start: number; valid: boolean };
   insertTextAtSelection: (value: string) => void;
   readText: () => string;
+  readContent: () => CodexPromptPart[];
+  setContent: (content: readonly CodexPromptPart[], caret?: number) => void;
+  insertMention: (mention: CodexPromptMention, start: number, end: number) => void;
   setCaret: (position: number, options?: { focus?: boolean }) => void;
   setSelection: (start: number, end: number, options?: { focus?: boolean }) => void;
   setText: (value: string, caret?: number, options?: { focus?: boolean }) => void;
@@ -43,6 +42,7 @@ const props = withDefaults(defineProps<{
   maxHeight?: number;
   mentionGroups?: readonly CodexComposerMentionGroup[];
   modelValue: string;
+  content?: readonly CodexPromptPart[];
   placeholder?: string;
   plugins?: readonly CodexSurfacePlugin[];
   skills?: readonly CodexSkillSummary[];
@@ -65,22 +65,21 @@ const emit = defineEmits<{
   input: [];
   'caret-change': [range: { end: number; start: number; valid: boolean }];
   'update:modelValue': [value: string];
+  'update:content': [content: CodexPromptPart[]];
 }>();
 // Stryker restore all
 
 const editor = ref<HTMLElement | null>(null);
 const caretPosition = ref(0);
-const catalogRevision = ref(0);
-const inlineTokenPattern = /(`[^`]+`)|(^|[^\w.%+-])([@$/])([^\s@$]+)/g;
-
-watch(() => [props.files, props.mentionGroups, props.plugins, props.skills], () => {
-  catalogRevision.value += 1;
-}, { deep: true, flush: 'sync' });
-
-watch(() => [props.modelValue, catalogRevision.value] as const, ([value, revision], previous) => {
-  if (!editor.value || (revision === previous[1] && readText() === value)) return;
+watch(() => props.modelValue, (value) => {
+  if (!editor.value || readText() === value) return;
   renderText(value, Math.min(caretPosition.value, value.length));
 });
+watch(() => props.content, (content) => {
+  if (!editor.value || !content || promptContentText(content) !== props.modelValue
+    || JSON.stringify(normalizePromptContent(content)) === JSON.stringify(readContent())) return;
+  renderParts(content, Math.min(caretPosition.value, props.modelValue.length), { focus: false });
+}, { deep: true });
 
 onMounted(() => {
   renderText(props.modelValue, props.modelValue.length, { focus: false });
@@ -103,6 +102,7 @@ function onInput(): void {
   const selection = getSelectionRange();
   const value = readText();
   caretPosition.value = selection.valid ? selection.end : value.length;
+  emit('update:content', readContent());
   emit('update:modelValue', value);
   emit('caret-change', selection.valid
     ? selection
@@ -166,6 +166,7 @@ function readText(): string {
 function canonicalNodeText(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent!;
   if (!(node instanceof HTMLElement)) return '';
+  if (node.dataset.promptMention) return (JSON.parse(node.dataset.promptMention) as CodexPromptMention).label;
   if (node.tagName === 'CODE') return `\`${node.textContent!}\``;
   if (node.dataset.pluginName) return `@${node.dataset.pluginName}`;
   if (node.dataset.fileMention) return `@${node.dataset.fileMention}`;
@@ -316,52 +317,77 @@ function insertTextAtSelection(value: string): void {
       return;
     }
   }
-  const current = readText();
-  const next = `${current.slice(0, selection.start)}${value}${current.slice(selection.end)}`;
-  const nextCaret = selection.start + value.length;
-  emit('update:modelValue', next);
-  renderText(next, nextCaret, { focus: true });
+  const content = readContent();
+  renderParts([
+    ...slicePromptContent(content, 0, selection.start), { type: 'text', text: value },
+    ...slicePromptContent(content, selection.end, readText().length),
+  ], selection.start + value.length, { focus: true });
+  onInput();
+  setCaret(selection.start + value.length);
 }
 
 function focusEnd(): void {
   void nextTick(() => setCaret(readText().length));
 }
 
+function readContent(): CodexPromptPart[] {
+  const parts: CodexPromptPart[] = [];
+  const visit = (node: Node): void => {
+    if (node instanceof HTMLElement && node.dataset.promptMention) {
+      parts.push(...normalizePromptContent([JSON.parse(node.dataset.promptMention)]));
+    } else if (node.nodeType === Node.TEXT_NODE || node instanceof HTMLBRElement) {
+      const text = canonicalNodeText(node);
+      const last = parts.at(-1);
+      if (last?.type === 'text') last.text += text;
+      else if (text) parts.push({ type: 'text', text });
+    } else {
+      node.childNodes.forEach(visit);
+    }
+  };
+  editor.value?.childNodes.forEach(visit);
+  return parts;
+}
+
+function setContent(content: readonly CodexPromptPart[], caret = promptContentText(content).length): void {
+  renderParts(content, caret, { focus: false });
+}
+
+function insertMention(mention: CodexPromptMention, start: number, end: number): void {
+  setSelection(start, end);
+  const chip = createMentionChip(mention);
+  const nextCaret = start + mention.label.length + 1;
+  if (typeof document.execCommand === 'function'
+    && document.execCommand('insertHTML', false, `${chip.outerHTML} `)) {
+    render(null, chip);
+    setCaret(nextCaret);
+    return;
+  }
+  render(null, chip);
+  const content = readContent();
+  renderParts([
+    ...slicePromptContent(content, 0, start), mention, { type: 'text', text: ' ' },
+    ...slicePromptContent(content, end, readText().length),
+  ], nextCaret);
+  onInput();
+  setCaret(nextCaret);
+}
+
 function renderText(value: string, caret = caretPosition.value, options: { focus?: boolean } = {}): void {
+  const content = props.content && promptContentText(props.content) === value
+    ? props.content : [{ type: 'text' as const, text: value }];
+  renderParts(content, caret, options);
+}
+
+function renderParts(content: readonly CodexPromptPart[], caret: number, options: { focus?: boolean } = {}): void {
   const element = editor.value;
   if (!element) return;
   const shouldFocus = options.focus ?? document.activeElement === element;
   const fragment = document.createDocumentFragment();
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  inlineTokenPattern.lastIndex = 0;
-  while ((match = inlineTokenPattern.exec(value)) !== null) {
-    if (match[1]) continue;
-    const prefix = match[2]!;
-    const trigger = match[3];
-    const tokenText = match[4]!;
-    const tokenStart = match.index + prefix.length;
-    const tokenEnd = tokenStart + tokenText.length + 1;
-    const mention = trigger === '$'
-      ? findSkill(tokenText)
-      : trigger === '@'
-        ? findAtMention(tokenText)
-        : undefined;
-    if (!mention) continue;
-    appendTextNode(fragment, value.slice(lastIndex, tokenStart));
-    if (trigger === '$') {
-      fragment.append(createSkillChip(tokenText, mention as CodexSkillSummary));
-    } else {
-      const atMention = mention as Exclude<ReturnType<typeof findAtMention>, undefined>;
-      fragment.append(atMention.kind === 'plugin'
-        ? createPluginChip(tokenText, atMention.value)
-        : atMention.kind === 'file'
-          ? createFileChip(tokenText, atMention.value)
-          : createCustomMentionChip(tokenText, atMention.group, atMention.item));
-    }
-    lastIndex = tokenEnd;
+  for (const part of normalizePromptContent(content)) {
+    if (part.type === 'mention') fragment.append(createMentionChip(part));
+    else appendTextNode(fragment, part.text);
   }
-  appendTextNode(fragment, value.slice(lastIndex));
+  const value = promptContentText(content);
   if (value.endsWith('\n')) {
     const trailingLineBreak = document.createElement('br');
     trailingLineBreak.dataset.trailingLineBreak = '';
@@ -382,40 +408,6 @@ function appendTextNode(parent: Node, value: string): void {
   });
 }
 
-function findPlugin(name: string): CodexSurfacePlugin | undefined {
-  return props.plugins.find((plugin) => pluginMatchesMention(plugin, name));
-}
-
-function findAtMention(name: string):
-  | { kind: 'plugin'; value: CodexSurfacePlugin }
-  | { kind: 'file'; value: CodexFileSearchItem }
-  | { kind: 'custom'; group: CodexComposerMentionGroup; item: CodexComposerMentionItem }
-  | undefined {
-  const leadingMention = findComposerMention(
-    props.mentionGroups.filter((group) => group.placement !== 'after'),
-    name,
-  );
-  if (leadingMention) return { kind: 'custom', ...leadingMention };
-  const plugin = findPlugin(name);
-  if (plugin) return { kind: 'plugin', value: plugin };
-  const file = findFile(name);
-  if (file) return { kind: 'file', value: file };
-  // Non-after groups were already exhausted by the leading lookup above.
-  const trailingMention = findComposerMention(
-    props.mentionGroups,
-    name,
-  );
-  return trailingMention ? { kind: 'custom', ...trailingMention } : undefined;
-}
-
-function findFile(path: string): CodexFileSearchItem | undefined {
-  return props.files.find((file) => file.path === path || file.name === path);
-}
-
-function findSkill(name: string): CodexSkillSummary | undefined {
-  return props.skills.find((skill) => skillMatchesMention(skill, name));
-}
-
 function createChip(dataset: Record<string, string>, properties: {
   iconUrl?: string;
   kind: 'file' | 'plugin' | 'skill';
@@ -430,40 +422,23 @@ function createChip(dataset: Record<string, string>, properties: {
   return host;
 }
 
-function createPluginChip(name: string, plugin: CodexSurfacePlugin): HTMLElement {
-  return createChip({ pluginName: name }, {
-    iconUrl: plugin.iconUrl,
-    kind: 'plugin',
-    name: plugin.displayName || plugin.name,
+function createMentionChip(part: CodexPromptMention): HTMLElement {
+  const dataset: Record<string, string> = part.kind === 'skill' ? { skillName: part.value }
+    : part.kind === 'plugin' ? { pluginName: part.value }
+      : part.kind === 'file' ? { fileMention: part.id }
+        : { mentionValue: part.value, mentionGroup: part.groupId ?? '' };
+  const host = createChip(dataset, {
+    kind: part.kind === 'custom' ? 'plugin' : part.kind, name: part.label,
   });
-}
-
-function createFileChip(path: string, file: CodexFileSearchItem): HTMLElement {
-  return createChip({ fileMention: path }, { kind: 'file', name: file.name });
-}
-
-function createSkillChip(name: string, skill: CodexSkillSummary): HTMLElement {
-  return createChip({ skillName: name, skillTrigger: '$' }, {
-    iconUrl: skill.iconSmall,
-    kind: 'skill',
-    name: skill.displayName || skill.name,
-  });
-}
-
-function createCustomMentionChip(
-  value: string,
-  group: CodexComposerMentionGroup,
-  item: CodexComposerMentionItem,
-): HTMLElement {
-  const host = document.createElement('span');
-  host.className = 'chat-rich-text-editor__chip-token-host';
-  host.contentEditable = 'false';
-  host.dataset.mentionGroup = group.id;
-  host.dataset.mentionValue = value;
-  host.setAttribute('aria-label', item.label);
-  render(slots.mention
-    ? h(Fragment, null, slots.mention({ group, item, surface: 'composer' }))
-    : h(ChatMentionChip, { kind: 'plugin', name: item.label }), host);
+  host.dataset.promptMention = JSON.stringify(part);
+  if (part.kind === 'custom' && slots.mention) {
+    const group = props.mentionGroups.find(candidate => candidate.id === part.groupId);
+    const item = group?.items.find(candidate => candidate.id === part.id);
+    render(h(Fragment, null, slots.mention({
+      group: group ?? { id: part.groupId ?? '', label: part.groupId ?? '', items: [] },
+      item: { ...item, id: part.id, value: part.value, label: part.label }, surface: 'composer',
+    })), host);
+  }
   return host;
 }
 
@@ -482,6 +457,9 @@ defineExpose<CodexRichTextEditorExpose>({
   getSelectionRange,
   insertTextAtSelection,
   readText,
+  readContent,
+  setContent,
+  insertMention,
   setCaret,
   setSelection,
   setText,

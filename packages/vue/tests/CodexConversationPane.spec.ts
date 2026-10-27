@@ -817,6 +817,12 @@ describe('CodexConversationPane', () => {
             'Use [@gmail](plugin://gmail@openai-curated-remote)',
             'and [$bank](/skills/update-bank-balance-sheet/SKILL.md)',
           ].join(' '),
+          promptContent: [
+            { type: 'text', text: 'Use ' },
+            { type: 'mention', kind: 'plugin', id: 'gmail@openai-curated-remote', value: 'gmail', label: 'Gmail' },
+            { type: 'text', text: ' and ' },
+            { type: 'mention', kind: 'skill', id: '/skills/update-bank-balance-sheet/SKILL.md', value: 'update-bank-balance-sheet', label: 'Update Bank Balance Sheet' },
+          ],
         }],
         modelValue: '',
         plugins: [{
@@ -2079,6 +2085,61 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
 
+  it.each(['controller', 'surface', 'events'] as const)('preserves authored chips during queue editing through %s', async (mode) => {
+    const part = { type: 'mention' as const, kind: 'custom' as const, id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' };
+    const queued = { id: 'authored-queue', text: 'Alex', options: { content: [part] } };
+    const actions = { updateQueuedPrompt: vi.fn(), steerQueuedPrompt: vi.fn() };
+    const surface = fakeSurfaceController();
+    surface.state.queuedPrompts = [queued];
+    surface.state.busy = true;
+    Object.assign(surface, actions);
+    const controller = createCodexConversationPaneController({ state: {
+      identity: { conversationKey: 'authored-queue', messages, busy: true }, thread: { queuedPrompts: [queued] },
+    }, actions });
+    const wrapper = mount(CodexConversationPane, { props: mode === 'controller' ? { controller }
+      : mode === 'surface' ? { surface } : { messages, busy: true, queuedPrompts: [queued] } });
+    try {
+      if (mode === 'surface') await flushPromises();
+      await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
+      expect(composerEditor(wrapper).get('[data-mention-value="agent:1"]').text()).toContain('Alex');
+      composerEditor(wrapper).element.append(document.createTextNode(' later'));
+      await composerEditor(wrapper).trigger('input');
+      await wrapper.get('form').trigger('submit');
+      const expected = ['authored-queue', 'Alex later', { content: [part, { type: 'text', text: ' later' }] }];
+      if (mode === 'events') expect(wrapper.emitted('updateQueuedPrompt')).toStrictEqual([expected]);
+      else expect(actions.updateQueuedPrompt).toHaveBeenCalledWith(...expected);
+      await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
+      await composerEditor(wrapper).trigger('keydown', { key: 'Enter', metaKey: true });
+      const steer = ['authored-queue', 'Alex', { content: [part] }];
+      if (mode === 'events') expect(wrapper.emitted('steerQueuedPrompt')).toStrictEqual([steer]);
+      else expect(actions.steerQueuedPrompt).toHaveBeenCalledWith(...steer);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it('renders the authored first message immediately while controlled admission is pending', async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>(resolve => { finish = resolve; });
+    const part = { type: 'mention' as const, kind: 'custom' as const, id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' };
+    const submit = vi.fn(() => pending);
+    const controller = createCodexConversationPaneController({ state: {
+      identity: { conversationKey: 'new-authored', messages: [] },
+      composer: { state: { text: 'Alex', content: [part], selectionStart: 4, selectionEnd: 4 } },
+    }, actions: { submit } });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+    try {
+      await wrapper.get('form').trigger('submit');
+      expect(submit).toHaveBeenCalledWith('Alex', { content: [part] });
+      expect(wrapper.get('.chat-user-text__mention--custom').text()).toBe('Alex');
+      expect(wrapper.text()).not.toContain('agent:1');
+    } finally {
+      finish();
+      await flushPromises();
+      wrapper.unmount();
+    }
+  });
+
   it('ignores queued-prompt edit requests while drafting or for an unknown prompt', async () => {
     const drafting = mount(CodexConversationPane, {
       props: {
@@ -2552,7 +2613,7 @@ describe('CodexConversationPane', () => {
     expect(surfaceActions.interrupt).toHaveBeenCalledOnce();
     expect(surfaceActions.respondToClientRequest).toHaveBeenCalledWith(response);
     expect(surfaceActions.deleteTurn).toHaveBeenCalledWith('turn-2');
-    expect(surfaceActions.editTurn).toHaveBeenCalledWith('turn-3', 'Edited surface prompt');
+    expect(surfaceActions.editTurn).toHaveBeenCalledWith('turn-3', 'Edited surface prompt', undefined);
     expect(surfaceActions.forkTurn).toHaveBeenCalledWith('turn-4');
     expect(surfaceActions.retryTurn).toHaveBeenCalledWith('turn-5');
     expect(surfaceActions.sendMessage).toHaveBeenCalledWith('Continue with tests');
@@ -3371,7 +3432,8 @@ describe('CodexConversationPane', () => {
           id: 'user-thread',
           role: 'user',
           status: 'complete',
-          parts: [{ type: 'text', text: 'Ask @thread:019abc' }],
+          parts: [{ type: 'text', text: 'Ask codex-claw' }],
+          metadata: { promptContent: [{ type: 'text', text: 'Ask ' }, { type: 'mention', kind: 'custom', id: 'thread-1', value: 'thread:019abc', groupId: 'threads', label: 'codex-claw' }] },
         } satisfies SurfaceMessage],
       },
       slots: {
@@ -3388,7 +3450,7 @@ describe('CodexConversationPane', () => {
     await setComposerText(wrapper, '@codex');
     expect(wrapper.get('.host-suggestion').text()).toBe('Thread: codex-claw');
     await wrapper.get('.chat-composer-at-menu__item').trigger('mousedown');
-    expect(composerValue(wrapper)).toBe('@thread:019abc ');
+    expect(composerValue(wrapper)).toBe('codex-claw ');
     expect(wrapper.get('.host-mention--composer').text()).toBe('🤖 codex-claw');
     expect(wrapper.emitted('mentionSelect')).toStrictEqual([[group.items[0], group]]);
   });

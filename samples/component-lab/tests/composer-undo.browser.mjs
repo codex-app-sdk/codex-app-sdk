@@ -65,7 +65,7 @@ try {
   await editor.click();
   await editor.pressSequentially('$cp');
   await page.getByRole('option').filter({ hasText: 'Commit-Push' }).click();
-  assert.equal(await editor.locator('[data-skill-name="cp"]').count(), 1);
+  assert.equal(await editor.locator('[data-skill-name]').count(), 1);
   await editor.press('Shift+Enter');
   await editor.evaluate(element => {
     const clipboardData = new DataTransfer();
@@ -74,7 +74,7 @@ try {
   });
   assert.match(await editor.innerText(), /\nafter chip$/);
   await editor.press('ControlOrMeta+z');
-  assert.equal(await editor.locator('[data-skill-name="cp"]').count(), 1, 'Undo must preserve existing mention chips');
+  assert.equal(await editor.locator('[data-skill-name]').count(), 1, 'Undo must preserve existing mention chips');
   assert.doesNotMatch(await editor.innerText(), /after chip/);
   await editor.press('ControlOrMeta+Shift+z');
   assert.match(await editor.innerText(), /\nafter chip$/);

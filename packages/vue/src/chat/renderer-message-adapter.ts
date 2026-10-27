@@ -1,4 +1,4 @@
-import type { SurfaceMessage, SurfaceMessagePart } from '@codex-app-sdk/core/surface';
+import { normalizePromptContent, type SurfaceMessage, type SurfaceMessagePart } from '@codex-app-sdk/core/surface';
 import type { Message, MessagePart, MessageToolCall, ToolExecutionState } from './types';
 
 export type ChatMessageInput = Message | SurfaceMessage;
@@ -59,6 +59,7 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
 
   return settleTerminalMessageToolCalls({
     content: contentParts.join('\n\n'),
+    ...(message.metadata?.promptContent === undefined ? {} : { promptContent: normalizePromptContent(message.metadata.promptContent) }),
     createdAt: message.createdAt,
     id: message.id,
     parts,

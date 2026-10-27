@@ -196,7 +196,7 @@ const emit = defineEmits<{
   'client-response': [response: ClientRequestResponse]
   'copy-message': [index: number]
   'delete-turn': [turnId: string]
-  'edit-turn': [payload: { content: string; turnId: string }]
+  'edit-turn': [payload: { content: string; turnId: string; options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions }]
   'fork-turn': [turnId: string]
   'load-older-messages': []
   'message-text-selection-change': [selection: CodexMessageTextSelection | null]

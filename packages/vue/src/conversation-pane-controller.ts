@@ -141,9 +141,9 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   onMessageCopied?: PaneAction<[index: number]>;
   deleteTurn?: PaneAction<[turnId: string]>;
   deleteQueuedPrompt?: PaneAction<[promptId: string]>;
-  updateQueuedPrompt?: PaneAction<[promptId: string, prompt: string]>;
+  updateQueuedPrompt?: PaneAction<[promptId: string, prompt: string, options?: CodexRendererSendMessageOptions]>;
   editGoal?: PaneAction;
-  editTurn?: PaneAction<[payload: { content: string; turnId: string }]>;
+  editTurn?: PaneAction<[payload: { content: string; turnId: string; options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions }]>;
   forkTurn?: PaneAction<[turnId: string]>;
   interrupt?: PaneAction;
   loadOlderHistory?: PaneAction;
@@ -164,7 +164,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   selectApprovalPreset?: PaneAction<[preset: ApprovalPreset]>;
   sendFollowUp?: PaneAction<[prompt: string]>;
   steer?: PaneAction<[prompt: string, options?: CodexRendererSendMessageOptions]>;
-  steerQueuedPrompt?: PaneAction<[promptId: string, prompt?: string]>;
+  steerQueuedPrompt?: PaneAction<[promptId: string, prompt?: string, options?: CodexRendererSendMessageOptions]>;
   submit?: PaneAction<[prompt: string, options?: CodexRendererSendMessageOptions]>;
   updateAttachments?: PaneAction<[attachments: readonly CodexHostAttachment[]]>;
   updateComposerState?: PaneAction<[state: CodexComposerState]>;

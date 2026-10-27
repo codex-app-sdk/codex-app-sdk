@@ -40,3 +40,5 @@ export {
   type CodexSurfaceBridgeOperationResult,
   type CodexSurfaceBridgeTarget,
 } from './surface-bridge';
+
+export { normalizePromptContent, promptContentText, promptContentDispatchText, trimPromptContent, slicePromptContent, replacePromptContentRange } from './prompt-content';

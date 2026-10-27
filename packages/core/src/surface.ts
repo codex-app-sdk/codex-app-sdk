@@ -1,3 +1,7 @@
+export { normalizePromptContent, promptContentText, promptContentDispatchText, trimPromptContent, slicePromptContent, replacePromptContentRange } from './prompt-content';
+export type { CodexPromptMention, CodexPromptPart } from './prompt-content';
+import type { CodexPromptPart } from './prompt-content';
+
 export type SurfaceMessageTextPart = {
   type: 'text';
   text: string;
@@ -1000,6 +1004,7 @@ export type CreateCodexRendererConversationOptions = Pick<
 >;
 
 export type SendCodexMessageOptions = {
+  content?: readonly CodexPromptPart[];
   attachments?: readonly CodexSurfaceAttachment[];
   inputMethod?: 'typed' | 'dictated';
   model?: string;
@@ -1102,12 +1107,12 @@ export type CodexSurfaceApi = {
   steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
   interrupt(): Promise<CodexSurfaceSnapshot>;
   deleteTurn(turnId: string): Promise<CodexSurfaceSnapshot>;
-  editTurn(turnId: string, content: string): Promise<CodexSurfaceSnapshot>;
+  editTurn(turnId: string, content: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
   forkTurn(turnId: string): Promise<CodexSurfaceSnapshot>;
   retryTurn(turnId: string): Promise<CodexSurfaceSnapshot>;
   deleteQueuedPrompt(promptId: string): Promise<CodexSurfaceSnapshot>;
-  updateQueuedPrompt(promptId: string, prompt: string): Promise<CodexSurfaceSnapshot>;
-  steerQueuedPrompt(promptId: string, prompt?: string): Promise<CodexSurfaceSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
   respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<CodexSurfaceSnapshot>;
   resolveApproval(
     approvalId: string,
@@ -1152,8 +1157,11 @@ export type CodexSurfaceStatePatch = {
 
 export type CodexSurfaceRendererApi = Omit<
   CodexSurfaceApi,
-  'createConversation' | 'sendMessage' | 'steerMessage'
+  'createConversation' | 'sendMessage' | 'steerMessage' | 'updateQueuedPrompt' | 'steerQueuedPrompt' | 'editTurn'
 > & {
+  editTurn(turnId: string, content: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
   createConversation(options?: CreateCodexRendererConversationOptions): Promise<CodexSurfaceSnapshot>;
   sendMessage(prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
   steerMessage(prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;

@@ -9,7 +9,7 @@ import type {
 } from '@codex-app-sdk/core/surface';
 import {
   codexThreadToSurfaceMessages,
-  preserveHistoricalAttachmentPreviews,
+  preserveHistoricalMessagePresentation,
 } from './codex-conversation-history';
 import type {
   CodexConversationHostOptions,
@@ -367,7 +367,7 @@ export class CodexSurfaceLifecycleController {
       const runningTurnId = changedTurns.length > 0
         ? loadingRuntime.activeTurnId
         : threadStatus.type === 'active' ? activeTurnId(turns) : null;
-      const historyMessages = preserveHistoricalAttachmentPreviews(
+      const historyMessages = preserveHistoricalMessagePresentation(
         loadingRuntime.messages,
         codexThreadToSurfaceMessages({ ...response.thread, turns: restoredTurns }),
       );

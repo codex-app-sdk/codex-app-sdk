@@ -524,9 +524,9 @@ const emit = defineEmits<{
   continueInterruptedTurn: [];
   deleteTurn: [turnId: string];
   deleteQueuedPrompt: [promptId: string];
-  updateQueuedPrompt: [promptId: string, prompt: string];
+  updateQueuedPrompt: [promptId: string, prompt: string, options?: CodexRendererSendMessageOptions];
   editGoal: [];
-  editTurn: [payload: { content: string; turnId: string }];
+  editTurn: [payload: { content: string; turnId: string; options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions }];
   forkTurn: [turnId: string];
   loadOlderHistory: [];
   error: [message: string | null];
@@ -547,7 +547,7 @@ const emit = defineEmits<{
   sendFollowUp: [prompt: string];
   submit: [prompt: string, options?: CodexRendererSendMessageOptions];
   steer: [prompt: string, options?: CodexRendererSendMessageOptions];
-  steerQueuedPrompt: [promptId: string, prompt?: string];
+  steerQueuedPrompt: [promptId: string, prompt?: string, options?: CodexRendererSendMessageOptions];
   'update:modelId': [modelId: string];
   'update:composerState': [state: CodexComposerState];
   'update:modelValue': [value: string];
@@ -1123,12 +1123,12 @@ function mergePromptHistories(
   return [...older, ...visible.slice(overlap)].slice(-100);
 }
 
-function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>): void {
+function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod' | 'content'>): void {
   updateDraft('');
   const queuedPromptId = editingQueuedPromptId.value;
   if (queuedPromptId) {
     editingQueuedPromptId.value = null;
-    updateQueuedPrompt(queuedPromptId, prompt);
+    updateQueuedPrompt(queuedPromptId, prompt, composerOptions);
     replaceAttachments([]);
     return;
   }
@@ -1139,7 +1139,7 @@ function submit(prompt: string, composerOptions?: Pick<CodexRendererSendMessageO
   if (effectiveController.value) {
     const controlledSubmit = effectiveControllerActions.value?.submit;
     if (controlledSubmit) {
-      const optimisticMessageId = beginControlledSubmission(prompt, selectedAttachments.value);
+      const optimisticMessageId = beginControlledSubmission(prompt, selectedAttachments.value, options?.content);
       void runSurfaceAction(
         () => Promise.resolve(controlledSubmit(prompt, options)),
         () => {
@@ -1193,6 +1193,7 @@ function continueInterruptedTurn(): void {
 function beginControlledSubmission(
   prompt: string,
   attachments: readonly CodexHostAttachment[],
+  content?: CodexRendererSendMessageOptions['content'],
 ): string | null {
   if (effectiveBusy.value || authoritativeMessages.value.length > 0) return null;
   const id = `codex-optimistic-user-${++optimisticSubmissionSequence}`;
@@ -1206,6 +1207,7 @@ function beginControlledSubmission(
       role: 'user',
       status: 'complete',
       createdAt: new Date().toISOString(),
+      ...(content ? { metadata: { promptContent: content } } : {}),
       parts: [
         { type: 'text', text: prompt },
         ...attachments.map((attachment) => ({
@@ -1399,7 +1401,7 @@ function replaceAttachments(attachments: CodexHostAttachment[]): void {
 
 function sendOptionsForAttachments(
   attachments: readonly CodexHostAttachment[],
-  composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>,
+  composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod' | 'content'>,
 ): CodexRendererSendMessageOptions | undefined {
   if (attachments.length === 0) return composerOptions;
   const surfaceAttachments: CodexRendererAttachment[] = attachments.map((attachment) => (
@@ -1483,11 +1485,11 @@ async function deleteTurn(turnId: string): Promise<void> {
   }
 }
 
-function editTurn(payload: { content: string; turnId: string }): void {
+function editTurn(payload: { content: string; turnId: string; options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions }): void {
   if (dispatchControllerAction('editTurn', payload)) return;
   if (effectiveController.value) return;
   emit('editTurn', payload);
-  if (props.surface) void runSurfaceAction(() => props.surface!.editTurn(payload.turnId, payload.content));
+  if (props.surface) void runSurfaceAction(() => props.surface!.editTurn(payload.turnId, payload.content, payload.options));
 }
 
 function forkTurn(turnId: string): void {
@@ -1531,29 +1533,32 @@ function editQueuedPrompt(promptId: string): void {
   const prompt = effectiveQueuedPrompts.value.find((candidate) => candidate.id === promptId);
   if (!prompt) return;
   editingQueuedPromptId.value = promptId;
-  updateDraft(prompt.text);
+  updateComposerState({ text: prompt.text, content: prompt.options?.content,
+    selectionStart: prompt.text.length, selectionEnd: prompt.text.length });
   composer.value?.focus();
 }
 
-function updateQueuedPrompt(promptId: string, prompt: string): void {
-  if (dispatchControllerAction('updateQueuedPrompt', promptId, prompt)) return;
+function updateQueuedPrompt(promptId: string, prompt: string, options?: CodexRendererSendMessageOptions): void {
+  if (dispatchControllerAction('updateQueuedPrompt', ...options ? [promptId, prompt, options] as const : [promptId, prompt] as const)) return;
   if (effectiveController.value) return;
-  emit('updateQueuedPrompt', promptId, prompt);
-  if (props.surface) void runSurfaceAction(() => props.surface!.updateQueuedPrompt(promptId, prompt));
+  if (options) emit('updateQueuedPrompt', promptId, prompt, options);
+  else emit('updateQueuedPrompt', promptId, prompt);
+  if (props.surface) void runSurfaceAction(() => (options ? props.surface!.updateQueuedPrompt(promptId, prompt, options) : props.surface!.updateQueuedPrompt(promptId, prompt)));
 }
 
-function steerQueuedPrompt(promptId: string, prompt?: string): void {
+function steerQueuedPrompt(promptId: string, prompt?: string, options?: CodexRendererSendMessageOptions): void {
   if (!effectiveCapabilities.value.steerPrompt) return;
   if (editingQueuedPromptId.value === promptId) editingQueuedPromptId.value = null;
   if (prompt === undefined) dispatchControllerAction('steerQueuedPrompt', promptId);
-  else dispatchControllerAction('steerQueuedPrompt', promptId, prompt);
+  else dispatchControllerAction('steerQueuedPrompt', ...options ? [promptId, prompt, options] as const : [promptId, prompt] as const);
   if (effectiveController.value) return;
   if (prompt === undefined) emit('steerQueuedPrompt', promptId);
+  else if (options) emit('steerQueuedPrompt', promptId, prompt, options);
   else emit('steerQueuedPrompt', promptId, prompt);
   if (props.surface) {
     void runSurfaceAction(() => prompt === undefined
       ? props.surface!.steerQueuedPrompt(promptId)
-      : props.surface!.steerQueuedPrompt(promptId, prompt));
+      : (options ? props.surface!.steerQueuedPrompt(promptId, prompt, options) : props.surface!.steerQueuedPrompt(promptId, prompt)));
   }
 }
 
@@ -1565,7 +1570,7 @@ function interrupt(): void {
   if (props.surface) void runSurfaceAction(() => props.surface!.interrupt());
 }
 
-function steer(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod'>): void {
+function steer(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOptions, 'inputMethod' | 'content'>): void {
   if (!effectiveCapabilities.value.steerPrompt) {
     submit(prompt, composerOptions);
     return;
@@ -1573,7 +1578,7 @@ function steer(prompt: string, composerOptions?: Pick<CodexRendererSendMessageOp
   const queuedPromptId = editingQueuedPromptId.value;
   if (queuedPromptId) {
     editingQueuedPromptId.value = null;
-    steerQueuedPrompt(queuedPromptId, prompt);
+    steerQueuedPrompt(queuedPromptId, prompt, composerOptions);
     replaceAttachments([]);
     return;
   }
