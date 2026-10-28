@@ -93,7 +93,8 @@ describe('ChatUserText', () => {
     expect(wrapper.find('br').exists()).toBe(true);
   });
 
-  it('renders host mentions with app-owned message content', () => {
+  it('renders host mentions from authored content or self-describing links without a catalog', async () => {
+    const rendered: unknown[] = [];
     const wrapper = mount(ChatUserText, {
       props: {
         content: 'Ask codex-claw',
@@ -105,12 +106,26 @@ describe('ChatUserText', () => {
         }],
       },
       slots: {
-        mention: ({ item }: { item: { label: string } }) => h('span', { class: 'host-thread-message' }, `🤖 ${item.label}`),
+        mention: ({ group, item }: { group: { id: string }; item: { label: string } }) => {
+          rendered.push({ group, item });
+          return h('span', { class: 'host-thread-message' }, `🤖 ${item.label}`);
+        },
       },
     });
 
     expect(wrapper.get('.host-thread-message').text()).toBe('🤖 codex-claw');
     expect(wrapper.text()).not.toContain('@thread:019abc');
+    const link = '[@codex-claw \\[review\\]](mention://threads/thread-1?value=thread%3A019abc)';
+    await wrapper.setProps({ content: link, promptContent: undefined, mentionGroups: [] });
+    expect(wrapper.get('.host-thread-message').text()).toBe('🤖 codex-claw [review]');
+    expect(rendered.at(-1)).toMatchObject({ group: { id: 'threads' }, item: {
+      id: 'thread-1', value: 'thread:019abc', label: 'codex-claw [review]',
+    } });
+    await wrapper.setProps({ content: '@thread:019abc', mentionGroups: [{ id: 'threads', label: 'Threads', items: [
+      { id: 'thread-1', value: 'thread:019abc', label: 'codex-claw' },
+    ] }] });
+    expect(wrapper.find('.host-thread-message').exists()).toBe(false);
+    expect(wrapper.text()).toBe('@thread:019abc');
   });
 
   it('uses a plugin namespace instead of an opaque app id for contributed skills', () => {
@@ -417,6 +432,10 @@ describe('ChatUserText', () => {
         { type: 'text', text: '[@gmail](plugin://)' },
         { type: 'text', text: ' [broken](destination' },
       ]);
+    for (const link of [
+      '[@Alex](mention://agents/id)', '[@Alex](mention://agents/id?value=)',
+      '[@Alex](mention://agents/%ZZ?value=agent%3A1)', '[@](mention://agents/id?value=agent%3A1)',
+    ]) expect(parseCodexUserText(link)).toStrictEqual([{ type: 'text', text: link }]);
   });
 
   it('normalizes encoded and angle-wrapped plugin destinations without losing canonical text', () => {

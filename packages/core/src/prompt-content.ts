@@ -17,17 +17,19 @@ export function promptContentText(content: readonly CodexPromptPart[]): string {
 }
 
 function linkedReference(part: CodexPromptMention): string {
-  const name = part.value.replace(/[\\[\]]/g, '\\$&');
+  const name = (part.kind === 'custom' ? part.label : part.value).replace(/[\\[\]]/g, '\\$&');
   const target = part.kind === 'plugin' ? `plugin://${part.id}` : part.id;
-  const path = encodeURI(target).replace(/[()#?]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `[${part.kind === 'skill' ? '$' : '@'}${name}](${path})`;
+  const encodeDelimiter = (char: string) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`;
+  const path = part.kind === 'custom'
+    ? `mention://${encodeURIComponent(part.groupId ?? 'custom')}/${encodeURIComponent(part.id)}?value=${encodeURIComponent(part.value)}`
+    : encodeURI(target).replace(/[?#]/g, encodeDelimiter);
+  return `[${part.kind === 'skill' ? '$' : '@'}${name}](${path.replace(/[()]/g, encodeDelimiter)})`;
 }
 
 /** Model-facing references. An optional prompt retains context after its authored prefix. */
 export function promptContentDispatchText(content: readonly CodexPromptPart[], prompt?: string): string {
   const text = content.map(part => part.type === 'text' ? part.text
-    : part.kind === 'skill' || part.kind === 'plugin' ? linkedReference(part)
-      : part.kind === 'file' ? `@${part.id}` : `@${part.value}`).join('');
+    : part.kind === 'file' ? `@${part.id}` : linkedReference(part)).join('');
   if (prompt === undefined) return text;
   const visible = promptContentText(content);
   if (prompt.startsWith(text) || !prompt.startsWith(visible)) return prompt;

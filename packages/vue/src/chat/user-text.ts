@@ -1,4 +1,4 @@
-import { normalizePromptContent, type CodexPromptPart, type CodexSurfacePlugin, type CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
+import { normalizePromptContent, type CodexPromptMention, type CodexPromptPart, type CodexSurfacePlugin, type CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 import { skillDisplayName, skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';
 import {
@@ -41,7 +41,7 @@ export function parseAuthoredUserText(
   skills: readonly CodexSurfaceSkill[] = [],
   groups: readonly CodexComposerMentionGroup[] = [],
 ): CodexUserTextToken[] {
-  if (content === undefined) return parseCodexUserText(text, plugins, skills, [], false);
+  if (content === undefined) return parseCodexUserText(text, plugins, skills, groups, false);
   return normalizePromptContent(content).flatMap((part): CodexUserTextToken[] => {
     if (part.type === 'text') {
       return part.text.split(/(`[^`\n]+`|\n)/g).filter(Boolean).map(value => value === '\n'
@@ -57,14 +57,18 @@ export function parseAuthoredUserText(
       plugin: plugins.find(plugin => plugin.id === part.id),
     }];
     if (part.kind === 'file') return [{ type: 'file-mention', displayName: part.label, label: part.label, href: part.id }];
-    const group = groups.find(group => group.id === part.groupId);
-    const item = group?.items.find(item => item.id === part.id);
-    return [{
-      type: 'custom-mention', displayName: part.label, label: part.label,
-      group: group ?? { id: part.groupId ?? part.kind, label: part.groupId ?? part.kind, items: [] },
-      item: { ...item, id: part.id, value: part.value, label: part.label },
-    }];
+    return [customMentionToken(part, groups)];
   });
+}
+
+function customMentionToken(part: CodexPromptMention, groups: readonly CodexComposerMentionGroup[]): Extract<CodexUserTextToken, { type: 'custom-mention' }> {
+  const group = groups.find(group => group.id === part.groupId);
+  const item = group?.items.find(item => item.id === part.id);
+  return {
+    type: 'custom-mention', displayName: part.label, label: part.label,
+    group: group ?? { id: part.groupId ?? part.kind, label: part.groupId ?? part.kind, items: [] },
+    item: { ...item, id: part.id, value: part.value, label: part.label },
+  };
 }
 
 export function parseCodexUserText(
@@ -90,7 +94,7 @@ export function parseCodexUserText(
     if (code !== undefined) {
       tokens.push({ type: 'code', text: code });
     } else if (label !== undefined) {
-      tokens.push(mentionToken(label, href!, plugins, skills) ?? { type: 'text', text: raw });
+      tokens.push(mentionToken(label, href!, plugins, skills, mentionGroups) ?? { type: 'text', text: raw });
     } else if (bareTrigger !== undefined) {
       tokens.push((allowBareMentions ? bareMentionToken(bareTrigger, bareName!, plugins, skills, mentionGroups) : null) ?? { type: 'text', text: raw });
     } else {
@@ -163,9 +167,20 @@ function mentionToken(
   rawHref: string,
   plugins: readonly CodexSurfacePlugin[],
   skills: readonly CodexSurfaceSkill[],
-): Extract<CodexUserTextToken, { type: 'plugin-mention' | 'skill-mention' }> | null {
-  const label = rawLabel.trim();
+  groups: readonly CodexComposerMentionGroup[],
+): Extract<CodexUserTextToken, { type: 'custom-mention' | 'plugin-mention' | 'skill-mention' }> | null {
+  const label = rawLabel.trim().replace(/\\([\\[\]])/g, '$1');
   const href = markdownDestination(rawHref);
+
+  if (label.startsWith('@') && href.startsWith('mention://')) {
+    try {
+      const match = /^mention:\/\/([^/]+)\/([^?]+)\?value=(.+)$/.exec(href);
+      if (!match) return null;
+      const [groupId, id, value] = match.slice(1).map(value => decodeURIComponent(value));
+      if (!groupId || !id || !value || label.length === 1) return null;
+      return customMentionToken({ type: 'mention', kind: 'custom', groupId, id, value, label: label.slice(1) }, groups);
+    } catch { return null; }
+  }
 
   if (label.startsWith('@') && href.startsWith('plugin://')) {
     const pluginId = safeDecode(href.slice('plugin://'.length));
@@ -238,7 +253,7 @@ export function humanizeMentionName(value: string, fallback: string): string {
 }
 
 function userTextTokenRegex(): RegExp {
-  return /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\n]+)\)|(?<![\w.%+-])([$@/])([A-Za-z0-9_.:-]+(?:[ \t]+\([A-Za-z0-9_.-]+\))?)|(\n)/g;
+  return /`([^`\n]+)`|\[((?:\\.|[^\]\\\n])+)\]\(([^)\n]+)\)|(?<![\w.%+-])([$@/])([A-Za-z0-9_.:-]+(?:[ \t]+\([A-Za-z0-9_.-]+\))?)|(\n)/g;
 }
 
 function isOpaqueAppName(value: string): boolean {

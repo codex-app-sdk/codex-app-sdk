@@ -18,14 +18,14 @@ describe('authored prompt content', () => {
       { type: 'mention', kind: 'custom', id: 'agent-1', label: 'Alex', value: 'agent:1', groupId: 'agents' },
     ];
     expect(promptContentText(parts)).toBe('$cp then Commit-PushGmailfile.tsAlex');
-    expect(promptContentDispatchText(parts)).toBe('$cp then [$cp](/skills/cp/SKILL.md)[@gmail](plugin://gmail@remote)@src/file.ts@agent:1');
+    expect(promptContentDispatchText(parts)).toBe('$cp then [$cp](/skills/cp/SKILL.md)[@gmail](plugin://gmail@remote)@src/file.ts[@Alex](mention://agents/agent-1?value=agent%3A1)');
     const copied = normalizePromptContent(parts);
     expect(copied).toStrictEqual(parts);
     copied[1] = { type: 'text', text: 'replacement' };
     expect(parts[1]).toStrictEqual(mention);
   });
 
-  it('serializes canonical skill and plugin references with Markdown-safe names and targets', () => {
+  it('serializes canonical references with Markdown-safe names and targets', () => {
     const parts: CodexPromptPart[] = [{ type: 'text', text: '$cp and ' }, {
       ...mention, label: 'Commit and push', value: 'Commit-Push [cp]', id: '/skills/Commit Push (cp)#1/SKILL.md',
     }];
@@ -34,6 +34,12 @@ describe('authored prompt content', () => {
     expect(promptContentDispatchText([{ type: 'text', text: '@gmail then ' }, {
       type: 'mention', kind: 'plugin', label: 'Gmail', value: 'mail [work]', id: 'mail@remote (work)#1',
     }])).toBe('@gmail then [@mail \\[work\\]](plugin://mail@remote%20%28work%29%231)');
+    expect(promptContentDispatchText([{
+      type: 'mention', kind: 'custom', label: 'A [team]', id: 'id/a?b#c', value: 'agent:a?b#c', groupId: 'People / X',
+    }])).toBe('[@A \\[team\\]](mention://People%20%2F%20X/id%2Fa%3Fb%23c?value=agent%3Aa%3Fb%23c)');
+    expect(promptContentDispatchText([{
+      type: 'mention', kind: 'custom', label: 'Fallback', id: 'id', value: 'plain',
+    }])).toBe('[@Fallback](mention://custom/id?value=plain)');
   });
 
   it('projects an authored prompt prefix once and preserves host context verbatim', () => {

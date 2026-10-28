@@ -272,7 +272,8 @@ mention group. Text parts have `{ type: 'text', text }`.
 Core exports `promptContentText(content)`, which joins text and saved labels
 verbatim without adding prefixes or spaces. `promptContentDispatchText(content)`
 produces model-facing text: selected skills use `[$value](id)`, plugins use
-`[@value](plugin://id)`, files use `@id`, and custom mentions use `@value`;
+`[@value](plugin://id)`, files use `@id`, and custom mentions use
+`[@label](mention://groupId/id?value=value)` (`custom` is the default group);
 text parts remain verbatim. Link names are Markdown-escaped and targets are
 URI-encoded. Pass an optional second
 argument, `promptContentDispatchText(content, prompt)`, to replace the authored

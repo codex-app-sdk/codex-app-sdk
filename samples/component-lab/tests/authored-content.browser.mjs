@@ -30,6 +30,7 @@ const server = await createServer({
         import Composer from ${source('components/CodexComposer.vue')};
         import Message from ${source('components/CodexMessage.vue')};
         import MessageEditor from ${source('chat/ChatMessageEditor.vue')};
+        import { promptContentDispatchText } from ${JSON.stringify(path.join(root, 'packages/core/src/prompt-content.ts'))};
         import ${source('styles.css')};
         const state = ref({text:'',selectionStart:0,selectionEnd:0});
         const submitted = ref(null);
@@ -40,6 +41,7 @@ const server = await createServer({
         const groups = [{id:'agents',label:'Agents',items:[{id:'agent-1',value:'agent:1',label:'Alex'}]}];
         window.authoredFixture = {
           clearCatalogs() { catalogs.value = false; },
+          reload() { const {prompt,options}=submitted.value; submitted.value={prompt:promptContentDispatchText(options.content,prompt)}; },
           edit() { editing.value=true; },
           reset() { editing.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; catalogs.value=true; },
           restore() { const {prompt,options}=submitted.value; state.value={text:prompt,content:options?.content,selectionStart:prompt.length,selectionEnd:prompt.length}; },
@@ -166,6 +168,8 @@ try {
     ]);
     await page.evaluate(() => window.authoredFixture.clearCatalogs());
     assert.equal(await page.locator('.chat-user-text__mention--custom').innerText(), 'Alex');
+    await page.evaluate(() => window.authoredFixture.reload());
+    assert.equal(await page.locator('.chat-user-text__mention--custom').innerText(), 'Alex', 'Agent links restore pills without authored metadata or catalogs');
     await page.evaluate(() => window.authoredFixture.reset());
     await focusEnd(editor); await editor.pressSequentially('Use @computer-use');
     await page.locator('.chat-composer-at-menu__item').filter({ hasText: 'Computer Use' }).waitFor();
