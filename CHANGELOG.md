@@ -14,6 +14,8 @@
   out of the attachment list.
 - Resume the Working display when app-server activity follows an answer,
   replacing the earlier summary until a new answer arrives.
+- Keep suggestion menus open when typing resumes before an earlier blur delay
+  expires.
 
 ## 0.18.0
 

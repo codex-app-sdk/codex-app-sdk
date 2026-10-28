@@ -49,6 +49,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   const activeSlashIndex = ref(0)
   let dismissedSuggestionContext: string | null = null
   let suggestionsSuspended = false
+  let closeTimer: number | undefined
 
   const activeFileMention = computed(() => findActiveFileMention(options.prompt.value, options.caretPosition.value))
   const visibleFiles = computed(() => {
@@ -321,7 +322,8 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   }
 
   function closeSoon(): void {
-    window.setTimeout(close, 120)
+    if (closeTimer !== undefined) window.clearTimeout(closeTimer)
+    closeTimer = window.setTimeout(close, 120)
   }
 
   function close(): void {
@@ -338,6 +340,7 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
   }
 
   function sync(): void {
+    if (closeTimer !== undefined) window.clearTimeout(closeTimer)
     if (suggestionsSuspended) {
       close()
       return

@@ -579,6 +579,13 @@ describe('useChatComposerSuggestions', () => {
       expect(state.suggestions.atMenuVisible.value).toBe(true);
       await vi.advanceTimersByTimeAsync(1);
       expect(state.suggestions.atMenuVisible.value).toBe(false);
+
+      state.suggestions.sync();
+      state.suggestions.closeSoon();
+      await vi.advanceTimersByTimeAsync(119);
+      state.suggestions.updateCaretPosition();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(state.suggestions.atMenuVisible.value).toBe(true);
     } finally {
       vi.useRealTimers();
     }

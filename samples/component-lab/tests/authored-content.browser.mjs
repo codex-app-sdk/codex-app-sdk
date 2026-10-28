@@ -172,8 +172,10 @@ try {
     await page.evaluate(() => window.authoredFixture.reload());
     assert.equal(await page.locator('.chat-user-text__mention--custom').innerText(), 'Alex', 'Agent links restore pills without authored metadata or catalogs');
     await page.evaluate(() => window.authoredFixture.reset());
+    await editor.dispatchEvent('blur');
     await focusEnd(editor); await editor.pressSequentially('Use @computer-use');
     await page.locator('.chat-composer-at-menu__item').filter({ hasText: 'Computer Use' }).waitFor();
+    await page.waitForTimeout(150); // Cross the earlier blur's 120ms close delay.
     await editor.press('Enter');
     const composerPill = editor.locator('[data-plugin-name] .chat-mention-chip');
     const composerStyle = await composerPill.evaluate(appearance);
