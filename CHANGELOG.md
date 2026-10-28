@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.18.1
+
+### Fixed
+
+- Show Goal controls when a host composer advertises Goal support without a
+  native Codex conversation ID.
+- Restore skill, plugin, and custom mention pills from canonical links after
+  reloading a conversation, retaining custom labels and stable targets.
+- Match message reference pills to composer styling and keep selected plugins
+  out of the attachment list.
+- Resume the Working display when app-server activity follows an answer,
+  replacing the earlier summary until a new answer arrives.
+
 ## 0.18.0
 
 ### Added

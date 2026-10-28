@@ -1,6 +1,6 @@
 {
   "name": "@codex-app-sdk/core",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Renderer-safe contracts and shared primitives for Codex applications.",
   "type": "module",
   "license": "Apache-2.0",
