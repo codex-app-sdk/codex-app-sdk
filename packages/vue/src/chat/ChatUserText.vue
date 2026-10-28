@@ -5,10 +5,7 @@
         <span v-if="token.type === 'text'">{{ token.text }}</span>
         <code v-else-if="token.type === 'code'">{{ token.text }}</code>
         <br v-else-if="token.type === 'line-break'">
-        <span v-else-if="token.type === 'file-mention'" class="chat-user-text__mention chat-user-text__mention--file" :title="token.displayName">
-          <FileTextIcon class="chat-user-text__mention-icon" aria-hidden="true" />
-          <span class="chat-user-text__mention-label">{{ token.displayName }}</span>
-        </span>
+        <ChatMentionChip v-else-if="token.type === 'file-mention'" kind="file" :name="token.displayName" class="chat-user-text__mention chat-user-text__mention--file" :title="token.displayName" />
         <slot
           v-else-if="token.type === 'custom-mention'"
           name="mention"
@@ -17,68 +14,55 @@
           :token="token"
           surface="message"
         >
-          <span class="chat-user-text__mention chat-user-text__mention--custom" :title="token.item.description || token.displayName">
-            <SparklesIcon class="chat-user-text__mention-icon" aria-hidden="true" />
-            <span class="chat-user-text__mention-label">{{ token.displayName }}</span>
-          </span>
+          <ChatMentionChip kind="plugin" :name="token.displayName" class="chat-user-text__mention chat-user-text__mention--custom" :title="token.item.description || token.displayName" />
         </slot>
-        <span
+        <ChatMentionChip
           v-else
+          :kind="token.type === 'plugin-mention' ? 'plugin' : 'skill'"
+          :name="token.displayName"
           class="chat-user-text__mention"
           :class="`chat-user-text__mention--${token.type === 'plugin-mention' ? 'plugin' : 'skill'}`"
-          :style="mentionStyle(token)"
           :title="mentionTitle(token)"
         >
-          <span
-            class="chat-user-text__mention-icon-frame"
-            :class="{
-              'chat-user-text__mention-icon-frame--has-light': mentionIcon(token, 'light'),
-              'chat-user-text__mention-icon-frame--has-dark': mentionIcon(token, 'dark'),
-            }"
-          >
-            <img
-              v-if="mentionIcon(token, 'light')"
-              class="chat-user-text__mention-image chat-user-text__mention-image--light"
-              :src="mentionIcon(token, 'light')!"
-              alt=""
-              aria-hidden="true"
-              decoding="async"
-              loading="lazy"
-              referrerpolicy="no-referrer"
-              @error="failedIconUrls.add(mentionIcon(token, 'light')!)"
+          <template #icon>
+            <span
+              class="chat-user-text__mention-icon-frame"
+              :class="{
+                'chat-user-text__mention-icon-frame--has-light': mentionIcon(token, 'light'),
+                'chat-user-text__mention-icon-frame--has-dark': mentionIcon(token, 'dark'),
+              }"
             >
-            <img
-              v-if="mentionIcon(token, 'dark')"
-              class="chat-user-text__mention-image chat-user-text__mention-image--dark"
-              :src="mentionIcon(token, 'dark')!"
-              alt=""
-              aria-hidden="true"
-              decoding="async"
-              loading="lazy"
-              referrerpolicy="no-referrer"
-              @error="failedIconUrls.add(mentionIcon(token, 'dark')!)"
-            >
-            <svg
-              v-if="token.type === 'plugin-mention'"
-              class="chat-user-text__mention-icon"
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.9"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M8 3v4" />
-              <path d="M16 3v4" />
-              <path d="M6 7h12v3a6 6 0 0 1-12 0V7" />
-              <path d="M12 16v5" />
-              <path d="M9 21h6" />
-            </svg>
-            <SparklesIcon v-else class="chat-user-text__mention-icon" aria-hidden="true" />
-          </span>
-          <span class="chat-user-text__mention-label">{{ token.displayName }}</span>
-        </span>
+              <img
+                v-if="mentionIcon(token, 'light')"
+                class="chat-user-text__mention-image chat-user-text__mention-image--light"
+                :src="mentionIcon(token, 'light')!"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="failedIconUrls.add(mentionIcon(token, 'light')!)"
+              >
+              <img
+                v-if="mentionIcon(token, 'dark')"
+                class="chat-user-text__mention-image chat-user-text__mention-image--dark"
+                :src="mentionIcon(token, 'dark')!"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="failedIconUrls.add(mentionIcon(token, 'dark')!)"
+              >
+              <PlugIcon
+                v-if="token.type === 'plugin-mention'"
+                class="chat-user-text__mention-icon"
+                aria-hidden="true"
+              />
+              <SparklesIcon v-else class="chat-user-text__mention-icon" aria-hidden="true" />
+            </span>
+          </template>
+        </ChatMentionChip>
       </template>
     </p>
   </div>
@@ -87,7 +71,8 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import type { CodexPromptPart, CodexSurfacePlugin, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
-import { FileTextIcon, SparklesIcon } from '../icons/app-icons';
+import { PlugIcon, SparklesIcon } from '../icons/app-icons';
+import ChatMentionChip from './ChatMentionChip.vue';
 import { parseAuthoredUserText, type CodexUserTextToken } from './user-text';
 import type { CodexComposerMentionGroup } from './composer-mentions-custom';
 
@@ -134,22 +119,11 @@ function mentionIcon(
   return /^data:image\/(?:avif|bmp|gif|jpeg|png|svg\+xml|webp|x-icon);base64,/i.test(value) ? value : null;
 }
 
-function mentionStyle(token: Extract<CodexUserTextToken, { type: 'plugin-mention' | 'skill-mention' }>) {
-  const color = token.type === 'plugin-mention'
-    ? token.plugin?.brandColor
-    : token.skill?.brandColor;
-  return isSafeBrandColor(color) ? { '--codex-mention-color': color } : undefined;
-}
-
 function mentionTitle(token: Extract<CodexUserTextToken, { type: 'plugin-mention' | 'skill-mention' }>): string {
   if (token.type === 'plugin-mention') {
     return token.plugin?.shortDescription || token.displayName;
   }
   return token.skill?.shortDescription || token.skill?.description || token.displayName;
-}
-
-function isSafeBrandColor(value: string | undefined): value is string {
-  return Boolean(value && /^#[\da-f]{3,8}$/i.test(value));
 }
 </script>
 
@@ -160,26 +134,15 @@ function isSafeBrandColor(value: string | undefined): value is string {
 }
 
 .chat-user-text__mention {
-  --codex-mention-color: var(--color-primary);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
-  max-width: 100%;
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  background: color-mix(in srgb, var(--codex-mention-color) 12%, var(--color-primary-container));
-  color: color-mix(in srgb, var(--codex-mention-color) 42%, var(--color-on-primary-container));
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  vertical-align: -0.18em;
+  vertical-align: -2px;
 }
 
 .chat-user-text__mention-icon-frame,
 .chat-user-text__mention-icon,
 .chat-user-text__mention-image {
-  width: 1.12em;
-  height: 1.12em;
-  flex: 0 0 1.12em;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 var(--icon-sm);
 }
 
 .chat-user-text__mention-icon-frame {
@@ -231,10 +194,5 @@ function isSafeBrandColor(value: string | undefined): value is string {
 .chat-user-text__mention-image {
   border-radius: 0.2em;
   object-fit: contain;
-}
-
-.chat-user-text__mention-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 </style>

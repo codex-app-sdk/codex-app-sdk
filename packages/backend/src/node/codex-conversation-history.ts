@@ -553,7 +553,7 @@ function asyncQuestionReply(text: string): { displayText: string; requestIds: st
 
 function userInputAttachment(input: unknown): SurfaceMessageAttachment | null {
   if (!isRecord(input) || typeof input.type !== 'string') return null;
-  if (input.type === 'mention' && typeof input.path === 'string') {
+  if (input.type === 'mention' && typeof input.path === 'string' && !input.path.startsWith('plugin://')) {
     const name = typeof input.name === 'string' && input.name.trim()
       ? input.name.trim()
       : attachmentName(input.path, 'File');

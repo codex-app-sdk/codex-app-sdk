@@ -741,7 +741,7 @@ describe('CodexSurface', () => {
     ];
     const context = '\n\n<context>Keep PDF tools and $pdf exactly here.</context>';
     const visible = 'Literal $pdf then PDF toolsREADME.mdGmail';
-    const dispatched = 'Literal $pdf then [$pdf](/trusted/pdf/SKILL.md)@/project/README.md@gmail';
+    const dispatched = 'Literal $pdf then [$pdf](/trusted/pdf/SKILL.md)@/project/README.md[@gmail](plugin://gmail@remote)';
     const input = [
       { type: 'text', text: dispatched + context, text_elements: [] },
       { type: 'mention', name: 'README.md', path: '/project/README.md' },

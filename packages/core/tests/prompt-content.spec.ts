@@ -18,19 +18,22 @@ describe('authored prompt content', () => {
       { type: 'mention', kind: 'custom', id: 'agent-1', label: 'Alex', value: 'agent:1', groupId: 'agents' },
     ];
     expect(promptContentText(parts)).toBe('$cp then Commit-PushGmailfile.tsAlex');
-    expect(promptContentDispatchText(parts)).toBe('$cp then [$cp](/skills/cp/SKILL.md)@gmail@src/file.ts@agent:1');
+    expect(promptContentDispatchText(parts)).toBe('$cp then [$cp](/skills/cp/SKILL.md)[@gmail](plugin://gmail@remote)@src/file.ts@agent:1');
     const copied = normalizePromptContent(parts);
     expect(copied).toStrictEqual(parts);
     copied[1] = { type: 'text', text: 'replacement' };
     expect(parts[1]).toStrictEqual(mention);
   });
 
-  it('serializes canonical skill references with Markdown-safe names and paths', () => {
+  it('serializes canonical skill and plugin references with Markdown-safe names and targets', () => {
     const parts: CodexPromptPart[] = [{ type: 'text', text: '$cp and ' }, {
       ...mention, label: 'Commit and push', value: 'Commit-Push [cp]', id: '/skills/Commit Push (cp)#1/SKILL.md',
     }];
     expect(promptContentText(parts)).toBe('$cp and Commit and push');
     expect(promptContentDispatchText(parts)).toBe('$cp and [$Commit-Push \\[cp\\]](/skills/Commit%20Push%20%28cp%29%231/SKILL.md)');
+    expect(promptContentDispatchText([{ type: 'text', text: '@gmail then ' }, {
+      type: 'mention', kind: 'plugin', label: 'Gmail', value: 'mail [work]', id: 'mail@remote (work)#1',
+    }])).toBe('@gmail then [@mail \\[work\\]](plugin://mail@remote%20%28work%29%231)');
   });
 
   it('projects an authored prompt prefix once and preserves host context verbatim', () => {

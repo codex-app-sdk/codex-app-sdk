@@ -12,14 +12,14 @@ const source = name => JSON.stringify(path.join(root, 'packages/vue/src', name))
 const cacheDir = await mkdtemp(path.join(tmpdir(), 'sdk-authored-content-'));
 const fixtureId = '\0authored-content';
 const server = await createServer({
-  configFile: false, root, cacheDir, optimizeDeps: { noDiscovery: true, include: ['vue', '@tabler/icons-vue', 'fix-webm-duration'] },
+  configFile: false, root, cacheDir, optimizeDeps: { noDiscovery: true, include: ['vue', '@tabler/icons-vue', 'fix-webm-duration', 'beautiful-mermaid'] },
   plugins: [vue(), {
     name: 'authored-content-fixture',
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
         if (request.url !== '/authored-content') return next();
         response.setHeader('Content-Type', 'text/html');
-        response.end('<div id="app"></div><script type="module" src="/authored-content.js"></script>');
+        response.end('<!doctype html><div id="app"></div><script type="module" src="/authored-content.js"></script>');
       });
     },
     resolveId(id) { if (id === '/authored-content.js') return fixtureId; },
@@ -28,7 +28,7 @@ const server = await createServer({
       return `
         import { createApp, h, ref } from 'vue';
         import Composer from ${source('components/CodexComposer.vue')};
-        import UserText from ${source('chat/ChatUserText.vue')};
+        import Message from ${source('components/CodexMessage.vue')};
         import MessageEditor from ${source('chat/ChatMessageEditor.vue')};
         import ${source('styles.css')};
         const state = ref({text:'',selectionStart:0,selectionEnd:0});
@@ -36,6 +36,7 @@ const server = await createServer({
         const catalogs = ref(true);
         const editing = ref(false);
         const skill = {name:'cp',displayName:'Commit-Push',path:'/skills/cp/SKILL.md',enabled:true};
+        const plugin = {id:'computer-use@openai-bundled',name:'computer-use',displayName:'Computer Use',brandColor:'#ff0000',enabled:true};
         const groups = [{id:'agents',label:'Agents',items:[{id:'agent-1',value:'agent:1',label:'Alex'}]}];
         window.authoredFixture = {
           clearCatalogs() { catalogs.value = false; },
@@ -46,12 +47,12 @@ const server = await createServer({
         };
         createApp({setup:()=>()=>h('main',[
           h(Composer,{disabled:false,isSending:false,composerState:state.value,
-            skills:catalogs.value?[skill]:[],mentionGroups:catalogs.value?groups:[],
+            skills:catalogs.value?[skill]:[],plugins:catalogs.value?[plugin]:[],mentionGroups:catalogs.value?groups:[],
             'onUpdate:composerState':value=>state.value=value,
             onSend:(prompt,options)=>submitted.value={prompt,options},
           }),
-          submitted.value?h(UserText,{content:submitted.value.prompt,promptContent:submitted.value.options?.content,
-            skills:catalogs.value?[skill]:[],mentionGroups:catalogs.value?groups:[]}):null,
+          submitted.value?h(Message,{message:{id:'submitted',role:'user',status:'complete',parts:[{type:'text',text:submitted.value.prompt}],metadata:{promptContent:submitted.value.options?.content}},
+            skills:catalogs.value?[skill]:[],plugins:catalogs.value?[plugin]:[],mentionGroups:catalogs.value?groups:[]}):null,
           submitted.value?.options?.content?h('button',{onClick:()=>editing.value=true},'Edit saved prompt'):null,
           editing.value?h(MessageEditor,{key:submitted.value.prompt,content:submitted.value.prompt,
             promptContent:submitted.value.options.content,cancelLabel:'Cancel',inputLabel:'Edit submitted prompt',saveLabel:'Resubmit',
@@ -62,6 +63,24 @@ const server = await createServer({
   }], server: { port: 0 },
 });
 let browser;
+const appearance = element => {
+  const style = getComputedStyle(element);
+  return Object.fromEntries(['backgroundColor', 'color', 'padding', 'borderRadius', 'fontSize', 'fontWeight', 'lineHeight', 'gap']
+    .map(key => [key, style[key]]));
+};
+const iconAppearance = element => ({
+  paths: [...element.querySelectorAll('path')].map(path => path.getAttribute('d')),
+  width: getComputedStyle(element).width, height: getComputedStyle(element).height,
+});
+const textAlignment = element => {
+  const anchor = element.closest('[data-prompt-mention]') ?? element;
+  let previous = anchor.previousSibling;
+  while (previous && (previous.nodeType === Node.COMMENT_NODE || !previous.textContent?.trim())) previous = previous.previousSibling;
+  const range = document.createRange(); range.selectNodeContents(previous);
+  const text = range.getBoundingClientRect();
+  const pill = element.getBoundingClientRect();
+  return pill.y + pill.height / 2 - text.y - text.height / 2;
+};
 async function focusEnd(locator) {
   await locator.focus();
   await locator.evaluate(element => {
@@ -86,7 +105,16 @@ try {
     assert.equal(await editor.locator('[data-skill-name]').count(), 0);
     await editor.press('Enter');
     await editor.locator('[data-skill-name="cp"]').waitFor();
+    const skillPill = editor.locator('[data-skill-name="cp"] .chat-mention-chip');
+    const skillStyle = await skillPill.evaluate(appearance);
+    const skillIcon = await skillPill.locator('svg').evaluate(iconAppearance);
+    const skillAlignment = await skillPill.evaluate(textAlignment);
     await page.locator('.chat-composer__send').click();
+    const messageSkill = page.locator('.chat-user-text__mention--skill');
+    assert.deepEqual(await messageSkill.evaluate(appearance), skillStyle, 'Skill pills must match composer styling');
+    assert.deepEqual(await messageSkill.locator('svg').evaluate(iconAppearance), skillIcon, 'Skill fallback icons must match');
+    const messageSkillAlignment = await messageSkill.evaluate(textAlignment);
+    assert(Math.abs(messageSkillAlignment - skillAlignment) <= 0.5, `Skill alignment: composer ${skillAlignment}px, message ${messageSkillAlignment}px`);
     const expected = [
       { type: 'text', text: '$cp then ' },
       { type: 'mention', kind: 'skill', id: '/skills/cp/SKILL.md', value: 'cp', label: 'Commit-Push' },
@@ -138,6 +166,21 @@ try {
     ]);
     await page.evaluate(() => window.authoredFixture.clearCatalogs());
     assert.equal(await page.locator('.chat-user-text__mention--custom').innerText(), 'Alex');
+    await page.evaluate(() => window.authoredFixture.reset());
+    await focusEnd(editor); await editor.pressSequentially('Use @computer-use');
+    await page.locator('.chat-composer-at-menu__item').filter({ hasText: 'Computer Use' }).waitFor();
+    await editor.press('Enter');
+    const composerPill = editor.locator('[data-plugin-name] .chat-mention-chip');
+    const composerStyle = await composerPill.evaluate(appearance);
+    const composerIcon = await composerPill.locator('svg').evaluate(iconAppearance);
+    const pluginAlignment = await composerPill.evaluate(textAlignment);
+    await page.locator('.chat-composer__send').click();
+    const messagePill = page.locator('.chat-user-text__mention--plugin');
+    assert.deepEqual(await messagePill.evaluate(appearance), composerStyle, 'Message pills must use composer pill styling');
+    assert.deepEqual(await messagePill.locator('svg').evaluate(iconAppearance), composerIcon, 'Plugin fallback icons must match');
+    const messagePluginAlignment = await messagePill.evaluate(textAlignment);
+    assert(Math.abs(messagePluginAlignment - pluginAlignment) <= 0.5, `Plugin alignment: composer ${pluginAlignment}px, message ${messagePluginAlignment}px`);
+    await page.screenshot({ path: `/tmp/sdk-message-pills-${engine.name()}.png` });
     console.log(`${engine.name()}: literal triggers, explicit skill/agent chips, draft restoration and inline paste/undo/resubmit preserve authored content.`);
     await browser.close(); browser = undefined;
   }

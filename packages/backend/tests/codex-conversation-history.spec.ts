@@ -13,23 +13,25 @@ import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
 const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 describe('codexThreadToSurfaceMessages', () => {
-  it('does not repeat a structured skill already present in prompt text', () => {
+  it('does not repeat structured skills or plugins already present in prompt text', () => {
+    const text = '[$cp](/skills/commit-push/SKILL.md) then [@computer-use](plugin://computer-use@openai-bundled)';
     const [message] = codexTurnToSurfaceMessages('thread-skill', {
       id: 'turn-skill', status: 'completed', startedAt: 1, completedAt: 2,
       items: [{
         type: 'userMessage', id: 'user-skill', clientId: null,
         content: [
-          { type: 'text', text: '$cp first', text_elements: [] },
+          { type: 'text', text, text_elements: [] },
           {
             type: 'skill',
             name: 'Commit-Push (cp)',
             path: '/skills/commit-push/SKILL.md',
           },
+          { type: 'mention', name: 'Computer Use', path: 'plugin://computer-use@openai-bundled' },
         ],
       }],
     } as unknown as v2.Turn);
 
-    expect(message?.parts).toStrictEqual([{ type: 'text', text: '$cp first' }]);
+    expect(message?.parts).toStrictEqual([{ type: 'text', text }]);
   });
 
   it('does not replay a tagged Plan-mode document as assistant text', () => {

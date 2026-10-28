@@ -61,7 +61,6 @@ describe('ChatUserText', () => {
     const plugin = wrapper.get('.chat-user-text__mention--plugin');
     expect(plugin.text()).toBe('Gmail');
     expect(plugin.attributes('title')).toBe('Read and manage Gmail');
-    expect(plugin.attributes('style')).toContain('--codex-mention-color: #EA4335');
     expect(plugin.get('img').attributes('src')).toBe(gmail.iconUrl);
 
     const skill = wrapper.get('.chat-user-text__mention--skill');
@@ -251,25 +250,7 @@ describe('ChatUserText', () => {
     if (accepted) expect(wrapper.get('img').attributes('src')).toBe(iconUrl);
   });
 
-  it.each([
-    ['#abc', true],
-    ['#ABCDEF12', true],
-    ['#ab', false],
-    ['#abcdefghi', false],
-    ['x#abcdef', false],
-    ['#abcdefx', false],
-    ['red', false],
-    ['', false],
-  ])('accepts only an anchored mention color %s: %s', (brandColor, accepted) => {
-    const wrapper = mount(ChatUserText, {
-      props: { content: 'Gmail', promptContent: [gmailMention], plugins: [{ ...gmail, brandColor }] },
-    });
-
-    expect(wrapper.get('.chat-user-text__mention').attributes('style')?.includes(brandColor) ?? false)
-      .toBe(accepted);
-  });
-
-  it('uses skill-owned color and title precedence independently from plugins', () => {
+  it('uses skill-owned title precedence independently from plugins', () => {
     const short = mount(ChatUserText, {
       props: {
         content: 'Update Bank Balance Sheet', promptContent: [bankMention],
@@ -286,7 +267,6 @@ describe('ChatUserText', () => {
       },
     });
 
-    expect(short.get('.chat-user-text__mention').attributes('style')).toContain('#123abc');
     expect(short.get('.chat-user-text__mention').attributes('title')).toBe('Short skill summary');
     expect(description.get('.chat-user-text__mention').attributes('title'))
       .toBe('Update balances in the workbook');

@@ -1,9 +1,11 @@
 <template>
   <span class="chat-mention-chip">
-    <img v-if="iconUrl" class="chat-mention-chip__icon" :src="iconUrl" alt="">
-    <FileTextIcon v-else-if="kind === 'file'" class="chat-mention-chip__icon" aria-hidden="true" />
-    <SparklesIcon v-else-if="kind === 'skill'" class="chat-mention-chip__icon" aria-hidden="true" />
-    <PlugIcon v-else class="chat-mention-chip__icon" aria-hidden="true" />
+    <slot name="icon">
+      <img v-if="iconUrl" class="chat-mention-chip__icon" :src="iconUrl" alt="">
+      <FileTextIcon v-else-if="kind === 'file'" class="chat-mention-chip__icon" aria-hidden="true" />
+      <SparklesIcon v-else-if="kind === 'skill'" class="chat-mention-chip__icon" aria-hidden="true" />
+      <PlugIcon v-else class="chat-mention-chip__icon" aria-hidden="true" />
+    </slot>
     <span class="chat-mention-chip__label">{{ name }}</span>
   </span>
 </template>
@@ -33,6 +35,7 @@ withDefaults(defineProps<{
   background: var(--color-primary-container);
   color: var(--color-on-primary-container);
   font-size: var(--font-size-13);
+  font-weight: var(--font-weight-regular);
   line-height: 1.2;
   vertical-align: baseline;
   user-select: all;

@@ -16,16 +16,17 @@ export function promptContentText(content: readonly CodexPromptPart[]): string {
   return content.map(part => part.type === 'text' ? part.text : part.label).join('');
 }
 
-function skillReference(part: CodexPromptMention): string {
+function linkedReference(part: CodexPromptMention): string {
   const name = part.value.replace(/[\\[\]]/g, '\\$&');
-  const path = encodeURI(part.id).replace(/[()#?]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `[$${name}](${path})`;
+  const target = part.kind === 'plugin' ? `plugin://${part.id}` : part.id;
+  const path = encodeURI(target).replace(/[()#?]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `[${part.kind === 'skill' ? '$' : '@'}${name}](${path})`;
 }
 
 /** Model-facing references. An optional prompt retains context after its authored prefix. */
 export function promptContentDispatchText(content: readonly CodexPromptPart[], prompt?: string): string {
   const text = content.map(part => part.type === 'text' ? part.text
-    : part.kind === 'skill' ? skillReference(part)
+    : part.kind === 'skill' || part.kind === 'plugin' ? linkedReference(part)
       : part.kind === 'file' ? `@${part.id}` : `@${part.value}`).join('');
   if (prompt === undefined) return text;
   const visible = promptContentText(content);

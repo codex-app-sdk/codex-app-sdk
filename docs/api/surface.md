@@ -270,9 +270,10 @@ mention group. Text parts have `{ type: 'text', text }`.
 
 Core exports `promptContentText(content)`, which joins text and saved labels
 verbatim without adding prefixes or spaces. `promptContentDispatchText(content)`
-produces model-facing text: selected skills use `[$value](id)`, files use `@id`,
-and plugins/custom mentions use `@value`; text parts remain verbatim. Skill link
-names are Markdown-escaped and paths are URI-encoded. Pass an optional second
+produces model-facing text: selected skills use `[$value](id)`, plugins use
+`[@value](plugin://id)`, files use `@id`, and custom mentions use `@value`;
+text parts remain verbatim. Link names are Markdown-escaped and targets are
+URI-encoded. Pass an optional second
 argument, `promptContentDispatchText(content, prompt)`, to replace the authored
 visible prefix while retaining appended host context verbatim. Already projected
 text and custom prompts without that prefix are unchanged. Hosts can use this
@@ -343,6 +344,7 @@ references as attachment parts in live and reloaded history; older mention-based
 history remains supported. Images still use native image inputs. Files are not
 copied, uploaded, or read into the prompt: the path must be accessible to the
 agent's runtime under its OS and sandbox permissions, including for queue/steer.
+Native `plugin://` mentions are references, not file attachments.
 
 Optional `getVersionedSnapshot()` and `onStatePatch()` members expose an
 incremental state stream; `getVersionedSnapshot()` resolves null when the other
