@@ -73,12 +73,25 @@ describe('ChatUserText', () => {
     expect(wrapper.text()).not.toContain('/Users/nbonamy');
   });
 
-  it('leaves typed skill and plugin triggers literal despite matching catalogs', () => {
+  it('keeps bare triggers literal while restoring linked pills with optional catalogs', async () => {
     const wrapper = mount(ChatUserText, { props: {
       content: 'Use $update-bank-balance-sheet and @gmail', plugins: [gmail], skills: [bankSkill],
     } });
     expect(wrapper.find('.chat-user-text__mention').exists()).toBe(false);
     expect(wrapper.text()).toBe('Use $update-bank-balance-sheet and @gmail');
+    const link = `[$bank](${bankSkill.path})`;
+    await wrapper.setProps({ content: `$update-bank-balance-sheet ${link} \`${link}\` [@gmail](plugin://${gmail.id})` });
+    expect(wrapper.get('.chat-user-text__mention--skill').text()).toBe('Update Bank Balance Sheet');
+    expect(wrapper.get('.chat-user-text__mention--plugin').text()).toBe('Gmail');
+    expect(wrapper.get('code').text()).toBe(link);
+    expect(wrapper.text()).toContain('$update-bank-balance-sheet');
+    await wrapper.setProps({ skills: [], plugins: [] });
+    expect(wrapper.get('.chat-user-text__mention--skill').text()).toBe('Bank');
+    expect(wrapper.get('.chat-user-text__mention--plugin').text()).toBe('Gmail');
+    await wrapper.setProps({ promptContent: [{ type: 'text', text: `\`$bank\`\n${link}` }] });
+    expect(wrapper.find('.chat-user-text__mention').exists()).toBe(false);
+    expect(wrapper.get('code').text()).toBe('$bank');
+    expect(wrapper.find('br').exists()).toBe(true);
   });
 
   it('renders host mentions with app-owned message content', () => {

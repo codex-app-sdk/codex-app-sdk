@@ -738,7 +738,9 @@ An explicit component prop takes precedence over the provided value.
 - surface-to-chat message adapters
 
 `CodexUserText` renders saved mentions from its `promptContent` prop. Plain text
-stays literal even when a matching skill, plugin, file, or host catalog exists.
+stays literal even when a matching catalog exists. Without saved parts, canonical
+skill/plugin Markdown links render as pills with catalog names or fallback labels.
+`parseCodexUserText` accepts a fifth argument of `false` to disable bare-trigger lookup.
 `CodexComposer` creates a mention only when the user accepts a suggestion, and
 emits the visible text plus `options.content` for submissions containing mentions.
 `CodexComposerState.content` preserves these parts when restoring a draft.

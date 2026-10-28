@@ -41,7 +41,8 @@ export function parseAuthoredUserText(
   skills: readonly CodexSurfaceSkill[] = [],
   groups: readonly CodexComposerMentionGroup[] = [],
 ): CodexUserTextToken[] {
-  return normalizePromptContent(content ?? [{ type: 'text', text }]).flatMap((part): CodexUserTextToken[] => {
+  if (content === undefined) return parseCodexUserText(text, plugins, skills, [], false);
+  return normalizePromptContent(content).flatMap((part): CodexUserTextToken[] => {
     if (part.type === 'text') {
       return part.text.split(/(`[^`\n]+`|\n)/g).filter(Boolean).map(value => value === '\n'
         ? { type: 'line-break' } : value.startsWith('`') && value.endsWith('`')
@@ -71,6 +72,7 @@ export function parseCodexUserText(
   plugins: readonly CodexSurfacePlugin[] = [],
   skills: readonly CodexSurfaceSkill[] = [],
   mentionGroups: readonly CodexComposerMentionGroup[] = [],
+  allowBareMentions = true,
 ): CodexUserTextToken[] {
   const tokens: CodexUserTextToken[] = [];
   let lastIndex = 0;
@@ -90,7 +92,7 @@ export function parseCodexUserText(
     } else if (label !== undefined) {
       tokens.push(mentionToken(label, href!, plugins, skills) ?? { type: 'text', text: raw });
     } else if (bareTrigger !== undefined) {
-      tokens.push(bareMentionToken(bareTrigger, bareName!, plugins, skills, mentionGroups) ?? { type: 'text', text: raw });
+      tokens.push((allowBareMentions ? bareMentionToken(bareTrigger, bareName!, plugins, skills, mentionGroups) : null) ?? { type: 'text', text: raw });
     } else {
       tokens.push({ type: 'line-break' });
     }

@@ -285,9 +285,9 @@ programmatic `options.skills` is still supported and validated against the catal
 
 Submitted user messages retain their parts in `metadata.promptContent`. The
 visible message uses that content, while the transport prompt may include
-host-owned hidden context. Hosts must persist authored parts alongside messages
-and restore them by stable message identity; displaying saved mentions does not
-require a catalog.
+host-owned hidden context. Without saved parts, Vue renders canonical skill and
+plugin Markdown links as pills, using catalog names when available and link names
+otherwise. Bare triggers and inline code remain literal; rendering never invokes a tool.
 
 `normalizePromptContent` validates and copies transport content.
 `trimPromptContent` removes surrounding whitespace in text parts.
