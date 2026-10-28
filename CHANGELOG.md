@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.18.0
+
+### Added
+
+- Render code blocks with Highlights after WebAssembly initializes, with Shiki
+  providing the initial rendering and fallback when Highlights is unavailable.
+
+### Changed
+
+- Update the public app-server bindings and supported CLI target to Codex 0.164.0,
+  including the `partial_answer` message phase.
+- Use `thread/revert` for paginated conversation edits, retries, and deletions.
+  Legacy conversations remain readable and accept new prompts; these mutations
+  reject without changing history because legacy rollback is no longer supported.
+
 ## 0.17.0
 
 ### Added
