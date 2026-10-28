@@ -104,7 +104,7 @@ import type {
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
 import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
-import type { MessageBlock } from '../chat/message-blocks'
+import { withoutSupersededFinalAnswers, type MessageBlock } from '../chat/message-blocks'
 import type { CodexMessageImageOpenHandler } from '../chat/message-image'
 import type { CodexConversationVisualization } from '../chat/visualization'
 import type { CodexMessageTextSelection } from '../chat/message-text-selection'
@@ -271,9 +271,10 @@ let observedFirstMessage = messageIdentityAt(props.messages, 0)
 let observedLastMessage = messageIdentityAt(props.messages, props.messages.length - 1)
 const loadingOlderMessages = ref(false)
 let olderMessagesRequestPending = false
+const presentedMessages = computed(() => withoutSupersededFinalAnswers(props.messages))
 const visibleMessages = computed(() => effectiveRenderStrategy.value === 'lazy'
-  ? props.messages.slice(renderStartIndex.value)
-  : props.messages)
+  ? presentedMessages.value.slice(renderStartIndex.value)
+  : presentedMessages.value)
 type DisplayEntry = {
   index: number
   message: Message | SurfaceMessage

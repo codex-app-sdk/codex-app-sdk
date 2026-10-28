@@ -265,7 +265,9 @@ const emit = defineEmits<{
 const hostCapabilities = useCodexHostCapabilities()
 
 const t = useCodexChatTranslate()
-const activityLabel = computed(() => props.activityState === 'working' ? t('chat.work.working') : 'Thinking')
+const activityLabel = computed(() => props.activityState === 'working'
+  || (assistantWorkTurn?.phased.value && assistantWorkTurn.active.value)
+  ? t('chat.work.working') : 'Thinking')
 const chatMessage = computed(() => chatMessageFromInput(props.message))
 const assistantWorkTurn = inject(assistantWorkTurnKey, undefined)
 provide(assistantWorkMessageIndexKey, computed(() => props.index))

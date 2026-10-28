@@ -120,7 +120,7 @@ export function upsertAssistantReasoningSummaries(
       return text ? { type: 'reasoning', summary: text, itemId, summaryIndex } : null;
     })
     .filter((part): part is SurfaceMessageReasoningPart => part !== null);
-  if (normalized.length === 0) return [...messages];
+  if (normalized.length === 0) normalized.push({ type: 'reasoning', summary: '', itemId, summaryIndex: 0 });
 
   const next = ensureAssistantTurnMessage(messages, threadId, turnId);
   const messageIndex = findLastIndex(next, (message) => (

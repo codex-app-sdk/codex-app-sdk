@@ -92,6 +92,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
   const createdAt = timestampToIso(turn.startedAt ?? turn.completedAt);
   let assistantSegmentIndex = 0;
   let sawAssistantActivity = false;
+  let sawFinalAnswer = false;
   const initialUserMessageKeys = new Set<string>();
 
   const flushAssistantMessage = () => {
@@ -165,6 +166,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
 
     if (item.type === 'agentMessage') {
       const text = typeof item.text === 'string' ? item.text : '';
+      if (item.phase === 'final_answer' && text.trim()) sawFinalAnswer = true;
       const questionPart = codexItemToQuestionPart(threadId, turn.id, item, true);
       const proposedPlan = item.phase === 'final_answer'
         ? extractProposedPlanDocument(text)
@@ -199,6 +201,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
       const summaries = item.summary
         .map((summary, summaryIndex) => ({ summary: summary.trim(), summaryIndex }))
         .filter(({ summary }) => summary.length > 0);
+      if (summaries.length === 0 && sawFinalAnswer) summaries.push({ summary: '', summaryIndex: 0 });
       if (summaries.length > 0) {
         sawAssistantActivity = true;
         assistantParts.push(...summaries.map(({ summary, summaryIndex }) => ({

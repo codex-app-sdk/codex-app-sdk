@@ -271,8 +271,6 @@ export class CodexSurfaceItemsController {
     }
 
     if (params.item.type === 'reasoning') {
-      const summaries = params.item.summary.filter((summary) => summary.trim().length > 0);
-      if (summaries.length === 0) return;
       const previousMessage = this.host.assistantMessageForTurn(params.threadId, params.turnId);
       const previousParts = previousMessage ? JSON.stringify(previousMessage.parts) : null;
       this.host.patchRuntime(params.threadId, {
@@ -371,14 +369,14 @@ export class CodexSurfaceItemsController {
         );
       }
       this.host.patchRuntime(params.threadId, { messages });
-      if (!visibleText && !questionPart) return;
+      if (!visibleText && !questionPart && !phase) return;
       const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
       if (message && !previousMessageIds.has(message.id)) {
         this.host.emitEvent('notification', {
           type: 'message.appended', conversationId: params.threadId, turnId: params.turnId,
           payload: { message: structuredClone(message) },
         });
-      } else if (message && questionPart && JSON.stringify(message.parts) !== previousParts) {
+      } else if (message && JSON.stringify(message.parts) !== previousParts && (questionPart || visibleText === previousText)) {
         this.host.emitEvent('notification', {
           type: 'message.updated', conversationId: params.threadId, turnId: params.turnId,
           payload: { message: structuredClone(message) },

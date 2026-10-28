@@ -220,17 +220,6 @@ describe('Codex surface message state', () => {
     expect(result.slice(1)).toStrictEqual([user('user-1'), wrongTurn, compaction]);
   });
 
-  it('ignores empty reasoning updates without creating or changing a message', () => {
-    const messages = [user('user-1')];
-    const result = upsertAssistantReasoningSummaries(
-      messages, 'thread-1', 'turn-1', 'reasoning-1', ['', '   '],
-    );
-
-    expect(result).toStrictEqual(messages);
-    expect(result).not.toBe(messages);
-    expect(result[0]).toBe(messages[0]);
-  });
-
   it('inserts and merges tool parts while preserving incremental fields', () => {
     const runningStatus = JSON.stringify({
       action: 'run',

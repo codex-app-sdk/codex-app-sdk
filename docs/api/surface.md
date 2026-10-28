@@ -142,8 +142,8 @@ type SurfaceMessage = {
 
 `SurfaceMessagePart` is a discriminated union of:
 
-- text, with an optional `commentary` or `final_answer` phase;
-- completed reasoning summaries;
+- text, with an optional `commentary`, `partial_answer`, or `final_answer` phase;
+- reasoning summaries and item-start markers;
 - attachments;
 - generated and attached media;
 - asynchronous agent questions;
@@ -183,7 +183,8 @@ type SurfaceMessageQuestionPart = {
 };
 ```
 
-Reasoning parts contain only completed app-server summaries. Raw reasoning
+An empty reasoning summary marks activity before summary text is available;
+empty phased text parts likewise preserve item-start phase changes. Raw reasoning
 content and reasoning deltas are not exposed through the surface contract.
 
 ## Questions and client requests

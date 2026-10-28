@@ -339,6 +339,8 @@ describe('codexThreadToSurfaceMessages', () => {
         {
           type: 'reasoning', id: 'reasoning-2', summary: ['Finishing'], content: ['also hidden'],
         },
+        { type: 'agentMessage', id: 'first-summary', text: 'Summary', phase: 'final_answer' },
+        { type: 'reasoning', id: 'resumed-empty', summary: [], content: ['private'] },
       ],
     } as unknown as v2.Turn);
 
@@ -353,6 +355,8 @@ describe('codexThreadToSurfaceMessages', () => {
         },
         { type: 'reasoning', summary: 'Checking events', itemId: 'reasoning-1', summaryIndex: 2 },
         { type: 'reasoning', summary: 'Finishing', itemId: 'reasoning-2', summaryIndex: 0 },
+        { type: 'text', text: 'Summary', itemId: 'first-summary', phase: 'final_answer' },
+        { type: 'reasoning', summary: '', itemId: 'resumed-empty', summaryIndex: 0 },
       ],
       createdAt: '1970-01-01T00:00:02.000Z',
       metadata: { conversationId: 'thread-reasoning', turnId: 'turn-reasoning' },

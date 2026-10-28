@@ -623,6 +623,10 @@ active tool group; normal assistant text removes that transient label. A transfo
 `turnId` for that behavior. A tool-only active segment is treated as structured
 work before the first phased text arrives; unphased messages containing
 ordinary text retain the flat rendering path.
+New commentary, reasoning, or tool activity in the same turn supersedes an
+earlier final answer: its summary is hidden and the disclosure returns to
+`Working` until the next final answer. A steer submission alone does not trigger
+this transition. The original conversation messages remain unchanged.
 
 Pass `activeTurnId` and `turns` when controlling the list, or put them in
 `controller.state.identity`. Surface-bound panes wire both automatically.

@@ -1,5 +1,25 @@
 import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageAttachment, type MessageMedia, type MessagePhase, type MessageToolCall, type MessagePart } from './types'
 import { findInlineHtmlBlocks } from './inline-html'
+import { chatMessageFromInput, type ChatMessageInput } from './renderer-message-adapter'
+
+/** A later model work item supersedes earlier final text in the same turn. */
+export function withoutSupersededFinalAnswers(messages: readonly ChatMessageInput[]): ChatMessageInput[] {
+  const resumedTurns = new Set<string>()
+  return [...messages].reverse().map((input) => {
+    const message = chatMessageFromInput(input)
+    if (message.role !== 'assistant' || !message.parts) return input
+    let resumed = message.turnId ? resumedTurns.has(message.turnId) : false
+    const parts = [...message.parts].reverse().filter((part) => {
+      if (part.type === 'tool' || part.type === 'reasoning'
+        || (part.type === 'text' && (part.phase === 'commentary' || part.phase === 'partial_answer'))) resumed = true
+      return !(resumed && part.type === 'text' && part.phase === 'final_answer')
+    }).reverse()
+    if (resumed && message.turnId) resumedTurns.add(message.turnId)
+    return parts.length === message.parts.length ? input : {
+      ...message, parts, content: parts.flatMap(part => part.type === 'text' ? [part.content] : []).join('\n\n'),
+    }
+  }).reverse()
+}
 
 type PhasedMessageBlock = {
   phase?: MessagePhase

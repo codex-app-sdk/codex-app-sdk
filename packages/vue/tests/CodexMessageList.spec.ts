@@ -604,6 +604,49 @@ describe('CodexMessageList', () => {
     expect(wrapper.text()).toContain('Later answer.');
   });
 
+  it('replaces a summary when model activity resumes within the same assistant message', async () => {
+    for (const activity of [
+      { type: 'text', text: '', phase: 'commentary' },
+      { type: 'reasoning', summary: '', itemId: 'resumed-reasoning', summaryIndex: 0 },
+      { type: 'tool', id: 'resumed-tool', title: 'Inspect files', status: 'running' },
+    ] as const) {
+      const initial: SurfaceMessage = {
+        id: 'assistant-resumed', role: 'assistant', status: 'streaming', turnId: 'turn-resumed',
+        parts: [
+          ...(activity.type === 'reasoning' ? [] : [{ type: 'text' as const, text: 'Checking the project.', phase: 'commentary' as const }]),
+          { type: 'text', text: 'Obsolete summary.', phase: 'final_answer' },
+        ],
+      };
+      const wrapper = mount(CodexMessageList, { props: {
+        busy: true, activeTurnId: 'turn-resumed', messages: [initial],
+        turns: [turnLifecycle('turn-resumed', 'inProgress')],
+      } });
+      if (activity.type !== 'reasoning') expect(wrapper.get('.chat-work-group__title').text()).toContain('Done');
+      expect(wrapper.text()).toContain('Obsolete summary.');
+      const resumed: SurfaceMessage = { ...initial, parts: [...initial.parts, activity] };
+      await wrapper.setProps({ messages: [resumed] });
+      expect(wrapper.get(activity.type === 'reasoning' ? '.chat-message__thinking' : '.chat-work-group__title').text()).toContain('Working');
+      expect(wrapper.text()).not.toContain('Obsolete summary.');
+      if (activity.type !== 'reasoning') expect(wrapper.text()).toContain('Checking the project.');
+      const finished: SurfaceMessage = { ...resumed, status: 'complete', parts: [
+        ...resumed.parts, { type: 'text', text: 'Replacement summary.', phase: 'final_answer' },
+      ] };
+      await wrapper.setProps({ busy: false, activeTurnId: null, messages: [finished],
+        turns: [turnLifecycle('turn-resumed', 'completed')] });
+      if (activity.type !== 'reasoning') expect(wrapper.get('.chat-work-group__title').text()).toContain('Done');
+      expect(wrapper.text()).toContain('Replacement summary.');
+      expect(wrapper.text()).not.toContain('Obsolete summary.');
+      expect(initial.parts).toHaveLength(activity.type === 'reasoning' ? 1 : 2);
+      wrapper.unmount();
+      const restored = mount(CodexMessageList, { props: {
+        messages: [finished], turns: [turnLifecycle('turn-resumed', 'completed')],
+      } });
+      expect(restored.text()).toContain('Replacement summary.');
+      expect(restored.text()).not.toContain('Obsolete summary.');
+      restored.unmount();
+    }
+  });
+
   it('reopens a completed turn when an async answer resumes assistant streaming', async () => {
     const completedMessages: SurfaceMessage[] = [{
       id: 'assistant-before-async-answer',
@@ -645,12 +688,18 @@ describe('CodexMessageList', () => {
         parts: [{ type: 'text', text: 'Preparing the local workflow.', phase: 'commentary' }],
       },
     ];
-    await wrapper.setProps({ busy: true, messages: resumedMessages });
+    await wrapper.setProps({ busy: true, messages: resumedMessages.map(message => (
+      message.id === 'assistant-after-async-answer' ? { ...message, parts: [] } : message
+    )) });
+    expect(wrapper.get('.chat-work-group__title').text()).toContain('Done');
+    expect(wrapper.text()).toContain('Choose where to run it.');
+    await wrapper.setProps({ messages: resumedMessages });
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Working');
     expect(wrapper.get('.chat-work-group__header').attributes('aria-expanded')).toBe('true');
     expect(wrapper.get('.chat-work-group__header').attributes()).toHaveProperty('disabled');
     expect(wrapper.text()).toContain('Preparing the local workflow.');
+    expect(wrapper.text()).not.toContain('Choose where to run it.');
 
     const finishedMessages: SurfaceMessage[] = resumedMessages.map((message) => (
       message.id === 'assistant-after-async-answer'

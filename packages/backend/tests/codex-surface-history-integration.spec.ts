@@ -513,11 +513,16 @@ describe('CodexSurface', () => {
     const { surface, transport } = createSurface('turn/start');
     await surface.connect();
     await surface.sendMessage('Think carefully');
+    const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+    surface.onConversationEvent('thread-existing', event => replica.apply(event));
 
     transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-live', startedAtMs: 1,
         item: { type: 'reasoning', id: 'reasoning-live', summary: [], content: [] },
       });
+    expect(replica.getSnapshot().messages.at(-1)?.parts).toContainEqual({
+      type: 'reasoning', summary: '', itemId: 'reasoning-live', summaryIndex: 0,
+    });
     transport.emitNotification('item/completed', {
         threadId: 'thread-existing', turnId: 'turn-live', completedAtMs: 2,
         item: { type: 'reasoning', id: 'reasoning-live', summary: ['Internal'], content: ['Hidden'] },
@@ -543,6 +548,8 @@ describe('CodexSurface', () => {
     await surface.connect();
     const events: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => events.push(event));
+    const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+    surface.onConversationEvent('thread-existing', event => replica.apply(event));
     transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-live', 'inProgress', []) });
     transport.emitNotification('item/started', {
         threadId: 'thread-existing',
@@ -581,6 +588,14 @@ describe('CodexSurface', () => {
         phase: 'final_answer',
       }),
     }));
+    transport.emitNotification('item/started', {
+      threadId: 'thread-existing', turnId: 'turn-live', startedAtMs: 2,
+      item: { type: 'agentMessage', id: 'resumed-commentary', text: '', phase: 'commentary',
+        memoryCitation: null, delivery: null, questions: null },
+    });
+    expect(replica.getSnapshot().messages.at(-1)?.parts.at(-1)).toStrictEqual({
+      type: 'text', text: '', itemId: 'resumed-commentary', phase: 'commentary',
+    });
   });
 
 });
