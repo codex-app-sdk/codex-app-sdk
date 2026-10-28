@@ -92,7 +92,7 @@
           :goal-mode="goalMode"
           :plan-mode="effectivePlanMode"
           :show-approval-menu="effectiveCodexCapabilities.approvals && Boolean(approvalPreset) && (effectiveCodexCapabilities.approvalPresets?.length ?? 0) > 0"
-          :show-goal-mode="effectiveCodexCapabilities.goals && Boolean(goalCommand)"
+          :show-goal-mode="effectiveCodexCapabilities.goals"
           :show-plan-mode="effectiveCodexCapabilities.planMode"
           @attach="$emit('attach')"
           @select="$emit('menuSelect', $event)"
@@ -163,7 +163,7 @@ import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapab
 import { promptContentText, trimPromptContent, replacePromptContentRange, type CodexPromptPart, type CodexRendererSendMessageOptions, type CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
-import { codexCommands } from '../chat/codex-commands';
+import { codexCommands, composerCommandsWithGoals } from '../chat/codex-commands';
 import { createComposerPromptHistory } from '../chat/composer-prompt-history';
 import CodexComposerSendButton from './CodexComposerSendButton.vue';
 import ChatComposerActiveModes from '../chat/ChatComposerActiveModes.vue';
@@ -269,11 +269,12 @@ let lastEmittedComposerState: CodexComposerState | null = null;
 let composerRestoreRevision = 0;
 const effectiveCodexCapabilities = computed(() => props.capabilities ?? codexCapabilities);
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation));
+const effectiveCommands = computed(() => composerCommandsWithGoals(props.commands ?? codexCommands, effectiveCodexCapabilities.value.goals));
 const activeCommand = computed(() => (
-  (props.commands ?? codexCommands).find((command) => command.id === activeCommandId.value) ?? null
+  effectiveCommands.value.find((command) => command.id === activeCommandId.value) ?? null
 ));
 const goalCommand = computed(() => (
-  (props.commands ?? codexCommands).find((command) => command.id === 'codex.goal' && command.composerMode) ?? null
+  effectiveCommands.value.find((command) => (command.slashName ?? command.name) === 'goal' && command.composerMode) ?? null
 ));
 const goalMode = computed(() => Boolean(goalCommand.value && activeCommandId.value === goalCommand.value.id));
 const effectivePlanMode = computed(() => Boolean(effectiveCodexCapabilities.value.planMode && props.planMode && !goalMode.value));
@@ -419,7 +420,7 @@ const {
   visibleSlashSkills,
 } = useChatComposerSuggestions({
   caretPosition,
-  commands: () => props.commands ?? codexCommands,
+  commands: () => effectiveCommands.value,
   disabled: () => props.disabled,
   files: () => props.files ?? [],
   plugins: () => props.plugins ?? [],

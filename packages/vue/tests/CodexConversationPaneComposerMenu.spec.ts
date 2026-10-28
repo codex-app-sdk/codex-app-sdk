@@ -34,7 +34,7 @@ describe('CodexConversationPane composer menu', () => {
       const label = button?.querySelector('.codex-composer-menu-list__label')?.textContent?.trim();
       return label ? [label] : [];
     });
-    expect(labels).toStrictEqual(['Approval', 'Permissions', 'Plan mode', 'Custom', 'Add Files & Photos']);
+    expect(labels).toStrictEqual(['Approval', 'Permissions', 'Goal mode', 'Plan mode', 'Custom', 'Add Files & Photos']);
 
     await wrapper.findAll('button').find((button) => button.text().includes('Permissions'))!.trigger('click');
     expect(menuSelect).toHaveBeenCalledWith(permissions);

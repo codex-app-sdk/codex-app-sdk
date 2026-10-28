@@ -37,3 +37,10 @@ export const codexCommands: readonly CodexCommandSummary[] = [
     },
   },
 ] as const;
+
+export function composerCommandsWithGoals(commands: readonly CodexCommandSummary[], goals: boolean): readonly CodexCommandSummary[] {
+  const isGoal = (command: CodexCommandSummary) => (command.slashName ?? command.name) === 'goal';
+  if (!goals) return commands.filter(command => !isGoal(command));
+  if (commands.some(command => isGoal(command) && command.composerMode)) return commands;
+  return [...commands.filter(command => !isGoal(command)), codexCommands.find(isGoal)!];
+}

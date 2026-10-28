@@ -335,7 +335,7 @@ import type {
 } from '../chat/contracts';
 import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
-import { codexCommands } from '../chat/codex-commands';
+import { codexCommands, composerCommandsWithGoals } from '../chat/codex-commands';
 import { codexConversationLinkFromHref } from '../chat/conversation-links';
 import {
   ingestCodexAttachments,
@@ -1263,12 +1263,15 @@ function quoteMessage(index: number): void {
 
 function editGoal(): void {
   if (!effectiveGoal.value?.objective.trim()) return;
+  const goalCommand = composerCommandsWithGoals(effectiveCommands.value, effectiveCapabilities.value.goals)
+    .find(command => (command.slashName ?? command.name) === 'goal' && command.composerMode);
+  if (!goalCommand) return;
   const objective = effectiveGoal.value.objective;
   updateComposerState({
     text: objective,
     selectionStart: objective.length,
     selectionEnd: objective.length,
-    activeCommandId: 'codex.goal',
+    activeCommandId: goalCommand.id,
   });
   if (dispatchControllerAction('editGoal')) return;
   if (effectiveController.value) return;

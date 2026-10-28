@@ -1047,7 +1047,7 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('update:planMode')).toBeUndefined();
   });
 
-  it('honors a host capability override when toggling plan mode and skills', async () => {
+  it('honors a host capability override for Goal mode, plan mode, and skills', async () => {
     const wrapper = mountComposer({
       capabilities: disabledCapabilities(),
       skills,
@@ -1059,6 +1059,9 @@ describe('ChatComposer', () => {
 
     expect(wrapper.emitted('update:planMode')).toBeUndefined();
     expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
+    await wrapper.setProps({ leadingMenuItems: [{ id: 'host.action', type: 'action', label: 'Host action' }] });
+    await wrapper.get('.chat-composer-action-menu__button').trigger('click');
+    expect(wrapper.findAll('[role="menuitemcheckbox"]').some(item => item.text().includes('Goal mode'))).toBe(false);
   });
 
   it('opens the composer action menu and toggles plan mode', async () => {
@@ -1073,8 +1076,13 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[true]]);
   });
 
-  it('switches between Goal and Plan through the composer menu without keeping both active', async () => {
-    const wrapper = mountComposer({ commands: codexCommands, planMode: true });
+  it.each([
+    { catalog: 'default', commands: codexCommands, goalId: 'codex.goal' },
+    { catalog: 'empty', commands: [], goalId: 'codex.goal' },
+    { catalog: 'host-defined', commands: [{ ...codexCommands.find(command => command.name === 'goal')!, id: 'host.goal' }], goalId: 'host.goal' },
+    { catalog: 'name-only', commands: [{ id: 'host.objective', name: 'goal', composerMode: { label: 'Goal', placeholder: 'Describe the goal' } }], goalId: 'host.objective' },
+  ])('switches between Goal and Plan using the goal capability with a $catalog catalog', async ({ commands, goalId }) => {
+    const wrapper = mountComposer({ commands, planMode: true });
 
     await wrapper.get('.chat-composer-action-menu__button').trigger('click');
     const goalItem = wrapper.findAll('[role="menuitemcheckbox"]')
@@ -1084,7 +1092,7 @@ describe('ChatComposer', () => {
 
     expect(wrapper.emitted('update:planMode')).toStrictEqual([[false]]);
     expect(wrapper.get('[aria-label="Active composer modes"]').text()).toBe('Goal');
-    expect(wrapper.emitted('update:composerState')?.at(-1)?.[0]).toMatchObject({ activeCommandId: 'codex.goal' });
+    expect(wrapper.emitted('update:composerState')?.at(-1)?.[0]).toMatchObject({ activeCommandId: goalId });
 
     await wrapper.setProps({ planMode: false });
     await wrapper.findAll('[role="menuitemcheckbox"]')

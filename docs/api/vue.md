@@ -299,8 +299,10 @@ emitting an intermediate empty value. `activeCommandId` identifies an active
 command whose `CodexCommandSummary.composerMode` supplies the visible chip label
 and placeholder. Submitting serializes `/<slashName-or-name> <text>` and clears
 the active command; removing its chip preserves the current text. The built-in
-Goal mode can also be toggled in the + menu when goals and `codex.goal` are
-available. It uses the same `activeCommandId` state as `/goal`, and is mutually
+Goal mode can also be toggled in the + menu when `capabilities.goals` is true,
+independently of host command IDs or catalog omissions. The composer supplies
+the built-in `/goal` entry when needed. It uses the same `activeCommandId` state
+as `/goal`, and is mutually
 exclusive with Plan mode.
 
 ```ts

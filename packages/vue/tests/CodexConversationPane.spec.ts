@@ -922,7 +922,10 @@ describe('CodexConversationPane', () => {
     expect(noAction.emitted('quoteMessage')).toBeUndefined();
   });
 
-  it('edits a legacy goal into the composer and emits its exact ownership event', async () => {
+  it.each([
+    { catalog: 'default', commands: codexCommands },
+    { catalog: 'host-defined', commands: [{ ...codexCommands.find(command => command.name === 'goal')!, id: 'host.goal' }] },
+  ])('edits a goal into the composer with a $catalog catalog and emits its ownership event', async ({ commands }) => {
     const wrapper = mount(CodexConversationPane, {
       props: {
         goal: {
@@ -930,6 +933,7 @@ describe('CodexConversationPane', () => {
           tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0,
         },
         messages,
+        commands,
         modelValue: '',
       },
     });
@@ -986,14 +990,18 @@ describe('CodexConversationPane', () => {
     expect(noAction.emitted('editGoal')).toBeUndefined();
   });
 
-  it('does not edit an empty goal objective', async () => {
+  it.each([
+    { reason: 'empty', objective: '   ', goals: true },
+    { reason: 'unsupported', objective: 'Retained goal', goals: false },
+  ])('preserves the draft when goal editing is $reason', async ({ objective, goals }) => {
     const wrapper = mount(CodexConversationPane, {
       props: {
         goal: {
-          threadId: 'blank-goal', objective: '   ', status: 'active', tokenBudget: null,
+          threadId: 'blank-goal', objective, status: 'active', tokenBudget: null,
           tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0,
         },
         messages,
+        capabilities: { ...codexCapabilities, goals },
         modelValue: 'Existing draft',
       },
     });
