@@ -105,6 +105,7 @@ try {
 
     await editor.pressSequentially('$cp then $cp');
     assert.equal(await editor.locator('[data-skill-name]').count(), 0);
+    await page.getByRole('option', { name: 'Commit-Push', exact: true }).waitFor();
     await editor.press('Enter');
     await editor.locator('[data-skill-name="cp"]').waitFor();
     const skillPill = editor.locator('[data-skill-name="cp"] .chat-mention-chip');
