@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.18.2
+
+### Fixed
+
+- Discard unanswered asynchronous questions when a new turn starts, keeping
+  them resolved across replay and rejecting late answers to resolved questions.
+
 ## 0.18.1
 
 ### Fixed
