@@ -211,6 +211,9 @@ are read-only transcript content, not pending requests. Durable answers remain
 visible when present in loaded history. A prior session's unanswered or skipped
 question does not reopen on restart; only a newly issued provider request is
 actionable. Historical questions fold with the turn's work details.
+Starting another turn discards unanswered asynchronous questions from earlier
+turns and emits `clientRequest.resolved` with reason `server`. Answered, skipped,
+or discarded async questions reject further responses.
 
 An optional question does not keep execution busy after a turn ends. Consumers
 mapping client requests to a blocking status must respect `request.blocking`.

@@ -267,6 +267,10 @@ export class CodexSurfaceRuntimeController {
   }
 
   markTurnActive(runtime: ThreadRuntimeState, turnId: string): void {
+    const expired = runtime.turnIds.includes(turnId) ? [] : this.projection(runtime).clientRequests.filter(request => (
+      request.kind === 'ask_user' && request.payload.request.delivery === 'async'
+      && request.turnId && request.turnId !== turnId
+    ));
     runtime.activeTurnId = turnId;
     runtime.busy = true;
     runtime.turnStartPending = false;
@@ -280,6 +284,15 @@ export class CodexSurfaceRuntimeController {
       completedAt: null,
       durationMs: null,
     });
+    if (expired.length > 0) {
+      this.patch(runtime.threadId, {
+        answeredClientRequestIds: [...new Set([...runtime.answeredClientRequestIds, ...expired.map(request => request.id)])],
+      });
+      for (const request of expired) this.host.emitEvent('notification', {
+        type: 'clientRequest.resolved', conversationId: runtime.threadId, turnId: request.turnId ?? undefined,
+        payload: { request: structuredClone(request), response: null, reason: 'server' },
+      });
+    }
   }
 
   patchConversationStatus(

@@ -18,7 +18,7 @@ import {
 } from './codex-surface-prompts';
 import { addUnique, updateAssistantToolPart, upsertAssistantToolPart } from './codex-surface-message-state';
 import type { SurfaceEventInput } from './codex-surface-events';
-import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';
+import { runtimeProjection, type ThreadRuntimePatch, type ThreadRuntimeState } from './codex-surface-runtime';
 
 type ToolInputRequest = Extract<ServerRequest, { method: 'item/tool/requestUserInput' }>;
 type McpElicitationRequest = Extract<ServerRequest, { method: 'mcpServer/elicitation/request' }>;
@@ -168,12 +168,11 @@ export class CodexSurfaceClientRequestsController {
   ): Promise<void> {
     const resolvedThreadId = threadId ?? this.host.activeConversationId();
     const runtime = resolvedThreadId === null ? null : this.host.requireRuntime(resolvedThreadId);
-    let request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> | null = null;
-    for (const message of runtime?.messages ?? []) {
-      for (const part of message.parts) {
-        if (part.type === 'question' && !part.historical && part.request.id === response.id) request = part.request;
-      }
-    }
+    const request = runtime && runtimeProjection(runtime, [], []).clientRequests.find(
+      (candidate): candidate is Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> => (
+        candidate.kind === 'ask_user' && candidate.id === response.id
+      ),
+    );
     const match = runtime && request ? { request, runtime } : null;
     if (!match) throw new Error(`Unknown client request '${response.id}'`);
     if (match.request.payload.request.delivery !== 'async') {

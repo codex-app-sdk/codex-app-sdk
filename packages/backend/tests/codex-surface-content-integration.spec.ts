@@ -218,6 +218,61 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'turn/start')).toBeDefined();
   });
 
+  it('discards prior async questions at the next turn without reviving them on replay', async () => {
+    const { surface, transport } = createSurface('turn/start');
+    onTestFinished(() => surface.close());
+    await surface.connect();
+    const replica = createCodexConversationReplica(surface.getConversationSnapshot('thread-existing'));
+    surface.onConversationEvent('thread-existing', event => replica.apply(event));
+    transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('question-turn', 'inProgress', []) });
+    const item = {
+      type: 'agentMessage' as const, id: 'pending-question', text: 'Choose', phase: null,
+      memoryCitation: null, delivery: 'async' as const, questions: [{ title: 'Choose', options: ['One', 'Two'] }],
+    };
+    const question = { threadId: 'thread-existing', turnId: 'question-turn', completedAtMs: 1_700_000_002_000, item };
+    transport.emitNotification('item/completed', question);
+    expect(surface.getSnapshot().clientRequests.map(request => request.id)).toStrictEqual(['async-question:pending-question']);
+    transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('next-turn', 'inProgress', []) });
+    expect(surface.getSnapshot().clientRequests).toStrictEqual([]);
+    expect(surface.getSnapshot().answeredClientRequestIds).toContain('async-question:pending-question');
+    expect(replica.getSnapshot().clientRequests).toStrictEqual([]);
+    expect(replica.getSnapshot().answeredClientRequestIds).toContain('async-question:pending-question');
+    transport.emitNotification('item/completed', question);
+    transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('next-turn', 'completed', []) });
+    expect(surface.getSnapshot().clientRequests).toStrictEqual([]);
+    await expect(surface.conversation('thread-existing').respondToClientRequest({
+      id: 'async-question:pending-question', payload: { cancelled: true },
+    })).rejects.toThrow('Unknown client request');
+    transport.emitNotification('item/completed', { ...question, turnId: 'next-turn', item: { ...item, id: 'new-question' } });
+    expect(surface.getSnapshot().clientRequests.map(request => request.id)).toStrictEqual(['async-question:new-question']);
+    transport.emitNotification('item/agentMessage/delta', {
+      threadId: 'thread-existing', turnId: 'question-turn', itemId: 'late-text', delta: 'Late previous-turn text',
+    });
+    expect(surface.getSnapshot().clientRequests.map(request => request.id)).toStrictEqual(['async-question:new-question']);
+  });
+
+  it('keeps an async Skip resolved across replay and history reload without persistent host state', async () => {
+    const { surface, transport } = createSurface('turn/start');
+    onTestFinished(() => surface.close());
+    await surface.connect();
+    const question = {
+      threadId: 'thread-existing', turnId: 'question-turn', completedAtMs: 1_700_000_002_000,
+      item: { type: 'agentMessage' as const, id: 'skipped-question', text: 'Choose', phase: null,
+        memoryCitation: null, delivery: 'async' as const, questions: [{ title: 'Choose', options: null }] },
+    };
+    transport.emitNotification('item/completed', question);
+    const handle = surface.conversation('thread-existing');
+    await handle.respondToClientRequest({ id: 'async-question:skipped-question', payload: { cancelled: true } });
+    transport.emitNotification('item/completed', question);
+    expect(handle.getSnapshot().clientRequests).toStrictEqual([]);
+    await expect(handle.respondToClientRequest({
+      id: 'async-question:skipped-question', payload: { answers: { '["request_user_input_async","skipped-question",0]': { answers: ['One'] } } },
+    })).rejects.toThrow('Unknown client request');
+    expect(lastRequest(transport, 'turn/start')).toBeUndefined();
+    await handle.load();
+    expect(handle.getSnapshot().clientRequests).toStrictEqual([]);
+  });
+
   it('projects asynchronous agent questions as answerable surface requests', async () => {
     const { surface, transport } = createSurface('turn/start');
     const events: CodexSurfaceEvent[] = [];
