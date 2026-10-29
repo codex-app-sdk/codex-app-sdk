@@ -90,6 +90,7 @@ function measureChrome() {
   height: 100%;
   min-height: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .codex-workbench-layout__header,

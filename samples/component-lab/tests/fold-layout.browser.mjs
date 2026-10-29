@@ -37,6 +37,7 @@ const fixture = {
       ] }];
       const controller = createCodexConversationPaneController({ state: {
         identity: { conversationKey: 'fold-layout', messages, busy: true, activeTurnId: 'turn' },
+        thread: { queuedPrompts: [{ id: 'long', text: 'Standardize the host selectors. '.repeat(20) + '/repository/'.repeat(30) }] },
       }, actions: {} });
       createApp({ setup() {
         const sidebarOpen = ref(true);
@@ -76,9 +77,15 @@ try {
       const bounds = await card.evaluate(element => ({
         card: element.getBoundingClientRect().width,
         content: element.closest('.chat-message__stack').getBoundingClientRect().width,
+        contained: [...element.closest('.codex-conversation-pane').querySelectorAll('.chat-composer, .chat-queued-prompt__actions')].every(child => {
+          const pane = element.closest('.codex-conversation-pane').getBoundingClientRect();
+          const rect = child.getBoundingClientRect();
+          return rect.left >= pane.left && rect.right <= pane.right;
+        }),
       }));
       assert(Math.abs(bounds.card - bounds.content) <= 1,
         `${engine.name()} ${state}: the folded question must fill the conversation (${JSON.stringify(bounds)})`);
+      assert(bounds.contained, `${engine.name()} ${state}: long queued prompts must not push the composer or queue actions outside the pane`);
       widths.push(bounds.card);
     };
     await measure('initial');
@@ -97,7 +104,7 @@ try {
     await measure('viewport widened');
     assert(Math.max(...widths) - Math.min(...widths) > 100,
       'The question must track substantial host and viewport width changes');
-    console.log(`${engine.name()}: folded question follows host resizing: ${widths.join(', ')}px.`);
+    console.log(`${engine.name()}: queue stays contained and folded question follows host resizing: ${widths.join(', ')}px.`);
     await browser.close();
     browser = undefined;
   }
