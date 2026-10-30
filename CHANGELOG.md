@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 0.19.0
+
+### Added
+
+- Load history summaries first with `historyItemsView: 'summary'`; expand
+  Working to fetch and cache one turn's details while active turns stream normally.
+- Read conversation images and diffs on demand through bounded content chunks.
+- Recover recorded tool screenshots from original Codex history, including
+  captures whose temporary files have been deleted or overwritten.
+- Load image previews near the viewport and reserve their intrinsic aspect ratio
+  before download to keep scrolling stable.
+
+### Changed
+
+- Retain compressed originals and thumbnails within the preview budget, so
+  returning to earlier screenshots avoids repeated downloads. Open, copy, and
+  download actions preserve the original image bytes.
+
+### Fixed
+
+- Keep queued prompts and their action controls inside the conversation width.
+
 ## 0.18.2
 
 ### Fixed
