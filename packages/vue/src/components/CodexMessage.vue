@@ -299,13 +299,14 @@ const groupWork = computed(() => {
   ))
   return state.phased.value || (state.active.value && onlyStructuredWork)
 })
-const blocks = computed(() => groupAssistantWorkBlocks(
-  chatMessage.value,
-  visibleBlocks.value,
-  workActive.value,
-  groupWork.value,
-  props.answeredClientRequestIds,
-))
+const blocks = computed(() => {
+  const grouped = groupAssistantWorkBlocks(chatMessage.value, visibleBlocks.value, workActive.value, groupWork.value, props.answeredClientRequestIds)
+  const state = workTurnState.value
+  return state?.itemsView?.value !== undefined && state.headerMessageIndex.value === props.index && !grouped.some(block => block.type === 'work-group')
+    ? [{ type: 'work-group' as const, active: false, finalStarted: state.finalStarted.value, blocks: [] }, ...grouped]
+    : grouped
+})
+
 const assistantWithoutMessageActions = computed(() => (
   chatMessage.value.role === 'assistant'
   && blocks.value.length > 0
@@ -371,6 +372,7 @@ const isLatestStreamingAssistantSegment = computed(() => (
 const showEmptyResponse = computed(() => (
   chatMessage.value.role === 'assistant' &&
   chatMessage.value.streaming !== true &&
+  messageTurnState.value?.itemsView?.value !== 'summary' &&
   allBlocks.value.length === 0
 ))
 const showThinkingIndicator = computed(() => (

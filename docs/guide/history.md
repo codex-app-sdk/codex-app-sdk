@@ -1,9 +1,10 @@
 # History and performance
 
-Conversation history has two independent policies:
+Conversation history has three independent policies:
 
-1. **loading** decides how much full-detail history enters SDK state;
-2. **rendering** decides how many supplied messages Vue mounts in the DOM.
+1. **loading** decides how many turns enter SDK state;
+2. **detail** decides whether completed turns initially include their Working content;
+3. **rendering** decides how many supplied messages Vue mounts in the DOM.
 
 Keeping these separate lets an application retain authoritative history without
 paying the renderer cost of mounting every historical tool row.
@@ -13,10 +14,44 @@ paying the renderer cost of mounting every historical tool row.
 | Layer | Option | Default | Initial batch | Older batch |
 | --- | --- | --- | ---: | ---: |
 | Node surface | `loadingStrategy` | `lazy` | 5 turns | 25 turns |
+| Node surface | `historyItemsView` | `full` | Full details | Same policy |
 | Vue list/pane | `renderStrategy` | `lazy` | 50 messages | 25 messages |
 
-All app-server history requests use `itemsView: 'full'`. The SDK does not show a
-summary representation and later replace it with full tool calls.
+## Summary-first history
+
+Use summaries to show the prompt and final answer before loading Working details:
+
+```ts
+const surface = createCodexSurface({
+  loadingStrategy: 'lazy',
+  historyItemsView: 'summary',
+});
+```
+
+Completed turns show `Done · 1m 49s · View details` when a duration is available.
+Opening the disclosure loads that turn's full items, including intermediate
+steering messages, commentary, reasoning, and tools. Reopening uses the cached
+details. Loading failures offer a retry. Active turns load full items and
+continue streaming normally.
+
+Surface-bound panes request details automatically. Controlled hosts supply
+`turns` and `actions.loadTurnHistory(turnId)` through their pane controller, or
+handle the pane's `loadTurnHistory` event:
+
+```ts
+await conversation.loadTurnHistory(turnId);
+```
+
+`turns[].itemsView === 'summary'` identifies partial turns; `detailsLoading`
+and `detailsError` describe their request state. Missing `itemsView` means full.
+Original-history tool screenshots enter after detail expansion; their image
+bytes still load lazily through the existing content reader.
+
+Override the policy per conversation with `load({ historyItemsView: 'summary' })`.
+On an already loaded handle, a load containing only history policy options
+preserves the current window, cursor, subscriptions, and active turn.
+`load({ historyItemsView: 'full' })` also awaits details for every loaded summary
+turn and makes future pages full. Switching back to summary keeps cached details.
 
 ## Loading strategy
 
@@ -36,12 +71,13 @@ await surface.conversation(threadId).load({ loadingStrategy: 'eager' });
 
 ### Lazy loading
 
-`lazy` returns after the newest full-detail page. The conversation snapshot
+`lazy` returns after the newest page in the selected detail policy. The conversation snapshot
 reports:
 
 ```ts
 type CodexConversationHistoryState = {
   loadingStrategy: 'lazy' | 'eager';
+  itemsView?: 'full' | 'summary'; // omitted means full
   hasOlder: boolean;
   loadingOlder: boolean;
   fullyLoaded: boolean;
@@ -66,7 +102,7 @@ switch or full-snapshot refresh is needed between pages.
 
 ### Eager loading
 
-`eager` also returns the initial full-detail page promptly, then hydrates older
+`eager` also returns the initial page promptly, then hydrates older
 pages in the background. It emits `conversation.historyPrepended` in bounded
 message batches, nearest older messages first, yielding between batches so a
 renderer can paint progressively.
@@ -79,7 +115,9 @@ does not end with a redundant full-history replacement.
 
 `readHistory()` and `readConversationHistory()` preserve the stronger contract:
 they await exhaustive full-detail hydration and return the authoritative
-history currently available from app-server.
+history currently available from app-server, without changing the configured
+detail policy for future UI pages. During an active turn, reads preserve the
+current live window and fill its unloaded details.
 
 Use these methods for export, persistence, or synchronization work that must not
 observe a partial transcript. Use snapshots/events for responsive UI.
@@ -165,10 +203,11 @@ still defines safety—for example, no active generation, queue, or approval.
 
 ## App-server history limits
 
-The SDK can only render items materialized by app-server history APIs. Some
-low-level execution items may be present in rollout files but absent after an
-app-server restart. The SDK does not parse private rollout JSONL as a fallback;
-that ownership remains with app-server.
+Text and tool details come from app-server history APIs. Some low-level
+execution items may be absent after an app-server restart. The optional
+`originalHistoryImages` reader recovers recorded image outputs from the
+provider's original history without writing an archive or changing that history;
+it does not reconstruct missing text or tool operations.
 
 See [Concurrent conversations](/guide/conversations),
 [Add a backend service](/guide/backend), and [Semantic events](/guide/events).

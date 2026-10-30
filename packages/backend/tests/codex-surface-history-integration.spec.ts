@@ -17,6 +17,93 @@ function historyTurn(id: string, index: number): v2.Turn {
 }
 
 describe('CodexSurface', () => {
+  it('loads summaries, hydrates one turn on demand, and upgrades a shared window without resetting live work', async () => {
+    const full = ['first', 'second', 'older'].map((id, i) => historyTurn(id, i));
+    const summary = full.map(value => ({ ...value, itemsView: 'summary' as const, items: [value.items[0]!, value.items.at(-1)!] }));
+    const pending = deferred<v2.ThreadItemsListResponse>(); const olderPage = deferred<v2.ThreadTurnsListResponse>(); let firstRequest = true;
+    const transport = new MockCodexAppServer({
+      'thread/resume': () => ({ ...resumeResponse({ ...thread('thread-existing', false), turns: summary.slice(0, 2) }), initialTurnsPage: { data: summary.slice(0, 2).reverse(), nextCursor: 'older', backwardsCursor: null } }),
+      'thread/items/list': params => {
+        if (firstRequest) { firstRequest = false; return pending.promise; }
+        const value = full.find(value => value.id === params.turnId)!;
+        const items = params.cursor ? value.items.slice(3) : value.items.slice(0, 3);
+        return { data: items.map(item => ({ turnId: value.id, item, startedAtMs: null, completedAtMs: null })), nextCursor: params.cursor ? null : 'more', backwardsCursor: null };
+      },
+      'thread/turns/list': params => params.itemsView === 'summary' ? olderPage.promise : ({ data: [full[2]!], nextCursor: null, backwardsCursor: null }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), historyItemsView: 'summary' });
+    try {
+      await surface.connect(); const handle = surface.conversation('thread-existing');
+      const replica = createCodexConversationReplica(handle.getSnapshot());
+      surface.onConversationEvent(handle.id, event => replica.apply(event));
+      expect(lastRequest(transport, 'thread/resume')).toMatchObject({ params: { initialTurnsPage: { itemsView: 'summary' } } });
+      expect(handle.getSnapshot().turns).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'first', itemsView: 'summary' })]));
+      expect(transport.sent.filter(m => 'method' in m && m.method === 'thread/items/list')).toHaveLength(0);
+      const loading = handle.loadTurnHistory('first');
+      await vi.waitFor(() => expect(replica.getSnapshot().turns.find(t => t.id === 'first')?.detailsLoading).toBe(true));
+      pending.reject(new Error('Read disconnected'));
+      await expect(loading).rejects.toThrow('Read disconnected');
+      expect(replica.getSnapshot().turns.find(t => t.id === 'first')).toMatchObject({ itemsView: 'summary', detailsLoading: false, detailsError: 'Read disconnected' });
+      const usage = (turnId: string, total: number) => transport.emitNotification('thread/tokenUsage/updated', { threadId: handle.id, turnId,
+        tokenUsage: { total: { totalTokens: total, inputTokens: total, cachedInputTokens: 0, cacheWriteInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 },
+          last: { totalTokens: 1, inputTokens: 1, cachedInputTokens: 0, cacheWriteInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 }, modelContextWindow: 2000 } });
+      usage('second', 100);
+      transport.emitNotification('turn/started', { threadId: handle.id, turn: turn('live', 'inProgress', []) });
+      usage('live', 150);
+      await Promise.all([handle.loadTurnHistory('first'), handle.loadTurnHistory('first')]);
+      expect(handle.getSnapshot().turns.find(t => t.id === 'first')).toMatchObject({ itemsView: 'full', detailsLoading: false, detailsError: null });
+      const reads = () => transport.sent.filter(m => 'method' in m && m.method === 'thread/items/list');
+      usage('live', 200);
+      expect(handle.getSnapshot().turns.find(t => t.id === 'live')?.executionUsage?.execution?.totalTokens).toBe(100);
+      expect(reads()).toHaveLength(3); // One failed read, then two shared detail pages.
+      await handle.loadTurnHistory('first'); expect(reads()).toHaveLength(3);
+      expect(handle.getSnapshot().messages.filter(m => m.turnId === 'first' && m.role === 'user')).toHaveLength(3);
+      const paging = handle.loadOlderHistory();
+      await vi.waitFor(() => expect(lastRequest(transport, 'thread/turns/list')).toMatchObject({ params: { itemsView: 'summary' } }));
+      const upgrading = handle.load({ historyItemsView: 'full' });
+      await vi.waitFor(() => expect(handle.getSnapshot().historyState?.itemsView).not.toBe('summary'));
+      olderPage.resolve({ data: [summary[2]!], nextCursor: null, backwardsCursor: null });
+      await Promise.all([paging, upgrading]);
+      expect(handle.getSnapshot()).toMatchObject({ busy: true, activeTurnId: 'live', historyState: { hasOlder: false } });
+      expect(handle.getSnapshot().turns.find(t => t.id === 'second')?.itemsView).toBe('full');
+      expect(transport.sent.filter(m => 'method' in m && m.method === 'thread/resume')).toHaveLength(1);
+      await handle.loadOlderHistory();
+      expect(lastRequest(transport, 'thread/turns/list')).toMatchObject({ params: { cursor: 'older', itemsView: 'full' } });
+      await handle.load({ historyItemsView: 'summary' });
+      expect(handle.getSnapshot().turns.find(t => t.id === 'first')?.itemsView).toBe('full');
+      expect(replica.getSnapshot().messages).toEqual(handle.getSnapshot().messages);
+    } finally { await surface.close(); }
+  });
+
+  it('materializes a resumed active turn while keeping exports full and future UI pages in summary mode', async () => {
+    const full = [historyTurn('past', 0), { ...historyTurn('running', 1), status: 'inProgress' as const }];
+    const summaries = full.map(value => ({ ...value, itemsView: 'summary' as const, items: [value.items[0]!, value.items.at(-1)!] }));
+    const transport = new MockCodexAppServer({
+      'thread/resume': () => resumeResponse({ ...thread('thread-existing', false), status: { type: 'active', activeFlags: [] }, turns: summaries }),
+      'thread/read': () => ({ thread: thread('thread-existing', false), readState: null }),
+      'thread/items/list': params => ({ data: full.find(value => value.id === params.turnId)!.items.map(item => ({ turnId: params.turnId!, item, startedAtMs: null, completedAtMs: null })), nextCursor: null, backwardsCursor: null }),
+      'thread/turns/list': () => ({ data: [...full].reverse().map(value => ({ ...value, status: 'completed' as const })), nextCursor: null, backwardsCursor: null }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), historyItemsView: 'summary' });
+    try {
+      await surface.connect(); const handle = surface.conversation('thread-existing');
+      expect(handle.getSnapshot()).toMatchObject({ activeTurnId: 'running', busy: true });
+      expect(handle.getSnapshot().turns.find(value => value.id === 'running')?.itemsView).not.toBe('summary');
+      expect(handle.getSnapshot().messages.filter(value => value.turnId === 'running' && value.role === 'user')).toHaveLength(3);
+      expect(handle.getSnapshot().messages.filter(value => value.turnId === 'past' && value.role === 'user')).toHaveLength(1);
+      transport.emitNotification('item/agentMessage/delta', { threadId: handle.id, turnId: 'running', itemId: 'streaming', delta: 'Still working' });
+      expect(JSON.stringify(handle.getSnapshot().messages)).toContain('Still working');
+      transport.emitNotification('turn/completed', { threadId: handle.id, turn: { ...full[1]!, status: 'completed' } });
+      const exported = await handle.readHistory();
+      expect(lastRequest(transport, 'thread/turns/list')).toMatchObject({ params: { itemsView: 'full' } });
+      expect(exported.messages.filter(value => value.turnId === 'past' && value.role === 'user')).toHaveLength(3);
+      expect(handle.getSnapshot().historyState?.itemsView).toBe('summary');
+      await handle.load({ cwd: '/fresh' });
+      expect(handle.getSnapshot().messages.filter(value => value.turnId === 'past' && value.role === 'user')).toHaveLength(3);
+      expect(handle.getSnapshot().turns.find(value => value.id === 'past')?.itemsView).toBe('full');
+    } finally { await surface.close(); }
+  });
+
   it('loads history, sends a message, and reduces streaming events into surface state', async () => {
     const { surface, transport } = createSurface('turn/start', 'turn/steer');
     await surface.connect();
@@ -76,7 +163,7 @@ describe('CodexSurface', () => {
       .toStrictEqual(messagesWithoutCreatedAt(conversationSnapshot.messages));
   });
 
-  it('renders a bounded full page before hydrating remaining history in the background', async () => {
+  it.each(['eager', 'switch'] as const)('renders a bounded page before background hydration (%s)', async (strategy) => {
     const firstTurn = turn('turn-first', 'completed', [
       { type: 'userMessage', id: 'user-first', clientId: null, content: [{ type: 'text', text: 'First', text_elements: [] }] },
       {
@@ -113,7 +200,7 @@ describe('CodexSurface', () => {
           : { data: [firstTurn], nextCursor: null, backwardsCursor: null };
       },
     });
-    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), loadingStrategy: 'eager' });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), loadingStrategy: strategy === 'switch' ? 'lazy' : 'eager' });
     const historyEvents: CodexSurfaceEvent[] = [];
     const historyPrependedEvents: CodexSurfaceEvent[] = [];
     surface.onEvent((event) => {
@@ -128,6 +215,7 @@ describe('CodexSurface', () => {
       expect.objectContaining({ type: 'tool', id: 'command-second', kind: 'command' }),
       expect.objectContaining({ type: 'text', text: 'Second reply' }),
     ]));
+    if (strategy === 'switch') await surface.conversation('thread-existing').load({ loadingStrategy: 'eager' });
     remainingFullPage.resolve({ data: [firstTurn], nextCursor: null, backwardsCursor: null });
     await vi.waitFor(() => expect(surface.getSnapshot().messages.flatMap((message) => message.parts)).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'text', text: 'First' }),

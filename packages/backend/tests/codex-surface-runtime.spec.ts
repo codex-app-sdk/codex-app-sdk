@@ -106,6 +106,7 @@ describe('Codex surface runtime state', () => {
       turnStartPending: false,
       historyLoading: false,
       loadingStrategy: 'eager',
+      historyItemsView: 'full',
       historyCursor: null,
       historyHasOlder: false,
       historyLoadingOlder: false,

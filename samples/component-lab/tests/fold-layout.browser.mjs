@@ -21,7 +21,7 @@ const fixture = {
   load(id) {
     if (id !== fixtureId) return;
     return `
-      import { createApp, h, ref } from 'vue';
+      import { createApp, h, ref, reactive } from 'vue';
       import { CodexConversationPane, createCodexConversationPaneController } from '@codex-app-sdk/vue';
       import '@codex-app-sdk/vue/styles.css';
       const questions = [{ id: 'branch', header: 'Branch',
@@ -35,15 +35,34 @@ const fixture = {
           input: questions, statusText: JSON.stringify({ source: 'codex', action: 'ask_user_question',
             phase: 'running', params: { requestId: 'request', questions } }), metadata: { requestId: 'request' } },
       ] }];
-      const controller = createCodexConversationPaneController({ state: {
+      const state = reactive({
         identity: { conversationKey: 'fold-layout', messages, busy: true, activeTurnId: 'turn' },
         thread: { queuedPrompts: [{ id: 'long', text: 'Standardize the host selectors. '.repeat(20) + '/repository/'.repeat(30) }] },
-      }, actions: {} });
+      });
+      window.detailReads = 0;
+      const controller = createCodexConversationPaneController({ state, actions: {
+        async loadTurnHistory(turnId) {
+          window.detailReads++;
+          state.identity.turns.find(turn => turn.id === turnId).detailsLoading = true;
+          await new Promise(resolve => setTimeout(resolve, 100));
+          state.identity.messages = state.identity.messages.map(message => message.turnId === turnId && message.role === 'assistant'
+            ? { ...message, parts: [{ type: 'text', text: 'Investigated the work. '.repeat(400), phase: 'commentary' }, ...message.parts] } : message);
+          Object.assign(state.identity.turns.find(turn => turn.id === turnId), { itemsView: 'full', detailsLoading: false });
+        },
+      } });
       createApp({ setup() {
         const sidebarOpen = ref(true);
         const sidebarWidth = ref(180);
         return () => [
           h('header', [
+            h('button', { onClick: () => { state.identity = {
+              conversationKey: 'summary-browser', busy: false, activeTurnId: null,
+              turns: Array.from({ length: 20 }, (_, i) => ({ id: 'summary-'+i, status: 'completed', itemsView: 'summary', durationMs: 109000 })),
+              messages: Array.from({ length: 20 }, (_, i) => [
+                { id: 'user-'+i, role: 'user', status: 'complete', turnId: 'summary-'+i, parts: [{ type: 'text', text: 'Request '+i }] },
+                { id: 'answer-'+i, role: 'assistant', status: 'complete', turnId: 'summary-'+i, parts: [{ type: 'text', text: 'Final answer '+i, phase: 'final_answer' }] },
+              ]).flat(),
+            }; } }, 'Summary history'),
             h('button', { onClick: () => { sidebarOpen.value = !sidebarOpen.value; } }, 'Toggle sidebar'),
             h('input', { type: 'range', min: 100, max: 300, step: 40, value: sidebarWidth.value,
               'aria-label': 'Sidebar width', onInput: event => { sidebarWidth.value = Number(event.target.value); } }),
@@ -105,6 +124,23 @@ try {
     assert(Math.max(...widths) - Math.min(...widths) > 100,
       'The question must track substantial host and viewport width changes');
     console.log(`${engine.name()}: queue stays contained and folded question follows host resizing: ${widths.join(', ')}px.`);
+    await page.getByRole('button', { name: 'Summary history', exact: true }).click();
+    const header = page.locator('.chat-work-group__header').last();
+    await header.waitFor();
+    assert.equal(await header.textContent().then(text => text.trim()), 'Done · 1m 49s · View details');
+    assert.equal(await page.evaluate(() => window.detailReads), 0, 'summaries must not request Working content');
+    await header.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(150);
+    const before = await header.boundingBox();
+    await header.click();
+    await page.getByRole('status').filter({ hasText: 'Loading details' }).waitFor();
+    await page.waitForFunction(() => document.querySelector('.chat-work-group__body') && document.body.textContent.includes('Investigated the work.'));
+    await page.waitForTimeout(250);
+    const after = await header.boundingBox();
+    assert(Math.abs(after.y - before.y) < 2, `${engine.name()}: expansion must preserve the clicked summary header position: ${JSON.stringify({before,after})}`);
+    await header.click(); await header.click();
+    assert.equal(await page.evaluate(() => window.detailReads), 1, 'reopening loaded Working content must use the cached turn');
+    console.log(`${engine.name()}: summary expansion loads once and preserves its scroll anchor.`);
     await browser.close();
     browser = undefined;
   }

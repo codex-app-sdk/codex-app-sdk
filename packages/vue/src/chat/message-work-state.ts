@@ -14,6 +14,10 @@ export type AssistantWorkTurnContext = {
   latestStreamingAssistantIndex: ComputedRef<number | undefined>
   phased: ComputedRef<boolean>
   startedAt?: ComputedRef<string | null | undefined>
+  itemsView?: ComputedRef<'summary' | 'full' | undefined>
+  detailsLoading?: ComputedRef<boolean | undefined>
+  detailsError?: ComputedRef<string | null | undefined>
+  reloadDetails?: () => void
   durationMs?: ComputedRef<number | null | undefined>
   status: ComputedRef<CodexSurfaceTurnStatus | undefined>
   turnId: ComputedRef<string | undefined>

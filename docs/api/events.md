@@ -38,12 +38,17 @@ snapshot. `readConversationHistory()` / `readHistory()` still waits for all
 pages and returns the authoritative complete history.
 
 For demand-paged hosts, `CodexConversationSnapshot.historyState` reports the
-selected `loadingStrategy`, `hasOlder`, `loadingOlder`, and `fullyLoaded` state while
+selected `loadingStrategy`, optional `itemsView`, `hasOlder`, `loadingOlder`, and `fullyLoaded` state while
 `CodexConversation.loadOlderHistory()` advances one opaque server cursor.
 `conversation.historyStateChanged` carries `{ historyLoading, historyState,
 error }` whenever loading or paging state changes, including completion and
 failure without new messages. `createCodexConversationReplica()` applies these
 events so `loadingOlder` clears after each request without another snapshot.
+
+On-demand Working hydration emits `conversation.historyReplaced` with reason
+`details`, including per-turn `itemsView`, `detailsLoading`, and `detailsError`.
+Asynchronous original-image projection uses reason `images`. Both update replicas
+without resetting live execution-usage baselines.
 
 Event families cover:
 

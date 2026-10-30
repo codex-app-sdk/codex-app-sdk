@@ -99,7 +99,7 @@ export class CodexSurfaceRuntimeController {
 
   patch(threadId: string, patch: ThreadRuntimePatch): void {
     const runtime = this.require(threadId);
-    const historyChanged = (['historyLoading', 'historyLoadingOlder', 'historyHasOlder', 'fullHistoryHydrated', 'loadingStrategy'] as const)
+    const historyChanged = (['historyLoading', 'historyLoadingOlder', 'historyHasOlder', 'fullHistoryHydrated', 'loadingStrategy', 'historyItemsView'] as const)
       .some((key) => key in patch && patch[key] !== runtime[key]);
     Object.assign(runtime, patch);
     if (this.host.getState().activeConversationId === threadId) {
@@ -354,6 +354,7 @@ function historyPrependState(runtime: ThreadRuntimeState) {
 function runtimeHistoryState(runtime: ThreadRuntimeState) {
   return {
     loadingStrategy: runtime.loadingStrategy,
+    ...(runtime.historyItemsView === 'summary' ? { itemsView: 'summary' as const } : {}),
     hasOlder: runtime.historyHasOlder,
     loadingOlder: runtime.historyLoadingOlder,
     fullyLoaded: runtime.fullHistoryHydrated,

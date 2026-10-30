@@ -36,6 +36,8 @@ type CodexSurfaceOptions = {
   conversationLimit?: number;
   /** `lazy` keeps older pages behind loadOlderHistory; `eager` hydrates all pages progressively. */
   loadingStrategy?: 'eager' | 'lazy';
+  /** Completed turns initially include all items (default) or prompt/final summaries. */
+  historyItemsView?: 'full' | 'summary';
   codexHome?: string;
   cwd?: string;
   autoSelectFirstConversation?: boolean;
@@ -393,13 +395,15 @@ type CodexConversation = {
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
   ): Promise<CodexConversationForkResult>;
-  /** Loads 5 recent full-detail turns immediately; older pages follow the configured loading strategy. */
+  /** Loads 5 recent turns using the configured paging and detail policies. */
   load(options?: CodexConversationLoadOptions): Promise<CodexConversationSnapshot>;
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;
   readPromptHistory(): Promise<CodexConversationPromptHistory>;
   /** Loads the next older page and reports whether another page remains. */
   loadOlderHistory(): Promise<CodexConversationHistoryPage>;
+  /** Loads and caches full items for one currently loaded summary turn. */
+  loadTurnHistory(turnId: string): Promise<CodexConversationSnapshot>;
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
@@ -418,6 +422,14 @@ type CodexConversation = {
   // message, queue, approval, client request, and goal actions are also exposed
 };
 ```
+
+`CodexConversationLoadOptions` accepts `historyItemsView?: 'full' | 'summary'`
+alongside `loadingStrategy` and host configuration. A policy-only load on a
+hydrated handle preserves its history window and live state; selecting `full`
+awaits all loaded turn details and applies to future pages. Full turns are never
+downgraded. `loadTurnHistory` shares concurrent requests, reports per-turn errors,
+and preserves live work received during the read. The standalone surface also
+exposes `loadTurnHistory(turnId, conversationId?)`.
 
 Fork types are protocol-free and exported from `@codex-app-sdk/backend`:
 

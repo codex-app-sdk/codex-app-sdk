@@ -288,6 +288,7 @@ export class CodexSurface {
       emitHistoryReplaced: (threadId, reason, origin) => this.emitHistoryReplaced(threadId, reason, origin),
       emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
       ensureThreadReady: (threadId) => this.ensureThreadReady(threadId),
+      loadTurnHistory: (threadId, turnId) => this.conversations.loadTurnHistory(threadId, turnId),
       getSnapshot: () => this.getSnapshot(),
       getState: () => this.state,
       hydrateCompleteHistory: (threadId, options) => this.conversations.hydrateCompleteHistory(threadId, options),
@@ -335,6 +336,7 @@ export class CodexSurface {
       this.client,
       options.conversationLimit,
       {
+        emitHistoryReplaced: (threadId, reason, origin) => this.emitHistoryReplaced(threadId, reason, origin),
         emitHistoryPrepended: (threadId, messages, origin) => this.emitHistoryPrepended(threadId, messages, origin),
         emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
         ensureConnected: () => this.ensureConnected(),
@@ -396,6 +398,7 @@ export class CodexSurface {
         emitHistoryReplaced: (threadId) => this.emitHistoryReplaced(threadId, 'fork', 'action'),
         emitSummaryUpserted: (summary) => this.emitSummaryUpserted(summary, 'created', 'action'),
         getState: () => this.state,
+        hydrateOriginalImages: (threadId, path) => this.conversations.hydrateOriginalImages(threadId, path),
         hydrateCompleteHistory: (threadId) => this.conversations.hydrateCompleteHistory(threadId),
         patch: (patch) => this.patch(patch),
         rememberHostOptions: (threadId, hostOptions) => (
@@ -404,6 +407,7 @@ export class CodexSurface {
         requireRuntime: (threadId) => this.requireRuntime(threadId),
         snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
       },
+      this.originalImages,
     );
     this.connection = new CodexSurfaceConnectionController(
       this.client,
@@ -771,6 +775,12 @@ export class CodexSurface {
     return readPromptHistory(this.client, conversationId);
   }
 
+  async loadTurnHistory(turnId: string, conversationId = this.state.activeConversationId ?? ''): Promise<CodexConversationSnapshot> {
+    await this.ensureThreadReady(conversationId);
+    await this.conversations.loadTurnHistory(conversationId, turnId);
+    return this.getConversationSnapshot(conversationId);
+  }
+
   async loadOlderConversationHistory(
     conversationId = this.state.activeConversationId ?? '',
   ): Promise<CodexConversationHistoryPage> {
@@ -889,6 +899,7 @@ export class CodexSurface {
       interrupt: () => this.turnActions.interruptThread(id),
       load: async (options) => { await this.ensureThreadReady(id, options); },
       loadOlderHistory: () => this.loadOlderConversationHistory(id),
+      loadTurnHistory: async (turnId) => { await this.loadTurnHistory(turnId, id); },
       onEvent: (listener) => this.onConversationEvent(id, listener),
       onStateChange: (listener) => this.onConversationStateChange(id, listener),
       readHistory: () => this.readConversationHistory(id),

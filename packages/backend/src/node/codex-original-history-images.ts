@@ -28,8 +28,12 @@ export class CodexOriginalHistoryImages {
   forget(threadId: string) { this.paths.delete(threadId); this.indexes.delete(threadId); this.images.clear(); }
   clear() { this.disposed = true; this.paths.clear(); this.indexes.clear(); this.images.clear(); }
 
-  async prepare(threadId: string, path?: string | null): Promise<(messages: SurfaceMessage[]) => SurfaceMessage[]> {
+  rememberPath(threadId: string, path?: string | null): void {
     if (path !== undefined && path !== this.paths.get(threadId)) { this.indexes.delete(threadId); this.paths.delete(threadId); if (path && isAbsolute(path)) this.paths.set(threadId, path); }
+  }
+
+  async prepare(threadId: string, path?: string | null): Promise<(messages: SurfaceMessage[]) => SurfaceMessage[]> {
+    this.rememberPath(threadId, path);
     let index: Index | undefined;
     try { index = await this.exclusive(() => this.index(threadId)); } catch { /* Unavailable provider history does not hide the normal transcript. */ }
     const parts = new Map<string, SurfaceMessageMediaPart[]>();
@@ -193,4 +197,12 @@ async function* lines(file: FileHandle, size: number) {
     offset += bytesRead;
   }
   // A trailing partial record is ignored until the provider appends its newline.
+}
+
+/** Keep mutable viewed files as operations, not historical screenshot substitutes. */
+export function suppressViewedImagePreviews(messages: SurfaceMessage[]): SurfaceMessage[] {
+  return messages.map(message => {
+    const viewed = new Set(message.parts.filter(p => p.type === 'tool' && p.title === 'view_image').map(p => p.type === 'tool' ? p.id : ''));
+    return viewed.size ? { ...message, parts: message.parts.filter(p => p.type !== 'media' || !viewed.has(p.itemId ?? '')) } : message;
+  });
 }

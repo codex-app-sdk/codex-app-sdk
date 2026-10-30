@@ -55,7 +55,7 @@ describe('CodexSurfaceForkController', () => {
       expect.objectContaining({ role: 'assistant', turnId: 'history' }),
     ]);
     expect(setup.host.rememberHostOptions).toHaveBeenCalledExactlyOnceWith('forked', {
-      cwd: '/forked', loadingStrategy: 'lazy', mcpServers: [{ name: 'default' }],
+      cwd: '/forked', loadingStrategy: 'lazy', historyItemsView: 'full', mcpServers: [{ name: 'default' }],
     });
     expect(setup.state.conversations).toEqual([
       expect.objectContaining({ id: 'source' }),
@@ -109,7 +109,7 @@ describe('CodexSurfaceForkController', () => {
       selectedReasoningEffort: 'high', selectedServiceTier: 'priority',
     });
     expect(setup.host.rememberHostOptions).toHaveBeenCalledWith('forked', {
-      cwd: '/response', extensionContext: { agent: 'one' }, loadingStrategy: 'eager',
+      cwd: '/response', extensionContext: { agent: 'one' }, loadingStrategy: 'eager', historyItemsView: 'full',
       mcpServers: [{ name: 'custom', transport: { type: 'stdio', command: 'server' } }],
     });
   });

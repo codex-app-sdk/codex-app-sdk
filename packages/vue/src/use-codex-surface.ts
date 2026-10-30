@@ -134,6 +134,8 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
         ? api.loadOlderConversationHistory(conversationId)
         : Promise.reject(new Error('Conversation history paging is not available.'))
     ),
+    loadTurnHistory: (turnId: string, conversationId?: string) => api.loadTurnHistory
+      ? api.loadTurnHistory(turnId, conversationId) : Promise.reject(new Error('Turn history is unavailable.')),
     refreshAccount: () => run(() => api.refreshAccount()),
     refreshConversations: () => run(() => api.refreshConversations()),
     renameConversation: (title: string) => run(() => api.renameConversation(title)),

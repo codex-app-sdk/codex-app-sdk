@@ -237,10 +237,15 @@ describe('useCodexSurface', () => {
       hasOlder: false,
     });
     expect(api.loadOlderConversationHistory).toHaveBeenCalledWith('thread-page');
+    const snapshot = { ...idleSnapshot, activeConversationId: 'thread-page', turnIds: [] };
+    api.loadTurnHistory = vi.fn(async () => snapshot);
+    await expect(surface.loadTurnHistory('turn-details', 'thread-page')).resolves.toStrictEqual(snapshot);
+    expect(api.loadTurnHistory).toHaveBeenCalledWith('turn-details', 'thread-page');
 
     const unsupported = useCodexSurface(fakeApi(() => vi.fn()));
     await expect(unsupported.loadOlderConversationHistory('thread-page'))
       .rejects.toThrow('Conversation history paging is not available.');
+    await expect(unsupported.loadTurnHistory('turn-details', 'thread-page')).rejects.toThrow('Turn history is unavailable.');
   });
 
   it('marks client requests before dispatch and clears the local guard on reconnect', async () => {

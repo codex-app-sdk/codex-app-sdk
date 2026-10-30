@@ -22,7 +22,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Client → app-server requests | 178 | 49 | 0 | 0 | 129 |
+| Client → app-server requests | 178 | 50 | 0 | 0 | 128 |
 | App-server → client notifications | 87 | 43 | 0 | 29 | 15 |
 | App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
@@ -95,7 +95,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `thread/read` | High-level SDK | `packages/backend/src/node/codex-original-history-images.ts`<br>`packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts` |
 | `thread/readState/update` | Typed client only | — |
 | `thread/turns/list` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-fork-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts`<br>`packages/backend/src/node/codex-surface-prompt-history.ts` |
-| `thread/items/list` | Typed client only | — |
+| `thread/items/list` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts` |
 | `thread/items/read` | Typed client only | — |
 | `thread/inject_items` | Typed client only | — |
 | `skills/list` | High-level SDK | `packages/backend/src/node/codex-surface-catalog-controller.ts` |

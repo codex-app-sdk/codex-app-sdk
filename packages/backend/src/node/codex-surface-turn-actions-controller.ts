@@ -30,6 +30,7 @@ export type CodexSurfaceTurnActionsHost = {
   emitHistoryReplaced(threadId: string, reason: 'rollback', origin: 'action'): void;
   emitSummaryUpserted(summary: CodexConversationSummary, reason: 'updated', origin: 'action'): void;
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
+  loadTurnHistory?(threadId: string, turnId: string): Promise<void>;
   getSnapshot(): CodexSurfaceSnapshot;
   getState(): CodexSurfaceSnapshot;
   hydrateCompleteHistory(threadId: string, options?: { initialPageLoaded?: boolean; cursor?: string | null }): Promise<void>;
@@ -167,6 +168,7 @@ export class CodexSurfaceTurnActionsController {
 
   async editTurnForThread(threadId: string, turnId: string, content: string, options?: SendCodexMessageOptions): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
+    if (runtime.turns.find(turn => turn.id === turnId)?.itemsView === 'summary') await this.host.loadTurnHistory?.(threadId, turnId);
     const message = runtime.messages.find((candidate) => (
       candidate.role === 'user'
       && candidate.kind !== 'steer'
@@ -188,6 +190,7 @@ export class CodexSurfaceTurnActionsController {
 
   async retryTurnForThread(threadId: string, turnId: string): Promise<void> {
     const runtime = await this.host.ensureThreadReady(threadId);
+    if (runtime.turns.find(turn => turn.id === turnId)?.itemsView === 'summary') await this.host.loadTurnHistory?.(threadId, turnId);
     const prompt = runtime.messages.find((candidate) => (
       candidate.role === 'user'
       && candidate.kind !== 'steer'

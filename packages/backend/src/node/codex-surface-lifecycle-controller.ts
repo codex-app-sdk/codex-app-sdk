@@ -1,3 +1,4 @@
+import { readTurnItems } from './codex-surface-conversations-controller';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
@@ -9,7 +10,7 @@ import type {
   CreateCodexConversationOptions,
 } from '@codex-app-sdk/core/surface';
 import {
-  codexThreadToSurfaceMessages,
+  codexTurnToSurfaceMessages,
   preserveHistoricalMessagePresentation,
 } from './codex-conversation-history';
 import type {
@@ -80,7 +81,7 @@ export class CodexSurfaceLifecycleController {
 
   constructor(
     private readonly client: CodexAppServerClient,
-    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd' | 'loadingStrategy'>,
+    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd' | 'loadingStrategy' | 'historyItemsView'>,
     private readonly catalog: CodexSurfaceCatalogController,
     private readonly extensions: CodexSurfaceExtensionsController,
     private readonly settings: CodexSurfaceConversationSettingsController,
@@ -190,6 +191,7 @@ export class CodexSurfaceLifecycleController {
     if (inheritedApprovalPreset) selection.approvalPreset = inheritedApprovalPreset;
     const runtime = this.host.createRuntime(response.thread.id, {
       hydrated: true,
+      ...(this.options.historyItemsView ? { historyItemsView: this.options.historyItemsView } : {}),
       historyMode: response.thread.historyMode ?? 'legacy',
       cwd: response.cwd ?? response.thread.cwd,
       activeTurnId: null,
@@ -237,7 +239,18 @@ export class CodexSurfaceLifecycleController {
   ): Promise<ThreadRuntimeState> {
     await this.host.ensureConnected();
     const runtime = this.host.runtime(threadId);
-    if (runtime?.hydrated && Object.keys(loadOptions).length === 0) return runtime;
+    if (runtime?.hydrated && Object.keys(loadOptions).every(key => key === 'historyItemsView' || key === 'loadingStrategy')) {
+      this.hostOptionsByThread.set(threadId, { ...this.hostOptionsByThread.get(threadId), ...loadOptions });
+      this.host.patchRuntime(threadId, {
+        ...(loadOptions.historyItemsView ? { historyItemsView: loadOptions.historyItemsView } : {}),
+        ...(loadOptions.loadingStrategy ? { loadingStrategy: loadOptions.loadingStrategy } : {}),
+      });
+      if (loadOptions.historyItemsView === 'full') await this.conversations.loadLoadedTurnHistory(threadId);
+      if (loadOptions.loadingStrategy === 'eager' && runtime.historyHasOlder) {
+        void this.conversations.hydrateCompleteHistory(threadId).catch(() => undefined);
+      }
+      return runtime;
+    }
     let hydration = this.hydrationPromises.get(threadId);
     if (!hydration) {
       hydration = this.resume(threadId, false, loadOptions, 'load').then(() => undefined);
@@ -254,7 +267,7 @@ export class CodexSurfaceLifecycleController {
     await this.host.ensureConnected();
     if (!conversationId) throw new Error('There is no active conversation');
     const existing = await this.ensureReady(conversationId);
-    if (existing.busy) return this.historySnapshot(conversationId, existing);
+    if (existing.busy) { await this.conversations.loadLoadedTurnHistory(conversationId); return this.historySnapshot(conversationId, existing); }
     const loadingRuntime = this.host.createRuntime(conversationId, { historyLoading: true, error: null });
     if (this.host.getState().activeConversationId === conversationId) this.host.activateRuntime(loadingRuntime);
     try {
@@ -318,6 +331,7 @@ export class CodexSurfaceLifecycleController {
       cwd: hostOptions.cwd,
       extensionContext: hostOptions.extensionContext,
     }, {}, hostOptions.mcpServers);
+    const historyItemsView = hostOptions.historyItemsView ?? this.options.historyItemsView ?? 'full';
     const loadingRuntime = this.host.createRuntime(conversationId, { historyLoading: true, error: null });
     const initialTurns = new Map(loadingRuntime.turns.map((turn) => [turn.id, turn]));
     const initialMessages = new Map(loadingRuntime.messages.map((message) => [message.id, message]));
@@ -331,7 +345,7 @@ export class CodexSurfaceLifecycleController {
           initialTurnsPage: {
           limit: CONVERSATION_HISTORY_PAGE_SIZE,
           sortDirection: 'desc',
-          itemsView: 'full',
+          itemsView: historyItemsView,
           },
           ...(hostOptions.cwd ? { cwd: hostOptions.cwd } : {}),
           ...(extension.baseInstructions === undefined ? {} : { baseInstructions: extension.baseInstructions }),
@@ -352,12 +366,14 @@ export class CodexSurfaceLifecycleController {
         cursor: null,
         limit: CONVERSATION_HISTORY_PAGE_SIZE,
         sortDirection: 'desc',
-        itemsView: 'full',
+        itemsView: historyItemsView,
       });
-      const turns = [...initialPage.data].reverse();
+      const turns = await Promise.all([...initialPage.data].reverse().map(async turn =>
+        turn.status === 'inProgress' && (turn.itemsView === 'summary' || turn.itemsView === 'notLoaded')
+          ? { ...turn, items: await readTurnItems(this.client, response.thread.id, turn.id), itemsView: 'full' as const } : turn));
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
       const catalogs = await this.catalog.loadConversationCatalogs(cwd);
-      const originalProjection = await this.originalImages?.prepare(response.thread.id, response.thread.path);
+      const originalProjection = historyItemsView === 'full' ? await this.originalImages?.prepare(response.thread.id, response.thread.path) : undefined;
       const changedTurns = loadingRuntime.turns.filter((turn) => initialTurns.get(turn.id) !== turn);
       const threadStatus = loadingRuntime.threadStatus !== initialStatus && loadingRuntime.threadStatus
         ? loadingRuntime.threadStatus
@@ -365,14 +381,17 @@ export class CodexSurfaceLifecycleController {
       const restoredTurns = turns.map((turn) => threadStatus.type === 'idle' && turn.status === 'inProgress'
         ? { ...turn, status: 'interrupted' as const }
         : turn);
-      const projectedTurns = new Map(restoredTurns.map((turn) => [turn.id, surfaceTurn(turn)]));
+      const previouslyFull = new Set(loadingRuntime.turns.filter(turn => turn.itemsView !== 'summary').map(turn => turn.id));
+      const projectedTurns = new Map(restoredTurns.map((turn) => [turn.id, turn.itemsView === 'summary' && previouslyFull.has(turn.id)
+        ? { ...loadingRuntime.turns.find(value => value.id === turn.id)!, ...surfaceTurn(turn), itemsView: 'full' as const } : surfaceTurn(turn)]));
       for (const turn of changedTurns) projectedTurns.set(turn.id, turn);
       const runningTurnId = changedTurns.length > 0
         ? loadingRuntime.activeTurnId
         : threadStatus.type === 'active' ? activeTurnId(turns) : null;
       const historyMessages = preserveHistoricalMessagePresentation(
         loadingRuntime.messages,
-        codexThreadToSurfaceMessages({ ...response.thread, turns: restoredTurns }),
+        restoredTurns.flatMap(turn => turn.itemsView === 'summary' && previouslyFull.has(turn.id)
+          ? loadingRuntime.messages.filter(message => message.turnId === turn.id) : codexTurnToSurfaceMessages(response.thread.id, turn)),
       );
       // Notifications received while hydration awaited RPC/catalog data are newer
       // than that response. Never replace them with the stale transcript page.
@@ -388,6 +407,7 @@ export class CodexSurfaceLifecycleController {
         hydrated: true,
         historyMode: response.thread.historyMode ?? 'legacy',
         loadingStrategy: hostOptions.loadingStrategy ?? this.options.loadingStrategy ?? 'lazy',
+        historyItemsView,
         historyCursor: initialPage.nextCursor,
         historyHasOlder: initialPage.nextCursor !== null,
         historyLoadingOlder: false,
@@ -413,6 +433,7 @@ export class CodexSurfaceLifecycleController {
       this.host.emitSummaryUpserted(summary, 'resumed', 'action');
       this.host.emitHistoryReplaced(response.thread.id, historyReason, 'action');
       this.emitConversationState(response.thread.id);
+      if (historyItemsView === 'summary') this.conversations.hydrateOriginalImages(response.thread.id, response.thread.path);
       if (runtime.loadingStrategy === 'eager' && initialPage.nextCursor !== null) {
         void this.conversations.hydrateCompleteHistory(response.thread.id, {
           cursor: initialPage.nextCursor,

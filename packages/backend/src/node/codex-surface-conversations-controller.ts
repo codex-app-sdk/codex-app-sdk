@@ -1,3 +1,4 @@
+import { suppressViewedImagePreviews } from './codex-original-history-images';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
@@ -5,6 +6,7 @@ import type {
   CodexSurfaceSnapshot,
   ListCodexConversationsOptions,
   SurfaceMessage,
+  CodexSurfaceHistoryReason,
 } from '@codex-app-sdk/core/surface';
 import {
   codexTurnToSurfaceMessages,
@@ -23,9 +25,11 @@ type HistoryHydrationOptions = {
   initialPageLoaded?: boolean;
   cursor?: string | null;
   restart?: boolean;
+  itemsView?: 'full' | 'summary';
 };
 
 export type CodexSurfaceConversationsHost = {
+  emitHistoryReplaced(threadId: string, reason: CodexSurfaceHistoryReason, origin: 'action'): void;
   emitHistoryPrepended(threadId: string, messages: readonly SurfaceMessage[], origin: 'lifecycle'): void;
   emitSummaryUpserted(
     summary: CodexConversationSummary,
@@ -44,6 +48,8 @@ export type CodexSurfaceConversationsHost = {
 };
 
 export class CodexSurfaceConversationsController {
+  private readonly turnLoads = new Map<string, Map<string, Promise<void>>>();
+  private readonly imageHydrations = new Map<string, Promise<void>>();
   private readonly historyHydrations = new Map<string, Promise<void>>();
   private readonly historyLoads = new Map<string, Promise<{
     conversationId: string;
@@ -59,13 +65,83 @@ export class CodexSurfaceConversationsController {
   ) {}
 
   reset(): void {
+    this.turnLoads.clear(); this.imageHydrations.clear();
     this.historyHydrations.clear();
     this.historyLoads.clear();
   }
 
   forget(threadId: string): void {
+    this.turnLoads.delete(threadId); this.imageHydrations.delete(threadId);
     this.historyHydrations.delete(threadId);
     this.historyLoads.delete(threadId);
+  }
+
+  async loadTurnHistory(threadId: string, turnId: string): Promise<void> {
+    const runtime = this.host.requireRuntime(threadId);
+    const prior = runtime.turns.find(turn => turn.id === turnId);
+    if (!prior) throw new Error('Turn is not loaded in this conversation.');
+    if (prior.itemsView !== 'summary') return;
+    let loads = this.turnLoads.get(threadId);
+    if (!loads) { loads = new Map(); this.turnLoads.set(threadId, loads); }
+    const existing = loads.get(turnId); if (existing) return existing;
+    const setDetails = (patch: Partial<typeof prior>) => {
+      this.host.patchRuntime(threadId, { turns: runtime.turns.map(turn => turn.id === turnId ? { ...turn, ...patch } : turn) });
+      this.host.emitHistoryReplaced(threadId, 'details', 'action');
+    };
+    const loading = (async () => {
+      await Promise.resolve();
+      try {
+        if (this.host.runtime(threadId) !== runtime) throw new Error('Conversation changed while loading turn details.');
+        setDetails({ detailsLoading: true, detailsError: null });
+        const items = await readTurnItems(this.client, threadId, turnId);
+        if (this.host.runtime(threadId) !== runtime) throw new Error('Conversation changed while loading turn details.');
+        const current = runtime.turns.find(turn => turn.id === turnId);
+        if (!current) throw new Error('Turn is no longer available.');
+        // An already-streaming turn is authoritative; never replace its live work.
+        if (runtime.activeTurnId !== turnId && current.status !== 'inProgress') {
+          const native: v2.Turn = { id: turnId, rootTurnId: null, itemsView: 'full', items, status: current.status, error: null,
+            startedAt: current.startedAt ? Date.parse(current.startedAt) / 1000 : null,
+            completedAt: current.completedAt ? Date.parse(current.completedAt) / 1000 : null, durationMs: current.durationMs };
+          let messages = preserveHistoricalMessagePresentation(runtime.messages, codexTurnToSurfaceMessages(threadId, native));
+          if (this.originalImages) messages = suppressViewedImagePreviews(messages);
+          const at = runtime.messages.findIndex(message => message.turnId === turnId);
+          const merged = runtime.messages.filter(message => message.turnId !== turnId);
+          merged.splice(at < 0 ? merged.length : at, 0, ...messages);
+          this.host.patchRuntime(threadId, { messages: merged });
+        }
+        setDetails({ itemsView: 'full', detailsLoading: false, detailsError: null });
+        this.hydrateOriginalImages(threadId);
+      } catch (error) {
+        if (this.host.runtime(threadId) === runtime) setDetails({ detailsLoading: false, detailsError: errorMessage(error) });
+        throw error;
+      } finally { if (this.turnLoads.get(threadId) === loads) loads.delete(turnId); }
+    })();
+    loads.set(turnId, loading); return loading;
+  }
+
+  async loadLoadedTurnHistory(threadId: string): Promise<void> {
+    const paging = this.historyLoads.get(threadId);
+    if (paging) await paging;
+    for (const turn of [...this.host.requireRuntime(threadId).turns]) {
+      if (turn.itemsView === 'summary') await this.loadTurnHistory(threadId, turn.id);
+    }
+  }
+
+  hydrateOriginalImages(threadId: string, path?: string | null): void {
+    if (!this.originalImages) return;
+    this.originalImages.rememberPath(threadId, path);
+    if (this.imageHydrations.has(threadId)) return;
+    const runtime = this.host.runtime(threadId);
+    if (!runtime || !runtime.turns.some(turn => turn.itemsView !== 'summary')) return;
+    const work = (async () => {
+      const project = await this.originalImages!.prepare(threadId, path);
+      if (this.host.runtime(threadId) !== runtime) return;
+      const summaryIds = new Set(runtime.turns.filter(turn => turn.itemsView === 'summary').map(turn => turn.id));
+      this.host.patchRuntime(threadId, { messages: project(runtime.messages).map((message, index) => summaryIds.has(message.turnId ?? '') ? runtime.messages[index]! : message) });
+      this.host.emitHistoryReplaced(threadId, 'images', 'action');
+    })();
+    this.imageHydrations.set(threadId, work);
+    void work.finally(() => { if (this.imageHydrations.get(threadId) === work) this.imageHydrations.delete(threadId); }).catch(() => undefined);
   }
 
   async refresh(): Promise<CodexSurfaceSnapshot> {
@@ -171,7 +247,7 @@ export class CodexSurfaceConversationsController {
           });
         }
         while (this.host.runtime(threadId)?.historyCursor !== null) {
-          await this.loadOlderHistory(threadId);
+          await this.loadOlderHistory(threadId, options.itemsView);
         }
         if (!this.host.runtime(threadId)) return;
         this.host.patchRuntime(threadId, {
@@ -194,7 +270,7 @@ export class CodexSurfaceConversationsController {
     return hydration;
   }
 
-  loadOlderHistory(threadId: string): Promise<{
+  loadOlderHistory(threadId: string, itemsView?: 'full' | 'summary'): Promise<{
     conversationId: string;
     messages: SurfaceMessage[];
     hasOlder: boolean;
@@ -217,9 +293,13 @@ export class CodexSurfaceConversationsController {
           }
           requestedCursors.add(cursor);
           const materializedTurnIds = new Set(this.host.requireRuntime(threadId).turnIds);
-          const response: v2.ThreadTurnsListResponse = await this.client.request('thread/turns/list', {
-            threadId, cursor, limit: HISTORY_PAGE_SIZE, sortDirection: 'desc', itemsView: 'full',
+          const requestedView = itemsView ?? this.host.requireRuntime(threadId).historyItemsView;
+          let response: v2.ThreadTurnsListResponse = await this.client.request('thread/turns/list', {
+            threadId, cursor, limit: HISTORY_PAGE_SIZE, sortDirection: 'desc', itemsView: requestedView,
           });
+          if (requestedView === 'summary' && (itemsView ?? this.host.requireRuntime(threadId).historyItemsView) === 'full') {
+            response = await this.client.request('thread/turns/list', { threadId, cursor, limit: HISTORY_PAGE_SIZE, sortDirection: 'desc', itemsView: 'full' });
+          }
           const turns = [...response.data].reverse();
           const newTurnIds = new Set(turns
             .map((turn) => turn.id)
@@ -275,7 +355,7 @@ export class CodexSurfaceConversationsController {
       historyCursor: null,
       historyHasOlder: true,
     });
-    await this.hydrateCompleteHistory(threadId, { restart: true });
+    await this.hydrateCompleteHistory(threadId, { restart: true, itemsView: 'full' });
   }
 
   private async requestConversations(
@@ -318,13 +398,13 @@ export class CodexSurfaceConversationsController {
     turns: readonly v2.Turn[],
     newTurnIds: ReadonlySet<string>,
   ): Promise<SurfaceMessage[]> {
-    const originalProjection = await this.originalImages?.prepare(threadId);
+    const originalProjection = this.host.runtime(threadId)?.historyItemsView !== 'summary' ? await this.originalImages?.prepare(threadId) : undefined;
     const current = this.host.runtime(threadId);
     if (!current) return [];
     const protectedTurnIds = new Set<string>();
     if (current.activeTurnId) protectedTurnIds.add(current.activeTurnId);
     for (const turn of turns) {
-      if (turn.status === 'inProgress' && current.turnIds.includes(turn.id)) protectedTurnIds.add(turn.id);
+      if ((turn.status === 'inProgress' || (turn.itemsView === 'summary' && current.turns.find(value => value.id === turn.id)?.itemsView !== 'summary')) && current.turnIds.includes(turn.id)) protectedTurnIds.add(turn.id);
     }
     const replaceableTurnIds = new Set(turns
       .filter((turn) => !protectedTurnIds.has(turn.id))
@@ -340,11 +420,13 @@ export class CodexSurfaceConversationsController {
       historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn)),
     );
     if (originalProjection) historyMessages = originalProjection(historyMessages);
+    else if (this.originalImages) historyMessages = suppressViewedImagePreviews(historyMessages);
     this.host.patchRuntime(threadId, {
       turnIds: [...historicalTurns.map((turn) => turn.id), ...preservedTurnIds],
       turns: [...historicalTurns.map((turn) => surfaceTurn(turn)), ...preservedTurns],
       messages: [...historyMessages, ...preservedMessages],
     });
+    if (current.historyItemsView === 'summary') this.hydrateOriginalImages(threadId);
     const turnCount = this.host.requireRuntime(threadId).turnIds.length;
     const state = this.host.getState();
     this.host.patch({
@@ -368,4 +450,17 @@ export class CodexSurfaceConversationsController {
 
 function yieldToRenderer(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Full-detail reads for one turn, independent of turn pagination. */
+export async function readTurnItems(client: CodexAppServerClient, threadId: string, turnId: string): Promise<v2.ThreadItem[]> {
+  const items = new Map<string, v2.ThreadItem>(); const cursors = new Set<string>(); let cursor: string | null = null;
+  do {
+    const page: v2.ThreadItemsListResponse = await client.request('thread/items/list', { threadId, turnId, cursor, limit: 100, sortDirection: 'asc' });
+    if (page.data.some(entry => entry.turnId !== turnId)) throw new Error('Turn details belong to another turn.');
+    for (const entry of page.data) items.set(entry.item.id, entry.item); cursor = page.nextCursor;
+    if (cursor && cursors.has(cursor)) throw new Error('Repeated turn detail cursor.');
+    if (cursor) cursors.add(cursor);
+  } while (cursor);
+  return [...items.values()];
 }

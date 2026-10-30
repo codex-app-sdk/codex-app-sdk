@@ -90,6 +90,43 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
+  it('loads summary Working details on expansion, retries failures, and keeps the loaded group cached', async () => {
+    const state = reactive<CodexConversationPaneState>({ identity: {
+      conversationKey: 'summary-thread', busy: false,
+      turns: [{ id: 'summary-turn', status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: 109_000, itemsView: 'summary' }],
+      messages: [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [{ type: 'text', text: 'Final answer', phase: 'final_answer' }] }],
+    } });
+    const loadTurnHistory = vi.fn();
+    const controller = createCodexConversationPaneController({ state, actions: { loadTurnHistory } });
+    const wrapper = mount(CodexConversationPane, { props: { controller } });
+    const header = () => wrapper.get('.chat-work-group__header');
+    expect(header().text()).toBe('Done · 1m 49s · View details');
+    expect(wrapper.text()).toContain('Final answer'); expect(loadTurnHistory).not.toHaveBeenCalled();
+    await header().trigger('click'); await flushPromises();
+    expect(loadTurnHistory).toHaveBeenCalledExactlyOnceWith('summary-turn');
+    const turn = state.identity.turns![0]!;
+    turn.detailsLoading = true; await nextTick();
+    expect(wrapper.get('[role="status"]').text()).toContain('Loading details');
+    turn.detailsLoading = false; turn.detailsError = 'Offline'; await nextTick();
+    expect(wrapper.get('.chat-work-group [role="alert"]').text()).toContain('Offline');
+    await wrapper.get('.chat-work-group [role="alert"] button').trigger('click');
+    expect(loadTurnHistory).toHaveBeenCalledTimes(2);
+    turn.itemsView = 'full'; turn.detailsError = null;
+    state.identity.messages = [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [
+      { type: 'text', text: 'Work details', phase: 'commentary' }, { type: 'text', text: 'Final answer', phase: 'final_answer' },
+    ] }];
+    await nextTick();
+    expect(header().attributes('aria-expanded')).toBe('true'); expect(wrapper.text()).toContain('Work details');
+    await header().trigger('click'); await header().trigger('click');
+    expect(loadTurnHistory).toHaveBeenCalledTimes(2);
+    state.identity.turns = [{ ...turn, id: 'empty-summary', itemsView: 'summary', durationMs: null }];
+    state.identity.messages = [{ id: 'empty-answer', role: 'assistant', status: 'complete', turnId: 'empty-summary', parts: [] }];
+    await nextTick();
+    expect(header().text()).toBe('Done · View details');
+    expect(wrapper.find('.chat-message__empty-response').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it.each(
     ['Tab', 'ArrowRight', ' '].flatMap(key => ['props', 'controller'].map(mode => ({ key, mode }))),
   )('accepts a changing custom placeholder with $key through $mode without submitting', async ({ key, mode }) => {
@@ -1226,12 +1263,14 @@ describe('CodexConversationPane', () => {
     expect(wrapper.find('[aria-label="Prompt attachments"]').exists()).toBe(false);
   });
 
-  it('routes older-history requests through legacy, controller, and surface ownership', async () => {
+  it('routes page and turn-history requests through legacy, controller, and surface ownership', async () => {
     const legacy = mount(CodexConversationPane, {
       props: { hasOlderHistory: true, messages, modelValue: '' },
     });
     legacy.findComponent(CodexMessageList).vm.$emit('load-older-messages');
     expect(legacy.emitted('loadOlderHistory')).toStrictEqual([[]]);
+    legacy.findComponent(CodexMessageList).vm.$emit('load-turn-history', 'turn-1');
+    expect(legacy.emitted('loadTurnHistory')).toStrictEqual([['turn-1']]);
 
     const keyedLegacy = mount(CodexConversationPane, {
       props: { conversationKey: 'legacy-key-without-surface', hasOlderHistory: true, messages },
@@ -1265,6 +1304,10 @@ describe('CodexConversationPane', () => {
     await flushPromises();
     expect(surface.loadOlderConversationHistory).toHaveBeenCalledWith('42');
     expect(bound.emitted('loadOlderHistory')).toBeUndefined();
+    bound.findComponent(CodexMessageList).vm.$emit('load-turn-history', 'turn-2');
+    await flushPromises();
+    expect(surface.loadTurnHistory).toHaveBeenCalledExactlyOnceWith('turn-2', '42');
+    expect(bound.emitted('loadTurnHistory')).toBeUndefined();
   });
 
   it('keeps controller-owned older-history requests inside controller mode without an action', () => {
@@ -1280,6 +1323,8 @@ describe('CodexConversationPane', () => {
     wrapper.findComponent(CodexMessageList).vm.$emit('load-older-messages');
 
     expect(wrapper.emitted('loadOlderHistory')).toBeUndefined();
+    wrapper.findComponent(CodexMessageList).vm.$emit('load-turn-history', 'turn-1');
+    expect(wrapper.emitted('loadTurnHistory')).toBeUndefined();
   });
 
   it('owns native attachment picking, previews, removal, and typed submit options', async () => {
@@ -4178,6 +4223,7 @@ function fakeSurfaceController(): CodexSurfaceController & { state: CodexSurface
     interrupt: action,
     listConversations: vi.fn(async () => []),
     loadOlderConversationHistory: action,
+    loadTurnHistory: vi.fn(async () => snapshot()),
     readConversationHistory: vi.fn(async () => ({
       conversationId: 'thread-bound', messages: [], threadStatus: null,
     })),

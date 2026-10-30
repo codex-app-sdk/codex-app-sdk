@@ -48,6 +48,7 @@ const templates: Record<string, string> = {
   'chat.work.stoppedHideDetailsFor': 'Stopped · {duration} · Hide details',
   'chat.work.stoppedViewDetails': 'Stopped · View details',
   'chat.work.stoppedViewDetailsFor': 'Stopped · {duration} · View details',
+  'chat.work.loadingDetails': 'Loading details…',
   'chat.work.working': 'Working',
   'chat.work.workingFor': 'Working · {duration}',
   'chat.skills.empty': 'No matching skills',

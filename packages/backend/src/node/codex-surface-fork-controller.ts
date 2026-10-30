@@ -1,3 +1,5 @@
+import { readTurnItems } from './codex-surface-conversations-controller';
+import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
@@ -38,6 +40,7 @@ export type CodexSurfaceForkHost = {
   emitConversationSettings(threadId: string): void;
   emitConversationSkills(threadId: string): void;
   emitHistoryReplaced(threadId: string): void;
+  hydrateOriginalImages?(threadId: string, path?: string | null): void;
   emitSummaryUpserted(summary: CodexConversationSummary): void;
   getState(): CodexSurfaceSnapshot;
   hydrateCompleteHistory(threadId: string): Promise<void>;
@@ -59,6 +62,7 @@ export class CodexSurfaceForkController {
     private readonly catalog: CodexSurfaceCatalogController,
     private readonly extensions: CodexSurfaceExtensionsController,
     private readonly host: CodexSurfaceForkHost,
+    private readonly originalImages?: CodexOriginalHistoryImages,
   ) {}
 
   async fork(
@@ -128,29 +132,35 @@ export class CodexSurfaceForkController {
       });
     }
 
+    const historyItemsView = hostOptions.historyItemsView ?? sourceRuntime.historyItemsView ?? 'full';
     const [initialPage, goal] = await Promise.all([
       this.client.request('thread/turns/list', {
         threadId: response.thread.id,
         cursor: null,
         limit: FORK_HISTORY_PAGE_SIZE,
         sortDirection: 'desc',
-        itemsView: 'full',
+        itemsView: historyItemsView,
       }),
       this.client.request('thread/goal/get', { threadId: response.thread.id })
         .then((result) => result.goal)
         .catch(() => null),
     ]);
-    const turns = [...initialPage.data].reverse();
+    const turns = await Promise.all([...initialPage.data].reverse().map(async turn =>
+      turn.status === 'inProgress' && (turn.itemsView === 'summary' || turn.itemsView === 'notLoaded')
+        ? { ...turn, items: await readTurnItems(this.client, response.thread.id, turn.id), itemsView: 'full' as const } : turn));
+    const originalProjection = historyItemsView === 'full' ? await this.originalImages?.prepare(response.thread.id, response.thread.path) : undefined;
     const runningTurnId = activeTurnId(turns);
     const historyMessages = codexThreadToSurfaceMessages({ ...response.thread, turns });
-    const messages = runningTurnId
+    let messages = runningTurnId
       ? ensureAssistantTurnMessage(historyMessages, response.thread.id, runningTurnId)
       : historyMessages;
+    if (originalProjection) messages = originalProjection(messages);
     const effectiveLoadingStrategy = hostOptions.loadingStrategy ?? this.loadingStrategy ?? 'lazy';
     const runtime = this.host.createRuntime(response.thread.id, {
       hydrated: true,
       historyMode: response.thread.historyMode ?? 'legacy',
       loadingStrategy: effectiveLoadingStrategy,
+      historyItemsView,
       historyCursor: initialPage.nextCursor,
       historyHasOlder: initialPage.nextCursor !== null,
       historyLoadingOlder: false,
@@ -174,6 +184,7 @@ export class CodexSurfaceForkController {
       ...hostOptions,
       ...(runtime.cwd ? { cwd: runtime.cwd } : {}),
       loadingStrategy: effectiveLoadingStrategy,
+      historyItemsView,
       mcpServers,
     });
     const summary = { ...threadToSummary(response.thread), turnCount: turns.length };
@@ -186,6 +197,7 @@ export class CodexSurfaceForkController {
     this.host.emitConversationSettings(response.thread.id);
     this.host.emitConversationSkills(response.thread.id);
     this.host.emitConversationPermissions(response.thread.id);
+    if (historyItemsView === 'summary') this.host.hydrateOriginalImages?.(response.thread.id, response.thread.path);
     if (effectiveLoadingStrategy === 'eager' && initialPage.nextCursor !== null) {
       void this.host.hydrateCompleteHistory(response.thread.id).catch(() => undefined);
     }

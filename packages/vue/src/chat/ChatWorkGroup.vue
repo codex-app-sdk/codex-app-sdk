@@ -24,7 +24,12 @@
 
     <ChatFoldTransition v-if="showHeader" :open="expanded">
       <div class="chat-work-group__body">
-        <slot />
+        <p v-if="assistantWorkTurn?.detailsLoading?.value" role="status">{{ t('chat.work.loadingDetails') }}</p>
+        <div v-else-if="assistantWorkTurn?.detailsError?.value" role="alert">
+          {{ assistantWorkTurn.detailsError.value }}
+          <button type="button" @click="assistantWorkTurn.reloadDetails?.()">{{ t('chat.actions.retry') }}</button>
+        </div>
+        <slot v-else />
       </div>
     </ChatFoldTransition>
     <div v-else class="chat-work-group__body chat-work-group__body--continuation">

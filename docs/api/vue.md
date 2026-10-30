@@ -593,6 +593,14 @@ combinations are valid:
 - `renderStrategy="lazy"` mounts only the visible message batch;
 - `renderStrategy="eager"` mounts every supplied message.
 
+Set `historyItemsView: 'summary'` on the Node surface for summary-first history.
+The pane shows `Done · duration · View details` before each completed answer
+(duration is omitted when unavailable). Expanding requests that turn's Working
+details, displays loading/retry state, and caches successful reads. Surface-bound
+panes wire this automatically. Controlled hosts forward `turns` through identity
+state and implement `controller.actions.loadTurnHistory(turnId)`; event-driven
+hosts handle `loadTurnHistory(turnId)`. Active turns retain full streaming work.
+
 The pane exposes `hasOlderHistory` and `loadingOlderHistory` for hosts that own
 the page request, and emits `loadOlderHistory` one viewport before the top of
 the list needs another page. Returning to the bottom collapses lazy rendering

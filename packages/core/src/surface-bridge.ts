@@ -73,6 +73,7 @@ type CodexConversationBridgeOperationFunctions = {
   getSnapshot(): Awaitable<CodexConversationSnapshot>;
   interrupt(): Awaitable<CodexConversationSnapshot>;
   loadOlderConversationHistory(): Awaitable<CodexConversationHistoryPage>;
+  loadTurnHistory(turnId: string): Awaitable<CodexConversationSnapshot>;
   readConversationHistory(): Awaitable<CodexConversationHistory>;
   readConversationPromptHistory(): Awaitable<CodexConversationPromptHistory>;
   renameConversation(title: string): Awaitable<CodexConversationSnapshot>;
@@ -94,7 +95,7 @@ type CodexConversationBridgeOperationFunctions = {
 
 export const codexConversationBridgeOperations = [
   'clearGoal', 'compactConversation', 'continueInterruptedTurn', 'deleteTurn', 'deleteQueuedPrompt', 'editTurn',
-  'forkTurn', 'getSnapshot', 'interrupt', 'loadOlderConversationHistory',
+  'forkTurn', 'getSnapshot', 'interrupt', 'loadOlderConversationHistory', 'loadTurnHistory',
   'readConversationHistory', 'readConversationPromptHistory', 'renameConversation',
   'respondToClientRequest', 'resolveApproval', 'retryTurn', 'sendMessage', 'setGoal',
   'startReview', 'steerMessage', 'steerQueuedPrompt', 'updateConversationSettings',
@@ -118,6 +119,7 @@ export type CodexConversationBridgeHandle = {
   getSnapshot(): CodexConversationSnapshot;
   interrupt(): Awaitable<CodexConversationSnapshot>;
   loadOlderHistory(): Awaitable<CodexConversationHistoryPage>;
+  loadTurnHistory?(turnId: string): Awaitable<CodexConversationSnapshot>;
   onEvent(listener: (event: CodexConversationEvent) => void): () => void;
   onStateChange(listener: (snapshot: CodexConversationSnapshot) => void): () => void;
   readHistory(): Awaitable<CodexConversationHistory>;
@@ -249,7 +251,7 @@ export const codexSurfaceBridgeOperations = [
   'archiveConversation', 'cancelLogin', 'clearGoal', 'compactConversation', 'connect',
   'continueInterruptedTurn', 'createConversation', 'deleteConversation', 'deleteTurn', 'deleteQueuedPrompt',
   'editTurn', 'forkTurn', 'getSnapshot', 'interrupt', 'listConversations',
-  'listModels', 'loadOlderConversationHistory', 'logout', 'readConversationHistory',
+  'listModels', 'loadOlderConversationHistory', 'loadTurnHistory', 'logout', 'readConversationHistory',
   'readConversationPromptHistory', 'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
   'resolveApproval', 'retryTurn', 'selectConversation', 'sendMessage', 'setGoal',
   'startChatGptDeviceCodeLogin', 'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
@@ -269,7 +271,7 @@ export const codexSurfaceBridgeArities: Readonly<
   compactConversation: [0, 0], connect: [0, 0], continueInterruptedTurn: [0, 0], createConversation: [0, 1],
   deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
   editTurn: [2, 3], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
-  listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1],
+  listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1], loadTurnHistory: [1, 2],
   logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
   refreshAccount: [0, 0],
   readRateLimits: [0, 1],
@@ -288,7 +290,7 @@ const conversationArities: Readonly<
 > = {
   clearGoal: [0, 0], compactConversation: [0, 0], continueInterruptedTurn: [0, 0], deleteTurn: [1, 1],
   deleteQueuedPrompt: [1, 1], editTurn: [2, 3], forkTurn: [1, 1], getSnapshot: [0, 0],
-  interrupt: [0, 0], loadOlderConversationHistory: [0, 0], readConversationHistory: [0, 0],
+  interrupt: [0, 0], loadOlderConversationHistory: [0, 0], loadTurnHistory: [1, 1], readConversationHistory: [0, 0],
   readConversationPromptHistory: [0, 0], renameConversation: [1, 1], respondToClientRequest: [1, 1],
   resolveApproval: [2, 3], retryTurn: [1, 1], sendMessage: [1, 2], setGoal: [1, 2],
   startReview: [0, 1], steerMessage: [1, 2], steerQueuedPrompt: [1, 3],
@@ -325,6 +327,7 @@ function conversationOperationTarget(conversation: CodexConversationBridgeHandle
     getSnapshot: () => conversation.getSnapshot(),
     interrupt: () => conversation.interrupt(),
     loadOlderConversationHistory: () => conversation.loadOlderHistory(),
+    loadTurnHistory: (turnId) => conversation.loadTurnHistory?.(turnId) ?? Promise.reject(new Error('Turn history is unavailable.')),
     readConversationHistory: () => conversation.readHistory(),
     readConversationPromptHistory: () => conversation.readPromptHistory(),
     renameConversation: (title) => conversation.rename(title),
@@ -369,6 +372,10 @@ async function invokeValidated(
     case 'interrupt': return target.interrupt();
     case 'listConversations': return target.listConversations(listConversationOptions(args[0]));
     case 'listModels': return target.listModels(listModelOptions(args[0]));
+    case 'loadTurnHistory': {
+      if (!target.loadTurnHistory) throw new Error('Turn history is unavailable.');
+      return target.loadTurnHistory(nonEmptyString(args[0], 'Turn id'), optionalString(args[1], 'Conversation id'));
+    }
     case 'loadOlderConversationHistory': return target.loadOlderConversationHistory(optionalString(args[0], 'Conversation id'));
     case 'logout': return target.logout();
     case 'readConversationHistory': return target.readConversationHistory(optionalString(args[0], 'Conversation id'));

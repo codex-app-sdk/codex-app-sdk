@@ -226,6 +226,7 @@ the older resume response.
 ```ts
 type CodexConversationHistoryState = {
   loadingStrategy: 'eager' | 'lazy';
+  itemsView?: 'full' | 'summary';
   hasOlder: boolean;
   loadingOlder: boolean;
   fullyLoaded: boolean;
@@ -233,8 +234,15 @@ type CodexConversationHistoryState = {
 ```
 
 `CodexConversationHistoryPage` contains `conversationId`, newly materialized
-`messages`, and `hasOlder`. Loading state and Vue rendering strategy are
-independent; see [History and performance](/guide/history).
+`messages`, and `hasOlder`. `itemsView` is the persistent page detail policy;
+omission means `full`. `fullyLoaded` describes turn pagination, not whether
+every turn's Working details have been fetched.
+
+`CodexSurfaceTurn` adds optional `itemsView`, `detailsLoading`, and `detailsError`
+fields. A summary turn retains its prompt/final answer and timing while its
+Working items are absent. `loadTurnHistory(turnId)` replaces that turn's history
+with full detail; completed reads remain cached. Loading, detail, and Vue
+rendering policies are independent; see [History and performance](/guide/history).
 
 ## Input contracts
 

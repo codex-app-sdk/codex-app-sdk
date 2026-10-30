@@ -236,6 +236,9 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
   }
 
   flushAssistantMessage();
+  if ((turn.itemsView === 'summary' || turn.itemsView === 'notLoaded') && !messages.some(m => m.role === 'assistant')) {
+    messages.push({ id: `assistant-${turn.id}`, role: 'assistant', status: surfaceMessageStatus(turn.status), turnId: turn.id, parts: [], createdAt, metadata: { conversationId: threadId, turnId: turn.id } });
+  }
   return turn.status === 'inProgress'
     ? messages
     : finalizeTurnToolParts(messages, turn.id, turn.status);

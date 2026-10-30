@@ -624,6 +624,7 @@ function setupLifecycle(options: Record<string, unknown> = {}) {
     threadStartSettings: vi.fn(() => ({ approvalPolicy: 'on-request' })),
   };
   const conversations = {
+    loadLoadedTurnHistory: vi.fn(async () => undefined),
     hydrateCompleteHistory: vi.fn(async () => undefined),
     refreshCompleteHistory: vi.fn(async () => undefined),
   };

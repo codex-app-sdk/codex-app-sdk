@@ -643,6 +643,7 @@ function createController(options: SetupOptions = {}) {
     return {};
   });
   const host = {
+    emitHistoryReplaced: vi.fn(),
     emitHistoryPrepended: vi.fn(),
     emitSummaryUpserted: vi.fn(),
     ensureConnected: vi.fn(async () => undefined),

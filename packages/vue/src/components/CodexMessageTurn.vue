@@ -28,12 +28,16 @@ const props = defineProps<{
   active?: boolean
   answeredClientRequestIds?: ReadonlySet<string>
   durationMs?: number | null
+  itemsView?: 'summary' | 'full'
+  detailsLoading?: boolean
+  detailsError?: string | null
   entries: readonly TurnEntry[]
   showToolBlocks: boolean
   startedAt?: string | null
   status?: CodexSurfaceTurnStatus
   turnId?: string
 }>()
+const emit = defineEmits<{ loadTurnHistory: [turnId: string] }>()
 // Stryker restore all
 
 const messages = computed(() => props.entries.map((entry) => ({
@@ -86,7 +90,7 @@ const completedWithoutFinal = computed(() => (
   && (status.value === undefined || status.value === 'completed')
 ))
 const headerMessageIndex = computed(() => messages.value.find(({ message }) => (
-  message.role === 'assistant' && shouldGroupMessageWork(message)
+  message.role === 'assistant' && (props.itemsView !== undefined || shouldGroupMessageWork(message))
 ))?.entry.index)
 const enabled = computed(() => Boolean(turnId.value && headerMessageIndex.value !== undefined))
 const expanded = ref((active.value && !finalStarted.value) || stoppedWithoutFinal.value)
@@ -111,6 +115,10 @@ provide(assistantWorkTurnKey, {
   phased,
   startedAt,
   durationMs,
+  itemsView: computed(() => props.itemsView),
+  detailsLoading: computed(() => props.detailsLoading),
+  detailsError: computed(() => props.detailsError),
+  reloadDetails: () => { if (props.turnId) emit('loadTurnHistory', props.turnId) },
   status,
   turnId,
   toggle() {
@@ -118,6 +126,10 @@ provide(assistantWorkTurnKey, {
     expanded.value = !expanded.value
   },
 })
+
+watch([expanded, () => props.itemsView, () => props.detailsLoading, () => props.detailsError], () => {
+  if (expanded.value && props.itemsView === 'summary' && !props.detailsLoading && !props.detailsError && props.turnId) emit('loadTurnHistory', props.turnId)
+}, { immediate: true })
 
 function shouldGroupMessageWork(message: Message): boolean {
   const blocks = computeMessageBlocks(message).filter((block) => (

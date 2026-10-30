@@ -104,7 +104,7 @@ describe('Codex conversation bridge', () => {
     const forkSnapshot = { activeConversationId: 'conversation-fork' } as CodexConversationSnapshot;
     const operations = Object.fromEntries([
       'clearGoal', 'compact', 'continueInterruptedTurn', 'deleteTurn', 'deleteQueuedPrompt', 'editTurn', 'getSnapshot',
-      'interrupt', 'loadOlderHistory', 'onEvent', 'onStateChange', 'readHistory', 'readPromptHistory',
+      'interrupt', 'loadOlderHistory', 'loadTurnHistory', 'onEvent', 'onStateChange', 'readHistory', 'readPromptHistory',
       'rename', 'respondToClientRequest', 'resolveApproval', 'retryTurn', 'sendMessage', 'setGoal',
       'startReview', 'steerMessage', 'steerQueuedPrompt', 'updateQueuedPrompt', 'updateSettings',
     ].map((name) => [name, vi.fn(async () => snapshot)])) as Record<string, ReturnType<typeof vi.fn>>;
@@ -125,6 +125,7 @@ describe('Codex conversation bridge', () => {
       ['getSnapshot', [], 'getSnapshot', []],
       ['interrupt', [], 'interrupt', []],
       ['loadOlderConversationHistory', [], 'loadOlderHistory', []],
+      ['loadTurnHistory', ['turn-1'], 'loadTurnHistory', ['turn-1']],
       ['readConversationHistory', [], 'readHistory', []],
       ['readConversationPromptHistory', [], 'readPromptHistory', []],
       ['renameConversation', ['New title'], 'rename', ['New title']],

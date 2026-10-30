@@ -102,6 +102,7 @@ describe('Codex surface Electron bridge', () => {
       listConversations: vi.fn(async () => []),
       listModels: vi.fn(async () => []),
       loadOlderConversationHistory: vi.fn(async () => history),
+      loadTurnHistory: vi.fn(async () => ({ ...snapshot, activeConversationId: 'thread-2', turnIds: ['turn-details'] })),
       logout: vi.fn(async () => snapshot),
       readConversationHistory: vi.fn(async () => history),
       readConversationPromptHistory: vi.fn(async () => promptHistory),
@@ -155,6 +156,8 @@ describe('Codex surface Electron bridge', () => {
       invoke: (channel, ...args) => main.call(channel, ...args),
       on() {}, off() {},
     });
+    await expect(liveApi.loadTurnHistory!('turn-details', 'thread-2')).resolves.toMatchObject({ activeConversationId: 'thread-2', turnIds: ['turn-details'] });
+    expect(surface.loadTurnHistory).toHaveBeenCalledWith('turn-details', 'thread-2');
     await expect(liveApi.startLiveChat!('thread-voice', { sdp: 'offer', version: 'v3' })).resolves.toEqual({ sdp: 'remote-answer' });
     expect(surface.startLiveChat).toHaveBeenCalledWith('thread-voice', { sdp: 'offer', version: 'v3' });
     await liveApi.stopLiveChat!('thread-voice');
@@ -198,6 +201,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:list-conversations',
       'codex-surface:list-models',
       'codex-surface:load-older-conversation-history',
+      'codex-surface:load-turn-history',
       'codex-surface:logout',
       'codex-surface:read-account-usage',
       'codex-surface:read-conversation-history',
@@ -637,6 +641,7 @@ describe('Codex surface Electron bridge', () => {
     await api.readConversationHistory('thread-2');
     await api.readConversationPromptHistory('thread-2');
     await api.loadOlderConversationHistory?.('thread-2');
+    await api.loadTurnHistory?.('turn-details', 'thread-2');
     await api.listConversations({ cwd: '/tmp/project', limit: 10 });
     await api.listModels({ includeHidden: true, forceReload: true });
     await api.logout();
@@ -681,6 +686,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:read-conversation-history', 'thread-2'],
       ['codex-surface:read-conversation-prompt-history', 'thread-2'],
       ['codex-surface:load-older-conversation-history', 'thread-2'],
+      ['codex-surface:load-turn-history', 'turn-details', 'thread-2'],
       ['codex-surface:list-conversations', { cwd: '/tmp/project', limit: 10 }],
       ['codex-surface:list-models', { includeHidden: true, forceReload: true }],
       ['codex-surface:logout'],

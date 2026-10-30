@@ -86,6 +86,8 @@ export type CodexConversationDefaults = Pick<
 export type CodexConversationLoadOptions = CodexConversationHostOptions & {
   cwd?: string;
   loadingStrategy?: CodexConversationLoadingStrategy;
+  /** Detail fetched for history pages; independent of turn pagination. Defaults to full. */
+  historyItemsView?: 'full' | 'summary';
 };
 
 /** Trusted thread-start overrides applied to a fork. Omitted values inherit from the source thread. */
@@ -149,6 +151,7 @@ export type CodexConversation = {
   /** Read current inline or original-history image/diff content in bounded chunks. Main-process only. */
   readContent(contentId: string, offset: number): Promise<{ data: string; totalBytes: number; nextOffset: number | null }>;
   loadOlderHistory(): Promise<CodexConversationHistoryPage>;
+  loadTurnHistory(turnId: string): Promise<CodexConversationSnapshot>;
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
@@ -204,6 +207,8 @@ export type CodexSurfaceOptions = {
   conversationLimit?: number;
   /** Default history loading strategy for resumed conversations. */
   loadingStrategy?: CodexConversationLoadingStrategy;
+  /** Detail fetched for history pages; independent of turn pagination. Defaults to full. */
+  historyItemsView?: 'full' | 'summary';
   /** Trusted main-process CODEX_HOME for the app-server. Never expose this through renderer IPC. */
   codexHome?: string;
   cwd?: string;

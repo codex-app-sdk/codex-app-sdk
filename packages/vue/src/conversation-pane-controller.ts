@@ -147,6 +147,7 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   forkTurn?: PaneAction<[turnId: string]>;
   interrupt?: PaneAction;
   loadOlderHistory?: PaneAction;
+  loadTurnHistory?: PaneAction<[turnId: string]>;
   menuSelect?: PaneAction<[item: CodexComposerMenuSelectableItem<Payload>]>;
   mentionSelect?: PaneAction<[item: CodexComposerMentionItem<Payload>, group: CodexComposerMentionGroup<Payload>]>;
   openImage?: CodexMessageImageOpenHandler;

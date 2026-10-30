@@ -40,6 +40,7 @@ export function surfaceTurnError(error: v2.TurnError | null): CodexSurfaceTurnEr
 export function surfaceTurn(turn: v2.Turn, willRetry = false): CodexSurfaceTurn {
   return {
     id: turn.id,
+    ...(turn.itemsView === 'summary' || turn.itemsView === 'notLoaded' ? { itemsView: 'summary' as const } : {}),
     status: turn.status,
     error: surfaceTurnError(turn.error),
     willRetry,

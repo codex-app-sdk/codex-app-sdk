@@ -62,6 +62,7 @@
         @edit-turn="editTurn"
         @fork-turn="forkTurn"
         @load-older-messages="loadOlderHistory"
+        @load-turn-history="loadTurnHistory"
         @message-text-selection-change="emit('messageTextSelectionChange', $event)"
         @open-link="handleConversationLink"
         @open-visualization="handleVisualization"
@@ -529,6 +530,7 @@ const emit = defineEmits<{
   editTurn: [payload: { content: string; turnId: string; options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions }];
   forkTurn: [turnId: string];
   loadOlderHistory: [];
+  loadTurnHistory: [turnId: string];
   error: [message: string | null];
   interrupt: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
@@ -1237,6 +1239,16 @@ function clearPendingControlledSubmission(messageId: string | null): void {
   if (messageId && pendingControlledSubmission.value?.message.id === messageId) {
     pendingControlledSubmission.value = null;
   }
+}
+
+function loadTurnHistory(turnId: string): void {
+  if (dispatchControllerAction('loadTurnHistory', turnId)) return;
+  if (effectiveController.value) return;
+  if (props.surface?.loadTurnHistory && effectiveConversationKey.value) {
+    void runSurfaceAction(() => props.surface!.loadTurnHistory!(turnId, String(effectiveConversationKey.value)));
+    return;
+  }
+  emit('loadTurnHistory', turnId);
 }
 
 function loadOlderHistory(): void {

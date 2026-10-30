@@ -40,6 +40,7 @@ export type ThreadRuntimeState = {
   historyLoading: boolean;
   historyMode: ThreadHistoryMode;
   loadingStrategy: CodexConversationLoadingStrategy;
+  historyItemsView: 'full' | 'summary';
   historyCursor: string | null;
   historyHasOlder: boolean;
   historyLoadingOlder: boolean;
@@ -133,6 +134,7 @@ export function createThreadRuntime(
     historyLoading: false,
     historyMode: 'legacy',
     loadingStrategy: state.historyState?.loadingStrategy ?? 'lazy',
+    historyItemsView: 'full',
     historyCursor: null,
     historyHasOlder: false,
     historyLoadingOlder: false,
@@ -213,6 +215,7 @@ export function runtimeProjection(
     historyLoading: runtime.historyLoading,
     historyState: {
       loadingStrategy: runtime.loadingStrategy,
+      ...(runtime.historyItemsView === 'summary' ? { itemsView: 'summary' as const } : {}),
       hasOlder: runtime.historyHasOlder,
       loadingOlder: runtime.historyLoadingOlder,
       fullyLoaded: runtime.fullHistoryHydrated,

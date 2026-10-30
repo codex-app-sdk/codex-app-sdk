@@ -118,3 +118,28 @@ it('bounds original-history scans and skips malformed, orphaned, and foreign-tur
     expect(surface.getSnapshot().messages.flatMap(m => m.parts)).toContainEqual(expect.objectContaining({ type: 'tool', id: 'view' }));
   } finally { await surface.close(); }
 });
+
+it('publishes summary answers and expanded text before original-image indexing completes', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'codex-summary-images-')); directories.push(directory);
+  const path = join(directory, 'rollout.jsonl'); await writeFile(path, records('thread-existing', [image(1)]));
+  const probe = await open(path, 'r'); const prototype = Object.getPrototypeOf(probe), originalRead = prototype.read; await probe.close();
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  const reads = vi.spyOn(prototype, 'read').mockImplementationOnce(async function (this: unknown, ...args: unknown[]) { await gate; return Reflect.apply(originalRead, this, args); });
+  const summary = { ...turn('turn-images', 'completed', [{ type: 'agentMessage' as const, id: 'final', text: 'Summary answer', phase: 'final_answer' as const, memoryCitation: null, delivery: null, questions: null }]), itemsView: 'summary' as const };
+  const transport = new MockCodexAppServer({ 'thread/resume': () => resumeResponse({ ...thread('thread-existing', false), path, turns: [summary] }),
+    'thread/items/list': () => ({ data: summary.items.map(item => ({ turnId: summary.id, item, startedAtMs: null, completedAtMs: null })), nextCursor: null, backwardsCursor: null }),
+  });
+  const surface = new CodexSurface({ client: new CodexAppServerClient(transport), originalHistoryImages: true, historyItemsView: 'summary' });
+  try {
+    let ready = false; const connecting = surface.connect().then(() => { ready = true; });
+    await vi.waitFor(() => expect(ready).toBe(true)); await connecting;
+    expect(reads).not.toHaveBeenCalled();
+    expect(surface.getSnapshot().messages.flatMap(m => m.parts)).toEqual([{ type: 'text', text: 'Summary answer', phase: 'final_answer', itemId: 'final' }]);
+    await surface.conversation('thread-existing').loadTurnHistory(summary.id);
+    await vi.waitFor(() => expect(reads).toHaveBeenCalled());
+    expect(surface.getSnapshot().messages.flatMap(m => m.parts).filter(p => p.type === 'media')).toHaveLength(0);
+    release();
+    await vi.waitFor(() => expect(surface.getSnapshot().messages.flatMap(m => m.parts).filter(p => p.type === 'media')).toHaveLength(1));
+    expect(surface.getSnapshot().turns[0]?.itemsView).toBe('full');
+  } finally { release(); await surface.close(); }
+});

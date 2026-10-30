@@ -47,6 +47,7 @@ export type CodexConversationHandleOperations = {
   readContent?: CodexConversation['readContent'];
   readPromptHistory(): Promise<CodexConversationPromptHistory>;
   loadOlderHistory?: () => Promise<CodexConversationHistoryPage>;
+  loadTurnHistory?: (turnId: string) => Promise<void>;
   rename(title: string): Promise<void>;
   resolveApproval(
     approvalId: string,
@@ -82,6 +83,7 @@ export function createCodexConversationHandle(
     readHistory: operations.readHistory,
     readContent: operations.readContent ?? (async () => { throw new Error('Content reads are unavailable.'); }),
     readPromptHistory: operations.readPromptHistory,
+    loadTurnHistory: (turnId) => snapshotAfter(() => operations.loadTurnHistory?.(turnId) ?? Promise.reject(new Error('Turn history is unavailable.'))),
     loadOlderHistory: operations.loadOlderHistory ?? (
       async () => ({ conversationId: id, messages: [], hasOlder: false })
     ),

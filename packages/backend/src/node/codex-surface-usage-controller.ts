@@ -43,7 +43,7 @@ export class CodexSurfaceUsageController {
   observe(origin: CodexSurfaceEventOrigin, input: EventInput): EventInput {
     if (!('conversationId' in input)) return input;
     const id = input.conversationId;
-    if (input.type === 'conversation.historyReplaced' || input.type === 'conversation.summaryRemoved') {
+    if ((input.type === 'conversation.historyReplaced' && input.payload.reason !== 'details' && input.payload.reason !== 'images') || input.type === 'conversation.summaryRemoved') {
       this.threads.delete(id);
       return input;
     }

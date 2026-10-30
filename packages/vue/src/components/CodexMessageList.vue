@@ -26,6 +26,10 @@
           :started-at="group.turnId ? turnTimingById.get(group.turnId)?.startedAt : undefined"
           :duration-ms="group.turnId ? turnTimingById.get(group.turnId)?.durationMs : undefined"
           :turn-id="group.turnId"
+          :items-view="group.turnId ? turnById.get(group.turnId)?.itemsView : undefined"
+          :details-loading="group.turnId ? turnById.get(group.turnId)?.detailsLoading : undefined"
+          :details-error="group.turnId ? turnById.get(group.turnId)?.detailsError : undefined"
+          @load-turn-history="emit('load-turn-history', $event)"
         >
           <template v-for="entry in group.entries" :key="entry.key">
             <div
@@ -199,6 +203,7 @@ const emit = defineEmits<{
   'edit-turn': [payload: { content: string; turnId: string; options?: import('@codex-app-sdk/core/surface').CodexRendererSendMessageOptions }]
   'fork-turn': [turnId: string]
   'load-older-messages': []
+  'load-turn-history': [turnId: string]
   'message-text-selection-change': [selection: CodexMessageTextSelection | null]
   'open-link': [link: CodexConversationLink]
   'open-visualization': [visualization: CodexConversationVisualization]
@@ -381,6 +386,7 @@ const inferredActiveTurnId = computed(() => {
     : undefined
   return streamingTurnId || null
 })
+const turnById = computed(() => new Map(props.turns?.map(turn => [turn.id, turn]) ?? []))
 const turnStatusById = computed(() => new Map(
   props.turns?.map((turn) => [turn.id, turn.status] as const) ?? [],
 ))

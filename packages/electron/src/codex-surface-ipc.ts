@@ -72,6 +72,7 @@ const channels = {
   readConversationHistory: 'codex-surface:read-conversation-history',
   readConversationPromptHistory: 'codex-surface:read-conversation-prompt-history',
   loadOlderConversationHistory: 'codex-surface:load-older-conversation-history',
+  loadTurnHistory: 'codex-surface:load-turn-history',
   refreshAccount: 'codex-surface:refresh-account',
   readRateLimits: 'codex-surface:read-rate-limits',
   readAccountUsage: 'codex-surface:read-account-usage',
@@ -125,6 +126,7 @@ type SurfaceRequests = {
     conversationId?: string,
   ], CodexConversationPromptHistory>;
   [channels.loadOlderConversationHistory]: IpcRequest<[conversationId?: string], import('@codex-app-sdk/core/surface').CodexConversationHistoryPage>;
+  [channels.loadTurnHistory]: IpcRequest<[turnId: string, conversationId?: string], import('@codex-app-sdk/core/surface').CodexConversationSnapshot>;
   [channels.refreshAccount]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.readRateLimits]: IpcRequest<[options?: ReadCodexRateLimitsOptions], CodexSurfaceRateLimits>;
   [channels.consumeRateLimitResetCredit]: IpcRequest<[options: ConsumeCodexRateLimitResetCreditOptions], CodexSurfaceRateLimitResetCreditResult>;
@@ -164,7 +166,7 @@ type SurfaceEvents = {
 
 export type { CodexSurfaceRendererApi } from '@codex-app-sdk/core/surface';
 
-type OptionalSurfaceOperation = 'loadOlderConversationHistory' | 'startLiveChat' | 'stopLiveChat';
+type OptionalSurfaceOperation = 'loadOlderConversationHistory' | 'loadTurnHistory' | 'startLiveChat' | 'stopLiveChat';
 
 export function registerCodexSurfaceIpc(
   port: IpcMainPort,
@@ -224,6 +226,7 @@ export function registerCodexSurfaceIpc(
     [channels.readConversationHistory]: (_event, ...args) => invoke('readConversationHistory', args),
     [channels.readConversationPromptHistory]: (_event, ...args) => invoke('readConversationPromptHistory', args),
     [channels.loadOlderConversationHistory]: (_event, ...args) => invoke('loadOlderConversationHistory', args),
+    [channels.loadTurnHistory]: (_event, ...args) => invoke('loadTurnHistory', args),
     [channels.refreshAccount]: (_event, ...args) => invoke('refreshAccount', args),
     [channels.readRateLimits]: (_event, ...args) => invoke('readRateLimits', args),
     [channels.consumeRateLimitResetCredit]: (_event, ...args) => invoke('consumeRateLimitResetCredit', args),
@@ -308,6 +311,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
       renderer.invoke(channels.readConversationPromptHistory, conversationId)
     ),
     loadOlderConversationHistory: (conversationId) => renderer.invoke(channels.loadOlderConversationHistory, conversationId),
+    loadTurnHistory: (turnId, conversationId) => renderer.invoke(channels.loadTurnHistory, turnId, conversationId),
     refreshAccount: () => renderer.invoke(channels.refreshAccount),
     readRateLimits: (options) => renderer.invoke(channels.readRateLimits, options),
     consumeRateLimitResetCredit: (options) => renderer.invoke(channels.consumeRateLimitResetCredit, options),

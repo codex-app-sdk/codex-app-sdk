@@ -454,6 +454,8 @@ export type CodexConversationLoadingStrategy = 'eager' | 'lazy';
 export type CodexConversationRenderStrategy = 'eager' | 'lazy';
 
 export type CodexConversationHistoryState = {
+  /** Missing means full detail; individual turns may already have richer cached content. */
+  itemsView?: 'full' | 'summary';
   loadingStrategy: CodexConversationLoadingStrategy;
   hasOlder: boolean;
   loadingOlder: boolean;
@@ -589,7 +591,7 @@ export type CodexConversationPromptHistory = {
 };
 
 export type CodexSurfaceEventOrigin = 'action' | 'notification' | 'lifecycle';
-export type CodexSurfaceHistoryReason = 'fork' | 'load' | 'resume' | 'rollback' | 'resync';
+export type CodexSurfaceHistoryReason = 'fork' | 'load' | 'resume' | 'rollback' | 'resync' | 'details' | 'images';
 export type CodexSurfaceTurnStatus = 'completed' | 'interrupted' | 'failed' | 'inProgress';
 export type CodexSurfaceFileActivityAction = 'read' | 'edit' | 'create';
 export type CodexSurfaceFileActivityStatus = 'running' | 'completed' | 'failed';
@@ -653,6 +655,10 @@ export type CodexSurfaceTurnError = {
 };
 export type CodexSurfaceTurn = {
   id: string;
+  /** Missing on older/full snapshots. Summary turns can fetch details on expansion. */
+  itemsView?: 'full' | 'summary';
+  detailsLoading?: boolean;
+  detailsError?: string | null;
   status: CodexSurfaceTurnStatus;
   error: CodexSurfaceTurnError | null;
   willRetry: boolean;
@@ -1104,6 +1110,7 @@ export type CodexSurfaceApi = {
   readConversationHistory(conversationId?: string): Promise<CodexConversationHistory>;
   readConversationPromptHistory(conversationId?: string): Promise<CodexConversationPromptHistory>;
   loadOlderConversationHistory?(conversationId?: string): Promise<CodexConversationHistoryPage>;
+  loadTurnHistory?(turnId: string, conversationId?: string): Promise<CodexConversationSnapshot>;
   renameConversation(title: string): Promise<CodexSurfaceSnapshot>;
   updateConversationSettings(settings: UpdateCodexConversationSettings): Promise<CodexSurfaceSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexSurfaceSnapshot>;
