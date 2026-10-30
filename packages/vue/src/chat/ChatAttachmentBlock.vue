@@ -27,6 +27,16 @@
       @close="fullscreenOpen = false"
     />
   </figure>
+  <button
+    v-else-if="managedPreview && attachment.kind === 'image'"
+    class="codex-chat-theme chat-attachment-block chat-attachment-block--chip"
+    type="button"
+    :aria-label="`Load ${attachment.name}`"
+    @click="reloadPreview"
+  >
+    <PhotoIcon aria-hidden="true" />
+    <span>{{ attachment.name }} · {{ managedPreview.loading.value ? 'Loading image…' : 'Load image' }}</span>
+  </button>
   <component
     :is="chipHref ? 'a' : 'span'"
     v-else
@@ -42,6 +52,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useManagedImagePreview } from './host-image-previews'
 import { useCodexHostCapabilities } from '../native-capabilities'
 import { PaperclipIcon, PhotoIcon } from '../icons/app-icons'
 import ChatImageLightbox from './ChatImageLightbox.vue'
@@ -56,13 +67,14 @@ const props = defineProps<{
 // Stryker restore all
 
 const hostCapabilities = useCodexHostCapabilities()
+const managedPreview = useManagedImagePreview(() => props.attachment.kind === 'image' ? props.attachment.url || props.attachment.path || '' : '')
 
 const previewFailed = ref(false)
 const nativePreviewSource = ref<string>()
 const fullscreenOpen = ref(false)
 const rootElement = ref<HTMLElement | null>(null)
 const previewSource = computed(() => (
-  props.attachment.kind === 'image' && isSafeImageSource(props.attachment.url)
+  managedPreview ? managedPreview.source.value : props.attachment.kind === 'image' && isSafeImageSource(props.attachment.url)
     ? props.attachment.url
     : nativePreviewSource.value
 ))
@@ -81,7 +93,7 @@ watch(
     const request = ++previewRequest
     nativePreviewSource.value = undefined
     const reference = path || url
-    if (kind !== 'image' || !reference || isSafeImageSource(url)) return
+    if (managedPreview || kind !== 'image' || !reference || isSafeImageSource(url)) return
     const readImagePreview = hostCapabilities?.readImagePreview
     if (!readImagePreview) return
     try {
@@ -100,8 +112,13 @@ onBeforeUnmount(() => {
   previewRequest += 1
 })
 
+async function reloadPreview() {
+  await managedPreview?.reload()
+  if (!previewSource.value) await handleImageOpen()
+}
+
 async function handleImageOpen() {
-  const src = previewSource.value
+  const src = previewSource.value || (managedPreview ? props.attachment.url || props.attachment.path : undefined)
   if (!src) return
   const image = {
     alt: props.attachment.name,

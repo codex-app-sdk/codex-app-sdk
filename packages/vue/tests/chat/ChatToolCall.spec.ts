@@ -48,6 +48,18 @@ function mountTool(
 }
 
 describe('ChatToolCall', () => {
+  it.each(['create', 'edit', 'delete'])('opens each deferred %s diff, including files beyond the title summary', async action => {
+    const diffContent = { sessionId: 'thread', contentId: 'a'.repeat(64), byteLength: 100_000, changeKind: 'add' };
+    const changes = Array.from({ length: 4 }, (_, index) => ({ path: `/repo/file${index}.txt`, kind: { type: 'add' }, diff: '', diffContent }));
+    const wrapper = mountTool(tool({ kind: 'fileChange', args: { changes }, metadata: { changes }, status: descriptor('codex', action, { target: 'files' }) }));
+    await wrapper.get('a').trigger('click');
+    expect(wrapper.emitted('open-link')?.[0]?.[0]).toMatchObject({ path: '/repo/file0.txt', diffContent });
+    await wrapper.get('button.chat-tool-call__header').trigger('click');
+    const last = wrapper.findAll('a').find(link => link.text() === '/repo/file3.txt');
+    expect(last).toBeDefined();
+    await last!.trigger('click');
+    expect(wrapper.emitted('open-link')?.at(-1)?.[0]).toMatchObject({ path: '/repo/file3.txt', diffContent });
+  });
   it.each([
     { done: false, state: 'running', running: true },
     { done: undefined, state: 'running', running: true },

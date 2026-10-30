@@ -66,13 +66,16 @@
       <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-call__chevron" :size="15" />
     </button>
 
-    <div v-if="headerless && toolDetailsEnabled" class="chat-tool-call__body">
+    <div v-if="headerless && (toolDetailsEnabled || deferredFiles.length)" class="chat-tool-call__body">
       <div v-if="hasParams" class="chat-tool-call__section">
-        <div class="chat-tool-call__section-title">Input</div>
-        <pre class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
+        <div class="chat-tool-call__section-title">{{ deferredFiles.length ? 'Files' : 'Input' }}</div>
+        <div v-if="deferredFiles.length" class="chat-tool-call__files">
+            <a v-for="file in deferredFiles" :key="file.href" :href="file.href" @click.stop.prevent="emit('open-link', file)">{{ file.path }}</a>
+          </div>
+          <pre v-else class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
       </div>
 
-      <div v-if="hasResult" class="chat-tool-call__section">
+      <div v-if="toolDetailsEnabled && hasResult" class="chat-tool-call__section">
         <div class="chat-tool-call__section-title">Result</div>
         <pre class="chat-tool-call__json">{{ formatValue(toolCall.result) }}</pre>
       </div>
@@ -81,11 +84,14 @@
     <ChatFoldTransition v-else-if="detailsAvailable" :open="isOpen">
       <div class="chat-tool-call__body">
         <div v-if="hasParams" class="chat-tool-call__section">
-          <div class="chat-tool-call__section-title">Input</div>
-          <pre class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
+          <div class="chat-tool-call__section-title">{{ deferredFiles.length ? 'Files' : 'Input' }}</div>
+          <div v-if="deferredFiles.length" class="chat-tool-call__files">
+            <a v-for="file in deferredFiles" :key="file.href" :href="file.href" @click.stop.prevent="emit('open-link', file)">{{ file.path }}</a>
+          </div>
+          <pre v-else class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
         </div>
 
-        <div v-if="hasResult" class="chat-tool-call__section">
+        <div v-if="toolDetailsEnabled && hasResult" class="chat-tool-call__section">
           <div class="chat-tool-call__section-title">Result</div>
           <pre class="chat-tool-call__json">{{ formatValue(toolCall.result) }}</pre>
         </div>
@@ -174,11 +180,16 @@ const titleTargetParts = computed(() => getToolDisplayTargetParts(
   statusDescriptor.value,
   titleParts.value.target,
 ))
+const deferredFiles = computed(() => {
+  const links = (getToolDisplayTargetParts(props.toolCall, statusDescriptor.value, undefined, Infinity) ?? [])
+    .flatMap(part => part.link?.kind === 'file' ? [part.link] : [])
+  return links.some(link => link.diffContent) ? links : []
+})
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)
 const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)
 const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
-const detailsAvailable = computed(() => toolDetailsEnabled.value && (hasParams.value || hasResult.value))
+const detailsAvailable = computed(() => deferredFiles.value.length > 0 || (toolDetailsEnabled.value && (hasParams.value || hasResult.value)))
 
 function toggleOpen() {
   isOpen.value = !isOpen.value
@@ -194,6 +205,8 @@ function formatValue(value: unknown) {
 </script>
 
 <style scoped>
+.chat-tool-call__files { display: flex; flex-direction: column; gap: var(--space-2); overflow-wrap: anywhere; }
+.chat-tool-call__files a { color: var(--color-primary); }
 .chat-tool-call {
   width: 100%;
   min-width: 0;

@@ -134,20 +134,22 @@ export function getToolDisplayTargetParts(
   toolCall: MessageToolCall,
   descriptor: ToolStatusDescriptor | undefined,
   _target?: string,
+  limit = 3,
 ): CodexToolDisplayTargetPart[] | undefined {
   if (
     !descriptor
-    || !['create', 'edit', 'read'].includes(descriptor.action)
+    || (!['create', 'edit', 'read'].includes(descriptor.action)
+      && !(descriptor.action === 'delete' && toolFilePaths(toolCall).some(path => deferredDiffForPath(toolCall, path).diffContent)))
   ) {
     return undefined;
   }
 
   const targetValues = fileTargetValues(toolCall, descriptor.action);
-  const targetTokens = targetValues.slice(0, 3);
+  const targetTokens = targetValues.slice(0, limit);
   const filePaths = toolFilePaths(toolCall);
   if (!targetTokens.length || !filePaths.length) return undefined;
 
-  const action = descriptor.action as CodexConversationFileAction;
+  const action = (descriptor.action === 'delete' ? 'edit' : descriptor.action) as CodexConversationFileAction;
   const parts = targetTokens.map((token, index) => {
     const filePath = filePaths.find((candidate) => displayFileName(candidate, descriptor.action) === token);
     const link = filePath ? codexConversationLinkFromHref(filePath) : undefined;
@@ -159,6 +161,7 @@ export function getToolDisplayTargetParts(
           ...link,
           filepath: link.path,
           action,
+          ...deferredDiffForPath(toolCall, filePath!),
           ...(toolCall.itemId ? { itemId: toolCall.itemId } : {}),
           ...(toolCall.messageId ? { messageId: toolCall.messageId } : {}),
           ...(toolCall.turnId ? { turnId: toolCall.turnId } : {}),
@@ -174,6 +177,18 @@ export function getToolDisplayTargetParts(
     parts.push({ label: `and ${truncatedCount} more`, separator: ' ' });
   }
   return parts;
+}
+
+function deferredDiffForPath(toolCall: MessageToolCall, path: string): Pick<Extract<CodexConversationLink, { kind: 'file' }>, 'diffContent'> {
+  const args = isRecord(toolCall.args) ? toolCall.args : {};
+  const changes = Array.isArray(toolCall.metadata?.changes) ? toolCall.metadata.changes : args.changes;
+  if (!Array.isArray(changes)) return {};
+  const cwd = absolutePath(typeof args.cwd === 'string' ? args.cwd : toolCall.metadata?.cwd);
+  const change = changes.find(value => isRecord(value) && typeof value.path === 'string' && (absolutePath(value.path) ?? (cwd ? joinPath(cwd, value.path) : value.path)) === path);
+  const ref = isRecord(change) ? change.diffContent : undefined;
+  return isRecord(ref) && typeof ref.sessionId === 'string' && typeof ref.contentId === 'string'
+    && typeof ref.byteLength === 'number' && ['add', 'update', 'delete'].includes(String(ref.changeKind))
+    ? { diffContent: ref as NonNullable<Extract<CodexConversationLink, { kind: 'file' }>['diffContent']> } : {};
 }
 
 export function getToolFallbackTitle(toolCall: MessageToolCall, t: Translate = defaultToolTranslate) {
@@ -211,7 +226,7 @@ function displayFileTarget(
   descriptor: ToolStatusDescriptor,
   target: string,
 ): string {
-  if (!['create', 'edit', 'read'].includes(descriptor.action)) return target;
+  if (!['create', 'edit', 'read', 'delete'].includes(descriptor.action)) return target;
   const values = fileTargetValues(toolCall, descriptor.action);
   if (values.length === 0) return target;
   if (values.length <= 3) return values.join(', ');

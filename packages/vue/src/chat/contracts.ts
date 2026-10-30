@@ -94,6 +94,8 @@ export type CodexConversationLink =
     messageId?: string;
     /** App-server item that produced the tool target, when available. */
     itemId?: string;
+    /** Exact historical file patch, fetched by the host only when selected. */
+    diffContent?: { sessionId: string; contentId: string; byteLength: number; changeKind: 'add' | 'update' | 'delete' };
     line?: number;
     column?: number;
   };

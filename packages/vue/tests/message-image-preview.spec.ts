@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils'
+import { defineComponent, shallowRef, type Component } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CodexConversationPane,
+  provideCodexHostCapabilities,
   CodexMessage,
   createCodexConversationPaneController,
   type CodexChatMessage,
@@ -95,6 +97,84 @@ describe('conversation message image previews', () => {
     await wrapper.get('[aria-label="Open Unavailable"]').trigger('click')
     expect(openImage).toHaveBeenCalledWith(expect.objectContaining({ src: '/tmp/missing.png' }), expect.objectContaining({ intent: 'open' }))
     wrapper.unmount()
+  })
+
+  // Browser decoding is covered by the native WebKit/Chromium workflow. This
+  // mounted workflow protects shared leases, cancellation, and oversized fallback.
+  it('shares bounded previews, releases their last consumer, and keeps full images accessible', async () => {
+    const revoked = vi.fn()
+    let nextUrl = 0
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, {
+      createObjectURL: () => `blob:preview-${++nextUrl}`, revokeObjectURL: revoked,
+    }))
+    let blobSize = 64
+    vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => ({ size: blobSize }) })))
+    let pixels = 16
+    vi.stubGlobal('Image', class {
+      naturalWidth = 1; get naturalHeight() { return pixels }
+      onload: (() => void) | null = null; onerror: (() => void) | null = null
+      set src(value: string) { if (value) queueMicrotask(() => pixels < 0 ? this.onerror?.() : this.onload?.()) }
+    })
+    let release!: (value: string) => void
+    const read = vi.fn(async (_reference: string): Promise<string | null> => imageUrl)
+    const openImage = vi.fn(() => true)
+    const items = shallowRef<CodexChatMessage[]>([])
+    const media = (id: string, url = '/tmp/shared.png'): CodexChatMessage => ({ id, role: 'assistant', content: '', parts: [{ type: 'media', media: { title: id, url } }] })
+    const wrapper = mount(defineComponent({ components: { CodexConversationPane: CodexConversationPane as unknown as Component }, setup() {
+      provideCodexHostCapabilities({ readImagePreview: read, capabilities: { attachments: false, clipboard: false, externalLinks: false, transcription: false },
+        copyToClipboard: async () => {}, ingestAttachments: async () => [], pickAttachments: async () => [], openExternal: async () => {}, transcribeAudio: async () => { throw new Error('Unavailable') },
+      }, { imagePreviewBudgetBytes: 256 })
+      return { items, openImage }
+    }, template: '<CodexConversationPane :messages="items" :open-image="openImage" />' }))
+    try {
+      items.value = [media('first'), media('second')]; await flushPromises()
+      expect(read).toHaveBeenCalledOnce()
+      expect(wrapper.findAll('img').map(img => img.attributes('src'))).toStrictEqual(['blob:preview-1', 'blob:preview-1'])
+      items.value = [media('second')]; await flushPromises(); expect(revoked).not.toHaveBeenCalled()
+      items.value = [media('second'), media('third', '/tmp/third.png'), media('fourth', '/tmp/fourth.png')]; await flushPromises()
+      expect(wrapper.get('[aria-label="Open second"]').text()).toContain('Load image')
+      await wrapper.get('[aria-label="Open second"]').trigger('click'); await flushPromises()
+      expect(wrapper.get('[aria-label="Open second"] img').attributes('src')).toMatch(/^blob:/)
+      pixels = 1000
+      items.value = [media('large', '/tmp/large.png')]; await flushPromises()
+      expect(wrapper.findAll('img')).toHaveLength(0)
+      await wrapper.get('[aria-label="Open large"]').trigger('click'); await flushPromises()
+      expect(openImage).toHaveBeenCalledWith(expect.objectContaining({ src: '/tmp/large.png' }), expect.anything())
+      pixels = 16
+      read.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+      items.value = [media('pending', '/tmp/pending.png')]; await flushPromises()
+      items.value = []; await flushPromises()
+      const count = nextUrl; release(imageUrl); await flushPromises()
+      expect(nextUrl).toBe(count)
+      for (const result of [null, 'file:///unsafe.png', 'data:image/png;base64,' + 'A'.repeat(24 * 1024 * 1024)]) {
+        read.mockResolvedValueOnce(result)
+        items.value = [media('unavailable', `/tmp/${nextUrl}-${String(result).length}.png`)]; await flushPromises()
+        expect(wrapper.findAll('img')).toHaveLength(0)
+      }
+      read.mockRejectedValueOnce(new Error('Disconnected'))
+      items.value = [media('offline', '/tmp/offline.png')]; await flushPromises()
+      expect(wrapper.get('[aria-label="Open offline"]').text()).toContain('Load image')
+      pixels = -1
+      items.value = [media('corrupt', '/tmp/corrupt.png')]; await flushPromises()
+      expect(wrapper.findAll('img')).toHaveLength(0)
+      pixels = 16; blobSize = 512
+      items.value = [media('encoded-overflow', '/tmp/encoded.png')]; await flushPromises()
+      expect(wrapper.findAll('img')).toHaveLength(0)
+      blobSize = 64
+      items.value = [media('remote', 'https://example.com/image.png')]; await flushPromises()
+      expect(wrapper.get('img').attributes('src')).toBe('https://example.com/image.png')
+      items.value = [{id:'attachment',role:'user',content:'',parts:[{type:'attachment',attachment:{kind:'image',name:'Photo.png',path:'/tmp/photo.png'}}]}]; await flushPromises()
+      expect(wrapper.get('[aria-label="Open Photo.png"] img').attributes('src')).toMatch(/^blob:/)
+      await wrapper.get('[aria-label="Open Photo.png"]').trigger('click'); await flushPromises()
+      expect(openImage).toHaveBeenLastCalledWith(expect.objectContaining({kind:'attachment'}), expect.anything())
+      pixels = 1000
+      items.value = [{id:'attachment',role:'user',content:'',parts:[{type:'attachment',attachment:{kind:'image',name:'Large.png',path:'/tmp/large-photo.png'}}]}]; await flushPromises()
+      await wrapper.get('[aria-label="Load Large.png"]').trigger('click'); await flushPromises()
+      expect(openImage).toHaveBeenLastCalledWith(expect.objectContaining({src:'/tmp/large-photo.png'}), expect.anything())
+      pixels = 16
+      items.value = [media('final')]; await flushPromises()
+    } finally { wrapper.unmount() }
+    expect(revoked.mock.calls.map(([url]) => url).sort()).toStrictEqual(Array.from({ length: nextUrl }, (_, i) => `blob:preview-${i + 1}`).sort())
   })
 
   it('opens user attachments and assistant media in the SDK lightbox by default', async () => {

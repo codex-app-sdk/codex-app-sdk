@@ -1,3 +1,4 @@
+import { ImagePreviewPool, imagePreviewPoolKey } from './chat/image-preview-pool';
 import type {
   CodexHostCapabilities,
   CodexHostAttachment,
@@ -7,6 +8,7 @@ import type {
 import {
   hasInjectionContext,
   inject,
+  onScopeDispose,
   provide,
   type InjectionKey,
 } from 'vue';
@@ -26,8 +28,15 @@ export type CodexAttachmentIngester = (
 
 export function provideCodexHostCapabilities(
   capabilities: CodexHostCapabilities | undefined,
+  options?: { imagePreviewBudgetBytes: number },
 ): CodexHostCapabilities | undefined {
   provide(hostCapabilitiesKey, capabilities);
+  if (options && options.imagePreviewBudgetBytes > 0) {
+    const pool = new ImagePreviewPool(reference => /^(?:data:image\/|https?:|blob:|\/\/)/i.test(reference)
+      ? Promise.resolve(reference) : capabilities?.readImagePreview?.(reference) ?? Promise.resolve(null), options.imagePreviewBudgetBytes);
+    provide(imagePreviewPoolKey, pool);
+    onScopeDispose(() => pool.clear());
+  }
   return capabilities;
 }
 

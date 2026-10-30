@@ -590,3 +590,31 @@ budget. Compare the same fixture on the same Mac; timings include its leading si
 
 See the [surface guide](/guide/surface), [conversations](/guide/conversations),
 and [extensions](/guide/extensions).
+
+## `ConversationContentTransport`
+
+Hosts carrying conversation snapshots or events over IPC or a network can replace
+embedded image data URLs and file diffs larger than 64 KiB with small references before serialization. Create one
+instance per conversation and pass immutable SDK snapshots/events to `project(value)`.
+The original value and provider history remain unchanged; unchanged objects are reused. Remote HTTP image URLs are unchanged.
+
+References have the form `conversation-image:<encoded conversation ID>:<sha256>`.
+Route them through the renderer host's `readImagePreview` capability. Authorize the
+request against the current conversation, then call
+`read(currentSnapshot, contentId, offset)`. It returns `{ data, totalBytes, nextOffset }`,
+where `data` is a base64-encoded chunk of the original image data URL, at most 64 KiB
+before encoding. Start at offset zero and continue until `nextOffset` is null.
+
+Reads fail for content absent from the supplied snapshot or invalid offsets. The
+host must bind the request to the authorized conversation and recheck that binding
+after asynchronous work. The weak cache only retains projections while their
+source values remain reachable; it is not a media archive or conversation store.
+Content entries refer to existing provider strings without retaining full binary
+copies. Reads encode bounded blocks of at most 64 KiB, including UTF-8 diffs.
+
+Large file changes keep their path, operation, and summary. Their `diff` becomes an
+empty string alongside `diffContent: { sessionId, contentId, byteLength, changeKind }`.
+The Vue file target forwards this reference to the host on selection. Fetch it using
+the same `read` method; offsets and lengths count UTF-8 bytes, and the reconstructed
+text is the exact historical patch (full file text for add/delete, unified hunks for
+update). Reads never consult the current working-tree file.

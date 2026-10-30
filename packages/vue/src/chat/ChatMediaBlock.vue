@@ -7,10 +7,12 @@
       @click="handleImageAction('open')"
     >
       <img
+        v-if="previewSource || !managedPreview"
         class="chat-media-block__image"
         :alt="media.alt || generatedAltLabel"
         :src="previewSource"
       >
+      <span v-if="managedPreview && !previewSource" class="chat-media-block__placeholder">{{ managedPreview?.loading.value ? 'Loading image…' : 'Load image' }}</span>
     </button>
     <figcaption class="chat-media-block__footer">
       <span class="chat-media-block__title">{{ media.title || generatedLabel }}</span>
@@ -62,7 +64,7 @@ import ChatImageLightbox from './ChatImageLightbox.vue'
 import ChatIconButton from './ChatIconButton.vue'
 import type { CodexMessageImageOpenHandler, CodexMessageImageOpenIntent } from './message-image'
 import type { MessageMedia } from './types'
-import { useHostImageSource } from './host-image-previews'
+import { useHostImageSource, useManagedImagePreview } from './host-image-previews'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
@@ -79,13 +81,15 @@ const generatedAltLabel = 'Generated media'
 const generatedLabel = 'Generated media'
 const promptLabel = 'Prompt'
 const openLabel = computed(() => `Open ${props.media.title || props.media.alt || generatedLabel}`)
-const previewSource = useHostImageSource(() => props.media.url)
+const managedPreview = useManagedImagePreview(() => props.media.url)
+const previewSource = managedPreview?.source ?? useHostImageSource(() => props.media.url)
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
 const rootElement = ref<HTMLElement | null>(null)
 const downloadName = computed(() => mediaDownloadName(props.media))
 
 async function handleImageAction(intent: CodexMessageImageOpenIntent) {
+  if (managedPreview && !previewSource.value) { await managedPreview.reload(); if (previewSource.value) return }
   const image = {
     alt: props.media.alt || generatedAltLabel,
     kind: 'media',
@@ -150,6 +154,8 @@ function mediaDownloadName(media: MessageMedia): string {
   background: var(--color-surface-low);
   cursor: pointer;
 }
+
+.chat-media-block__placeholder { display: block; padding: var(--space-6); color: var(--color-text-muted); }
 
 .chat-media-block__image {
   display: block;

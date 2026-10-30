@@ -688,10 +688,17 @@ openLink: [link: {
   turnId?: string;
   messageId?: string;
   itemId?: string;
+  diffContent?: { sessionId: string; contentId: string; byteLength: number; changeKind: 'add' | 'update' | 'delete' };
   line?: number;
   column?: number;
 }]
 ```
+
+When a host uses `ConversationContentTransport`, oversized file diffs carry
+`diffContent`. Fetch the exact patch through the host's authorized content reader
+only when that file is selected. The expandable file list exposes every deferred
+file even when raw tool details are disabled. Deleted files use the `edit` link
+action to open their historical diff.
 
 Raw tool-call input and output are inaccessible by default: stock tool rows do
 not render a disclosure control or place those values in the DOM. Enable access
@@ -800,3 +807,20 @@ See the [Vue guide](/guide/vue),
 [message/tool guide](/guide/messages-tools),
 [Vue provider guide](/guide/vue-providers), and
 [presentation guide](/guide/presentation).
+
+
+### Bounded image previews
+
+`provideCodexHostCapabilities(capabilities, { imagePreviewBudgetBytes })` optionally
+bounds retained media and attachment previews for that Vue subtree. The budget
+counts encoded blob bytes plus decoded pixels (four bytes per pixel). Two preview
+loads run at a time. Data URLs become blob URLs; evicted previews clear their image
+source and offer a reload action. The last consumer releasing a preview revokes its
+owned blob URL, and disposing the provider releases the whole pool. Remote image
+URLs are charged for decoded pixels; their browser HTTP cache is browser-owned.
+
+This bounds retained preview resources, not total process RSS: provider snapshots,
+in-flight reads/decodes, browser caching, and a host's separate fullscreen viewer
+have their own lifetimes. Images larger than the preview budget are not retained.
+Without the option, hosts retain the existing preview behavior. This option does
+not add viewport observation or change when mounted components request images.

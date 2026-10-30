@@ -83,3 +83,5 @@ export {
   type AppleSpeechTranscriptionResult,
 } from './apple-speech-transcription';
 export { startAppleSpeechSession, type AppleSpeechSession } from './apple-speech-session';
+
+export { ConversationContentTransport } from "./conversation-content-transport";

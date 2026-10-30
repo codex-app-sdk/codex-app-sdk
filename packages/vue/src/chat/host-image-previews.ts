@@ -1,4 +1,5 @@
-import { computed, shallowRef, watch, type WatchSource } from 'vue'
+import { imagePreviewPoolKey } from './image-preview-pool'
+import { computed, inject, shallowRef, watch, type WatchSource } from 'vue'
 import { useCodexHostCapabilities } from '../native-capabilities'
 
 function localSource(source: string): boolean {
@@ -23,4 +24,25 @@ export function useHostImageSource(source: WatchSource<string>) {
     } catch { /* Opening the image lets its host present an unavailable state. */ }
   }, { immediate: true })
   return computed(() => resolved.value)
+}
+
+/** A host may bound all native previews in its surface without changing when
+ * components request them. Cleanup releases shared resources after the last use. */
+export function useManagedImagePreview(source: WatchSource<string>) {
+  const pool = inject(imagePreviewPoolKey, undefined)
+  if (!pool) return undefined
+  const entry = shallowRef<ReturnType<typeof pool.acquire>>()
+  watch(source, (reference, _previous, onCleanup) => {
+    entry.value = undefined
+    if (!reference) return
+    const current = pool.acquire(reference)
+    entry.value = current
+    onCleanup(() => pool.release(current))
+    void pool.load(current)
+  }, { immediate: true })
+  return {
+    source: computed(() => entry.value?.source.value),
+    loading: computed(() => entry.value?.state.value === 'loading'),
+    reload: () => entry.value ? pool.load(entry.value) : Promise.resolve(),
+  }
 }
