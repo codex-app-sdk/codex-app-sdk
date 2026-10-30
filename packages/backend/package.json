@@ -39,7 +39,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "0.18.2"
+    "@codex-app-sdk/core": "0.18.2",
+    "image-size": "^2.0.4"
   },
   "engines": {
     "node": ">=22"

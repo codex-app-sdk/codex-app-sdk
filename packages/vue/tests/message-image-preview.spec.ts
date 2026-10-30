@@ -177,6 +177,91 @@ describe('conversation message image previews', () => {
     expect(revoked.mock.calls.map(([url]) => url).sort()).toStrictEqual(Array.from({ length: nextUrl }, (_, i) => `blob:preview-${i + 1}`).sort())
   })
 
+  // Observer delivery and host promises can race source changes or disposal;
+  // exercise that boundary here while real geometry is covered in browser tests.
+  it('loads near images once, protects visible previews, and ignores stale visibility after disposal', async () => {
+    type Observer = { callback: IntersectionObserverCallback; targets: Set<Element>; margin: string; disconnected: boolean }
+    const observers: Observer[] = []
+    vi.stubGlobal('IntersectionObserver', class {
+      state: Observer
+      constructor(callback: IntersectionObserverCallback, options: IntersectionObserverInit) {
+        this.state = { callback, targets: new Set(), margin: options.rootMargin ?? '', disconnected: false }; observers.push(this.state)
+      }
+      observe(target: Element) { this.state.targets.add(target) }
+      unobserve(target: Element) { this.state.targets.delete(target) }
+      disconnect() { this.state.disconnected = true }
+    })
+    let sequence = 0
+    const revoke = vi.fn()
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL: () => `blob:viewport-${++sequence}`, revokeObjectURL: revoke }))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => ({size:64}) })))
+    vi.stubGlobal('Image', class {
+      naturalWidth = 4; naturalHeight = 4; onload: (() => void) | null = null
+      set src(value: string) { if (value) queueMicrotask(() => this.onload?.()) }
+    })
+    const read = vi.fn(async (_reference: string): Promise<string | null> => imageUrl)
+    const items = shallowRef<CodexChatMessage[]>(['first','second','third'].map(id => ({id,role:'assistant',content:'',parts:[{type:'media',media:{title:id,url:`/${id}.png`, ...(id === 'first' ? {width:1024,height:512} : id === 'third' ? {width:Number.NaN,height:-1} : {})}}]})))
+    const wrapper = mount(defineComponent({setup() {
+      provideCodexHostCapabilities({readImagePreview:read} as never, {imagePreviewBudgetBytes:256,viewportImageLoading:true})
+      return {items}
+    }, components:{CodexMessage:CodexMessage as unknown as Component}, template:'<div style="overflow-y:auto"><CodexMessage v-for="item in items" :key="item.id" :message="item" /></div>'}), {attachTo:document.body})
+    const target = (name: string) => wrapper.get(`[aria-label="Open ${name}"]`).element.closest('figure')!
+    const deliver = (element: Element, near: boolean, visible: boolean) => {
+      for (const observer of observers) if (observer.targets.has(element)) observer.callback([
+        {target:element,isIntersecting:observer.margin === '0px' ? visible : near} as IntersectionObserverEntry,
+      ], {} as IntersectionObserver)
+    }
+    await flushPromises()
+    expect(read).not.toHaveBeenCalled()
+    expect(wrapper.get('[aria-label="Open first"]').attributes('style')).toContain('aspect-ratio: 1024 / 512')
+    const first = target('first'), second = target('second'), third = target('third')
+    deliver(first,true,true); deliver(second,true,false); await flushPromises()
+    expect(wrapper.findAll('img')).toHaveLength(2)
+    deliver(third,true,false); await flushPromises()
+    expect(wrapper.get('[aria-label="Open first"] img').attributes('src')).toBe('blob:viewport-1')
+    expect(wrapper.find('[aria-label="Open second"] img').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="Open second"]').attributes('style')).toContain('aspect-ratio: 4 / 4')
+    deliver(second,false,false); deliver(third,false,false); deliver(second,true,true); await flushPromises()
+    expect(wrapper.get('[aria-label="Open second"] img').attributes('src')).toMatch(/^blob:/)
+    const count = read.mock.calls.length
+    deliver(second,false,false); deliver(second,true,true); await flushPromises(); expect(read).toHaveBeenCalledTimes(count)
+    // With both retained previews visible, a third cannot churn them out.
+    deliver(third,true,true); await flushPromises()
+    expect(wrapper.findAll('img')).toHaveLength(2)
+    expect(wrapper.get('[aria-label="Open first"] img').attributes('src')).toBe('blob:viewport-1')
+    items.value = [{id:'portrait',role:'user',content:'',parts:[{type:'attachment',attachment:{kind:'image',name:'Portrait',url:'/portrait.png',width:720,height:1280}}]}]
+    await flushPromises()
+    expect(wrapper.get('[aria-label="Open Portrait"]').attributes('style')).toContain('aspect-ratio: 720 / 1280')
+    deliver(target('Portrait'),true,true); await flushPromises()
+    expect(wrapper.get('[aria-label="Open Portrait"] img').attributes('src')).toMatch(/^blob:/)
+    expect(wrapper.get('[aria-label="Open Portrait"]').attributes('style')).toContain('aspect-ratio: 720 / 1280')
+    // Scrolling away before a queued request starts must avoid the host read.
+    const releases: Array<(value: string) => void> = []
+    read.mockImplementationOnce(() => new Promise(resolve => releases.push(resolve))).mockImplementationOnce(() => new Promise(resolve => releases.push(resolve)))
+    items.value = ['queue-a','queue-b','queue-c','queue-d','queue-e'].map(id => ({id,role:'assistant',content:'',parts:[{type:'media',media:{title:id,url:`/${id}.png`}}]}))
+    await flushPromises()
+    for (const name of ['queue-a','queue-b','queue-c','queue-d','queue-e']) deliver(target(name),true,name === 'queue-e')
+    await flushPromises(); expect(releases).toHaveLength(2)
+    deliver(target('queue-c'),false,false)
+    for (const finish of releases) finish(imageUrl)
+    await flushPromises()
+    expect(read.mock.calls.some(([reference]) => reference === '/queue-c.png')).toBe(false)
+    expect(read.mock.calls.findIndex(([r]) => r === '/queue-e.png')).toBeLessThan(read.mock.calls.findIndex(([r]) => r === '/queue-d.png'))
+    read.mockResolvedValue(imageUrl)
+    // A host may scroll the document rather than a dedicated chat container.
+    ;(wrapper.element as HTMLElement).style.overflowY = ''
+    let finish!: (value: string) => void
+    read.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    items.value = [{id:'slow',role:'assistant',content:'',parts:[{type:'media',media:{title:'slow',url:'/slow.png'}}]}]
+    await flushPromises(); deliver(target('slow'),true,true); await flushPromises()
+    const old = observers.flatMap(o => [...o.targets].map(element => ({o,element})))
+    wrapper.unmount(); finish(imageUrl); await flushPromises()
+    for (const {o,element} of old) o.callback([{target:element,isIntersecting:true} as IntersectionObserverEntry], {} as IntersectionObserver)
+    await flushPromises()
+    expect(observers.every(o => o.disconnected)).toBe(true)
+    expect(revoke).toHaveBeenCalledTimes(sequence)
+  })
+
   it('opens user attachments and assistant media in the SDK lightbox by default', async () => {
     const wrapper = mount(CodexConversationPane, { props: { messages } })
 

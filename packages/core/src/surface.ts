@@ -41,6 +41,9 @@ export type SurfaceMessageQuestionPart = {
 };
 
 export type SurfaceMessageAttachment = {
+  /** Intrinsic display dimensions, available before lazy image bytes load. */
+  width?: number;
+  height?: number;
   kind: 'file' | 'image';
   name: string;
   path?: string;
@@ -54,6 +57,9 @@ export type SurfaceMessageAttachmentPart = {
 };
 
 export type SurfaceMessageMedia = {
+  /** Intrinsic display dimensions, available before lazy image bytes load. */
+  width?: number;
+  height?: number;
   url: string;
   alt?: string;
   mimeType?: string;

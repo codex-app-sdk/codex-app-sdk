@@ -594,7 +594,7 @@ and [extensions](/guide/extensions).
 ## `ConversationContentTransport`
 
 Hosts carrying conversation snapshots or events over IPC or a network can replace
-embedded image data URLs and file diffs larger than 64 KiB with small references before serialization. Create one
+embedded image data URLs and file diffs larger than 64 KiB with small references before serialization. Image objects carry optional display `width` and `height`, probed from at most 64 KiB of base64 header text with EXIF orientation applied. Unreadable headers omit dimensions without changing image access. Create one
 instance per conversation and pass immutable SDK snapshots/events to `project(value)`.
 The original value and provider history remain unchanged; unchanged objects are reused. Remote HTTP image URLs are unchanged.
 

@@ -1,28 +1,32 @@
 <template>
   <figure
-    v-if="previewSource && !previewFailed"
+    v-if="(previewSource && !previewFailed) || (managedPreview?.viewport && attachment.kind === 'image')"
     ref="rootElement"
     class="codex-chat-theme chat-attachment-block chat-attachment-block--image"
+    :class="{ 'chat-attachment-block--proportional': managedPreview?.viewport && aspectRatio }"
     :title="attachment.path || attachment.url || attachment.name"
   >
     <button
       class="chat-attachment-block__preview-button"
+      :style="managedPreview?.viewport && aspectRatio ? { aspectRatio } : undefined"
       type="button"
       :aria-label="`Open ${attachment.name}`"
-      @click="handleImageOpen"
+      @click="previewSource ? handleImageOpen() : reloadPreview()"
     >
       <img
+        v-if="previewSource && !previewFailed"
         class="chat-attachment-block__preview"
         :alt="attachment.name"
         :src="previewSource"
         @error="previewFailed = true"
       >
+      <span v-if="!previewSource || previewFailed" class="chat-attachment-block__placeholder">{{ managedPreview?.loading.value ? 'Loading image…' : attachment.name }}</span>
     </button>
     <ChatImageLightbox
       :alt="attachment.name"
       :label="attachment.name"
       :open="fullscreenOpen"
-      :src="previewSource"
+      :src="previewSource || ''"
       :theme-source="rootElement"
       @close="fullscreenOpen = false"
     />
@@ -52,7 +56,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useManagedImagePreview } from './host-image-previews'
+import { imageAspectRatio, useManagedImagePreview } from './host-image-previews'
 import { useCodexHostCapabilities } from '../native-capabilities'
 import { PaperclipIcon, PhotoIcon } from '../icons/app-icons'
 import ChatImageLightbox from './ChatImageLightbox.vue'
@@ -67,12 +71,13 @@ const props = defineProps<{
 // Stryker restore all
 
 const hostCapabilities = useCodexHostCapabilities()
-const managedPreview = useManagedImagePreview(() => props.attachment.kind === 'image' ? props.attachment.url || props.attachment.path || '' : '')
+const rootElement = ref<HTMLElement | null>(null)
+const managedPreview = useManagedImagePreview(() => props.attachment.kind === 'image' ? props.attachment.url || props.attachment.path || '' : '', rootElement)
 
+const aspectRatio = computed(() => imageAspectRatio(props.attachment) ?? imageAspectRatio(managedPreview?.dimensions.value))
 const previewFailed = ref(false)
 const nativePreviewSource = ref<string>()
 const fullscreenOpen = ref(false)
-const rootElement = ref<HTMLElement | null>(null)
 const previewSource = computed(() => (
   managedPreview ? managedPreview.source.value : props.attachment.kind === 'image' && isSafeImageSource(props.attachment.url)
     ? props.attachment.url
@@ -163,7 +168,7 @@ function safeFileHref(value: string | undefined): string | undefined {
 }
 
 .chat-attachment-block--image {
-  width: min(160px, 100%);
+  width: 160px;
   margin: 0;
   padding: var(--space-1);
   overflow: hidden;
@@ -179,6 +184,11 @@ function safeFileHref(value: string | undefined): string | undefined {
   border-radius: calc(var(--radius-lg) - var(--space-1));
   object-fit: cover;
 }
+
+.chat-attachment-block--proportional .chat-attachment-block__preview-button { position: relative; }
+.chat-attachment-block--proportional .chat-attachment-block__preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.chat-attachment-block--proportional .chat-attachment-block__placeholder { position: absolute; inset: 0; height: 100%; }
+.chat-attachment-block__placeholder { display: flex; align-items: center; justify-content: center; height: 120px; overflow: hidden; overflow-wrap: anywhere; color: var(--color-text-muted); }
 
 .chat-attachment-block__preview-button {
   display: block;

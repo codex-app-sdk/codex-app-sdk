@@ -28,12 +28,12 @@ export type CodexAttachmentIngester = (
 
 export function provideCodexHostCapabilities(
   capabilities: CodexHostCapabilities | undefined,
-  options?: { imagePreviewBudgetBytes: number },
+  options?: { imagePreviewBudgetBytes: number; viewportImageLoading?: boolean },
 ): CodexHostCapabilities | undefined {
   provide(hostCapabilitiesKey, capabilities);
   if (options && options.imagePreviewBudgetBytes > 0) {
     const pool = new ImagePreviewPool(reference => /^(?:data:image\/|https?:|blob:|\/\/)/i.test(reference)
-      ? Promise.resolve(reference) : capabilities?.readImagePreview?.(reference) ?? Promise.resolve(null), options.imagePreviewBudgetBytes);
+      ? Promise.resolve(reference) : capabilities?.readImagePreview?.(reference) ?? Promise.resolve(null), options.imagePreviewBudgetBytes, options.viewportImageLoading);
     provide(imagePreviewPoolKey, pool);
     onScopeDispose(() => pool.clear());
   }

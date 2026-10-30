@@ -822,5 +822,18 @@ URLs are charged for decoded pixels; their browser HTTP cache is browser-owned.
 This bounds retained preview resources, not total process RSS: provider snapshots,
 in-flight reads/decodes, browser caching, and a host's separate fullscreen viewer
 have their own lifetimes. Images larger than the preview budget are not retained.
-Without the option, hosts retain the existing preview behavior. This option does
-not add viewport observation or change when mounted components request images.
+Without the option, hosts retain the existing preview behavior.
+
+Add `viewportImageLoading: true` alongside the budget to fetch previews only when
+visible or within 400 CSS pixels of their scroll container. Observers are shared
+per container; visible requests take priority over prefetches. Offscreen previews
+remain cached within the budget and are evicted before visible previews. Returning
+to an evicted image reloads it automatically. Optional image `width` and `height` reserve the intrinsic aspect ratio before
+loading, preserving transcript geometry without letterboxing. For older images
+without dimensions, the decoded ratio is retained through cache eviction; the
+first load can adjust the initial placeholder. Failed or over-budget previews
+remain explicitly retryable; automatic eviction does not trigger a reload loop.
+
+Preview blob URLs are borrowed resources: a host that opens an independent image
+tab must retain its own Blob/object URL before the preview is released, and revoke
+its own URL when the tab closes. The preview budget does not own that viewer.

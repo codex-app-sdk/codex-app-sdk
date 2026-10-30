@@ -32,9 +32,22 @@ describe('conversation image transport', () => {
     const text = { text: diff, diff, path: '/repo/user-text' };
     expect(transport.project(text)).toBe(text);
   });
+  it('preserves unreadable images and carries portrait dimensions on attachments', () => {
+    const transport = new ConversationContentTransport('thread');
+    const portrait = Buffer.from('89504e470d0a1a0a0000000d49484452000002d000000500', 'hex');
+    const url = 'data:image/png;base64,' + portrait.toString('base64');
+    const projected = transport.project({ attachment: {kind:'image',url}, media:{url:'data:image/png;base64,Y29ycnVwdA=='} });
+    expect(projected.attachment).toMatchObject({width:720,height:1280});
+    expect(projected.media).not.toHaveProperty('width');
+    expect(projected.media.url).toMatch(/^conversation-image:/);
+    expect(Buffer.from(transport.read({media:{url:'data:image/png;base64,Y29ycnVwdA=='}}, projected.media.url.split(':')[2]!, 0).data, 'base64').toString()).toBe('data:image/png;base64,Y29ycnVwdA==');
+  });
   it('keeps a screenshot-heavy reset and live updates small, and reads only requested current content', () => {
     const transport = new ConversationContentTransport('thread');
-    const image = 'data:image/png;base64,' + Buffer.alloc(600_000, 123).toString('base64');
+    const bytes = Buffer.alloc(600_000, 123);
+    Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex').copy(bytes);
+    bytes.writeUInt32BE(1600, 16); bytes.writeUInt32BE(900, 20);
+    const image = 'data:image/png;base64,' + bytes.toString('base64');
     const messages = Array.from({ length: 99 }, (_, index) => ({ id: String(index), parts: [{ type: 'media', media: { url: image } }] }));
     const snapshot = { messages };
     const beforeProjection = process.memoryUsage().arrayBuffers;
@@ -43,6 +56,7 @@ describe('conversation image transport', () => {
     expect(Buffer.byteLength(JSON.stringify(projected))).toBeLessThan(32_000);
     const reference = projected.messages[0]!.parts[0]!.media.url;
     expect(reference).toMatch(/^conversation-image:thread:[a-f0-9]{64}$/);
+    expect(projected.messages[0]!.parts[0]!.media).toMatchObject({width:1600,height:900});
     expect(transport.project({ payload: { message: messages[0] } }).payload.message).toStrictEqual(projected.messages[0]);
     expect(snapshot.messages[0]!.parts[0]!.media.url).toBe(image);
     const contentId = reference.split(':')[2]!;

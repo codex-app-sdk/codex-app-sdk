@@ -1,5 +1,6 @@
+import { observeImageViewport } from './image-viewport'
 import { imagePreviewPoolKey } from './image-preview-pool'
-import { computed, inject, shallowRef, watch, type WatchSource } from 'vue'
+import { computed, inject, shallowRef, watch, type Ref, type WatchSource } from 'vue'
 import { useCodexHostCapabilities } from '../native-capabilities'
 
 function localSource(source: string): boolean {
@@ -28,7 +29,7 @@ export function useHostImageSource(source: WatchSource<string>) {
 
 /** A host may bound all native previews in its surface without changing when
  * components request them. Cleanup releases shared resources after the last use. */
-export function useManagedImagePreview(source: WatchSource<string>) {
+export function useManagedImagePreview(source: WatchSource<string>, element: Ref<HTMLElement | null>) {
   const pool = inject(imagePreviewPoolKey, undefined)
   if (!pool) return undefined
   const entry = shallowRef<ReturnType<typeof pool.acquire>>()
@@ -38,11 +39,32 @@ export function useManagedImagePreview(source: WatchSource<string>) {
     const current = pool.acquire(reference)
     entry.value = current
     onCleanup(() => pool.release(current))
-    void pool.load(current)
+    if (!pool.viewport) void pool.load(current)
   }, { immediate: true })
+  watch([entry, element], ([current, target], _previous, onCleanup) => {
+    if (!current || !target || !pool.viewport) return
+    let near = false, visible = false
+    const stop = observeImageViewport(target, state => {
+      const entered = (state.near && !near) || (state.visible && !visible)
+      current.near += Number(state.near) - Number(near)
+      current.visible += Number(state.visible) - Number(visible)
+      near = state.near; visible = state.visible
+      if (entered) void pool.load(current)
+    })
+    onCleanup(() => { stop(); current.near -= Number(near); current.visible -= Number(visible) })
+  }, { flush: 'post' })
   return {
+    viewport: pool.viewport,
+    dimensions: computed(() => entry.value?.dimensions.value),
     source: computed(() => entry.value?.source.value),
     loading: computed(() => entry.value?.state.value === 'loading'),
-    reload: () => entry.value ? pool.load(entry.value) : Promise.resolve(),
+    reload: () => entry.value ? pool.load(entry.value, true) : Promise.resolve(),
   }
+}
+
+/** Prefer transported dimensions; keep learned dimensions through cache eviction. */
+export function imageAspectRatio(size?: { width?: number; height?: number }): string | undefined {
+  const width = size?.width, height = size?.height
+  return typeof width === 'number' && typeof height === 'number' && Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? `${width} / ${height}` : undefined
 }

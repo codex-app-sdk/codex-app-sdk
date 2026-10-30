@@ -38,6 +38,9 @@ export function getMessageToolCallArgs(toolCall: MessageToolCall) {
 }
 
 export type MessageMedia = {
+  /** Intrinsic display dimensions, available before lazy image bytes load. */
+  width?: number;
+  height?: number;
   alt?: string;
   mimeType?: string;
   prompt?: string;
@@ -46,6 +49,9 @@ export type MessageMedia = {
 };
 
 export type MessageAttachment = {
+  /** Intrinsic display dimensions, available before lazy image bytes load. */
+  width?: number;
+  height?: number;
   kind: 'file' | 'image';
   name: string;
   path?: string;

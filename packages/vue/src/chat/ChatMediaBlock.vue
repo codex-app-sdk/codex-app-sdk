@@ -2,6 +2,8 @@
   <figure ref="rootElement" class="codex-chat-theme chat-media-block">
     <button
       class="chat-media-block__image-button"
+      :class="{ 'chat-media-block__image-button--reserved': managedPreview?.viewport && aspectRatio }"
+      :style="managedPreview?.viewport && aspectRatio ? { aspectRatio } : undefined"
       type="button"
       :aria-label="openLabel"
       @click="handleImageAction('open')"
@@ -64,7 +66,7 @@ import ChatImageLightbox from './ChatImageLightbox.vue'
 import ChatIconButton from './ChatIconButton.vue'
 import type { CodexMessageImageOpenHandler, CodexMessageImageOpenIntent } from './message-image'
 import type { MessageMedia } from './types'
-import { useHostImageSource, useManagedImagePreview } from './host-image-previews'
+import { imageAspectRatio, useHostImageSource, useManagedImagePreview } from './host-image-previews'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
@@ -81,11 +83,12 @@ const generatedAltLabel = 'Generated media'
 const generatedLabel = 'Generated media'
 const promptLabel = 'Prompt'
 const openLabel = computed(() => `Open ${props.media.title || props.media.alt || generatedLabel}`)
-const managedPreview = useManagedImagePreview(() => props.media.url)
+const rootElement = ref<HTMLElement | null>(null)
+const managedPreview = useManagedImagePreview(() => props.media.url, rootElement)
+const aspectRatio = computed(() => imageAspectRatio(props.media) ?? imageAspectRatio(managedPreview?.dimensions.value))
 const previewSource = managedPreview?.source ?? useHostImageSource(() => props.media.url)
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
-const rootElement = ref<HTMLElement | null>(null)
 const downloadName = computed(() => mediaDownloadName(props.media))
 
 async function handleImageAction(intent: CodexMessageImageOpenIntent) {
@@ -155,6 +158,8 @@ function mediaDownloadName(media: MessageMedia): string {
   cursor: pointer;
 }
 
+.chat-media-block__image-button--reserved { position: relative; }
+.chat-media-block__image-button--reserved .chat-media-block__image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .chat-media-block__placeholder { display: block; padding: var(--space-6); color: var(--color-text-muted); }
 
 .chat-media-block__image {

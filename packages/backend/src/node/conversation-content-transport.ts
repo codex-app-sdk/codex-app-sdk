@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { imageSize } from 'image-size';
 
 type Content = { text: string; byteLength: number; charOffset: number; byteOffset: number };
 type Projection = { value: unknown; contents: Map<string, Content> };
@@ -25,6 +26,7 @@ export class ConversationContentTransport {
     }
     const contents = new Map<string, Content>();
     const references = new Map<string, string>();
+    const dimensions = new Map<string, { width: number; height: number } | undefined>();
     const visit = (value: unknown, field?: string): unknown => {
       if (typeof value === 'string' && ['url', 'imageUrl', 'image_url', 'previewUrl'].includes(field ?? '') && /^data:image\/[a-z0-9.+-]+;base64,[a-z\d+/]+=*$/i.test(value)) {
         let reference = references.get(value);
@@ -33,6 +35,7 @@ export class ConversationContentTransport {
           contents.set(id, { text: value, byteLength: value.length, charOffset: 0, byteOffset: 0 });
           reference = `conversation-image:${encodeURIComponent(this.conversationId)}:${id}`;
           references.set(value, reference);
+          dimensions.set(reference, imageDimensions(value));
         }
         return reference;
       }
@@ -46,10 +49,13 @@ export class ConversationContentTransport {
         return { ...value, diff: '', diffContent: { sessionId: this.conversationId, contentId, byteLength, changeKind: change.kind!.type } };
       }
       let changed = false;
+      let size: { width: number; height: number } | undefined;
       const entries = Object.entries(value).map(([key, child]) => {
-        const next = visit(child, key); changed ||= next !== child; return [key, next] as const;
+        const next = visit(child, key); changed ||= next !== child;
+        if (typeof next === 'string') size ??= dimensions.get(next);
+        return [key, next] as const;
       });
-      return changed ? Array.isArray(value) ? entries.map(([, child]) => child) : Object.fromEntries(entries) : value;
+      return changed ? Array.isArray(value) ? entries.map(([, child]) => child) : { ...Object.fromEntries(entries), ...size } : value;
     };
     const projection = { value: visit(source), contents };
     if (source && typeof source === 'object') this.cache.set(source, projection);
@@ -87,4 +93,15 @@ function contentHash(text: string): string {
     hash.update(text.slice(start, end)); start = end;
   }
   return hash.digest('hex');
+}
+
+/** Probe a bounded header, never decode or duplicate the full image. Unsupported
+ * or truncated headers omit metadata; the image remains readable unchanged. */
+function imageDimensions(dataUrl: string): { width: number; height: number } | undefined {
+  try {
+    const start = dataUrl.indexOf(',') + 1;
+    const { width, height, orientation } = imageSize(Buffer.from(dataUrl.slice(start, start + 64 * 1024), 'base64'));
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) return undefined;
+    return orientation && orientation >= 5 && orientation <= 8 ? { width: height, height: width } : { width, height };
+  } catch { return undefined; }
 }
