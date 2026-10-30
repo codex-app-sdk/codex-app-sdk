@@ -35,6 +35,7 @@ export {
   IconMaximize as Maximize2,
   IconMessageQuestion as MessageQuestionIcon,
   IconMicrophone as MicrophoneIcon,
+  IconMicrophoneOff as MicrophoneOffIcon,
   IconPaperclip as PaperclipIcon,
   IconPalette as PaletteIcon,
   IconPencil as PencilIcon,

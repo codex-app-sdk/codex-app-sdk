@@ -6,10 +6,9 @@
         class="chat-composer__listening"
         role="status"
         aria-label="Listening"
-      ><span
+      ><ChatAudioLevelIndicator
         class="chat-composer__listening-dot"
-        :style="{ '--audio-level': audioLevel ?? 0 }"
-        aria-hidden="true"
+        :audio-level="audioLevel"
       /></span><span
         v-else-if="!hasText"
         class="chat-composer__audio-status"
@@ -22,6 +21,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { CodexSpeechTranscript } from '@codex-app-sdk/core/native'
+import ChatAudioLevelIndicator from './ChatAudioLevelIndicator.vue'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
@@ -64,17 +64,6 @@ const hasText = computed(() => props.before || props.after || props.transcript?.
 .chat-composer__listening {
   display: inline-block;
   margin-inline-start: var(--space-3);
-}
-
-.chat-composer__listening-dot {
-  display: inline-block;
-  width: var(--space-4);
-  height: var(--space-4);
-  border-radius: 50%;
-  background: var(--color-text-muted);
-  opacity: calc(0.25 + var(--audio-level) * 0.4);
-  transform: scale(calc(0.65 + var(--audio-level) * 0.65));
-  transition: transform 100ms ease-out, opacity 100ms ease-out;
 }
 
 .chat-composer__audio-status {

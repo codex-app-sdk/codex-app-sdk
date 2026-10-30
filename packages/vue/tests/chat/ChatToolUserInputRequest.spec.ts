@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
+import type { CodexNativeRendererApi, CodexSpeechSessionEvent } from '@codex-app-sdk/core/native';
 import { describe, expect, it, vi } from 'vitest';
 import ChatToolUserInputRequest from '../../src/chat/ChatToolUserInputRequest.vue';
 import type { AskUserQuestion } from '../../src/chat/contracts';
@@ -68,6 +69,81 @@ function requestTool(
 }
 
 describe('ChatToolUserInputRequest normalization and resolution', () => {
+  it('dictates an editable answer and discards recording when the question changes or closes', async () => {
+    const noop = () => {};
+    const track = Object.assign(new EventTarget(), { stop: noop });
+    const port = { onmessage: null as ((event: { data: unknown }) => void) | null,
+      postMessage: () => queueMicrotask(() => port.onmessage?.({ data: 'stopped' })), close: noop };
+    vi.stubGlobal('navigator', { language: 'en-US', mediaDevices: { getUserMedia: async () => ({ getTracks: () => [track] }) } });
+    vi.stubGlobal('AudioContext', class { sampleRate = 16000; destination = {}; audioWorklet = { addModule: async () => {} };
+      async resume() {} async close() {} createMediaStreamSource() { return { connect: noop, disconnect: noop }; } });
+    vi.stubGlobal('AudioWorkletNode', class { port = port; connect = noop; disconnect = noop; });
+    let publish: (event: CodexSpeechSessionEvent) => void = noop;
+    let sessionId = '';
+    let finish!: (result: { text: string; error?: string }) => void;
+    const nativeWindow = window as Window & { codexAppSdkNative?: CodexNativeRendererApi };
+    nativeWindow.codexAppSdkNative = {
+      capabilities: { attachments: false, clipboard: false, externalLinks: false, transcription: true },
+      copyToClipboard: async () => {}, ingestAttachments: async () => [], openExternal: async () => {}, pickAttachments: async () => [],
+      transcribeAudio: async () => ({ text: '' }),
+      streamingTranscription: { start: async options => { sessionId = options.sessionId; }, append: async () => {},
+        stop: () => new Promise(resolve => { finish = resolve; }), cancel: async () => {},
+        onEvent: listener => { publish = listener; return () => { publish = noop; }; } },
+    };
+    const wrapper = mount(ChatToolUserInputRequest, { props: { toolCall: requestTool([
+      firstQuestion, { ...firstQuestion, id: 'more', question: 'Anything else?', options: null },
+    ]) } });
+    try {
+      const input = () => wrapper.get<HTMLTextAreaElement>('textarea');
+      const next = () => wrapper.get<HTMLButtonElement>('.chat-tool-user-input__button--primary');
+      const mic = () => wrapper.get('[aria-label="Dictate answer"]');
+      await input().setValue('Before ending'); input().element.setSelectionRange(7, 7);
+      await mic().trigger('click'); await flushPromises();
+      expect(next().element.disabled).toBe(true);
+      publish({ type: 'transcript', sessionId, finalText: 'spoken', partialText: ' words' });
+      await flushPromises();
+      expect(input().element.value).toBe('Before spoken words ending');
+      expect(input().element.readOnly).toBe(true);
+      expect(next().element.disabled).toBe(false);
+      await wrapper.get('[aria-label="Stop dictation"]').trigger('click'); await flushPromises();
+      finish({ text: 'spoken words' }); await flushPromises();
+      expect(input().element.readOnly).toBe(false);
+      expect(input().element.value).toBe('Before spoken words ending');
+      expect(wrapper.emitted('client-response')).toBeUndefined();
+      await input().setValue('Reviewed answer'); await next().trigger('click');
+      await mic().trigger('click'); await flushPromises();
+      expect(next().element.disabled).toBe(true);
+      await wrapper.get('[aria-label="Stop dictation"]').trigger('click'); await flushPromises();
+      await wrapper.get('button.chat-tool-user-input__button:not(.chat-tool-user-input__button--primary)').trigger('click');
+      finish({ text: 'late result' }); await flushPromises();
+      expect(input().element.value).toBe('Reviewed answer');
+      await mic().trigger('click'); await flushPromises();
+      publish({ type: 'error', sessionId, error: 'Recognition failed' }); await flushPromises();
+      expect(wrapper.get('[role="alert"]').text()).toBe('Recognition failed');
+      expect(input().element.value).toBe('Reviewed answer');
+      await mic().trigger('click'); await flushPromises();
+      await wrapper.get('[aria-label="Stop dictation"]').trigger('keydown', { key: 'Escape' }); await flushPromises();
+      expect(input().element.value).toBe('Reviewed answer');
+      await mic().trigger('click'); await flushPromises();
+      publish({ type: 'transcript', sessionId, finalText: '', partialText: 'more' }); await flushPromises();
+      await next().trigger('click'); await flushPromises();
+      finish({ text: '', error: 'No speech detected' }); await flushPromises();
+      expect(wrapper.get('[role="alert"]').text()).toBe('No speech detected');
+      expect(input().element.value).toBe('Reviewed answer');
+      await mic().trigger('click'); await flushPromises();
+      publish({ type: 'transcript', sessionId, finalText: '', partialText: 'more' }); await flushPromises();
+      await next().trigger('click'); await flushPromises();
+      expect(next().element.disabled).toBe(true);
+      finish({ text: 'more detail' }); await flushPromises();
+      expect(input().element.value).toBe('');
+      expect(wrapper.emitted('client-response')).toBeUndefined();
+      await mic().trigger('click'); await flushPromises();
+      await wrapper.setProps({ historical: true });
+      expect(wrapper.find('[aria-label="Stop dictation"]').exists()).toBe(false);
+      expect(wrapper.emitted('client-response')).toBeUndefined();
+    } finally { wrapper.unmount(); delete nativeWindow.codexAppSdkNative; vi.unstubAllGlobals(); }
+  });
+
   it.each([undefined, null, false, 0, '', {}, { id: 'not-an-array' }])
   ('shows preparation state for invalid question data %#', (questions) => {
     const wrapper = mount(ChatToolUserInputRequest, {

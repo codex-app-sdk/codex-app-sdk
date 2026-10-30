@@ -261,7 +261,13 @@ pending-question chip. Questions whose `options` value is `null` render an
 immediately focused free-text field. Questions with `isOther: true` and options
 show an always-visible, initially one-line field beside Other. Focusing or typing
 in it selects Other, preserving any other selections only for `multiSelect`
-questions. Question cards omit a header that repeats
+questions. Free-text answers reuse the host's composer speech support through a
+microphone button. Stop the microphone to review the editable transcript, or
+press Send/Next while recording to finish transcription and submit or advance.
+Send becomes available after the first recognized words; a centered,
+sound-responsive dot replaces the microphone while recording, keeping Send as
+the single primary action.
+Question cards omit a header that repeats
 the question, and an immediately preceding text part that exactly matches a
 structured question is not rendered twice. Distinct introductory text and
 short question labels remain visible. Answered questions stack their label
@@ -476,7 +482,9 @@ muted listening dot that grows and brightens with `audioLevel`, remaining still
 in silence, without changing layout or adding recording controls.
 `CodexComposerVoiceButton` displays a primary-colored circle
 with a white microphone while recording; connect its `toggle` event to the
-controller. In the stock composer, Escape cancels dictation and restores the draft.
+controller. Its `recording` slot replaces the microphone with custom feedback;
+hover reveals a crossed-out microphone as a stop affordance. In the stock composer,
+Escape cancels dictation and restores the draft.
 
 ### Messages and media
 

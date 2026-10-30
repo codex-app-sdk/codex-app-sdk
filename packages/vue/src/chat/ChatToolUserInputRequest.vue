@@ -114,13 +114,15 @@
             :aria-label="isFreeTextOnly(currentQuestion) ? currentQuestion.question : 'Other answer'"
             :autocomplete="currentQuestion.isSecret ? 'off' : undefined"
             :placeholder="answerPlaceholder"
+            :readonly="voiceBusy"
             :rows="currentQuestion.isSecret ? undefined : 1"
             :type="currentQuestion.isSecret ? 'password' : undefined"
-            :value="otherTexts[currentQuestion.id] ?? ''"
+            :value="voiceBusy ? voicePreview : otherTexts[currentQuestion.id] ?? ''"
             @input="onAnswerInput(currentQuestion, $event)"
             @keydown="onAnswerKeydown"
           />
         </div>
+        <p v-if="voiceError" class="chat-tool-user-input__error" role="alert">{{ voiceError }}</p>
 
         <div class="codex-request-footer chat-tool-user-input__actions">
           <button
@@ -131,6 +133,14 @@
           >
             Back
           </button>
+          <ChatComposerVoiceButton v-if="acceptsText && !currentQuestion.isSecret"
+            :disabled="voiceDisabled" :recording="isRecording"
+            :label="isRecording ? 'Stop dictation' : 'Dictate answer'"
+            :title="voiceTitle === 'Record voice prompt' ? 'Dictate answer' : voiceTitle"
+            @toggle="toggleDictation"
+          >
+            <template #recording><ChatAudioLevelIndicator :audio-level="audioLevel" /></template>
+          </ChatComposerVoiceButton>
           <button
             class="codex-request-button codex-request-button--primary chat-tool-user-input__button chat-tool-user-input__button--primary"
             :disabled="!canProceed"
@@ -150,6 +160,9 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { AskUserAnswers, AskUserQuestion } from './contracts'
 import { Check, MessageQuestionIcon, PencilIcon, SquareCheck, SquareDashed, SquareX, X } from '../icons/app-icons'
 import ChatToolCallTitle from './ChatToolCallTitle.vue'
+import ChatComposerVoiceButton from './ChatComposerVoiceButton.vue'
+import ChatAudioLevelIndicator from './ChatAudioLevelIndicator.vue'
+import { useChatComposerVoice } from './use-chat-composer-voice'
 import { parseToolStatusDescriptor } from './tool-status'
 import type { MessageToolCall } from './types'
 
@@ -170,7 +183,7 @@ const localAnswered = ref(false)
 const localCancelled = ref(false)
 const selections = reactive<Record<string, string[]>>({})
 const root = ref<HTMLElement>()
-const answerField = ref<HTMLElement>()
+const answerField = ref<HTMLInputElement | HTMLTextAreaElement>()
 const otherTexts = reactive<Record<string, string>>({})
 
 const descriptor = computed(() => parseToolStatusDescriptor(props.toolCall.status))
@@ -208,11 +221,51 @@ const acceptsText = computed(() => {
   const question = currentQuestion.value
   return !!question && (isFreeTextOnly(question) || question.isOther === true)
 })
+let voiceTarget: { id: string; before: string; after: string } | undefined
+const { buttonDisabled: voiceDisabled, buttonTitle: voiceTitle, error: voiceError,
+  isStarting, isRecording, isTranscribing, transcript, audioLevel, toggle: toggleVoice, cancel: cancelVoice, stop: stopVoice,
+} = useChatComposerVoice({
+  isDisabled: () => !interactive.value || !acceptsText.value || !!currentQuestion.value?.isSecret,
+  isSending: () => false,
+  onTranscript: async text => {
+    const question = currentQuestion.value
+    if (!question || !voiceTarget || !interactive.value || question.id !== voiceTarget.id) return
+    const insertion = text.trim()
+    setAnswerText(question, `${voiceTarget.before}${insertion}${voiceTarget.after}`)
+    const caret = voiceTarget.before.length + insertion.length
+    await nextTick()
+    answerField.value?.focus()
+    answerField.value?.setSelectionRange(caret, caret)
+  },
+})
+const voiceBusy = computed(() => isStarting.value || isRecording.value || isTranscribing.value)
+const voicePreview = computed(() => `${voiceTarget?.before ?? ''}${transcript.value.finalText}${transcript.value.partialText}${voiceTarget?.after ?? ''}`)
+watch([requestId, () => currentQuestion.value?.id, interactive, acceptsText, () => currentQuestion.value?.isSecret], () => {
+  voiceTarget = undefined
+  voiceError.value = null
+  void cancelVoice()
+}, { flush: 'sync' })
+
+async function toggleDictation() {
+  const question = currentQuestion.value
+  if (!question) return
+  if (!voiceBusy.value) {
+    const text = otherTexts[question.id] ?? ''
+    const before = text.slice(0, answerField.value?.selectionStart ?? text.length)
+    const after = text.slice(answerField.value?.selectionEnd ?? text.length)
+    voiceTarget = { id: question.id, before: before && !/\s$/.test(before) ? `${before} ` : before,
+      after: after && !/^\s/.test(after) ? ` ${after}` : after }
+  }
+  await toggleVoice()
+}
 const eyebrow = computed(() => {
   const question = currentQuestion.value
   return question && question.header.trim() !== question.question.trim() ? question.header : 'Question'
 })
 const answerPlaceholder = computed(() => {
+  if (isStarting.value) return 'Starting microphone...'
+  if (isRecording.value) return 'Listening...'
+  if (isTranscribing.value) return 'Transcribing...'
   const question = currentQuestion.value
   if (question?.isSecret) {
     return 'Enter private answer'
@@ -221,9 +274,11 @@ const answerPlaceholder = computed(() => {
 })
 const canProceed = computed(() => {
   const question = currentQuestion.value
-  if (!question || !hasAnswerFor(question)) {
+  if (isStarting.value || isTranscribing.value || !question) {
     return false
   }
+  if (isRecording.value) return !!(transcript.value.finalText + transcript.value.partialText).trim()
+  if (!hasAnswerFor(question)) return false
 
   return !isLastQuestion.value || questions.value.every((entry) => hasAnswerFor(entry))
 })
@@ -266,7 +321,7 @@ function isSelected(questionId: string, label: string) {
 }
 
 function toggleOption(question: AskUserQuestion, label: string) {
-  if (answered.value || cancelled.value) {
+  if (answered.value || cancelled.value || voiceBusy.value) {
     return
   }
 
@@ -293,7 +348,10 @@ function onAnswerInput(question: AskUserQuestion, event: Event) {
     return
   }
 
-  const text = (event.target as HTMLInputElement | HTMLTextAreaElement).value
+  setAnswerText(question, (event.target as HTMLInputElement | HTMLTextAreaElement).value)
+}
+
+function setAnswerText(question: AskUserQuestion, text: string) {
   otherTexts[question.id] = text
   if (!question.multiSelect && text.trim()) {
     selections[question.id] = []
@@ -305,6 +363,12 @@ function hasAnswerFor(question: AskUserQuestion) {
 }
 
 function onCardKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && voiceBusy.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    void cancelVoice()
+    return
+  }
   if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !interactive.value) {
     return
   }
@@ -326,6 +390,10 @@ function onCardKeydown(event: KeyboardEvent) {
 }
 
 function onAnswerKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && voiceBusy.value) {
+    onCardKeydown(event)
+    return
+  }
   event.stopPropagation()
   if (event.key !== 'Enter' || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
     return
@@ -337,7 +405,10 @@ function onAnswerKeydown(event: KeyboardEvent) {
   }
 }
 
-function proceed() {
+async function proceed() {
+  if (isStarting.value || isTranscribing.value) return
+  if (isRecording.value && !await stopVoice()) return
+  if (!canProceed.value) return
   if (isLastQuestion.value) {
     submit()
   } else {
@@ -671,6 +742,19 @@ function normalizeQuestions(value: unknown): AskUserQuestion[] {
   flex: 0 0 auto;
   margin-top: 8px;
   color: var(--color-text-muted);
+}
+
+.chat-tool-user-input__actions > .chat-composer__voice--recording,
+.chat-tool-user-input__actions > .chat-composer__voice--recording:hover:not(:disabled) {
+  color: var(--color-text-muted);
+  background: var(--color-surface-base);
+}
+
+.chat-tool-user-input__error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-12);
 }
 
 .chat-tool-user-input__other-input {

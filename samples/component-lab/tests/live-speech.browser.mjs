@@ -144,8 +144,81 @@ try {
   const bytes = await page.evaluate(() => window.speechProbe.bytes);
   await page.waitForTimeout(400);
   assert.equal(await page.evaluate(() => window.speechProbe.bytes), bytes, 'Cancelled capture must stop sending PCM');
+  await page.evaluate(async ({ root, packaged }) => {
+    const { createApp, h } = await import('/node_modules/.vite/deps/vue.js');
+    const Question = packaged
+      ? (await import('/@fs/' + root + 'packages/vue/dist/index.js')).CodexQuestionRequest
+      : (await import('/@fs/' + root + 'packages/vue/src/chat/ChatQuestionRequest.vue')).default;
+    const probe = window.speechProbe;
+    probe.startReady = undefined; probe.finish = undefined; probe.answers = [];
+    const target = document.createElement('div'); target.id = 'question-speech-fixture';
+    target.style.cssText = 'position:fixed;inset:12px;background:white;z-index:10000;padding:12px';
+    document.body.append(target);
+    createApp({ render: () => h(Question, { request: {
+      id: 'question-request', kind: 'ask_user', conversationId: 'thread', turnId: 'turn', itemId: 'question-item',
+      payload: { request: { itemId: 'question-item', delivery: 'async', blocking: false,
+        questions: [{ id: 'answer', header: 'Details', question: 'What should we change?', isOther: true, isSecret: false,
+          options: [{ label: 'Default', description: '' }] }] } },
+    }, onClientResponse: answer => probe.answers.push(answer) }) }).mount(target);
+  }, { root, packaged: process.env.SDK_SPEECH_PACKAGE === '1' });
+  const question = page.locator('#question-speech-fixture');
+  const answer = question.getByRole('textbox', { name: 'Other answer' });
+  assert.equal(await question.locator('.chat-composer__voice svg').count(), 1, 'Idle button shows the microphone');
+  await answer.fill('Before\nending'); await answer.evaluate(el => el.setSelectionRange(7, 7));
+  await question.getByRole('button', { name: 'Dictate answer', exact: true }).click();
+  await page.waitForFunction(() => typeof window.speechProbe.startReady === 'function');
+  await page.evaluate(() => window.speechProbe.startReady());
+  await question.getByRole('button', { name: 'Stop dictation', exact: true }).waitFor();
+  assert.equal(await question.locator('.chat-audio-level-indicator').isVisible(), true,
+    'Starting recording shows the pulsing dot even when the pointer remains on the button');
+  await page.mouse.move(0, 0);
+  const sendAnswer = question.getByRole('button', { name: 'Send', exact: true });
+  assert.equal(await sendAnswer.isDisabled(), true, 'Send waits for recognized words');
+  await transcript('', '   ');
+  assert.equal(await sendAnswer.isDisabled(), true, 'Whitespace is not recognized speech');
+  await transcript('spoken', ' words');
+  assert.equal(await answer.inputValue(), 'Before\nspoken words ending');
+  assert.equal(await sendAnswer.isDisabled(), false);
+  await question.getByRole('button', { name: 'Stop dictation', exact: true }).hover();
+  assert.equal(await question.locator('.chat-composer__voice svg:visible').count(), 1, 'Hover reveals the microphone stop affordance');
+  assert.equal(await question.locator('.chat-audio-level-indicator').isVisible(), false, 'Hover replaces the recording dot');
+  assert.notEqual(await question.locator('.chat-composer__voice').evaluate(el => getComputedStyle(el).backgroundColor),
+    await sendAnswer.evaluate(el => getComputedStyle(el).backgroundColor),
+    'Recording microphone stays neutral beside the primary Send button');
+  const questionDot = question.locator('.chat-audio-level-indicator');
+  await page.mouse.move(0, 0);
+  assert.equal(await question.locator('.chat-composer__voice svg:visible').count(), 0, 'Recording dot replaces the microphone');
+  assert.equal(await questionDot.evaluate(el => getComputedStyle(el).width), '8px');
+  const centered = await questionDot.evaluate(el => {
+    const dot = el.getBoundingClientRect(), button = el.closest('button').getBoundingClientRect();
+    return Math.abs(dot.x + dot.width / 2 - button.x - button.width / 2) <= 0.5
+      && Math.abs(dot.y + dot.height / 2 - button.y - button.height / 2) <= 0.5;
+  });
+  assert(centered, 'Recording dot is centered in its control');
+  const quietDot = await questionDot.evaluate(el => Number(getComputedStyle(el).opacity));
+  await page.evaluate(() => { window.speechProbe.volume.value = 0.1; });
+  await page.waitForFunction(quiet => Number(getComputedStyle(document.querySelector('#question-speech-fixture .chat-audio-level-indicator')).opacity) > quiet + 0.1, quietDot);
+  if (process.env.SPEECH_SCREENSHOT) await question.locator('.chat-tool-user-input').screenshot({ path: process.env.SPEECH_SCREENSHOT + '.recording.png' });
+  await page.evaluate(() => { window.speechProbe.volume.value = 0; });
+  await page.waitForFunction(quiet => Number(getComputedStyle(document.querySelector('#question-speech-fixture .chat-audio-level-indicator')).opacity) <= quiet + 0.01, quietDot);
+  const bounds = await question.locator('.chat-composer__voice').boundingBox();
+  assert(bounds.x >= 0 && bounds.x + bounds.width <= 390, 'Question microphone fits the phone viewport');
+  const sendBounds = await sendAnswer.boundingBox();
+  assert((await answer.boundingBox()).height > 40, 'Alignment is checked with a multiline answer');
+  assert(Math.abs(bounds.y + bounds.height / 2 - sendBounds.y - sendBounds.height / 2) <= 1,
+    'Microphone and Send stay vertically aligned for multiline answers');
+  await sendAnswer.click();
+  await page.waitForFunction(() => typeof window.speechProbe.finish === 'function');
+  assert.equal(await sendAnswer.isDisabled(), true);
+  assert.equal(await page.evaluate(() => window.speechProbe.answers.length), 0, 'Send waits for the final transcript');
+  if (process.env.SPEECH_SCREENSHOT) await question.locator('.chat-tool-user-input').screenshot({ path: process.env.SPEECH_SCREENSHOT + '.question.png' });
+  await page.evaluate(() => window.speechProbe.finish({ text: 'final spoken answer' }));
+  await page.waitForFunction(() => window.speechProbe.answers.length === 1);
+  assert.deepEqual(await page.evaluate(() => window.speechProbe.answers), [{
+    id: 'question-request', payload: { answers: { answer: { answers: ['Before\nfinal spoken answer ending'] } } },
+  }]);
   assert.deepEqual(errors, []);
-  console.log('Live composer: real AudioWorklet capture, corrected partials, caret insertion, finalize/send, draft restoration, and active-capture cancellation passed.');
+  console.log('Composer and questions: real AudioWorklet capture, live/corrected transcripts, caret insertion, reviewed submission, and cancellation passed.');
 } finally {
   await browser?.close();
   await server.close();

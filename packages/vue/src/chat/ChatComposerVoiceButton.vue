@@ -8,16 +8,20 @@
     :aria-label="label"
     :title="title"
     @click="emit('toggle')"
+    @pointerenter="hovered = recording && $event.pointerType !== 'touch'"
+    @pointerleave="hovered = false"
   >
-    <MicrophoneIcon aria-hidden="true" />
+    <slot v-if="recording && !hovered && $slots.recording" name="recording" />
+    <component :is="hovered ? MicrophoneOffIcon : MicrophoneIcon" v-else aria-hidden="true" />
   </button>
 </template>
 
 <script setup lang="ts">
-import { MicrophoneIcon } from '../icons/app-icons'
+import { MicrophoneIcon, MicrophoneOffIcon } from '../icons/app-icons'
+import { ref, watch } from 'vue'
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
-defineProps<{
+const props = defineProps<{
   disabled: boolean
   label: string
   recording: boolean
@@ -28,6 +32,8 @@ const emit = defineEmits<{
   toggle: []
 }>()
 // Stryker restore all
+const hovered = ref(false)
+watch(() => props.recording, () => { hovered.value = false })
 </script>
 
 <style scoped>
@@ -65,4 +71,5 @@ const emit = defineEmits<{
   height: 20px;
   stroke-width: 1.8;
 }
+
 </style>

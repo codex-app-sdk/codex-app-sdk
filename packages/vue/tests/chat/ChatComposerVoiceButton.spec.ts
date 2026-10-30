@@ -13,6 +13,7 @@ describe('ChatComposerVoiceButton', () => {
         recording: true,
         title: 'Stop recording',
       },
+      slots: { recording: '<span>Listening</span>' },
     });
 
     expect(wrapper.attributes('aria-label')).toBe('Stop recording');
@@ -20,9 +21,20 @@ describe('ChatComposerVoiceButton', () => {
     expect(wrapper.classes()).toContain('chat-composer__voice--recording');
     await wrapper.trigger('click');
     expect(wrapper.emitted('toggle')).toStrictEqual([[]]);
+    await wrapper.trigger('pointerenter', { pointerType: 'touch' });
+    expect(wrapper.text()).toBe('Listening');
+    await wrapper.trigger('pointerenter', { pointerType: 'mouse' });
+    expect(wrapper.text()).toBe('');
+    expect(wrapper.find('svg.tabler-icon-microphone-off').exists()).toBe(true);
+    await wrapper.trigger('pointerleave');
+    expect(wrapper.text()).toBe('Listening');
+    await wrapper.trigger('pointerenter', { pointerType: 'mouse' });
+    await wrapper.setProps({ recording: false });
+    await wrapper.setProps({ recording: true });
+    expect(wrapper.text()).toBe('Listening');
   });
 
-  it('forwards disabled state', () => {
+  it('forwards disabled state and keeps the default composer recording control', async () => {
     const wrapper = mount(ChatComposerVoiceButton, {
       props: {
         disabled: true,
@@ -34,5 +46,11 @@ describe('ChatComposerVoiceButton', () => {
 
     expect(wrapper.attributes('disabled')).toBeDefined();
     expect(wrapper.attributes('title')).toBe('Audio recording is not available.');
+    await wrapper.setProps({ disabled: false, recording: true });
+    expect(wrapper.find('svg.tabler-icon-microphone').exists()).toBe(true);
+    await wrapper.trigger('pointerenter', { pointerType: 'mouse' });
+    expect(wrapper.find('svg.tabler-icon-microphone-off').exists()).toBe(true);
+    await wrapper.trigger('pointerleave');
+    expect(wrapper.find('svg.tabler-icon-microphone').exists()).toBe(true);
   });
 });
