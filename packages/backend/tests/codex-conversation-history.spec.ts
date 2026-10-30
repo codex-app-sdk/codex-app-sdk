@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   codexImageDataUrl,
   codexItemToMediaPart,
+  codexItemToMediaParts,
   codexItemToSurfaceMessage,
   codexThreadToSurfaceMessages,
   codexTurnToSurfaceMessages,
@@ -528,6 +529,28 @@ describe('codexThreadToSurfaceMessages', () => {
     } as unknown as v2.ThreadItem)).toMatchObject({
       media: { url: `data:image/png;base64,${pngBase64}` },
     });
+  });
+
+  it('only restores bounded image envelopes and authorized raster path candidates', () => {
+    const image = { type: 'image', data: pngBase64, mimeType: 'image/svg+xml' };
+    const wrap = (content: unknown[]) => [{ type: 'text', text: JSON.stringify({ content }) }];
+    const extract = (content: unknown[]) => codexItemToMediaParts({
+      type: 'mcpToolCall', id: 'bounded', status: 'completed', result: { content },
+    } as unknown as v2.ThreadItem);
+    expect(extract(wrap([image]))[0]?.media.mimeType).toBe('image/png'); // Sniff bytes, not the claimed MIME.
+    for (const content of [
+      [{ type: 'text', text: '{broken JSON' }],
+      [{ type: 'text', text: JSON.stringify({ unrelated: [image] }) }],
+      wrap([{ type: 'image', data: 'not an image' }]),
+      wrap([{ type: 'image', data: pngBase64.slice(0, 40) + '…' + pngBase64.slice(-12) }]),
+      Array.from({ length: 5 }).reduce<unknown[]>(value => wrap(value), [image]),
+      [...Array.from({ length: 256 }, () => ({ type: 'text', text: '' })), image],
+      [{ type: 'text', text: ' '.repeat(32 * 1024 * 1024) + JSON.stringify({ content: [image] }) }],
+    ]) expect(extract(content)).toEqual([]);
+    expect(extract(Array.from({ length: 10 }, () => image))).toHaveLength(8);
+    for (const path of ['relative.png', 'https://example.com/shot.png', '/tmp/vector.svg', '/tmp/file.txt']) {
+      expect(codexItemToMediaParts({ type: 'imageView', id: 'unsafe', path })).toEqual([]);
+    }
   });
 
   it('bounds historical tool payloads without dropping visible generated images', () => {

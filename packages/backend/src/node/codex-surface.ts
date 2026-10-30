@@ -1,3 +1,5 @@
+import { CodexOriginalHistoryImages } from './codex-original-history-images';
+import { ConversationContentTransport } from './conversation-content-transport';
 import {
   CodexAppServerClient,
   type ServerNotification,
@@ -166,6 +168,7 @@ export class CodexSurface {
   private readonly turnActions: CodexSurfaceTurnActionsController;
   private readonly messagesController: CodexSurfaceMessagesController;
   private readonly lifecycle: CodexSurfaceLifecycleController;
+  private readonly originalImages?: CodexOriginalHistoryImages;
   private readonly forks: CodexSurfaceForkController;
   private readonly notifications: CodexSurfaceNotificationsController;
   private readonly runtimeState: CodexSurfaceRuntimeController;
@@ -196,6 +199,7 @@ export class CodexSurface {
         : new CodexAppServerStdioTransport(transportOptions),
       options.onListenerError ? { onListenerError: options.onListenerError } : {},
     );
+    this.originalImages = options.originalHistoryImages ? new CodexOriginalHistoryImages(this.client) : undefined;
     this.markdownImages = new CodexMarkdownImageHydrator(this.client);
     this.authentication = new CodexSurfaceAuthenticationController(this.client, {
       bootstrapSurfaceData: (force) => this.connection.bootstrapSurfaceData(force),
@@ -343,6 +347,7 @@ export class CodexSurface {
         runtime: (threadId) => this.runtimeState.get(threadId),
         schedulePluginRefresh: (force) => this.catalog.schedulePluginRefresh(force),
       },
+      this.originalImages,
     );
     this.lifecycle = new CodexSurfaceLifecycleController(
       this.client,
@@ -375,6 +380,7 @@ export class CodexSurface {
         runtimeProjection: (runtime) => this.runtimeProjection(runtime),
         snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
       },
+      this.originalImages,
     );
     this.forks = new CodexSurfaceForkController(
       this.client,
@@ -708,6 +714,7 @@ export class CodexSurface {
     const wasActive = this.state.activeConversationId === threadId;
     this.runtimeState.forget(threadId);
     this.lifecycle.forget(threadId);
+    this.originalImages?.forget(threadId);
     this.conversations.forget(threadId);
     this.items.forget(threadId);
     this.conversationHandles.delete(threadId);
@@ -735,6 +742,21 @@ export class CodexSurface {
       },
       error: null,
     });
+  }
+
+  /** Main-process content reader. Every read is bound to the current runtime. */
+  async readConversationContent(conversationId: string, contentId: string, offset: number) {
+    if (!/^[a-f0-9]{64}$/.test(contentId) || !Number.isSafeInteger(offset) || offset < 0) throw new Error('Invalid conversation content request.');
+    const runtime = this.runtimeState.get(conversationId);
+    if (!runtime?.hydrated || this.closed) throw new Error('Conversation content is no longer available.');
+    const reference = `conversation-image:${encodeURIComponent(conversationId)}:${contentId}`;
+    const owns = () => !this.closed && this.runtimeState.get(conversationId) === runtime && runtime.messages.some(m => m.parts.some(p => p.type === 'media' && p.media.url === reference));
+    if (this.originalImages && owns()) {
+      const result = await this.originalImages.read(conversationId, contentId, offset);
+      if (!owns()) throw new Error('Conversation content is no longer available.');
+      return result;
+    }
+    return new ConversationContentTransport(conversationId).read({ messages: runtime.messages }, contentId, offset);
   }
 
   async readConversationHistory(conversationId = this.state.activeConversationId ?? ''): Promise<CodexConversationHistory> {
@@ -870,6 +892,7 @@ export class CodexSurface {
       onEvent: (listener) => this.onConversationEvent(id, listener),
       onStateChange: (listener) => this.onConversationStateChange(id, listener),
       readHistory: () => this.readConversationHistory(id),
+      readContent: (contentId, offset) => this.readConversationContent(id, contentId, offset),
       readPromptHistory: () => this.readConversationPromptHistory(id),
       rename: (title) => this.conversationSettings.rename(id, title),
       resolveApproval: (approvalId, decision, scope = 'once') => (
@@ -991,6 +1014,7 @@ export class CodexSurface {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    this.originalImages?.clear();
     this.usage.clear();
     this.unsubscribeNotification();
     this.unsubscribeToolInputRequests();
@@ -1205,6 +1229,7 @@ export class CodexSurface {
     this.clearPendingForThread(threadId, 'Codex thread is no longer available', 'conversation_removed');
     this.runtimeState.forget(threadId);
     this.lifecycle.forget(threadId);
+    this.originalImages?.forget(threadId);
     this.conversations.forget(threadId);
     this.conversationHandles.delete(threadId);
     const conversations = this.state.conversations.filter((conversation) => conversation.id !== threadId);

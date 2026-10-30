@@ -44,6 +44,7 @@ export type CodexConversationHandleOperations = {
   onEvent(listener: (event: CodexConversationEvent) => void): () => void;
   onStateChange(listener: (snapshot: CodexConversationSnapshot) => void): () => void;
   readHistory(): Promise<CodexConversationHistory>;
+  readContent?: CodexConversation['readContent'];
   readPromptHistory(): Promise<CodexConversationPromptHistory>;
   loadOlderHistory?: () => Promise<CodexConversationHistoryPage>;
   rename(title: string): Promise<void>;
@@ -79,6 +80,7 @@ export function createCodexConversationHandle(
     load: (options) => snapshotAfter(() => operations.load(options)),
     select: () => snapshotAfter(operations.select),
     readHistory: operations.readHistory,
+    readContent: operations.readContent ?? (async () => { throw new Error('Content reads are unavailable.'); }),
     readPromptHistory: operations.readPromptHistory,
     loadOlderHistory: operations.loadOlderHistory ?? (
       async () => ({ conversationId: id, messages: [], hasOlder: false })

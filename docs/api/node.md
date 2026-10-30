@@ -618,3 +618,35 @@ The Vue file target forwards this reference to the host on selection. Fetch it u
 the same `read` method; offsets and lengths count UTF-8 bytes, and the reconstructed
 text is the exact historical patch (full file text for add/delete, unified hunks for
 update). Reads never consult the current working-tree file.
+
+### Original tool images from local history
+
+Set `originalHistoryImages: true` on `CodexSurface` to restore recorded tool
+images from the local app-server's existing history file. The default is `false`.
+The SDK obtains that path from app-server, verifies the history's conversation
+identity, and reads it without modifying it or creating image files or sidecars.
+
+History snapshots contain small `conversation-image:` media references with
+intrinsic dimensions when available. Originals belong to their recorded turn,
+outer tool-call ID, and image index; temporary filenames do not establish image
+identity. Native `imageView` operations remain as tool/path rows in this mode,
+while their mutable current-file thumbnails are omitted. Other native media is
+unchanged. Recorded images are inserted before the turn's final answer.
+
+Main-process hosts can use `conversation.readContent(contentId, offset)` (or
+`surface.readConversationContent(conversationId, contentId, offset)`) for both
+original images and existing inline image/diff content. The result has the same
+`{ data, totalBytes, nextOffset }` chunk contract as
+`ConversationContentTransport.read`. The synchronous reader remains available.
+Authorize the conversation before calling and recheck its host binding after
+awaiting the result. The SDK checks that an original reference still belongs to
+the current snapshot after asynchronous reads; foreign IDs and invalid offsets
+are rejected. No renderer or mobile protocol change is required.
+
+Scanning uses 64 KiB file reads, at most 256 MiB per history file and 100,000
+records; records over 32 MiB are skipped. Each of two cached offset indexes holds
+at most 2,048 images; at most two encoded originals share one 20 MiB cache budget. Index scans and
+record decodes are serialized per surface, including requests from older clients. At most 256 output blocks are examined per operation. Unavailable,
+malformed, oversized, and foreign history cannot grant image access. The provider
+history file must be accessible to the SDK process; this option is intended for
+local app-server integrations.

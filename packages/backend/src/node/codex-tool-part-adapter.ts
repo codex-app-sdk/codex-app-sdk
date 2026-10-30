@@ -171,6 +171,11 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
     };
   }
 
+  if (item.type === 'imageView' && typeof item.path === 'string') {
+    return { type: 'tool', id: item.id, kind: 'dynamic', title: 'view_image',
+      status: 'completed', input: { path: item.path } };
+  }
+
   if (item.type === 'imageGeneration') {
     return {
       type: 'tool',

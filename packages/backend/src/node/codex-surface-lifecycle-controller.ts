@@ -1,3 +1,4 @@
+import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationHistory,
@@ -85,6 +86,7 @@ export class CodexSurfaceLifecycleController {
     private readonly settings: CodexSurfaceConversationSettingsController,
     private readonly conversations: CodexSurfaceConversationsController,
     private readonly host: CodexSurfaceLifecycleHost,
+    private readonly originalImages?: CodexOriginalHistoryImages,
   ) {}
 
   hostOptions(threadId: string): CodexConversationLoadOptions | undefined {
@@ -355,6 +357,7 @@ export class CodexSurfaceLifecycleController {
       const turns = [...initialPage.data].reverse();
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
       const catalogs = await this.catalog.loadConversationCatalogs(cwd);
+      const originalProjection = await this.originalImages?.prepare(response.thread.id, response.thread.path);
       const changedTurns = loadingRuntime.turns.filter((turn) => initialTurns.get(turn.id) !== turn);
       const threadStatus = loadingRuntime.threadStatus !== initialStatus && loadingRuntime.threadStatus
         ? loadingRuntime.threadStatus
@@ -377,9 +380,10 @@ export class CodexSurfaceLifecycleController {
       for (const message of loadingRuntime.messages) {
         if (initialMessages.get(message.id) !== message) mergedMessages.set(message.id, message);
       }
-      const messages = runningTurnId
+      let messages = runningTurnId
         ? ensureAssistantTurnMessage([...mergedMessages.values()], response.thread.id, runningTurnId)
         : [...mergedMessages.values()];
+      if (originalProjection) messages = originalProjection(messages);
       const runtime = this.host.createRuntime(response.thread.id, {
         hydrated: true,
         historyMode: response.thread.historyMode ?? 'legacy',

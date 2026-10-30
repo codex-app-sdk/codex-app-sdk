@@ -1,3 +1,4 @@
+import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
@@ -54,6 +55,7 @@ export class CodexSurfaceConversationsController {
     private readonly client: CodexAppServerClient,
     private readonly conversationLimit: number | undefined,
     private readonly host: CodexSurfaceConversationsHost,
+    private readonly originalImages?: CodexOriginalHistoryImages,
   ) {}
 
   reset(): void {
@@ -155,7 +157,7 @@ export class CodexSurfaceConversationsController {
             sortDirection: 'desc',
             itemsView: 'full',
           });
-          this.mergeHistoryPage(threadId, [...response.data].reverse(), new Set());
+          await this.mergeHistoryPage(threadId, [...response.data].reverse(), new Set());
           this.host.patchRuntime(threadId, {
             historyCursor: response.nextCursor,
             historyHasOlder: response.nextCursor !== null,
@@ -222,7 +224,7 @@ export class CodexSurfaceConversationsController {
           const newTurnIds = new Set(turns
             .map((turn) => turn.id)
             .filter((turnId) => !materializedTurnIds.has(turnId)));
-          messages = this.mergeHistoryPage(threadId, turns, newTurnIds);
+          messages = await this.mergeHistoryPage(threadId, turns, newTurnIds);
           cursor = response.nextCursor;
           this.host.patchRuntime(threadId, {
             historyCursor: cursor,
@@ -311,11 +313,12 @@ export class CodexSurfaceConversationsController {
     return conversations;
   }
 
-  private mergeHistoryPage(
+  private async mergeHistoryPage(
     threadId: string,
     turns: readonly v2.Turn[],
     newTurnIds: ReadonlySet<string>,
-  ): SurfaceMessage[] {
+  ): Promise<SurfaceMessage[]> {
+    const originalProjection = await this.originalImages?.prepare(threadId);
     const current = this.host.runtime(threadId);
     if (!current) return [];
     const protectedTurnIds = new Set<string>();
@@ -332,10 +335,11 @@ export class CodexSurfaceConversationsController {
     const preservedMessages = current.messages.filter((message) => (
       message.turnId === undefined || !replaceableTurnIds.has(message.turnId)
     ));
-    const historyMessages = preserveHistoricalMessagePresentation(
+    let historyMessages = preserveHistoricalMessagePresentation(
       current.messages,
       historicalTurns.flatMap((turn) => codexTurnToSurfaceMessages(threadId, turn)),
     );
+    if (originalProjection) historyMessages = originalProjection(historyMessages);
     this.host.patchRuntime(threadId, {
       turnIds: [...historicalTurns.map((turn) => turn.id), ...preservedTurnIds],
       turns: [...historicalTurns.map((turn) => surfaceTurn(turn)), ...preservedTurns],

@@ -164,9 +164,20 @@ const history = await build.readHistory();
 
 `readHistory()` waits for a complete full-detail refresh of the turns currently
 available from app-server. History and live notifications are projected through
-the same `SurfaceMessage` contract. Generated image results become media parts,
+the same `SurfaceMessage` contract. Generated images, viewed raster files, and
+tool-result images (including JSON-encoded `content` envelopes) become media parts,
 technical calls become tool parts, and restored messages use the same renderer
 as new messages.
+Viewed files use the host's existing authorized image-preview reader. Tool images
+remain independent of text-output limits; extraction is bounded per call to four
+envelope levels, 256 entries, 32 MiB of parsed text, eight images, and 20 MiB of
+image URLs. Invalid images and unsupported file types are omitted.
+
+For recorded screenshots that must survive temporary-file deletion or reuse,
+enable `originalHistoryImages` on the local main-process surface and route
+image-content requests to `conversation.readContent`. The SDK reads Codex’s
+original history; the host does not need an image archive. See
+[original tool images](/api/node#original-tool-images-from-local-history).
 
 ## Settings and turn actions
 

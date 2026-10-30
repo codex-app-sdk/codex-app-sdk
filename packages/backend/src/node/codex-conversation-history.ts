@@ -414,6 +414,13 @@ export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart 
 
 /** Tool result images are media, independently of the small text/JSON tool-output budget. */
 export function codexItemToMediaParts(item: ThreadItem): SurfaceMessageMediaPart[] {
+  if (item.type === 'imageView') {
+    if (typeof item.path !== 'string') return [];
+    const mimeType = mimeTypeForSource(item.path);
+    return isAbsolute(item.path) && mimeType && supportedGeneratedImageMimeTypes.has(mimeType)
+      ? [{ type: 'media', itemId: item.id, media: { url: pathToFileURL(item.path).href, mimeType, alt: 'Viewed image', title: 'Viewed image' } }]
+      : [];
+  }
   const generated = codexItemToMediaPart(item);
   if (generated) return [generated];
   const content = item.type === 'mcpToolCall' && item.status === 'completed' ? item.result?.content
@@ -421,18 +428,37 @@ export function codexItemToMediaParts(item: ThreadItem): SurfaceMessageMediaPart
   if (!Array.isArray(content)) return [];
   const parts: SurfaceMessageMediaPart[] = [];
   let remaining = 20 * 1024 * 1024;
-  for (const entry of content) {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || parts.length >= 8) continue;
-    const value = entry as Record<string, unknown>;
-    const source = value.type === 'image' && typeof value.data === 'string' ? value.data
-      : value.type === 'inputImage' && typeof value.imageUrl === 'string' ? value.imageUrl : '';
-    if (source.length > remaining) continue;
-    const image = codexImageDataUrl(source);
-    if (!image) continue;
-    remaining -= image.url.length;
-    parts.push({ type: 'media', itemId: parts.length ? `${item.id}:image:${parts.length}` : item.id,
-      media: { url: image.url, mimeType: image.mimeType, alt: 'Tool image', title: 'Tool image' } });
-  }
+  let parseBudget = 32 * 1024 * 1024;
+  let entries = 256;
+  // Only unwrap the provider's content/text JSON envelopes, never arbitrary
+  // result properties. Cumulative limits bound both parsing work and images.
+  const visit = (blocks: unknown[], depth: number): void => {
+    for (const entry of blocks) {
+      if (--entries < 0 || parts.length >= 8) return;
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+      const value = entry as Record<string, unknown>;
+      if (value.type === 'text' || value.type === 'inputText') {
+        if (depth >= 4 || typeof value.text !== 'string') continue;
+        const byteLength = Buffer.byteLength(value.text);
+        if (byteLength > parseBudget) continue;
+        parseBudget -= byteLength;
+        try {
+          const envelope: unknown = JSON.parse(value.text);
+          if (isRecord(envelope) && Array.isArray(envelope.content)) visit(envelope.content, depth + 1);
+        } catch { /* Ordinary text and malformed envelopes are not media. */ }
+        continue;
+      }
+      const source = value.type === 'image' && typeof value.data === 'string' ? value.data
+        : value.type === 'inputImage' && typeof value.imageUrl === 'string' ? value.imageUrl : '';
+      if (source.length > remaining) continue;
+      const image = codexImageDataUrl(source);
+      if (!image) continue;
+      remaining -= image.url.length;
+      parts.push({ type: 'media', itemId: parts.length ? `${item.id}:image:${parts.length}` : item.id,
+        media: { url: image.url, mimeType: image.mimeType, alt: 'Tool image', title: 'Tool image' } });
+    }
+  };
+  visit(content, 0);
   return parts;
 }
 

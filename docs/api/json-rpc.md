@@ -92,7 +92,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `thread/search` | Typed client only | — |
 | `thread/searchOccurrences` | Typed client only | — |
 | `thread/loaded/list` | Typed client only | — |
-| `thread/read` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts` |
+| `thread/read` | High-level SDK | `packages/backend/src/node/codex-original-history-images.ts`<br>`packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts` |
 | `thread/readState/update` | Typed client only | — |
 | `thread/turns/list` | High-level SDK | `packages/backend/src/node/codex-surface-conversations-controller.ts`<br>`packages/backend/src/node/codex-surface-fork-controller.ts`<br>`packages/backend/src/node/codex-surface-lifecycle-controller.ts`<br>`packages/backend/src/node/codex-surface-prompt-history.ts` |
 | `thread/items/list` | Typed client only | — |

@@ -146,6 +146,8 @@ export type CodexConversation = {
   select(): Promise<CodexConversationSnapshot>;
   readHistory(): Promise<CodexConversationHistory>;
   readPromptHistory(): Promise<CodexConversationPromptHistory>;
+  /** Read current inline or original-history image/diff content in bounded chunks. Main-process only. */
+  readContent(contentId: string, offset: number): Promise<{ data: string; totalBytes: number; nextOffset: number | null }>;
   loadOlderHistory(): Promise<CodexConversationHistoryPage>;
   rename(title: string): Promise<CodexConversationSnapshot>;
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
@@ -192,6 +194,8 @@ export type CodexAppServerTransportOptions =
   | CodexAppServerUnixSocketTransportOptions;
 
 export type CodexSurfaceOptions = {
+  /** Read original tool images from local provider-owned history. Defaults to false. */
+  originalHistoryImages?: boolean;
   approvalPreset?: CodexSurfaceApprovalPreset;
   approvalMode?: CodexSurfaceApprovalMode;
   clientInfo?: { name: string; title?: string; version: string };

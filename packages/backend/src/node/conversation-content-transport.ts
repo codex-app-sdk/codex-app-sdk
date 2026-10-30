@@ -97,7 +97,7 @@ function contentHash(text: string): string {
 
 /** Probe a bounded header, never decode or duplicate the full image. Unsupported
  * or truncated headers omit metadata; the image remains readable unchanged. */
-function imageDimensions(dataUrl: string): { width: number; height: number } | undefined {
+export function imageDimensions(dataUrl: string): { width: number; height: number } | undefined {
   try {
     const start = dataUrl.indexOf(',') + 1;
     const { width, height, orientation } = imageSize(Buffer.from(dataUrl.slice(start, start + 64 * 1024), 'base64'));
