@@ -644,7 +644,9 @@ rendering key. The default behavior is identity.
 logical turn. Steering messages remain in chronological order, while all
 assistant commentary, reasoning-aware tool groups, and generated media share
 one logical turn. Commentary and tool groups share the `Working` / `Done`
-disclosure, while generated media remains visible outside that fold in its
+disclosure. Media parts marked `phase: 'commentary'`, including tool screenshots
+and image observations recovered from history, belong to the same disclosure.
+Final-answer and generated media remain visible outside that fold in their
 chronological position. The latest reasoning summary labels only the currently
 active tool group; normal assistant text removes that transient label. A transform that returns a `CodexChatMessage` should retain
 `turnId` for that behavior. A tool-only active segment is treated as structured
@@ -854,8 +856,9 @@ the host's image-open action. Without the option, hosts retain the existing prev
 Add `viewportImageLoading: true` alongside the budget to fetch previews only when
 visible or within 400 CSS pixels of their scroll container. Observers are shared
 per container; visible requests take priority over prefetches. Inline previews are
-sized for their rendered width, capped at 1024 pixels per edge; open, copy and
-download actions use original bytes. Leaving the prefetch region releases decoded
+sized for their rendered width and display density, capped at 1024 pixels wide;
+height preserves the source aspect ratio. Open, copy and download actions use
+original bytes. Leaving the prefetch region releases decoded
 previews while retaining compressed originals and thumbnails within the same budget.
 Returning reuses the cached thumbnail immediately without another host request. Least-recently-used
 originals are evicted only when the total cache needs room, before visible images.

@@ -63,7 +63,7 @@ export type MessagePhase = 'commentary' | 'partial_answer' | 'final_answer';
 
 export type MessagePart =
   | { type: 'attachment'; attachment: MessageAttachment }
-  | { type: 'media'; media: MessageMedia }
+  | { type: 'media'; media: MessageMedia; phase?: MessagePhase }
   | { type: 'question'; historical?: boolean; request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> }
   | { type: 'reasoning'; summary: string; itemId?: string; summaryIndex?: number }
   | { type: 'text'; content: string; itemId?: string; phase?: MessagePhase }

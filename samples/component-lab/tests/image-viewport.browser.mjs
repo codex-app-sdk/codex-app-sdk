@@ -34,9 +34,14 @@ const fixture = {
           window.reads.push(reference); window.peak = Math.max(window.peak, ++window.active);
           await new Promise(resolve => setTimeout(resolve, reference.includes('slow') ? 250 : 30));
           window.active--;
-          const canvas = document.createElement('canvas'); canvas.width = reference.includes('large') ? 3072 : 1024; canvas.height = reference.includes('large') ? 2048 : 512;
+          const canvas = document.createElement('canvas'); canvas.width = reference.includes('portrait') ? 1170 : reference.includes('large') ? 3072 : 1024; canvas.height = reference.includes('portrait') ? 2532 : reference.includes('large') ? 2048 : 512;
+          if (reference.includes('portrait')) {
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = 'white'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = 'black'; ctx.font = '32px sans-serif';
+            for (let y=60;y<canvas.height;y+=60) ctx.fillText('Portrait screenshot — readable details 0123456789',24,y);
+          }
           const original=canvas.toDataURL('image/png'); window.originals.set(reference,original); return original;
-        }}, {imagePreviewBudgetBytes: 5 * 1024 * 1024, viewportImageLoading: true});
+        }}, {imagePreviewBudgetBytes: window.previewBudgetBytes ?? 5 * 1024 * 1024, viewportImageLoading: true});
         return () => h('section', {id:'scroll',style:'height:600px;overflow-y:auto;width:700px;margin:80px auto'},
           items.value.map(message => h('article',{key:message.id,style:message.id === 'crowded' ? '' : 'padding-bottom:900px'},h(CodexMessage,{message,openImage: image => { window.openedImage = image; return true; }}))));
       }});
@@ -48,6 +53,8 @@ const server = await createServer({ configFile: new URL('../vite.config.ts', imp
   root: new URL('..', import.meta.url).pathname, plugins:[fixture], server:{port:0} });
 let browser;
 const evidence = [];
+const artifacts = process.env.IMAGE_VIEWPORT_ARTIFACTS || join(tmpdir(), 'codex-app-sdk-image-viewport');
+await mkdir(artifacts,{recursive:true});
 try {
   await server.listen();
   for (const engine of [chromium, webkit]) {
@@ -84,18 +91,31 @@ try {
     await large.click();
     const original=await page.evaluate(async()=>{const image=new Image(); image.src=window.openedImage.src; await image.decode(); const href=document.querySelector('[aria-label="Download media"]')?.getAttribute('href');return {width:image.naturalWidth,height:image.naturalHeight,downloadMatchesOriginal:href===window.openedImage.src,bytesMatch:await (await fetch(window.openedImage.src)).blob().then(blob=>new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result===window.originals.get('/large.png'));r.readAsDataURL(blob);}))};});
     assert.deepEqual(original,{width:3072,height:2048,downloadMatchesOriginal:true,bytesMatch:true},'open and download retain the full original');
+    const qualityPage = await browser.newPage({viewport:{width:1200,height:900},deviceScaleFactor:2});
+    await qualityPage.addInitScript(()=>{ window.previewBudgetBytes=64*1024*1024; });
+    await qualityPage.goto(new URL('/image-viewport',server.resolvedUrls.local[0]).href);
+    await qualityPage.evaluate(()=>window.replaceImages([{id:'portrait',role:'assistant',content:'',parts:[{type:'media',media:{url:'/portrait.png',title:'Portrait',width:1170,height:2532}}]}]));
+    const portrait=qualityPage.getByRole('button',{name:'Open Portrait',exact:true});
+    await portrait.evaluate(el=>el.scrollIntoView({block:'start'}));
+    await qualityPage.waitForFunction(()=>document.querySelector('[aria-label="Open Portrait"] img')?.naturalWidth>0);
+    const portraitSize=await portrait.locator('img').evaluate(image=>({
+      width:image.naturalWidth,height:image.naturalHeight,
+      requiredWidth:Math.min(1170,Math.round(image.getBoundingClientRect().width*devicePixelRatio)),
+    }));
+    await qualityPage.screenshot({path:join(artifacts,engine.name()+'-portrait.png')});
+    assert.ok(portraitSize.width>=portraitSize.requiredWidth-1,'portrait thumbnails must retain enough pixels for their rendered width on a Retina display: '+JSON.stringify(portraitSize));
+    assert.ok(Math.abs(portraitSize.width/portraitSize.height-1170/2532)<0.001,'portrait previews preserve the source aspect ratio');
+    await qualityPage.close();
     await page.evaluate(()=>window.replaceImages([{id:'slow',role:'assistant',content:'',parts:[{type:'media',media:{url:'/slow.png',title:'Slow'}}]}]));
     await page.getByRole('button',{name:'Open Slow',exact:true}).evaluate(el=>el.scrollIntoView());
     await page.waitForFunction(()=>window.reads.includes('/slow.png'));
     await page.evaluate(()=>window.closeImages());
     await page.waitForFunction(()=>window.active===0);
     assert.equal(await page.evaluate(()=>window.urls.size),0,'late replies cannot retain resources after the pane closes');
-    evidence.push({engine:engine.name(),peak:await page.evaluate(()=>window.peak),...settled,stableGeometry:true,reloaded:true,released:true});
+    evidence.push({engine:engine.name(),peak:await page.evaluate(()=>window.peak),...settled,portraitSize,stableGeometry:true,reloaded:true,released:true});
     assert.ok(evidence.at(-1).peak<=2);
     await browser.close(); browser=undefined;
   }
-  const artifacts = process.env.IMAGE_VIEWPORT_ARTIFACTS || join(tmpdir(), 'codex-app-sdk-image-viewport');
-  await mkdir(artifacts,{recursive:true});
   await writeFile(join(artifacts, 'measurements.json'),JSON.stringify(evidence,null,2));
   console.log(JSON.stringify(evidence));
 } finally { await browser?.close(); await server.close(); }

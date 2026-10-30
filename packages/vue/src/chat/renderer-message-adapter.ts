@@ -30,9 +30,11 @@ export function surfaceMessageToChatMessage(message: SurfaceMessage): Message {
         attachment: { ...part.attachment },
       });
     } else if (part.type === 'media') {
+      const phase = part.phase ?? (part.itemId?.startsWith('original-image:') ? 'commentary' : undefined);
       parts.push({
         type: 'media',
         media: { ...part.media },
+        ...(phase ? { phase } : {}),
       });
     } else if (part.type === 'reasoning') {
       parts.push({

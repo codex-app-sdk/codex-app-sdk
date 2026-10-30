@@ -421,7 +421,7 @@ export function codexItemToMediaParts(item: ThreadItem): SurfaceMessageMediaPart
     if (typeof item.path !== 'string') return [];
     const mimeType = mimeTypeForSource(item.path);
     return isAbsolute(item.path) && mimeType && supportedGeneratedImageMimeTypes.has(mimeType)
-      ? [{ type: 'media', itemId: item.id, media: { url: pathToFileURL(item.path).href, mimeType, alt: 'Viewed image', title: 'Viewed image' } }]
+      ? [{ type: 'media', phase: 'commentary', itemId: item.id, media: { url: pathToFileURL(item.path).href, mimeType, alt: 'Viewed image', title: 'Viewed image' } }]
       : [];
   }
   const generated = codexItemToMediaPart(item);
@@ -457,7 +457,7 @@ export function codexItemToMediaParts(item: ThreadItem): SurfaceMessageMediaPart
       const image = codexImageDataUrl(source);
       if (!image) continue;
       remaining -= image.url.length;
-      parts.push({ type: 'media', itemId: parts.length ? `${item.id}:image:${parts.length}` : item.id,
+      parts.push({ type: 'media', phase: 'commentary', itemId: parts.length ? `${item.id}:image:${parts.length}` : item.id,
         media: { url: image.url, mimeType: image.mimeType, alt: 'Tool image', title: 'Tool image' } });
     }
   };

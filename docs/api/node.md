@@ -643,7 +643,8 @@ intrinsic dimensions when available. Originals belong to their recorded turn,
 outer tool-call ID, and image index; temporary filenames do not establish image
 identity. Native `imageView` operations remain as tool/path rows in this mode,
 while their mutable current-file thumbnails are omitted. Other native media is
-unchanged. Recorded images are inserted before the turn's final answer.
+unchanged. Recorded images are inserted before the turn's final answer with
+`phase: 'commentary'`, so they collapse with Working details.
 
 Main-process hosts can use `conversation.readContent(contentId, offset)` (or
 `surface.readConversationContent(conversationId, contentId, offset)`) for both
@@ -655,10 +656,10 @@ awaiting the result. The SDK checks that an original reference still belongs to
 the current snapshot after asynchronous reads; foreign IDs and invalid offsets
 are rejected. No renderer or mobile protocol change is required.
 
-Scanning uses 64 KiB file reads, at most 256 MiB per history file and 100,000
+Scanning streams history files in 64 KiB reads, with at most 100,000
 records; records over 32 MiB are skipped. Each of two cached offset indexes holds
 at most 2,048 images; at most two encoded originals share one 20 MiB cache budget. Index scans and
 record decodes are serialized per surface, including requests from older clients. At most 256 output blocks are examined per operation. Unavailable,
-malformed, oversized, and foreign history cannot grant image access. The provider
+malformed, oversized records and foreign history cannot grant image access. The provider
 history file must be accessible to the SDK process; this option is intended for
 local app-server integrations.

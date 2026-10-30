@@ -537,6 +537,8 @@ describe('codexThreadToSurfaceMessages', () => {
     const extract = (content: unknown[]) => codexItemToMediaParts({
       type: 'mcpToolCall', id: 'bounded', status: 'completed', result: { content },
     } as unknown as v2.ThreadItem);
+    expect(extract(wrap([image]))[0]?.phase).toBe('commentary');
+    expect(codexItemToMediaParts({ type: 'imageView', id: 'view', path: '/tmp/screenshot.png' })[0]?.phase).toBe('commentary');
     expect(extract(wrap([image]))[0]?.media.mimeType).toBe('image/png'); // Sniff bytes, not the claimed MIME.
     for (const content of [
       [{ type: 'text', text: '{broken JSON' }],

@@ -69,6 +69,8 @@ export type SurfaceMessageMedia = {
 
 export type SurfaceMessageMediaPart = {
   type: 'media';
+  /** Tool observations belong to Working; final-answer media stays visible. */
+  phase?: SurfaceMessageTextPart['phase'];
   media: SurfaceMessageMedia;
   itemId?: string;
 };

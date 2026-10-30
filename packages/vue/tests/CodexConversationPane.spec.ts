@@ -91,15 +91,18 @@ const routingMentionGroup = {
 
 describe('CodexConversationPane', () => {
   it('loads summary Working details on expansion, retries failures, and keeps the loaded group cached', async () => {
+    const final = 'Final answer\n\n![Phone](data:image/png;base64,cG5n)\n\n![Desktop](data:image/png;base64,cG5n)';
     const state = reactive<CodexConversationPaneState>({ identity: {
       conversationKey: 'summary-thread', busy: false,
       turns: [{ id: 'summary-turn', status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: 109_000, itemsView: 'summary' }],
-      messages: [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [{ type: 'text', text: 'Final answer', phase: 'final_answer' }] }],
+      messages: [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [{ type: 'text', text: final, phase: 'final_answer' }] }],
     } });
     const loadTurnHistory = vi.fn();
     const controller = createCodexConversationPaneController({ state, actions: { loadTurnHistory } });
     const wrapper = mount(CodexConversationPane, { props: { controller } });
     const header = () => wrapper.get('.chat-work-group__header');
+    const answerImages = () => wrapper.findAll('.chat-media-block').filter(image => !image.element.closest('.chat-work-group__body'));
+    expect(answerImages()).toHaveLength(2);
     expect(header().text()).toBe('Done · 1m 49s · View details');
     expect(wrapper.text()).toContain('Final answer'); expect(loadTurnHistory).not.toHaveBeenCalled();
     await header().trigger('click'); await flushPromises();
@@ -113,11 +116,20 @@ describe('CodexConversationPane', () => {
     expect(loadTurnHistory).toHaveBeenCalledTimes(2);
     turn.itemsView = 'full'; turn.detailsError = null;
     state.identity.messages = [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [
-      { type: 'text', text: 'Work details', phase: 'commentary' }, { type: 'text', text: 'Final answer', phase: 'final_answer' },
+      { type: 'text', text: 'Work details', phase: 'commentary' },
+      ...Array.from({ length: 3 }, (_, i) => ({ type: 'media' as const, ...(i ? { phase: 'commentary' as const } : {}), itemId: `original-image:call-${i}:0`, media: { url: 'data:image/png;base64,cG5n', title: `Inspected screenshot ${i}` } })),
+      { type: 'text', text: final, phase: 'final_answer' },
     ] }];
     await nextTick();
     expect(header().attributes('aria-expanded')).toBe('true'); expect(wrapper.text()).toContain('Work details');
-    await header().trigger('click'); await header().trigger('click');
+    expect(wrapper.findAll('.chat-work-group__body .chat-media-block')).toHaveLength(3);
+    expect(answerImages()).toHaveLength(2);
+    await header().trigger('click');
+    expect(header().attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('.chat-fold--open').exists()).toBe(false);
+    expect(answerImages()).toHaveLength(2);
+    await header().trigger('click');
+    expect(wrapper.findAll('.chat-work-group__body .chat-media-block')).toHaveLength(3);
     expect(loadTurnHistory).toHaveBeenCalledTimes(2);
     state.identity.turns = [{ ...turn, id: 'empty-summary', itemsView: 'summary', durationMs: null }];
     state.identity.messages = [{ id: 'empty-answer', role: 'assistant', status: 'complete', turnId: 'empty-summary', parts: [] }];

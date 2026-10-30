@@ -47,6 +47,7 @@ it('reads operation-owned originals after temporary files change or disappear, w
     expect(media).toHaveLength(2);
     expect(media.map(p => p.itemId)).toEqual(['original-image:call-0:0', 'original-image:call-1:0']);
     expect(media.every(p => p.media.url.startsWith('conversation-image:thread-existing:'))).toBe(true);
+    expect(media.map(p => p.phase)).toEqual(['commentary', 'commentary']);
     expect(JSON.stringify(snapshot)).not.toContain(originals[0]);
     expect(snapshot.messages.flatMap(m => m.parts).filter(p => p.type === 'tool').map(p => p.input)).toEqual([{ path: temporary }, { path: temporary }]);
     const ids = media.map(part => part.media.url.split(':')[2]!);
@@ -113,8 +114,14 @@ it('bounds original-history scans and skips malformed, orphaned, and foreign-tur
     const chunk = await surface.conversation('thread-existing').readContent(media()[0]!.media.url.split(':')[2]!, 0);
     expect(Buffer.from(chunk.data, 'base64').toString()).toBe(image(1).slice(0, 64 * 1024));
     await truncate(path, 256 * 1024 * 1024 + 1);
+    // A large rollout still has recoverable images beyond an oversized record.
+    const later = records('thread-existing', [image(2)]).trimEnd().split('\n').slice(1).map(line => line.replaceAll('call-0', 'call-late')).join('\n');
+    await appendFile(path, '\n' + later + '\n');
     await surface.conversation('thread-existing').load({ cwd: directory });
-    expect(media()).toEqual([]);
+    expect(media()).toHaveLength(2);
+    const late = media().find(part => part.itemId === 'original-image:call-late:0')!;
+    const lateChunk = await surface.conversation('thread-existing').readContent(late.media.url.split(':')[2]!, 0);
+    expect(Buffer.from(lateChunk.data, 'base64').toString()).toBe(image(2).slice(0, 64 * 1024));
     expect(surface.getSnapshot().messages.flatMap(m => m.parts)).toContainEqual(expect.objectContaining({ type: 'tool', id: 'view' }));
   } finally { await surface.close(); }
 });

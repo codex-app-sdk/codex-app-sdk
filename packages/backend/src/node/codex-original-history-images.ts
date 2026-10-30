@@ -7,7 +7,6 @@ import type { SurfaceMessage, SurfaceMessageMediaPart } from '@codex-app-sdk/cor
 import { codexImageDataUrl } from './codex-conversation-history';
 import { imageDimensions } from './conversation-content-transport';
 
-const MAX_FILE = 256 * 1024 * 1024;
 const MAX_RECORD = 32 * 1024 * 1024;
 const MAX_IMAGE = 20 * 1024 * 1024;
 const MAX_IMAGES = 2048;
@@ -113,7 +112,7 @@ export class CodexOriginalHistoryImages {
       path = thread.path; this.paths.set(threadId, path);
     }
     const metadata = await stat(path);
-    if (!metadata.isFile() || metadata.size > MAX_FILE) throw new Error('Original history exceeds the read limit.');
+    if (!metadata.isFile()) throw new Error('Original history is not a file.');
     const signature = fileSignature(metadata);
     const cached = this.indexes.get(threadId);
     if (cached?.signature === signature) return cached;
@@ -143,7 +142,7 @@ export class CodexOriginalHistoryImages {
           const digest = hash(url);
           const id = hash(JSON.stringify([threadId, turn, payload.call_id, i, digest]));
           images.set(id, { offset: line.offset, length: line.length, turnId: turn, callId: payload.call_id, imageIndex: i, byteLength: url.length, hash: digest,
-            part: { type: 'media', itemId: `original-image:${payload.call_id}:${i}`, media: {
+            part: { type: 'media', phase: 'commentary', itemId: `original-image:${payload.call_id}:${i}`, media: {
               url: `conversation-image:${encodeURIComponent(threadId)}:${id}`, mimeType: url.slice(5, url.indexOf(';')),
               title: 'Recorded tool image', alt: 'Recorded tool image', ...imageDimensions(url),
             } } });

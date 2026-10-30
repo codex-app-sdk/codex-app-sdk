@@ -162,7 +162,7 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
     }
 
     if (part.type === 'media') {
-      blocks.push({ type: 'media', media: part.media })
+      blocks.push({ type: 'media', media: part.media, ...(part.phase ? { phase: part.phase } : {}) })
       continue
     }
 
@@ -396,14 +396,13 @@ function pushTextBlock(blocks: MessageBlock[], content: string, phase?: MessageP
 
 export function hasExplicitAssistantWorkPhases(message: Message) {
   return message.parts?.some((part) => (
-    part.type === 'reasoning' || (part.type === 'text' && part.phase !== undefined)
+    part.type === 'reasoning' || ((part.type === 'text' || part.type === 'media') && part.phase !== undefined)
   )) ?? false
 }
 
 export function isAssistantWorkBlock(block: MessageBlock, answeredClientRequestIds?: ReadonlySet<string>) {
   if (block.type === 'question') return block.historical === true || answeredClientRequestIds?.has(block.request.id) === true
   if (block.type === 'reasoning' || block.type === 'tool' || block.type === 'tool-group') return true
-  if (block.type === 'media') return false
   return 'phase' in block && block.phase === 'commentary'
 }
 

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { createServer } from 'vite';
 
@@ -24,6 +26,12 @@ const fixture = {
       import { createApp, h, ref, reactive } from 'vue';
       import { CodexConversationPane, createCodexConversationPaneController } from '@codex-app-sdk/vue';
       import '@codex-app-sdk/vue/styles.css';
+      const canvas = document.createElement('canvas');
+      canvas.width = 180; canvas.height = 120;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#edf2ff'; context.fillRect(0, 0, 180, 120);
+      context.fillStyle = '#24345c'; context.font = '16px sans-serif'; context.fillText('Screenshot fixture', 12, 65);
+      const image = canvas.toDataURL('image/png');
       const questions = [{ id: 'branch', header: 'Branch',
         question: 'Where should the tool read the delivery branch from?', isOther: true, isSecret: false,
         options: [{ label: 'Input only', description: 'Read the caller branch input.' },
@@ -46,7 +54,8 @@ const fixture = {
           state.identity.turns.find(turn => turn.id === turnId).detailsLoading = true;
           await new Promise(resolve => setTimeout(resolve, 100));
           state.identity.messages = state.identity.messages.map(message => message.turnId === turnId && message.role === 'assistant'
-            ? { ...message, parts: [{ type: 'text', text: 'Investigated the work. '.repeat(400), phase: 'commentary' }, ...message.parts] } : message);
+            ? { ...message, parts: [{ type: 'text', text: 'Investigated the work. '.repeat(400), phase: 'commentary' },
+              ...Array.from({ length: 3 }, (_, i) => ({ type: 'media', phase: 'commentary', media: { url: image, title: 'Tool screenshot '+i, width: 100, height: 100 } })), ...message.parts] } : message);
           Object.assign(state.identity.turns.find(turn => turn.id === turnId), { itemsView: 'full', detailsLoading: false });
         },
       } });
@@ -60,7 +69,7 @@ const fixture = {
               turns: Array.from({ length: 20 }, (_, i) => ({ id: 'summary-'+i, status: 'completed', itemsView: 'summary', durationMs: 109000 })),
               messages: Array.from({ length: 20 }, (_, i) => [
                 { id: 'user-'+i, role: 'user', status: 'complete', turnId: 'summary-'+i, parts: [{ type: 'text', text: 'Request '+i }] },
-                { id: 'answer-'+i, role: 'assistant', status: 'complete', turnId: 'summary-'+i, parts: [{ type: 'text', text: 'Final answer '+i, phase: 'final_answer' }] },
+                { id: 'answer-'+i, role: 'assistant', status: 'complete', turnId: 'summary-'+i, parts: [{ type: 'text', text: 'Final answer '+i+'\\n\\n![Phone]('+image+')\\n\\n![Desktop]('+image+')', phase: 'final_answer' }] },
               ]).flat(),
             }; } }, 'Summary history'),
             h('button', { onClick: () => { sidebarOpen.value = !sidebarOpen.value; } }, 'Toggle sidebar'),
@@ -81,6 +90,8 @@ const server = await createServer({
   plugins: [fixture],
   server: { port: 0 },
 });
+const artifacts = process.env.FOLD_LAYOUT_ARTIFACTS;
+if (artifacts) await mkdir(artifacts, { recursive: true });
 let browser;
 try {
   await server.listen();
@@ -138,7 +149,20 @@ try {
     await page.waitForTimeout(250);
     const after = await header.boundingBox();
     assert(Math.abs(after.y - before.y) < 2, `${engine.name()}: expansion must preserve the clicked summary header position: ${JSON.stringify({before,after})}`);
-    await header.click(); await header.click();
+    const turn = header.locator('xpath=ancestor::*[contains(@class, "chat-message--assistant")][1]');
+    assert.equal(await turn.locator('.chat-work-group__body .chat-media-block').count(), 3);
+    assert.equal(await turn.locator('.chat-media-block').count(), 5);
+    await page.waitForFunction(() => document.querySelectorAll('.chat-work-group__body .chat-media-block img').length === 3);
+    if (artifacts) await turn.screenshot({ path: join(artifacts, engine.name() + '-expanded.png') });
+    await header.click();
+    await page.waitForTimeout(250);
+    assert.equal(await turn.locator('.chat-work-group__body').evaluateAll(nodes => nodes.reduce((sum, node) => sum + (node.closest('.chat-fold')?.getBoundingClientRect().height ?? node.getBoundingClientRect().height), 0)), 0, 'collapsed tool screenshots must occupy no transcript space');
+    assert.equal(await turn.locator('.chat-media-block').evaluateAll(nodes => nodes.filter(node => !node.closest('.chat-work-group__body')).length), 2, 'only the final-answer screenshots remain outside Working');
+    if (artifacts) {
+      await turn.screenshot({ path: join(artifacts, engine.name() + '-collapsed.png') });
+      await writeFile(join(artifacts, engine.name() + '.json'), JSON.stringify({ expandedImages: 5, foldedImages: 3, finalAnswerImages: 2, detailReads: await page.evaluate(() => window.detailReads), anchorShiftPx: after.y - before.y }, null, 2));
+    }
+    await header.click();
     assert.equal(await page.evaluate(() => window.detailReads), 1, 'reopening loaded Working content must use the cached turn');
     console.log(`${engine.name()}: summary expansion loads once and preserves its scroll anchor.`);
     await browser.close();

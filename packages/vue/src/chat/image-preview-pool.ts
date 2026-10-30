@@ -140,7 +140,7 @@ function imagePreview(url: string, maxWidth = Infinity): Promise<{ url: string; 
     const timer = setTimeout(fail, 15_000)
     image.onload = () => {
       const originalSize = { width: image.naturalWidth, height: image.naturalHeight }
-      const scale = Math.min(1, maxWidth / originalSize.width, maxWidth / originalSize.height)
+      const scale = Math.min(1, maxWidth / originalSize.width)
       if (scale === 1) { finished = true; cleanup(); resolve({ url, owned: false, bytes: 0, ...originalSize, originalSize }); return }
       try {
         canvas = document.createElement('canvas')
