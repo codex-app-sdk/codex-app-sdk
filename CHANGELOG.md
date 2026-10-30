@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.19.1
+
+### Added
+
+- Export `CodexUltrafastIcon` for shared host controls, with an outlined rear
+  bolt and filled front bolt separated by a thin outline.
+- Offer Ultrafast in the model selector when advertised by the model catalog.
+
+### Changed
+
+- Show speed controls in one row with mode-aware labels, a lightning toggle,
+  and an information tooltip. Use filled blue active-speed icons and a gray
+  context usage ring.
+
+### Fixed
+
+- Keep completed historical Working details collapsible when no final answer
+  exists, and omit empty details toggles for fully loaded text-only turns.
+
 ## 0.19.0
 
 ### Added
