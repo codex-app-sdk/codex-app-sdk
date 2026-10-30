@@ -22,7 +22,7 @@ export type CodexComposerMenuActionItem<Payload = unknown> = CodexComposerMenuIt
 
 export type CodexComposerMenuCheckboxItem<Payload = unknown> = CodexComposerMenuItemBase<Payload> & {
   type: 'checkbox';
-  accessory?: 'check' | 'switch';
+  accessory?: 'check' | 'switch' | Component;
   checked: boolean;
   closeOnSelect?: boolean;
 };

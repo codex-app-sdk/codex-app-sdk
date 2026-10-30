@@ -1,5 +1,5 @@
 <template>
-  <div class="codex-chat-theme chat-model-selector">
+  <div class="codex-chat-theme chat-model-selector" :class="{ 'chat-model-selector--accelerated': activeSpeedTier }">
     <button
       v-if="models.length === 0"
       class="chat-model-selector__button"
@@ -33,8 +33,9 @@
           @click="toggle"
         >
           <BrainIcon class="chat-model-selector__compact-icon" aria-hidden="true" />
-          <BoltIcon
-            v-if="selectedModel && fastServiceTier && props.serviceTier === fastServiceTier.id"
+          <component
+            v-if="activeSpeedTier"
+            :is="speedIcon"
             class="chat-model-selector__leading-icon"
             aria-hidden="true"
           />
@@ -49,13 +50,14 @@
 <script setup lang="ts" generic="Payload = unknown">
 import { computed } from 'vue';
 import type { CodexModelOption, ReasoningEffort } from './contracts';
-import { BoltIcon, BrainIcon, ChevronDown } from '../icons/app-icons';
+import { BoltIcon, BrainIcon, ChevronDown, Info } from '../icons/app-icons';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../composer-menu';
 import CodexComposerMenu from '../components/CodexComposerMenu.vue';
+import CodexUltrafastIcon from './CodexUltrafastIcon.vue';
 
 type SelectorCommand<Payload> =
   | { source: 'selector'; kind: 'model'; value: string; reasoningEffort?: ReasoningEffort }
-  | { source: 'selector'; kind: 'serviceTier'; value: string }
+  | { source: 'selector'; kind: 'serviceTier'; value: string | null }
   | { source: 'host'; item: CodexComposerMenuSelectableItem<Payload> };
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
@@ -110,8 +112,17 @@ const effectiveReasoningEffort = computed(() => (
 const serviceTiers = computed(() => selectedModel.value?.serviceTiers ?? []);
 const showServiceTier = computed(() => props.showServiceTier && serviceTiers.value.length > 0);
 const fastServiceTier = computed(() => serviceTiers.value.find((tier) => (
-  /^(fast|priority)$/i.test(tier.id) || /fast|priority/i.test(tier.name)
+  /^(fast|priority)$/i.test(tier.id) || /\b(fast|priority)\b/i.test(tier.name)
 )) ?? null);
+
+const ultrafastServiceTier = computed(() => serviceTiers.value.find(tier =>
+  /^ultrafast$/i.test(tier.id) || /\bultra[ -]?fast\b/i.test(tier.name)) ?? null);
+const speedTiers = computed(() => [fastServiceTier.value, ultrafastServiceTier.value].filter(tier => tier !== null));
+const activeSpeedTier = computed(() => speedTiers.value.find(tier => tier.id === props.serviceTier));
+const speedLabel = (id?: string | null) => !id ? 'Normal speed'
+  : id === ultrafastServiceTier.value?.id ? 'Ultrafast' : 'Fast mode';
+const speedIcon = computed(() => activeSpeedTier.value && activeSpeedTier.value === ultrafastServiceTier.value ? CodexUltrafastIcon : BoltIcon);
+const speedDescription = computed(() => activeSpeedTier.value?.description ?? 'Default processing for this model.');
 
 const controlDisabled = computed(() => props.disabled);
 
@@ -163,19 +174,26 @@ const selectorItems = computed<CodexComposerMenuItem<SelectorCommand<Payload>>[]
     });
   }
 
-  if (showServiceTier.value && fastServiceTier.value) {
+  if (showServiceTier.value && speedTiers.value.length > 0) {
     items.push({ id: 'model-service-tier-separator', type: 'separator' });
-    items.push({ id: 'service-tier-heading', type: 'heading', label: 'Speed' });
-    items.push({
-      accessory: 'switch',
-      checked: props.serviceTier === fastServiceTier.value.id,
-      closeOnSelect: false,
-      description: fastServiceTier.value.description,
-      id: `service-tier:${fastServiceTier.value.id}`,
-      label: 'Fast mode',
-      payload: { source: 'selector' as const, kind: 'serviceTier' as const, value: fastServiceTier.value.id },
-      type: 'checkbox' as const,
-    });
+    const info = { valueIcon: Info, valueIconLabel: speedDescription.value };
+    if (ultrafastServiceTier.value) {
+      items.push({ id: 'model-speed', type: 'submenu', label: speedLabel(activeSpeedTier.value?.id), icon: speedIcon.value, ...info,
+        items: [null, ...speedTiers.value].map(tier => ({
+          id: `service-tier:${tier?.id ?? 'default'}`, type: 'radio' as const,
+          label: speedLabel(tier?.id), checked: tier ? tier.id === props.serviceTier : !activeSpeedTier.value,
+          icon: tier === ultrafastServiceTier.value ? CodexUltrafastIcon : tier ? BoltIcon : undefined,
+          payload: { source: 'selector' as const, kind: 'serviceTier' as const, value: tier?.id ?? null },
+        })),
+      });
+    } else {
+      const tier = fastServiceTier.value!;
+      items.push({
+        accessory: BoltIcon, checked: Boolean(activeSpeedTier.value), closeOnSelect: false, ...info,
+        id: `service-tier:${tier.id}`, label: speedLabel(activeSpeedTier.value?.id), type: 'checkbox',
+        payload: { source: 'selector', kind: 'serviceTier', value: activeSpeedTier.value ? null : tier.id },
+      });
+    }
   }
 
   return items;
@@ -245,8 +263,9 @@ function onSelect(item: CodexComposerMenuSelectableItem<SelectorCommand<Payload>
   } else if (command.kind === 'model') {
     if (props.modelId !== command.value) emit('update:modelId', command.value);
     if (props.showReasoning && command.reasoningEffort !== undefined) emit('update:reasoningEffort', command.reasoningEffort);
-  } else if (command.kind === 'serviceTier' && fastServiceTier.value) {
-    emit('update:serviceTier', props.serviceTier === fastServiceTier.value.id ? null : command.value);
+  } else if (command.kind === 'serviceTier' && speedTiers.value.length > 0
+    && (command.value === null || speedTiers.value.some(tier => tier.id === command.value))) {
+    emit('update:serviceTier', command.value);
   }
 }
 
@@ -355,6 +374,32 @@ function wrapHostMenuItems(
   background: var(--color-surface-lowest);
   box-shadow: var(--shadow-menu);
   color: var(--color-text);
+}
+
+.chat-model-selector__leading-icon {
+  color: var(--codex-primary-color, var(--color-primary, #1b4fb2));
+  fill: currentColor;
+}
+
+:deep([data-submenu-id="model-speed"] > .codex-composer-menu-list__submenu-list) {
+  top: auto;
+  right: 0;
+  bottom: 100%;
+  left: auto;
+  width: 180px;
+}
+
+:deep([data-submenu-id="model-speed"] > button .codex-composer-menu-list__icon) {
+  opacity: 1;
+  fill: currentColor;
+}
+
+.chat-model-selector--accelerated :deep([data-submenu-id="model-speed"] > button .codex-composer-menu-list__icon) {
+  color: var(--codex-primary-color, var(--color-primary, #1b4fb2));
+}
+
+:deep(.chat-model-selector__menu .codex-composer-menu-list__icon-toggle > svg) {
+  fill: currentColor;
 }
 
 :deep(.chat-model-selector__menu .codex-composer-menu-list__icon--empty) {

@@ -6,6 +6,7 @@ import ChatModelReasoningSelector from '../../src/chat/ChatModelReasoningSelecto
 import CodexComposerMenu from '../../src/components/CodexComposerMenu.vue';
 import type { CodexModelOption, ReasoningEffort } from '../../src/chat/contracts';
 import type { CodexComposerMenuItem } from '../../src/composer-menu';
+import { CodexUltrafastIcon } from '../../src';
 
 type SelectorProps = {
   disabled?: boolean;
@@ -234,19 +235,47 @@ describe('ChatModelReasoningSelector', () => {
 
     const fastMode = wrapper.findAll('[role="menuitemcheckbox"]');
     expect(fastMode).toHaveLength(1);
-    expect(fastMode[0]!.text()).toContain('Fast mode');
-    expect(fastMode[0]!.text()).toContain('Fast responses');
+    expect(fastMode[0]!.text()).toContain('Normal speed');
+    expect(fastMode[0]!.get('.codex-composer-menu-list__copy').text()).toBe('Normal speed');
+    expect(fastMode[0]!.get('[aria-label="Default processing for this model."]').attributes('title')).toBe('Default processing for this model.');
     expect(fastMode[0]!.attributes('aria-checked')).toBe('false');
-    expect(fastMode[0]!.find('.codex-composer-menu-list__switch').exists()).toBe(true);
+    expect(fastMode[0]!.find('.codex-composer-menu-list__switch').exists()).toBe(false);
+    expect(fastMode[0]!.find('.codex-composer-menu-list__icon-toggle svg').exists()).toBe(true);
     await fastMode[0]!.trigger('click');
     expect(wrapper.emitted('update:serviceTier')).toStrictEqual([['priority']]);
     expect(wrapper.find('[role="menu"]').exists()).toBe(true);
   });
 
+  it('offers advertised Ultrafast separately and reflects the selected speed with a double bolt', async () => {
+    const model = { ...models[1]!, serviceTiers: [
+      ...models[1]!.serviceTiers!, { id: 'ultrafast', name: 'Ultrafast', description: 'Faster processing, increased usage' },
+    ] };
+    const wrapper = mountSelector({ models: [model] });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+    const speed = () => wrapper.get('[data-submenu-id="model-speed"]');
+    expect(speed().get('button').text()).toContain('Normal speed');
+    await speed().trigger('mouseenter');
+    const options = speed().findAll('[role="menuitemradio"]');
+    expect(options.map(option => option.get('.codex-composer-menu-list__label').text())).toEqual(['Normal speed', 'Fast mode', 'Ultrafast']);
+    await options[2]!.trigger('click');
+    expect(wrapper.emitted('update:serviceTier')).toEqual([['ultrafast']]);
+    await wrapper.setProps({ serviceTier: 'ultrafast' });
+    expect(wrapper.findComponent(CodexUltrafastIcon).exists()).toBe(true);
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+    expect(speed().get('.codex-composer-menu-list__label').text()).toBe('Ultrafast');
+    await speed().trigger('mouseenter');
+    await speed().findAll('[role="menuitemradio"]')[0]!.trigger('click');
+    expect(wrapper.emitted('update:serviceTier')).toEqual([['ultrafast'], [null]]);
+    await wrapper.setProps({ serviceTier: null, models });
+    await wrapper.get('.chat-model-selector__button').trigger('click');
+    expect(wrapper.find('[data-submenu-id="model-speed"]').exists()).toBe(false);
+    expect(wrapper.findAll('[role="menuitemcheckbox"]')).toHaveLength(1);
+  });
+
   it('turns an already selected Fast mode off', async () => {
     const wrapper = mountSelector({ modelId: 'codex-max', serviceTier: 'priority' });
     await wrapper.get('.chat-model-selector__button').trigger('click');
-    await wrapper.get('[role="menuitemcheckbox"]').trigger('click');
+    await wrapper.get('.codex-composer-menu-list__icon-toggle').trigger('click');
 
     expect(wrapper.emitted('update:serviceTier')).toStrictEqual([[null]]);
   });
@@ -256,12 +285,12 @@ describe('ChatModelReasoningSelector', () => {
       ...models[0]!,
       serviceTiers: [{ id: 'turbo', name: 'Priority lane', description: 'Name-matched speed' }],
     };
-    const wrapper = mountSelector({ models: [nameMatchedModel] });
+    const wrapper = mountSelector({ models: [nameMatchedModel], serviceTier: 'turbo' });
     await wrapper.get('.chat-model-selector__button').trigger('click');
 
-    expect(wrapper.get('[role="menuitemcheckbox"]').text()).toContain('Name-matched speed');
+    expect(wrapper.get('[role="menuitemcheckbox"] [aria-label="Name-matched speed"]').attributes('title')).toBe('Name-matched speed');
     await wrapper.get('[role="menuitemcheckbox"]').trigger('click');
-    expect(wrapper.emitted('update:serviceTier')).toStrictEqual([['turbo']]);
+    expect(wrapper.emitted('update:serviceTier')).toStrictEqual([[null]]);
   });
 
   it.each([
@@ -304,7 +333,7 @@ describe('ChatModelReasoningSelector', () => {
     await wrapper.get('.chat-model-selector__button').trigger('click');
 
     expect(wrapper.findAll('.codex-composer-menu-list__separator')).toHaveLength(1);
-    expect(wrapper.get('.codex-composer-menu-list__heading').text()).toBe('Speed');
+    expect(wrapper.find('.codex-composer-menu-list__heading').exists()).toBe(false);
   });
 
   it('normalizes custom effort labels and marks only the effective effort as checked', async () => {
@@ -420,7 +449,7 @@ describe('ChatModelReasoningSelector', () => {
     await wrapper.get('[data-submenu-id="model:codex-fast"]').trigger('mouseenter');
     expect(wrapper.get('[data-submenu-id="model:codex-fast"] > button').attributes('aria-expanded')).toBe('true');
     expect(wrapper.findAll('[data-submenu-id="model:codex-fast"] [role="menuitemradio"]')).toHaveLength(2);
-    expect(wrapper.findAll('.codex-composer-menu-list__description')).toHaveLength(1);
+    expect(wrapper.findAll('.codex-composer-menu-list__description')).toHaveLength(0);
     expect(wrapper.findAll('.chat-model-selector__menu')).toHaveLength(1);
   });
 });

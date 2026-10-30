@@ -261,6 +261,26 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   max-width: min(360px, calc(100vw - 24px));
 }
 
+.codex-composer-menu-list__icon-toggle {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--codex-muted-text-color, var(--color-text-muted, #666));
+}
+
+.codex-composer-menu-list__icon-toggle > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.codex-composer-menu-list__item[aria-checked="true"] .codex-composer-menu-list__icon-toggle {
+  color: var(--codex-primary-color, var(--color-primary, #1b4fb2));
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
 .codex-composer-menu-list__switch {
   position: relative;
   width: 28px;

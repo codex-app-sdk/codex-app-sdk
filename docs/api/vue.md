@@ -164,6 +164,13 @@ dispatch through `actions.menuSelect`; the equivalent granular prop is
 rendered as accessible trailing icon controls in the heading row.
 At viewport widths up to 720px, the model selector uses a compact brain-icon
 button with the same model and reasoning menu; wider layouts show the model label.
+The speed row shows Normal speed or Fast mode beside an information tooltip and
+a lightning-bolt toggle. Active speed indicators are filled and blue. When the
+model catalog advertises Ultrafast, the row offers a speed submenu and shows a
+double bolt for Ultrafast; unavailable tiers are omitted.
+`CodexUltrafastIcon` is exported for host controls: `<CodexUltrafastIcon :size="16" />`.
+It inherits `currentColor` and layers an outline bolt behind a filled bolt with a thin separating outline. `size`
+sets its width and height in pixels (default 16).
 `CodexComposerMenuSubmenuItem.selectAction` optionally supplies the action emitted
 when its trigger is clicked or activated with Enter/Space. Hover and ArrowRight
 still open its submenu. Without it, clicking the trigger only toggles the submenu.
@@ -171,7 +178,8 @@ Menu labels and headings default to regular weight and share the 13.5px
 `--codex-menu-font-size` default across root menus, submenus, and suggestions.
 `CodexComposerMenuItemBase.valueIcon` adds a trailing icon beside `value`; set
 `valueIconLabel` when the icon carries meaning. `valueAppearance: 'badge'`
-renders short values as compact metadata badges.
+renders short values as compact metadata badges. Checkbox items accept a Vue
+component as `accessory` for an icon toggle, alongside `'check'` and `'switch'`.
 
 `catalogs.mentionGroups` adds app-owned grouped `@` suggestions alongside the
 built-in plugin and file results. `actions.mentionSelect(item, group)` observes

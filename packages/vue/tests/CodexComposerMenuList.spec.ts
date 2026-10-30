@@ -81,6 +81,13 @@ describe('CodexComposerMenuList', () => {
 
     await headingButton.trigger('click');
     expect(wrapper.emitted('select')?.[1]).toStrictEqual([headingAction]);
+    await wrapper.setProps({ items: [{ id: 'icon-toggle', type: 'checkbox', label: 'Icon toggle', checked: false, accessory: ValueIcon }] });
+    const iconToggle = wrapper.get('[role="menuitemcheckbox"]');
+    expect(iconToggle.get('.codex-composer-menu-list__icon-toggle [data-icon="value"]').attributes('data-icon')).toBe('value');
+    await iconToggle.trigger('click');
+    expect(wrapper.emitted('select')?.at(-1)).toEqual([{ id: 'icon-toggle', type: 'checkbox', label: 'Icon toggle', checked: false, accessory: ValueIcon }]);
+    await wrapper.setProps({ items });
+
   });
 
   it('supports host item and icon slots while suppressing disabled selection', async () => {

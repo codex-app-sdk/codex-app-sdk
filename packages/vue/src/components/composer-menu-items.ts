@@ -181,7 +181,7 @@ function renderItem(
     key: item.id,
     class: [
       'codex-composer-menu-list__item',
-      item.type === 'checkbox' && item.accessory === 'switch'
+      item.type === 'checkbox' && item.accessory && item.accessory !== 'check'
         ? 'codex-composer-menu-list__item--switch'
         : null,
       (item.type === 'action' || item.type === 'custom') && item.danger
@@ -204,6 +204,8 @@ function renderItem(
         ],
         'aria-hidden': 'true',
       }, [h('span', { class: 'codex-composer-menu-list__switch-thumb' })])
+      : item.type === 'checkbox' && item.accessory && typeof item.accessory !== 'string'
+        ? h('span', { class: 'codex-composer-menu-list__icon-toggle', 'aria-hidden': 'true' }, [h(item.accessory)])
       : item.type === 'checkbox' || (item.type === 'radio' && item.checked && !content.leadingRadioCheck)
         ? h('span', { class: 'codex-composer-menu-list__selection', 'aria-hidden': 'true' }, item.checked ? '✓' : '')
       : null,

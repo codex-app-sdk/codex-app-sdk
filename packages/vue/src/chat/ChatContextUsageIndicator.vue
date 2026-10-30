@@ -92,7 +92,7 @@ function compactTokenCount(tokens: number): string {
   content: '';
   border-radius: var(--radius-full);
   background: conic-gradient(
-    var(--color-primary) 0 var(--chat-context-usage-percent),
+    var(--color-text-muted) 0 var(--chat-context-usage-percent),
     transparent var(--chat-context-usage-percent) 100%
   );
   mask: radial-gradient(circle at center, transparent 0 45%, black 47%);

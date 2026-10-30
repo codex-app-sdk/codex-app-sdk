@@ -53,6 +53,7 @@ export {
   type CodexComposerVoiceOptions,
 } from './chat/use-chat-composer-voice';
 export { default as CodexContextUsageIndicator } from './chat/ChatContextUsageIndicator.vue';
+export { default as CodexUltrafastIcon } from './chat/CodexUltrafastIcon.vue';
 export { default as CodexFoldTransition } from './chat/ChatFoldTransition.vue';
 export { default as CodexFollowUps } from './chat/ChatFollowUps.vue';
 export { default as CodexGoal } from './chat/ChatGoal.vue';
