@@ -297,7 +297,7 @@ const groupWork = computed(() => {
   const onlyStructuredWork = allBlocks.value.length > 0 && allBlocks.value.every((block) => (
     block.type === 'tool' || block.type === 'tool-group'
   ))
-  return state.phased.value || (state.active.value && onlyStructuredWork)
+  return state.phased.value || state.itemsView?.value !== undefined || (state.active.value && onlyStructuredWork)
 })
 const blocks = computed(() => {
   const grouped = groupAssistantWorkBlocks(chatMessage.value, visibleBlocks.value, workActive.value, groupWork.value, props.answeredClientRequestIds)
@@ -327,6 +327,7 @@ const hideCollapsedTurnDetail = computed(() => {
   ) return true
   const state = messageTurnState.value
   if (!state?.enabled.value || state.active.value) return false
+  if (chatMessage.value.type === 'steer' && state.itemsView?.value === 'summary') return true
   if (state.completedWithoutFinal.value) return chatMessage.value.type === 'steer'
   if (state.expanded.value) return false
   if (chatMessage.value.type === 'steer') return true

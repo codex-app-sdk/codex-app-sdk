@@ -4,8 +4,11 @@
     class="codex-chat-theme chat-work-group"
     :class="{ 'chat-work-group--continuation': !showHeader }"
   >
+    <div v-if="showHeader && !hasDetails" class="chat-work-group__header">
+      <span class="chat-work-group__title">{{ label }}</span>
+    </div>
     <button
-      v-if="showHeader"
+      v-else-if="showHeader"
       type="button"
       class="chat-work-group__header"
       :aria-expanded="expanded"
@@ -22,7 +25,7 @@
       <component v-if="!active" :is="expanded ? ChevronDown : ChevronRightIcon" :size="15" />
     </button>
 
-    <ChatFoldTransition v-if="showHeader" :open="expanded">
+    <ChatFoldTransition v-if="showHeader && hasDetails" :open="expanded">
       <div class="chat-work-group__body">
         <p v-if="assistantWorkTurn?.detailsLoading?.value" role="status">{{ t('chat.work.loadingDetails') }}</p>
         <div v-else-if="assistantWorkTurn?.detailsError?.value" role="alert">
@@ -32,7 +35,7 @@
         <slot v-else />
       </div>
     </ChatFoldTransition>
-    <div v-else class="chat-work-group__body chat-work-group__body--continuation">
+    <div v-else-if="expanded && hasDetails" class="chat-work-group__body chat-work-group__body--continuation">
       <slot />
     </div>
   </section>
@@ -68,6 +71,7 @@ const active = computed(() => (
     ? assistantWorkTurn!.active.value
     : props.active && !props.finalStarted
 ))
+const hasDetails = computed(() => !usesTurn.value || active.value || assistantWorkTurn!.hasDetails?.value !== false)
 const expanded = computed(() => (
   active.value
     ? true
@@ -105,6 +109,7 @@ const label = computed(() => {
     : assistantWorkTurn?.status.value === 'failed' ? 'failed'
     : 'done'
   if (state === 'working') return t(timed ? 'chat.work.workingFor' : 'chat.work.working', params)
+  if (!hasDetails.value) return t(`chat.work.${state}${timed ? 'For' : ''}`, params)
   const action = expanded.value ? 'HideDetails' : 'ViewDetails'
   return t(`chat.work.${state}${action}${timed ? 'For' : ''}`, params)
 })

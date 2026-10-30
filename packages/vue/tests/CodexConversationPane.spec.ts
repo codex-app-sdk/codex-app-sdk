@@ -127,6 +127,46 @@ describe('CodexConversationPane', () => {
     wrapper.unmount();
   });
 
+  it.each([
+    { name: 'work without a final answer', parts: [{ type: 'text' as const, text: 'Inspected the files', phase: 'commentary' as const }], hasDetails: true, work: 'Inspected the files' },
+    { name: 'a tool without text', parts: [{ type: 'tool' as const, id: 'read', kind: 'command', title: 'Read files', status: 'completed' as const }], hasDetails: true, work: 'Read files' },
+    { name: 'work and a newly loaded final answer', parts: [{ type: 'text' as const, text: 'Inspected the files', phase: 'commentary' as const }, { type: 'text' as const, text: 'All done', phase: 'final_answer' as const }], hasDetails: true, work: 'Inspected the files' },
+    { name: 'a continuation input without assistant work', parts: [{ type: 'text' as const, text: 'Answer only', phase: 'final_answer' as const }], hasDetails: true, work: 'Follow-up direction', steer: true },
+    { name: 'a final answer without work', parts: [{ type: 'text' as const, text: 'Answer only', phase: 'final_answer' as const }], hasDetails: false },
+  ])('keeps the historical status accurate after loading $name', async ({ parts, hasDetails, work, steer }) => {
+    const state = reactive<CodexConversationPaneState>({ identity: {
+      conversationKey: 'historical-thread', busy: false,
+      turns: [{ id: 'historical-turn', status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: 11_000, itemsView: 'summary' }],
+      messages: [{ id: 'historical-answer', role: 'assistant', status: 'complete', turnId: 'historical-turn', parts: [] }],
+    } });
+    const loadTurnHistory = vi.fn();
+    const wrapper = mount(CodexConversationPane, { props: { controller: createCodexConversationPaneController({ state, actions: { loadTurnHistory } }) } });
+    try {
+      await wrapper.get('.chat-work-group__header').trigger('click');
+      expect(loadTurnHistory).toHaveBeenCalledExactlyOnceWith('historical-turn');
+      state.identity.turns![0]!.itemsView = 'full';
+      state.identity.messages = [{ id: 'historical-answer', role: 'assistant', status: 'complete', turnId: 'historical-turn', parts }];
+      if (steer) state.identity.messages = [{ id: 'historical-steer', role: 'user', kind: 'steer', status: 'complete', turnId: 'historical-turn', parts: [{ type: 'text', text: work }] }, ...state.identity.messages];
+      await nextTick();
+      const group = wrapper.get('.chat-work-group');
+      expect(group.text()).toContain('Done · 11s');
+      if (hasDetails) {
+        expect(group.get('button').attributes('aria-expanded')).toBe('true');
+        expect(wrapper.text()).toContain(work);
+        await group.get('button').trigger('click');
+        expect(group.get('button').attributes('aria-expanded')).toBe('false');
+        await group.get('button').trigger('click');
+        expect(loadTurnHistory).toHaveBeenCalledTimes(1);
+      } else {
+        expect(group.find('button').exists()).toBe(false);
+        expect(group.find('[aria-expanded]').exists()).toBe(false);
+        expect(group.find('svg').exists()).toBe(false);
+        expect(wrapper.text()).toContain('Answer only');
+        expect(group.text()).not.toMatch(/View details|Hide details/);
+      }
+    } finally { wrapper.unmount(); }
+  });
+
   it.each(
     ['Tab', 'ArrowRight', ' '].flatMap(key => ['props', 'controller'].map(mode => ({ key, mode }))),
   )('accepts a changing custom placeholder with $key through $mode without submitting', async ({ key, mode }) => {

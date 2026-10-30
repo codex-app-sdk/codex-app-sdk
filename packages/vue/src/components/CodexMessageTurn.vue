@@ -84,7 +84,8 @@ const stoppedWithoutFinal = computed(() => (
   && (status.value === 'interrupted' || status.value === 'failed')
 ))
 const completedWithoutFinal = computed(() => (
-  phased.value
+  props.itemsView === undefined
+  && phased.value
   && !active.value
   && !finalStarted.value
   && (status.value === undefined || status.value === 'completed')
@@ -92,12 +93,19 @@ const completedWithoutFinal = computed(() => (
 const headerMessageIndex = computed(() => messages.value.find(({ message }) => (
   message.role === 'assistant' && (props.itemsView !== undefined || shouldGroupMessageWork(message))
 ))?.entry.index)
+const hasDetails = computed(() => props.itemsView === 'summary' || messages.value.some(({ message }) => (
+  (message.type === 'steer' && computeMessageBlocks(message).length > 0)
+  || message.role === 'assistant' && computeMessageBlocks(message).some(block => (
+    (props.showToolBlocks || (block.type !== 'tool' && block.type !== 'tool-group'))
+    && isAssistantWorkBlock(block, props.answeredClientRequestIds)
+  ))
+)))
 const enabled = computed(() => Boolean(turnId.value && headerMessageIndex.value !== undefined))
 const expanded = ref((active.value && !finalStarted.value) || stoppedWithoutFinal.value)
 const userToggled = ref(false)
 
 watch(finalStarted, (started, previous) => {
-  if (started && !previous) expanded.value = false
+  if (started && !previous && !userToggled.value) expanded.value = false
 })
 
 watch([active, stoppedWithoutFinal], ([isActive, isStoppedWithoutFinal]) => {
@@ -115,6 +123,7 @@ provide(assistantWorkTurnKey, {
   phased,
   startedAt,
   durationMs,
+  hasDetails,
   itemsView: computed(() => props.itemsView),
   detailsLoading: computed(() => props.detailsLoading),
   detailsError: computed(() => props.detailsError),

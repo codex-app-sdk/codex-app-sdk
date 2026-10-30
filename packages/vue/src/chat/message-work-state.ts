@@ -14,6 +14,7 @@ export type AssistantWorkTurnContext = {
   latestStreamingAssistantIndex: ComputedRef<number | undefined>
   phased: ComputedRef<boolean>
   startedAt?: ComputedRef<string | null | undefined>
+  hasDetails?: ComputedRef<boolean>
   itemsView?: ComputedRef<'summary' | 'full' | undefined>
   detailsLoading?: ComputedRef<boolean | undefined>
   detailsError?: ComputedRef<string | null | undefined>
