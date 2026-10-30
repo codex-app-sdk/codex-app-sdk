@@ -29,7 +29,7 @@
         />
         <ChatIconButton
           :download="downloadName"
-          :href="previewSource"
+          :href="originalSource"
           :label="downloadLabel"
           @click.stop
         >
@@ -50,7 +50,7 @@
       :alt="media.alt || generatedAltLabel"
       :label="media.title || generatedLabel"
       :open="fullscreenOpen"
-      :src="previewSource || media.url"
+      :src="originalSource || media.url"
       :theme-source="rootElement"
       @close="closeFullscreen"
     />
@@ -87,6 +87,7 @@ const rootElement = ref<HTMLElement | null>(null)
 const managedPreview = useManagedImagePreview(() => props.media.url, rootElement)
 const aspectRatio = computed(() => imageAspectRatio(props.media) ?? imageAspectRatio(managedPreview?.dimensions.value))
 const previewSource = managedPreview?.source ?? useHostImageSource(() => props.media.url)
+const originalSource = computed(() => managedPreview ? managedPreview.original.value : previewSource.value)
 const detailsOpen = ref(false)
 const fullscreenOpen = ref(false)
 const downloadName = computed(() => mediaDownloadName(props.media))
@@ -98,7 +99,7 @@ async function handleImageAction(intent: CodexMessageImageOpenIntent) {
     kind: 'media',
     mimeType: props.media.mimeType,
     name: props.media.title,
-    src: previewSource.value || props.media.url,
+    src: originalSource.value || props.media.url,
     title: props.media.title || generatedLabel,
   } as const
   if (await props.openImage?.(image, { intent }) === true) return
@@ -110,7 +111,7 @@ function closeFullscreen() {
 }
 
 async function copyImage() {
-  const blob = await fetch(previewSource.value || props.media.url).then((response) => response.blob())
+  const blob = await fetch(originalSource.value || props.media.url).then((response) => response.blob())
   const mimeType = blob.type || props.media.mimeType || 'image/png'
   await navigator.clipboard.write([
     new ClipboardItem({ [mimeType]: blob }),

@@ -26,7 +26,7 @@
       :alt="attachment.name"
       :label="attachment.name"
       :open="fullscreenOpen"
-      :src="previewSource || ''"
+      :src="originalSource || ''"
       :theme-source="rootElement"
       @close="fullscreenOpen = false"
     />
@@ -83,6 +83,7 @@ const previewSource = computed(() => (
     ? props.attachment.url
     : nativePreviewSource.value
 ))
+const originalSource = computed(() => managedPreview ? managedPreview.original.value : previewSource.value)
 const chipHref = computed(() => (
   safeFileHref(props.attachment.path) || safeLinkHref(props.attachment.url)
 ))
@@ -123,7 +124,7 @@ async function reloadPreview() {
 }
 
 async function handleImageOpen() {
-  const src = previewSource.value || (managedPreview ? props.attachment.url || props.attachment.path : undefined)
+  const src = originalSource.value || (managedPreview ? props.attachment.url || props.attachment.path : undefined)
   if (!src) return
   const image = {
     alt: props.attachment.name,

@@ -821,26 +821,28 @@ See the [Vue guide](/guide/vue),
 
 `provideCodexHostCapabilities(capabilities, { imagePreviewBudgetBytes })` optionally
 bounds retained media and attachment previews for that Vue subtree. The budget
-counts encoded blob bytes plus decoded pixels (four bytes per pixel). Two preview
-loads run at a time. Data URLs become blob URLs; evicted previews clear their image
-source and offer a reload action. The last consumer releasing a preview revokes its
-owned blob URL, and disposing the provider releases the whole pool. Remote image
-URLs are charged for decoded pixels; their browser HTTP cache is browser-owned.
+counts cached original bytes, thumbnail bytes, and decoded preview pixels (four
+bytes per pixel). Two preview loads run at a time. Data URLs become blob URLs;
+no base64 strings are retained by the pool. The last consumer releasing an image
+revokes its owned URLs, and disposing the provider releases the whole pool.
+Remote image URLs use the browser's own HTTP cache.
 
 This bounds retained preview resources, not total process RSS: provider snapshots,
 in-flight reads/decodes, browser caching, and a host's separate fullscreen viewer
-have their own lifetimes. Images larger than the preview budget are not retained.
-Without the option, hosts retain the existing preview behavior.
+have their own lifetimes. Originals larger than the budget remain available through
+the host's image-open action. Without the option, hosts retain the existing preview behavior.
 
 Add `viewportImageLoading: true` alongside the budget to fetch previews only when
 visible or within 400 CSS pixels of their scroll container. Observers are shared
-per container; visible requests take priority over prefetches. Offscreen previews
-remain cached within the budget and are evicted before visible previews. Returning
-to an evicted image reloads it automatically. Optional image `width` and `height` reserve the intrinsic aspect ratio before
-loading, preserving transcript geometry without letterboxing. For older images
-without dimensions, the decoded ratio is retained through cache eviction; the
-first load can adjust the initial placeholder. Failed or over-budget previews
-remain explicitly retryable; automatic eviction does not trigger a reload loop.
+per container; visible requests take priority over prefetches. Inline previews are
+sized for their rendered width, capped at 1024 pixels per edge; open, copy and
+download actions use original bytes. Leaving the prefetch region releases decoded
+previews while retaining compressed originals and thumbnails within the same budget.
+Returning reuses the cached thumbnail immediately without another host request. Least-recently-used
+originals are evicted only when the total cache needs room, before visible images.
+Optional image `width` and `height` reserve the intrinsic aspect ratio before
+loading. Decoded dimensions survive cache eviction for images without metadata.
+Failed previews remain explicitly retryable; eviction does not cause a fetch loop.
 
 Preview blob URLs are borrowed resources: a host that opens an independent image
 tab must retain its own Blob/object URL before the preview is released, and revoke

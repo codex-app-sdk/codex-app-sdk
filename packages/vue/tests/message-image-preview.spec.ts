@@ -248,6 +248,27 @@ describe('conversation message image previews', () => {
     expect(read.mock.calls.some(([reference]) => reference === '/queue-c.png')).toBe(false)
     expect(read.mock.calls.findIndex(([r]) => r === '/queue-e.png')).toBeLessThan(read.mock.calls.findIndex(([r]) => r === '/queue-d.png'))
     read.mockResolvedValue(imageUrl)
+    // A stalled native thumbnail encoder must release the two loading slots;
+    // callbacks arriving after disposal must not allocate orphaned blob URLs.
+    const encoders: BlobCallback[] = []
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage() {} } as never)
+    const encode = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => { encoders.push(callback) })
+    vi.useFakeTimers()
+    try {
+      items.value = ['encode-a','encode-b','encode-c','encode-d','encode-e'].map(id => ({id,role:'assistant',content:'',parts:[{type:'media',media:{title:id,url:`/${id}.png`}}]}))
+      await flushPromises()
+      for (const name of ['encode-a','encode-b','encode-c','encode-d','encode-e']) { Object.defineProperty(target(name),'clientWidth',{value:1}); deliver(target(name),true,false) }
+      await flushPromises(); expect(encoders).toHaveLength(2)
+      encoders[0]!(new Blob(['thumbnail'])); encoders[1]!(null)
+      await flushPromises(); expect(encoders).toHaveLength(4)
+      await vi.advanceTimersByTimeAsync(15_001); await flushPromises()
+      expect(encoders).toHaveLength(5)
+      await vi.advanceTimersByTimeAsync(15_001); await flushPromises()
+      items.value = []; await flushPromises()
+      const allocations = sequence
+      for (const callback of encoders) callback(new Blob(['original']))
+      await flushPromises(); expect(sequence).toBe(allocations)
+    } finally { vi.useRealTimers(); context.mockRestore(); encode.mockRestore() }
     // A host may scroll the document rather than a dedicated chat container.
     ;(wrapper.element as HTMLElement).style.overflowY = ''
     let finish!: (value: string) => void

@@ -49,6 +49,7 @@ export function useManagedImagePreview(source: WatchSource<string>, element: Ref
       current.near += Number(state.near) - Number(near)
       current.visible += Number(state.visible) - Number(visible)
       near = state.near; visible = state.visible
+      pool.visibilityChanged(current, target.clientWidth || 512)
       if (entered) void pool.load(current)
     })
     onCleanup(() => { stop(); current.near -= Number(near); current.visible -= Number(visible) })
@@ -56,6 +57,7 @@ export function useManagedImagePreview(source: WatchSource<string>, element: Ref
   return {
     viewport: pool.viewport,
     dimensions: computed(() => entry.value?.dimensions.value),
+    original: computed(() => entry.value?.original.value),
     source: computed(() => entry.value?.source.value),
     loading: computed(() => entry.value?.state.value === 'loading'),
     reload: () => entry.value ? pool.load(entry.value, true) : Promise.resolve(),
