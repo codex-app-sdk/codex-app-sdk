@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 0.19.2
+
+### Added
+
+- Dictate free-text answers to synchronous and asynchronous questions. Stop to
+  review the transcript, or press Send/Next to finish recording and continue.
+- Browse assistant images in fullscreen with side arrows and Left/Right keys.
+  Original images load on selection; user attachments open individually.
+
+### Changed
+
+- Keep tall screenshots compact inline, preserving their proportions without
+  side gutters. Keep image actions visible while long titles truncate.
+- Share sound-responsive recording feedback across composer and question
+  controls, with a microphone-off stop affordance on hover.
+- Use a darker fullscreen backdrop and larger image navigation icons.
+
+### Fixed
+
+- Open fullscreen after a single click even while its inline preview is loading.
+- Restore recorded screenshots when their Working details are expanded.
+- Preserve source-sized images in transport and sharper previews on Retina
+  displays while keeping inline preview resources bounded.
+
 ## 0.19.1
 
 ### Added
