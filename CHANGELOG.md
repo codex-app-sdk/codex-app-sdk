@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.19.4
+
+### Fixed
+
+- Keep Working details folded until their content is ready, with a small spinner
+  replacing the chevron while loading.
+
 ## 0.19.3
 
 ### Added
