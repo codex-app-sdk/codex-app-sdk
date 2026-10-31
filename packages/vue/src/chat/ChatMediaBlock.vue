@@ -1,5 +1,7 @@
 <template>
-  <figure ref="rootElement" class="codex-chat-theme chat-media-block">
+  <figure ref="rootElement" class="codex-chat-theme chat-media-block"
+    :style="aspectRatio ? { '--image-aspect-ratio': aspectRatio } : undefined"
+  >
     <button
       class="chat-media-block__image-button"
       :class="{ 'chat-media-block__image-button--reserved': managedPreview?.viewport && aspectRatio }"
@@ -51,6 +53,7 @@
       :label="media.title || generatedLabel"
       :open="fullscreenOpen"
       :src="originalSource || media.url"
+      :reference="media.url"
       :theme-source="rootElement"
       @close="closeFullscreen"
     />
@@ -143,13 +146,15 @@ function mediaDownloadName(media: MessageMedia): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-width: 60%;
+  max-width: min(60%, calc(min(360px, 50vh) * (var(--image-aspect-ratio, 100))));
   margin: var(--space-3) var(--space-6);
 }
 
 .chat-media-block__image-button {
   display: block;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  max-height: min(360px, 50vh);
   padding: 0;
   overflow: hidden;
   border: none;
@@ -159,14 +164,17 @@ function mediaDownloadName(media: MessageMedia): string {
   cursor: pointer;
 }
 
-.chat-media-block__image-button--reserved { position: relative; }
+.chat-media-block__image-button--reserved { position: relative; width: 100%; }
 .chat-media-block__image-button--reserved .chat-media-block__image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .chat-media-block__placeholder { display: block; padding: var(--space-6); color: var(--color-text-muted); }
 
 .chat-media-block__image {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: auto;
+  max-height: min(360px, 50vh);
+  object-fit: contain;
 }
 
 .chat-media-block__footer {
@@ -180,6 +188,7 @@ function mediaDownloadName(media: MessageMedia): string {
 }
 
 .chat-media-block__title {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -188,6 +197,7 @@ function mediaDownloadName(media: MessageMedia): string {
 
 .chat-media-block__actions {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0;
 }

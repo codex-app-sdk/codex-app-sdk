@@ -284,11 +284,37 @@ describe('conversation message image previews', () => {
   })
 
   it('opens user attachments and assistant media in the SDK lightbox by default', async () => {
-    const wrapper = mount(CodexConversationPane, { props: { messages } })
+    const wrapper = mount(CodexConversationPane, { props: { messages: [messages[0]!, {
+      ...messages[1]!, parts: [{ type: 'media', media: { alt: 'Generated result', title: 'screenshot.png', url: imageUrl } }],
+    }, {
+      id: 'another-result', role: 'assistant', content: '',
+      parts: [{ type: 'media', media: { alt: 'Another result', title: 'Another', url: imageUrl } }],
+    }] } })
 
     await wrapper.get('[aria-label="Open screenshot.png"]').trigger('click')
     await flushPromises()
     expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('src')).toBe(imageUrl)
+
+    expect(document.body.querySelector('[aria-label="Next image"]')).toBeNull()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    await flushPromises()
+    expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('alt')).toBe('screenshot.png')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(document.body.querySelector('.chat-image-lightbox')).toBeNull()
+    await wrapper.get('.chat-media-block__actions [aria-label="Open fullscreen"]').trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector<HTMLButtonElement>('[aria-label="Previous image"]')?.disabled).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    await flushPromises()
+    expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('alt')).toBe('Another result')
+    expect(document.body.querySelector<HTMLButtonElement>('[aria-label="Next image"]')?.disabled).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
+    await flushPromises()
+    expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('alt')).toBe('Generated result')
+    document.body.querySelector<HTMLButtonElement>('[aria-label="Next image"]')!.click()
+    await flushPromises()
+    expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('alt')).toBe('Another result')
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await wrapper.vm.$nextTick()
@@ -297,6 +323,52 @@ describe('conversation message image previews', () => {
     await wrapper.get('.chat-media-block__actions [aria-label="Open fullscreen"]').trigger('click')
     await flushPromises()
     expect(document.body.querySelector('.chat-image-lightbox__image')?.getAttribute('alt')).toBe('Generated result')
+    expect(document.body.querySelector<HTMLButtonElement>('[aria-label="Previous image"]')?.disabled).toBe(true)
+  })
+
+  it('loads gallery originals on selection, handles unavailable images, and ignores replies after close', async () => {
+    const read = vi.fn(async (_reference: string): Promise<string | null> => imageUrl)
+    vi.stubGlobal('codexAppSdkNative', { readImagePreview: read,
+      capabilities: { attachments: false, clipboard: false, externalLinks: false, transcription: false } })
+    const wrapper = mount(CodexConversationPane, { props: { messages: [{ id: 'gallery', role: 'assistant', content: '', parts: [
+      { type: 'media', media: { url: '/first.png', title: 'First' } },
+      { type: 'media', media: { url: '/second.png' } },
+      { type: 'attachment', attachment: { kind: 'image', name: 'Third', path: '/third.png' } },
+      { type: 'attachment', attachment: { kind: 'image', name: 'No source' } },
+      { type: 'attachment', attachment: { kind: 'file', name: 'Notes', path: '/notes.txt' } },
+    ] }] } })
+    await flushPromises()
+    const button = (label: string) => document.body.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!
+    const alt = () => document.body.querySelector('dialog img, [role="dialog"] img')?.getAttribute('alt')
+    await wrapper.get('[aria-label="Open First"]').trigger('click'); await flushPromises()
+    let finish!: (result: string | null) => void
+    read.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    button('Next image').click(); await flushPromises()
+    expect(document.body.querySelector('[role="status"]')?.textContent).toBe('Loading image…')
+    expect(button('Previous image').disabled).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' })); await flushPromises()
+    const secondUrl = 'data:image/png;base64,c2Vjb25k'
+    finish(secondUrl); await flushPromises()
+    expect(alt()).toBe('Generated media')
+    expect(document.body.querySelector('[role="dialog"] img')?.getAttribute('src')).toBe(secondUrl)
+    button('Next image').click(); await flushPromises()
+    expect(alt()).toBe('Third')
+    expect(read).toHaveBeenLastCalledWith('/third.png')
+    expect(button('Next image').disabled).toBe(true)
+    read.mockResolvedValueOnce(null)
+    button('Previous image').click(); await flushPromises()
+    expect(document.body.querySelector('[role="status"]')?.textContent).toBe('Image unavailable')
+    button('Previous image').click(); await flushPromises()
+    expect(alt()).toBe('Generated media')
+    read.mockRejectedValueOnce(new Error('Disconnected'))
+    button('Next image').click(); await flushPromises()
+    expect(document.body.querySelector('[role="status"]')?.textContent).toBe('Image unavailable')
+    button('Previous image').click(); await flushPromises()
+    read.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    button('Next image').click(); await flushPromises()
+    button('Close fullscreen').click(); await flushPromises()
+    finish(imageUrl); await flushPromises()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
   })
 
   it('lets generated-media downloads bypass conversation link interception', () => {

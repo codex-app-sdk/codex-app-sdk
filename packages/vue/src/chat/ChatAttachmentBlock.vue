@@ -8,7 +8,7 @@
   >
     <button
       class="chat-attachment-block__preview-button"
-      :style="managedPreview?.viewport && aspectRatio ? { aspectRatio } : undefined"
+      :style="managedPreview?.viewport && aspectRatio ? { aspectRatio, '--image-aspect-ratio': aspectRatio } : undefined"
       type="button"
       :aria-label="`Open ${attachment.name}`"
       @click="previewSource ? handleImageOpen() : reloadPreview()"
@@ -27,6 +27,7 @@
       :label="attachment.name"
       :open="fullscreenOpen"
       :src="originalSource || ''"
+      :reference="attachment.url || attachment.path"
       :theme-source="rootElement"
       @close="fullscreenOpen = false"
     />
@@ -186,7 +187,7 @@ function safeFileHref(value: string | undefined): string | undefined {
   object-fit: cover;
 }
 
-.chat-attachment-block--proportional .chat-attachment-block__preview-button { position: relative; }
+.chat-attachment-block--proportional .chat-attachment-block__preview-button { position: relative; max-width: min(100%, calc(min(360px, 50vh) * (var(--image-aspect-ratio)))); }
 .chat-attachment-block--proportional .chat-attachment-block__preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .chat-attachment-block--proportional .chat-attachment-block__placeholder { position: absolute; inset: 0; height: 100%; }
 .chat-attachment-block__placeholder { display: flex; align-items: center; justify-content: center; height: 120px; overflow: hidden; overflow-wrap: anywhere; color: var(--color-text-muted); }
@@ -194,6 +195,7 @@ function safeFileHref(value: string | undefined): string | undefined {
 .chat-attachment-block__preview-button {
   display: block;
   width: 100%;
+  max-height: min(360px, 50vh);
   padding: 0;
   border: 0;
   appearance: none;

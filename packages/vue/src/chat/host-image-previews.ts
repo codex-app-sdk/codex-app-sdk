@@ -11,18 +11,21 @@ function displaySource(source: string): boolean {
 }
 
 /** Hosts resolve their own files; a phone or web client never interprets a laptop path locally. */
-export function useHostImageSource(source: WatchSource<string>) {
+export function useHostImageSource(source: WatchSource<string>, loading?: Ref<boolean>) {
   const host = useCodexHostCapabilities()
   const resolved = shallowRef<string>()
   watch(source, async (value, _previous, onCleanup) => {
     let active = true
     onCleanup(() => { active = false })
     resolved.value = undefined
+    if (loading) loading.value = false
     if (!localSource(value) || !host?.readImagePreview) { resolved.value = value; return }
+    if (loading) loading.value = true
     try {
       const result = await host.readImagePreview(value)
       if (active && result && displaySource(result)) resolved.value = result
     } catch { /* Opening the image lets its host present an unavailable state. */ }
+    finally { if (active && loading) loading.value = false }
   }, { immediate: true })
   return computed(() => resolved.value)
 }

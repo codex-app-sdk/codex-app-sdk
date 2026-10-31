@@ -21,7 +21,7 @@ const fixture = {
     if (id !== '\0image-viewport') return;
     return `
       import { createApp, h, ref } from 'vue';
-      import { CodexMessage, provideCodexHostCapabilities } from '@codex-app-sdk/vue';
+      import { CodexMessage, CodexMessageList, provideCodexHostCapabilities } from '@codex-app-sdk/vue';
       import '@codex-app-sdk/vue/styles.css';
       window.reads = []; window.urls = new Set(); window.cachedBytes = new Map(); window.originals = new Map(); window.active = 0; window.peak = 0;
       const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
@@ -29,6 +29,7 @@ const fixture = {
       URL.revokeObjectURL = url => { window.urls.delete(url); window.cachedBytes.delete(url); revoke(url); };
       const items = ref(Array.from({length:12}, (_,i) => ({ id: 'photo-'+i, role:'assistant', content:'', parts:[{type:'media',media:{url:'/photo-'+i+'.png',title:'Photo '+i,width:1024,height:512}}] })));
       window.replaceImages = value => { items.value = value; };
+      const gallery = ref(false); window.showGallery = () => { gallery.value = true; };
       const app = createApp({setup() {
         provideCodexHostCapabilities({readImagePreview: async reference => {
           window.reads.push(reference); window.peak = Math.max(window.peak, ++window.active);
@@ -43,7 +44,7 @@ const fixture = {
           const original=canvas.toDataURL('image/png'); window.originals.set(reference,original); return original;
         }}, {imagePreviewBudgetBytes: window.previewBudgetBytes ?? 5 * 1024 * 1024, viewportImageLoading: true});
         return () => h('section', {id:'scroll',style:'height:600px;overflow-y:auto;width:700px;margin:80px auto'},
-          items.value.map(message => h('article',{key:message.id,style:message.id === 'crowded' ? '' : 'padding-bottom:900px'},h(CodexMessage,{message,openImage: image => { window.openedImage = image; return true; }}))));
+          gallery.value ? h(CodexMessageList,{messages:items.value,style:'height:100%',openImage:()=>false}) : items.value.map(message => h('article',{key:message.id,style:message.id === 'crowded' ? '' : 'padding-bottom:900px'},h(CodexMessage,{message,openImage: image => { window.openedImage = image; return true; }}))));
       }});
       app.mount('#app'); window.closeImages = () => app.unmount();
     `;
@@ -98,6 +99,9 @@ try {
     const portrait=qualityPage.getByRole('button',{name:'Open Portrait',exact:true});
     await portrait.evaluate(el=>el.scrollIntoView({block:'start'}));
     await qualityPage.waitForFunction(()=>document.querySelector('[aria-label="Open Portrait"] img')?.naturalWidth>0);
+    assert.ok((await portrait.boundingBox()).height <= 360, 'tall screenshots must not dominate the conversation');
+    const portraitBounds = await portrait.boundingBox();
+    assert.ok(Math.abs(portraitBounds.width / portraitBounds.height - 1170 / 2532) < 0.001, 'portrait containers shrink to the image without side gutters');
     const portraitSize=await portrait.locator('img').evaluate(image=>({
       width:image.naturalWidth,height:image.naturalHeight,
       requiredWidth:Math.min(1170,Math.round(image.getBoundingClientRect().width*devicePixelRatio)),
@@ -105,7 +109,37 @@ try {
     await qualityPage.screenshot({path:join(artifacts,engine.name()+'-portrait.png')});
     assert.ok(portraitSize.width>=portraitSize.requiredWidth-1,'portrait thumbnails must retain enough pixels for their rendered width on a Retina display: '+JSON.stringify(portraitSize));
     assert.ok(Math.abs(portraitSize.width/portraitSize.height-1170/2532)<0.001,'portrait previews preserve the source aspect ratio');
+    await qualityPage.setViewportSize({width:390,height:600});
+    assert.ok((await portrait.boundingBox()).height <= 300, 'previews use at most half a small viewport');
     await qualityPage.close();
+    const galleryPage = await browser.newPage({viewport:{width:1200,height:900}});
+    await galleryPage.goto(new URL('/image-viewport',server.resolvedUrls.local[0]).href);
+    await galleryPage.evaluate(()=>{ window.showGallery(); window.replaceImages([
+      {id:'gallery-first',role:'assistant',content:'',parts:[{type:'media',media:{url:'/portrait.png',title:'First',alt:'First screenshot',width:1170,height:2532}}]},
+      {id:'gallery-second',role:'assistant',content:'',parts:[{type:'media',media:{url:'/slow-gallery.png',title:'Second',alt:'Second screenshot',width:1024,height:512}}]},
+    ]); });
+    await galleryPage.locator('[aria-label="Open fullscreen"]').first().click();
+    const dialog = galleryPage.getByRole('dialog');
+    const previous = dialog.getByRole('button',{name:'Previous image'}), next = dialog.getByRole('button',{name:'Next image'});
+    assert.equal(await previous.isDisabled(),true);
+    assert.ok(await dialog.evaluate(el=>Number(getComputedStyle(el).backgroundColor.match(/[\d.]+/g).at(-1))>=0.85),'fullscreen backdrop stays dark');
+    await next.click();
+    await dialog.getByAltText('Second screenshot').waitFor();
+    await galleryPage.waitForFunction(()=>document.querySelector('[role="dialog"] img')?.naturalWidth===1024);
+    assert.equal(await next.isDisabled(),true);
+    await galleryPage.keyboard.press('ArrowLeft');
+    await dialog.getByAltText('First screenshot').waitFor();
+    await galleryPage.waitForFunction(()=>document.querySelector('[role="dialog"] img')?.naturalWidth===1170);
+    const fullscreenBounds = await dialog.locator('img').boundingBox();
+    assert.ok(Math.abs(fullscreenBounds.x+fullscreenBounds.width/2-600)<1,'fullscreen image stays centered');
+    assert.ok(fullscreenBounds.y>=0 && fullscreenBounds.y+fullscreenBounds.height<=900,'portrait fits within fullscreen');
+    await galleryPage.screenshot({path:join(artifacts,engine.name()+'-gallery.png')});
+    await galleryPage.setViewportSize({width:390,height:600});
+    const imageBounds = await dialog.locator('img').boundingBox(), arrowBounds = await next.boundingBox();
+    assert.ok(imageBounds.x+imageBounds.width<=arrowBounds.x,'navigation does not cover the image on phones');
+    await galleryPage.keyboard.press('Escape');
+    assert.equal(await dialog.count(),0);
+    await galleryPage.close();
     await page.evaluate(()=>window.replaceImages([{id:'slow',role:'assistant',content:'',parts:[{type:'media',media:{url:'/slow.png',title:'Slow'}}]}]));
     await page.getByRole('button',{name:'Open Slow',exact:true}).evaluate(el=>el.scrollIntoView());
     await page.waitForFunction(()=>window.reads.includes('/slow.png'));

@@ -9,6 +9,7 @@ export {
   IconCheck as CheckIcon,
   IconCheck as Check,
   IconChevronDown as ChevronDown,
+  IconChevronLeft as ChevronLeftIcon,
   IconChevronRight as ChevronRightIcon,
   IconChevronUp as ChevronUp,
   IconCircleX as CircleXIcon,

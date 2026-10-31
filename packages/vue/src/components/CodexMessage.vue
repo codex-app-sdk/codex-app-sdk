@@ -184,6 +184,7 @@ import type {
 } from '../chat/message-image'
 import type { CodexConversationVisualization } from '../chat/visualization'
 import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
+import { imageGalleryMessageKey } from '../chat/image-gallery'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
 import ChatCompactionMessage from '../chat/ChatCompactionMessage.vue'
 import ChatMessageEditor from '../chat/ChatMessageEditor.vue'
@@ -269,6 +270,7 @@ const activityLabel = computed(() => props.activityState === 'working'
   || (assistantWorkTurn?.phased.value && assistantWorkTurn.active.value)
   ? t('chat.work.working') : 'Thinking')
 const chatMessage = computed(() => chatMessageFromInput(props.message))
+provide(imageGalleryMessageKey, chatMessage)
 const assistantWorkTurn = inject(assistantWorkTurnKey, undefined)
 provide(assistantWorkMessageIndexKey, computed(() => props.index))
 const messageTurnState = computed(() => (

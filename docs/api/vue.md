@@ -512,10 +512,16 @@ access, HTTP scripts, and API fetches; CDN requests require network access.
 See [interactive HTML previews](/guide/messages-tools#interactive-html-previews)
 for syntax, controls, and sandbox restrictions.
 
+Inline image previews are capped at 360 CSS pixels or half the viewport height,
+whichever is smaller. Tall screenshots remain fully visible without cropping.
 Image attachments and media open `CodexImageLightbox` by default. Override
 message image clicks with either `CodexConversationPane`'s `openImage` prop or
 the controlled pane's `actions.openImage(image, context)`. The handler owns the
 click when it returns `void` or `true`; return `false` to use the stock lightbox.
+Within a conversation pane or message list, the stock viewer navigates assistant
+images from the loaded history with side arrows or Left/Right keys. It loads the
+selected original on demand and stops at either end. User attachments open
+individually. Gallery navigation does not fetch older history or Working details.
 The exported renderer-safe types are `CodexMessageImage`,
 `CodexMessageImageContext`, `CodexMessageImageOpenIntent`, and
 `CodexMessageImageOpenHandler`.

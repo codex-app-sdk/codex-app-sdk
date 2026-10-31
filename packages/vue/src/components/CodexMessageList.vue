@@ -110,6 +110,7 @@ import { resolveCodexConversationPresentation } from '../chat/contracts'
 import type { Message } from '../chat/types'
 import { withoutSupersededFinalAnswers, type MessageBlock } from '../chat/message-blocks'
 import type { CodexMessageImageOpenHandler } from '../chat/message-image'
+import { conversationImages, imageGalleryKey } from '../chat/image-gallery'
 import type { CodexConversationVisualization } from '../chat/visualization'
 import type { CodexMessageTextSelection } from '../chat/message-text-selection'
 import { chatMessageFromInput } from '../chat/renderer-message-adapter'
@@ -277,6 +278,7 @@ let observedLastMessage = messageIdentityAt(props.messages, props.messages.lengt
 const loadingOlderMessages = ref(false)
 let olderMessagesRequestPending = false
 const presentedMessages = computed(() => withoutSupersededFinalAnswers(props.messages))
+provide(imageGalleryKey, computed(() => conversationImages(presentedMessages.value.map(chatMessageFromInput))))
 const visibleMessages = computed(() => effectiveRenderStrategy.value === 'lazy'
   ? presentedMessages.value.slice(renderStartIndex.value)
   : presentedMessages.value)
