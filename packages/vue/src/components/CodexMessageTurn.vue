@@ -103,9 +103,9 @@ const hasDetails = computed(() => props.itemsView === 'summary' || messages.valu
 const enabled = computed(() => Boolean(turnId.value && headerMessageIndex.value !== undefined))
 const expanded = ref((active.value && !finalStarted.value) || stoppedWithoutFinal.value)
 const userToggled = ref(false)
-const detailsLoading = computed(() => props.detailsLoading || (
+const detailsLoading = computed(() => !active.value && (props.detailsLoading || (
   expanded.value && props.itemsView === 'summary' && !props.detailsError
-))
+)))
 
 watch(finalStarted, (started, previous) => {
   if (started && !previous && !userToggled.value) expanded.value = false
@@ -119,7 +119,7 @@ provide(assistantWorkTurnKey, {
   active,
   completedWithoutFinal,
   enabled,
-  expanded: computed(() => expanded.value && !detailsLoading.value && (props.itemsView !== 'summary' || Boolean(props.detailsError))),
+  expanded: computed(() => expanded.value && !detailsLoading.value && (active.value || props.itemsView !== 'summary' || Boolean(props.detailsError))),
   finalStarted,
   headerMessageIndex,
   latestStreamingAssistantIndex,
@@ -139,8 +139,8 @@ provide(assistantWorkTurnKey, {
   },
 })
 
-watch([expanded, () => props.itemsView, () => props.detailsLoading, () => props.detailsError], () => {
-  if (expanded.value && props.itemsView === 'summary' && !props.detailsLoading && !props.detailsError && props.turnId) emit('loadTurnHistory', props.turnId)
+watch([active, expanded, () => props.itemsView, () => props.detailsLoading, () => props.detailsError], () => {
+  if (!active.value && expanded.value && props.itemsView === 'summary' && !props.detailsLoading && !props.detailsError && props.turnId) emit('loadTurnHistory', props.turnId)
 }, { immediate: true })
 
 function shouldGroupMessageWork(message: Message): boolean {
