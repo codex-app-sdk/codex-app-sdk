@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.19.3
+
+### Added
+
+- Accept suggested follow-ups with Enter. The first press fills the draft;
+  pressing Enter again submits it using the normal send, queue, or steer action.
+
 ## 0.19.2
 
 ### Added
