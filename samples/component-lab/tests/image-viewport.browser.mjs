@@ -34,6 +34,7 @@ const fixture = {
         provideCodexHostCapabilities({readImagePreview: async reference => {
           window.reads.push(reference); window.peak = Math.max(window.peak, ++window.active);
           await new Promise(resolve => setTimeout(resolve, reference.includes('slow') ? 250 : 30));
+          if (reference.includes('gallery-first')) await new Promise(resolve => { window.releaseFirstGalleryImage = resolve; });
           window.active--;
           const canvas = document.createElement('canvas'); canvas.width = reference.includes('portrait') ? 1170 : reference.includes('large') ? 3072 : 1024; canvas.height = reference.includes('portrait') ? 2532 : reference.includes('large') ? 2048 : 512;
           if (reference.includes('portrait')) {
@@ -113,12 +114,15 @@ try {
     assert.ok((await portrait.boundingBox()).height <= 300, 'previews use at most half a small viewport');
     await qualityPage.close();
     const galleryPage = await browser.newPage({viewport:{width:1200,height:900}});
+    galleryPage.setDefaultTimeout(5000);
     await galleryPage.goto(new URL('/image-viewport',server.resolvedUrls.local[0]).href);
     await galleryPage.evaluate(()=>{ window.showGallery(); window.replaceImages([
-      {id:'gallery-first',role:'assistant',content:'',parts:[{type:'media',media:{url:'/portrait.png',title:'First',alt:'First screenshot',width:1170,height:2532}}]},
+      {id:'gallery-first',role:'assistant',content:'',parts:[{type:'media',media:{url:'/portrait-gallery-first.png',title:'First',alt:'First screenshot',width:1170,height:2532}}]},
       {id:'gallery-second',role:'assistant',content:'',parts:[{type:'media',media:{url:'/slow-gallery.png',title:'Second',alt:'Second screenshot',width:1024,height:512}}]},
     ]); });
+    await galleryPage.waitForFunction(()=>typeof window.releaseFirstGalleryImage==='function');
     await galleryPage.locator('[aria-label="Open fullscreen"]').first().click();
+    await galleryPage.evaluate(()=>window.releaseFirstGalleryImage());
     const dialog = galleryPage.getByRole('dialog');
     const previous = dialog.getByRole('button',{name:'Previous image'}), next = dialog.getByRole('button',{name:'Next image'});
     assert.equal(await previous.isDisabled(),true);

@@ -96,7 +96,7 @@ const fullscreenOpen = ref(false)
 const downloadName = computed(() => mediaDownloadName(props.media))
 
 async function handleImageAction(intent: CodexMessageImageOpenIntent) {
-  if (managedPreview && !previewSource.value) { await managedPreview.reload(); if (previewSource.value) return }
+  if (managedPreview && !previewSource.value) { await managedPreview.reload(); if (previewSource.value && intent === 'open') return }
   const image = {
     alt: props.media.alt || generatedAltLabel,
     kind: 'media',
