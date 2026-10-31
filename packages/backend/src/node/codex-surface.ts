@@ -408,6 +408,7 @@ export class CodexSurface {
         snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
       },
       this.originalImages,
+      options.useConfiguredModelProvider,
     );
     this.connection = new CodexSurfaceConnectionController(
       this.client,

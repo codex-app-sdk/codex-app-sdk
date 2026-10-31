@@ -22,7 +22,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 
 | Direction | Total | High-level | Policy boundary | Ignored | Typed only |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Client → app-server requests | 178 | 50 | 0 | 0 | 128 |
+| Client → app-server requests | 178 | 51 | 0 | 0 | 127 |
 | App-server → client notifications | 87 | 43 | 0 | 29 | 15 |
 | App-server → client requests | 11 | 9 | 2 | 0 | 0 |
 
@@ -192,7 +192,7 @@ handling. CI and local checks can use `npm run check:rpc` to detect drift.
 | `process/writeStdin` | Typed client only | — |
 | `process/kill` | Typed client only | — |
 | `process/resizePty` | Typed client only | — |
-| `config/read` | Typed client only | — |
+| `config/read` | High-level SDK | `packages/backend/src/node/codex-surface-model-provider.ts` |
 | `externalAgentConfig/detect` | Typed client only | — |
 | `externalAgentConfig/import` | Typed client only | — |
 | `externalAgentConfig/import/recordHistory` | Typed client only | — |

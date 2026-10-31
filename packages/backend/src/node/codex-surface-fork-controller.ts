@@ -1,3 +1,4 @@
+import { configuredModelProvider } from './codex-surface-model-provider';
 import { readTurnItems } from './codex-surface-conversations-controller';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '../codex/index';
@@ -63,6 +64,7 @@ export class CodexSurfaceForkController {
     private readonly extensions: CodexSurfaceExtensionsController,
     private readonly host: CodexSurfaceForkHost,
     private readonly originalImages?: CodexOriginalHistoryImages,
+    private readonly useConfiguredModelProvider = false,
   ) {}
 
   async fork(
@@ -99,8 +101,10 @@ export class CodexSurfaceForkController {
       createOptions: options,
       extensionContext: hostOptions.extensionContext,
     }, options, mcpServers);
+    const modelProvider = this.useConfiguredModelProvider ? await configuredModelProvider(this.client, cwd ?? undefined) : undefined;
     const response = await this.client.request('thread/fork', {
       threadId: sourceThreadId,
+      ...(modelProvider === undefined ? {} : { modelProvider }),
       ...(boundary.beforeTurnId ? { beforeTurnId: boundary.beforeTurnId } : {}),
       ...(boundary.lastTurnId ? { lastTurnId: boundary.lastTurnId } : {}),
       excludeTurns: true,

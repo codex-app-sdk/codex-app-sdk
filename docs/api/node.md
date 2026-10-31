@@ -14,6 +14,13 @@ import {
 
 Creates a high-level surface and its default app-server client/stdio transport.
 
+With `useConfiguredModelProvider: true`, resumed and forked conversations use
+app-server's effective provider for their working directory instead of the
+provider recorded in history. Native configuration resolves CLI, profile and
+project layers. An omitted provider uses `openai`; a failed configuration read
+rejects the operation. The default is `false`, preserving each conversation's
+saved provider. Conversation identity, history and permissions remain native.
+
 Closing the default stdio transport ends stdin first so app-server can stop its
 threads and flush history. It allows 12 seconds by default (`shutdownTimeoutMs`
 overrides this), then escalates to SIGTERM and SIGKILL with at most one second
@@ -41,6 +48,7 @@ type CodexSurfaceOptions = {
   codexHome?: string;
   cwd?: string;
   autoSelectFirstConversation?: boolean;
+  useConfiguredModelProvider?: boolean;
   extensions?: readonly CodexSurfaceExtension[];
   mcpServers?: readonly CodexMcpServerDefinition[];
   onUnknownNotification?: (notification: { method: string; params?: unknown }) => void;
@@ -547,6 +555,14 @@ the browser media lifecycle. Only one live session should own a given thread
 at a time; stop it before starting another owner.
 
 ## Runtime utilities
+
+When `useConfiguredModelProvider` is enabled, resumed and forked conversations use
+app-server's effective provider configuration for their working directory instead
+of the provider recorded in history. The SDK reads native configuration before
+the operation, including CLI, profile and project layers; a configuration read
+failure rejects the operation. An omitted provider selects the native `openai`
+default. Conversation IDs, history and permission settings remain provider-owned.
+The default is `false`, preserving the provider recorded in each conversation.
 
 ### Executable and transport
 

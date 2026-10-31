@@ -17,6 +17,32 @@ function historyTurn(id: string, index: number): v2.Turn {
 }
 
 describe('CodexSurface', () => {
+  it('opts into the current configured provider on resume without changing conversation history, and fails closed on configuration errors', async () => {
+    let provider: string | null = 'gateway';
+    let fail = false;
+    const transport = new MockCodexAppServer({
+      'config/read': () => {
+        if (fail) throw new Error('Configuration unavailable');
+        return { config: { model_provider: provider } as v2.Config, origins: {}, layers: null };
+      },
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), autoSelectFirstConversation: false, useConfiguredModelProvider: true });
+    try {
+      await surface.connect();
+      const handle = surface.conversation('thread-existing');
+      for (provider of ['gateway', null, 'another-direct-provider']) {
+        await handle.load({ cwd: '/tmp/project' });
+        expect(lastRequest(transport, 'config/read')).toMatchObject({ params: { cwd: '/tmp/project', includeLayers: false } });
+        expect(lastRequest(transport, 'thread/resume')).toMatchObject({ params: { threadId: handle.id, modelProvider: provider ?? 'openai' } });
+        expect(handle.getSnapshot().messages.length).toBeGreaterThan(0);
+      }
+      const resumes = transport.sent.filter(m => 'method' in m && m.method === 'thread/resume').length;
+      fail = true;
+      await expect(handle.load({ cwd: '/tmp/project' })).rejects.toThrow('Configuration unavailable');
+      expect(transport.sent.filter(m => 'method' in m && m.method === 'thread/resume')).toHaveLength(resumes);
+    } finally { await surface.close(); }
+  });
+
   it('loads summaries, hydrates one turn on demand, and upgrades a shared window without resetting live work', async () => {
     const full = ['first', 'second', 'older'].map((id, i) => historyTurn(id, i));
     const summary = full.map(value => ({ ...value, itemsView: 'summary' as const, items: [value.items[0]!, value.items.at(-1)!] }));

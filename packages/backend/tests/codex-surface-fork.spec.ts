@@ -13,6 +13,17 @@ import {
 } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface conversation forks', () => {
+  it('uses the current configured provider for forks when the host opts in', async () => {
+    const transport = forkTransport({ configuredModelProvider: 'gateway' });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), useConfiguredModelProvider: true });
+    try {
+      await surface.connect();
+      const result = await surface.conversation('thread-existing').fork();
+      expect(lastRequest(transport, 'thread/fork')).toMatchObject({ params: { modelProvider: 'gateway' } });
+      expect(result.snapshot.messages.some(message => message.role === 'user')).toBe(true);
+    } finally { await surface.close(); }
+  });
+
   it.each(['latest', 'turn'] as const)(
     'inherits source host context when forking the %s boundary',
     async (boundary) => {
@@ -281,6 +292,7 @@ describe('CodexSurface conversation forks', () => {
 });
 
 function forkTransport(overrides: {
+  configuredModelProvider?: string;
   model?: string;
   serviceTier?: string | null;
   cwd?: string;
@@ -297,6 +309,7 @@ function forkTransport(overrides: {
     { type: 'agentMessage', id: 'forked-agent', text: 'Forked reply', phase: null, memoryCitation: null, delivery: null, questions: null },
   ]);
   return new MockCodexAppServer({
+    'config/read': () => ({ config: { model_provider: overrides.configuredModelProvider ?? null } as v2.Config, origins: {}, layers: null }),
     'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     'thread/settings/update': () => ({}),
     'thread/fork': () => ({ disabledPluginIds: [],

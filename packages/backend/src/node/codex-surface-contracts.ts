@@ -197,6 +197,8 @@ export type CodexAppServerTransportOptions =
   | CodexAppServerUnixSocketTransportOptions;
 
 export type CodexSurfaceOptions = {
+  /** Resume and fork using the effective cwd configuration's provider instead of the saved provider. Defaults to false. */
+  useConfiguredModelProvider?: boolean;
   /** Read original tool images from local provider-owned history. Defaults to false. */
   originalHistoryImages?: boolean;
   approvalPreset?: CodexSurfaceApprovalPreset;

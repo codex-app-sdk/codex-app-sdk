@@ -1,3 +1,4 @@
+import { configuredModelProvider } from './codex-surface-model-provider';
 import { readTurnItems } from './codex-surface-conversations-controller';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '../codex/index';
@@ -81,7 +82,7 @@ export class CodexSurfaceLifecycleController {
 
   constructor(
     private readonly client: CodexAppServerClient,
-    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd' | 'loadingStrategy' | 'historyItemsView'>,
+    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd' | 'loadingStrategy' | 'historyItemsView' | 'useConfiguredModelProvider'>,
     private readonly catalog: CodexSurfaceCatalogController,
     private readonly extensions: CodexSurfaceExtensionsController,
     private readonly settings: CodexSurfaceConversationSettingsController,
@@ -338,9 +339,12 @@ export class CodexSurfaceLifecycleController {
     const initialStatus = loadingRuntime.threadStatus;
     if (activate) this.host.activateRuntime(loadingRuntime);
     try {
+      const modelProvider = this.options.useConfiguredModelProvider
+        ? await configuredModelProvider(this.client, hostOptions.cwd ?? this.options.cwd) : undefined;
       const [response, goal] = await Promise.all([
         this.client.request('thread/resume', {
           threadId: conversationId,
+          ...(modelProvider === undefined ? {} : { modelProvider }),
           excludeTurns: true,
           initialTurnsPage: {
           limit: CONVERSATION_HISTORY_PAGE_SIZE,
