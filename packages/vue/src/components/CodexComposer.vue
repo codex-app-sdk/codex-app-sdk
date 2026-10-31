@@ -670,7 +670,7 @@ function handleEditorKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (['Tab', 'ArrowRight', ' '].includes(event.key)
+  if (['Tab', 'ArrowRight', ' ', 'Enter'].includes(event.key)
     && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
     && !event.isComposing && !props.disabled && !activeCommand.value
     && props.placeholder?.trim() && (editorEl.value?.readText() ?? prompt.value) === '') {

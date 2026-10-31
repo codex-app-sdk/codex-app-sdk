@@ -135,7 +135,7 @@ Controller-based panes supply the catalog through
 | `Up` / `Down` with a slash menu open | Highlight a command |
 | `Enter` with a slash menu open | Execute the highlighted command; commands requiring input activate their composer mode |
 | `Tab` with a slash menu open | Complete the highlighted command without submitting it; commands requiring input activate their composer mode |
-| `Tab` / `Right Arrow` / `Space` in an empty composer with a custom suggested placeholder | Insert the suggestion into the draft without sending |
+| `Tab` / `Right Arrow` / `Space` / `Enter` in an empty composer with a custom suggested placeholder | Insert the suggestion into the draft without sending; Enter again submits |
 | `Shift+Enter` | Insert a newline at the current selection |
 | `Cmd+Enter` / `Ctrl+Enter` | While busy, use the other follow-up action; while idle, use ordinary send |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |

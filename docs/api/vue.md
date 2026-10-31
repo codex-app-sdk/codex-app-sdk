@@ -289,7 +289,7 @@ multiple panes are busy, only the pane containing document focus responds.
 Set `placeholder` on `CodexConversationPane` or `CodexComposer`, or
 `state.composer.placeholder` when using a pane controller, to show a dynamic
 suggested follow-up. When the editor is empty, unmodified **Tab**, **Right Arrow**,
-or **Space** inserts a non-blank custom placeholder into the draft without submitting it. The caret moves to the
+**Space**, or **Enter** inserts a non-blank custom placeholder into the draft without submitting it. Press Enter again to submit. The caret moves to the
 end and the insertion supports normal undo. Existing text (including whitespace)
 is never replaced. Disabled editors, IME composition, modified acceptance shortcuts,
 and active command modes do not accept the placeholder; suggestion-picker
