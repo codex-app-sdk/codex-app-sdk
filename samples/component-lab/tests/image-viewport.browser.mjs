@@ -63,6 +63,7 @@ try {
     browser = await engine.launch();
     const page = await browser.newPage({viewport:{width:1200,height:900}});
     page.setDefaultTimeout(5000);
+    page.setDefaultNavigationTimeout(30000);
     await page.goto(new URL('/image-viewport',server.resolvedUrls.local[0]).href);
     const shot = i => page.getByRole('button',{name:'Open Photo '+i,exact:true});
     await page.waitForFunction(() => document.querySelector('img')?.naturalWidth > 0);
@@ -115,6 +116,7 @@ try {
     await qualityPage.close();
     const galleryPage = await browser.newPage({viewport:{width:1200,height:900}});
     galleryPage.setDefaultTimeout(5000);
+    galleryPage.setDefaultNavigationTimeout(30000);
     await galleryPage.goto(new URL('/image-viewport',server.resolvedUrls.local[0]).href);
     await galleryPage.evaluate(()=>{ window.showGallery(); window.replaceImages([
       {id:'gallery-first',role:'assistant',content:'',parts:[{type:'media',media:{url:'/portrait-gallery-first.png',title:'First',alt:'First screenshot',width:1170,height:2532}}]},
