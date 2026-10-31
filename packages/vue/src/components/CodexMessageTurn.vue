@@ -103,6 +103,9 @@ const hasDetails = computed(() => props.itemsView === 'summary' || messages.valu
 const enabled = computed(() => Boolean(turnId.value && headerMessageIndex.value !== undefined))
 const expanded = ref((active.value && !finalStarted.value) || stoppedWithoutFinal.value)
 const userToggled = ref(false)
+const detailsLoading = computed(() => props.detailsLoading || (
+  expanded.value && props.itemsView === 'summary' && !props.detailsError
+))
 
 watch(finalStarted, (started, previous) => {
   if (started && !previous && !userToggled.value) expanded.value = false
@@ -116,7 +119,7 @@ provide(assistantWorkTurnKey, {
   active,
   completedWithoutFinal,
   enabled,
-  expanded,
+  expanded: computed(() => expanded.value && !detailsLoading.value && (props.itemsView !== 'summary' || Boolean(props.detailsError))),
   finalStarted,
   headerMessageIndex,
   latestStreamingAssistantIndex,
@@ -125,7 +128,7 @@ provide(assistantWorkTurnKey, {
   durationMs,
   hasDetails,
   itemsView: computed(() => props.itemsView),
-  detailsLoading: computed(() => props.detailsLoading),
+  detailsLoading,
   detailsError: computed(() => props.detailsError),
   reloadDetails: () => { if (props.turnId) emit('loadTurnHistory', props.turnId) },
   status,

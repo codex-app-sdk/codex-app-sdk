@@ -107,13 +107,22 @@ describe('CodexConversationPane', () => {
     expect(wrapper.text()).toContain('Final answer'); expect(loadTurnHistory).not.toHaveBeenCalled();
     await header().trigger('click'); await flushPromises();
     expect(loadTurnHistory).toHaveBeenCalledExactlyOnceWith('summary-turn');
+    expect(header().attributes('aria-expanded')).toBe('false');
+    expect(header().attributes('disabled')).toBeDefined();
+    expect(header().get('[role="status"]').attributes('aria-label')).toContain('Loading details');
+    expect(header().findAll('svg')).toHaveLength(1);
+    expect(wrapper.find('.chat-fold--open').exists()).toBe(false);
+    await header().trigger('click');
+    expect(loadTurnHistory).toHaveBeenCalledTimes(1);
     const turn = state.identity.turns![0]!;
     turn.detailsLoading = true; await nextTick();
-    expect(wrapper.get('[role="status"]').text()).toContain('Loading details');
+    expect(header().attributes('aria-expanded')).toBe('false');
     turn.detailsLoading = false; turn.detailsError = 'Offline'; await nextTick();
     expect(wrapper.get('.chat-work-group [role="alert"]').text()).toContain('Offline');
     await wrapper.get('.chat-work-group [role="alert"] button').trigger('click');
     expect(loadTurnHistory).toHaveBeenCalledTimes(2);
+    turn.detailsLoading = true; await nextTick();
+    expect(header().attributes('aria-expanded')).toBe('false');
     turn.itemsView = 'full'; turn.detailsError = null;
     state.identity.messages = [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [
       { type: 'text', text: 'Work details', phase: 'commentary' },
@@ -121,7 +130,11 @@ describe('CodexConversationPane', () => {
       { type: 'text', text: final, phase: 'final_answer' },
     ] }];
     await nextTick();
+    expect(header().attributes('aria-expanded')).toBe('false');
+    turn.detailsLoading = false; await nextTick();
     expect(header().attributes('aria-expanded')).toBe('true'); expect(wrapper.text()).toContain('Work details');
+    expect(header().find('[role="status"]').exists()).toBe(false);
+    expect(header().attributes('disabled')).toBeUndefined();
     expect(wrapper.findAll('.chat-work-group__body .chat-media-block')).toHaveLength(3);
     expect(answerImages()).toHaveLength(2);
     await header().trigger('click');

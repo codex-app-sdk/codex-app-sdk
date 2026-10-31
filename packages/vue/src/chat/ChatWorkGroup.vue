@@ -12,7 +12,8 @@
       type="button"
       class="chat-work-group__header"
       :aria-expanded="expanded"
-      :disabled="active"
+      :disabled="active || detailsLoading"
+      :aria-busy="detailsLoading || undefined"
       @click="toggle"
     >
       <span
@@ -22,13 +23,13 @@
       >
         {{ label }}
       </span>
-      <component v-if="!active" :is="expanded ? ChevronDown : ChevronRightIcon" :size="15" />
+      <Loader2Icon v-if="detailsLoading" class="chat-work-group__spinner" :size="15" role="status" :aria-label="t('chat.work.loadingDetails')" />
+      <component v-else-if="!active" :is="expanded ? ChevronDown : ChevronRightIcon" :size="15" />
     </button>
 
     <ChatFoldTransition v-if="showHeader && hasDetails" :open="expanded">
       <div class="chat-work-group__body">
-        <p v-if="assistantWorkTurn?.detailsLoading?.value" role="status">{{ t('chat.work.loadingDetails') }}</p>
-        <div v-else-if="assistantWorkTurn?.detailsError?.value" role="alert">
+        <div v-if="assistantWorkTurn?.detailsError?.value" role="alert">
           {{ assistantWorkTurn.detailsError.value }}
           <button type="button" @click="assistantWorkTurn.reloadDetails?.()">{{ t('chat.actions.retry') }}</button>
         </div>
@@ -43,7 +44,7 @@
 
 <script setup lang="ts">
 import { computed, inject, onScopeDispose, ref, watch } from 'vue'
-import { ChevronDown, ChevronRightIcon } from '../icons/app-icons'
+import { ChevronDown, ChevronRightIcon, Loader2Icon } from '../icons/app-icons'
 import { useCodexChatTranslate } from './chat-i18n'
 import ChatFoldTransition from './ChatFoldTransition.vue'
 import { assistantWorkMessageIndexKey, assistantWorkTurnKey } from './message-work-state'
@@ -72,6 +73,7 @@ const active = computed(() => (
     : props.active && !props.finalStarted
 ))
 const hasDetails = computed(() => !usesTurn.value || active.value || assistantWorkTurn!.hasDetails?.value !== false)
+const detailsLoading = computed(() => assistantWorkTurn?.detailsLoading?.value === true)
 const expanded = computed(() => (
   active.value
     ? true
@@ -167,6 +169,15 @@ function toggle() {
 
 .chat-work-group__header:disabled {
   cursor: default;
+}
+
+.chat-work-group__spinner {
+  flex-shrink: 0;
+  animation: chat-work-group-spin 800ms linear infinite;
+}
+
+@keyframes chat-work-group-spin {
+  to { transform: rotate(360deg); }
 }
 
 .chat-work-group__title {

@@ -617,8 +617,9 @@ combinations are valid:
 
 Set `historyItemsView: 'summary'` on the Node surface for summary-first history.
 The pane shows `Done · duration · View details` before each completed answer
-(duration is omitted when unavailable). Expanding requests that turn's Working
-details, displays loading/retry state, and caches successful reads. Completed
+(duration is omitted when unavailable). Selecting View details requests that turn's
+Working details. A small spinner replaces the chevron while the group stays folded;
+it expands when content is ready, offers retry on failure, and caches successful reads. Completed
 historical turns keep their status and collapse control even without a final answer.
 After loading, a turn with no Working content shows a plain status with no details
 action. Surface-bound

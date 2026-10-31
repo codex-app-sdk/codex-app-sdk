@@ -52,7 +52,7 @@ const fixture = {
         async loadTurnHistory(turnId) {
           window.detailReads++;
           state.identity.turns.find(turn => turn.id === turnId).detailsLoading = true;
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => { window.finishDetailRead = resolve; });
           state.identity.messages = state.identity.messages.map(message => message.turnId === turnId && message.role === 'assistant'
             ? { ...message, parts: [{ type: 'text', text: 'Investigated the work. '.repeat(400), phase: 'commentary' },
               ...Array.from({ length: 3 }, (_, i) => ({ type: 'media', phase: 'commentary', media: { url: image, title: 'Tool screenshot '+i, width: 100, height: 100 } })), ...message.parts] } : message);
@@ -88,7 +88,7 @@ const server = await createServer({
   configFile: new URL('../vite.config.ts', import.meta.url).pathname,
   root: new URL('..', import.meta.url).pathname,
   plugins: [fixture],
-  server: { port: 0 },
+  server: { port: 0, strictPort: false },
 });
 const artifacts = process.env.FOLD_LAYOUT_ARTIFACTS;
 if (artifacts) await mkdir(artifacts, { recursive: true });
@@ -144,7 +144,13 @@ try {
     await page.waitForTimeout(150);
     const before = await header.boundingBox();
     await header.click();
-    await page.getByRole('status').filter({ hasText: 'Loading details' }).waitFor();
+    await header.getByRole('status', { name: 'Loading details…' }).waitFor();
+    assert.equal(await header.getAttribute('aria-expanded'), 'false');
+    assert.equal(await header.isDisabled(), true);
+    assert.equal(await header.locator('svg').count(), 1, 'the spinner replaces the chevron');
+    assert.equal(await page.locator('.chat-fold--open').count(), 0, 'pending history must stay folded');
+    if (artifacts) await page.screenshot({ path: join(artifacts, engine.name() + '-loading.png') });
+    await page.evaluate(() => window.finishDetailRead());
     await page.waitForFunction(() => document.querySelector('.chat-work-group__body') && document.body.textContent.includes('Investigated the work.'));
     await page.waitForTimeout(250);
     const after = await header.boundingBox();
