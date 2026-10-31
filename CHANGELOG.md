@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.19.5
+
+### Fixed
+
+- Keep live Working details visible while an agent is active.
+
 ## 0.19.4
 
 ### Fixed
