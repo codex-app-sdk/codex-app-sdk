@@ -12,3 +12,6 @@ samples/electron/*/dist-mcp/
 samples/electron/*/dist-renderer/
 *.log
 .DS_Store
+
+# Isolated CI benchmark measurements
+benchmark-results/

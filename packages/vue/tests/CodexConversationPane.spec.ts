@@ -92,7 +92,7 @@ const routingMentionGroup = {
 describe('CodexConversationPane', () => {
   it('loads summary Working details on expansion, retries failures, and keeps the loaded group cached', async () => {
     const final = 'Final answer\n\n![Phone](data:image/png;base64,cG5n)\n\n![Desktop](data:image/png;base64,cG5n)';
-    const state = reactive<CodexConversationPaneState>({ identity: {
+    const state: CodexConversationPaneState = reactive({ identity: {
       conversationKey: 'summary-thread', busy: true, activeTurnId: 'summary-turn',
       turns: [{ id: 'summary-turn', status: 'inProgress', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: 109_000, itemsView: 'summary' }],
       messages: [{ id: 'summary-answer', role: 'assistant', status: 'streaming', turnId: 'summary-turn', parts: [{ type: 'text', text: 'Live work', phase: 'commentary' }] }],

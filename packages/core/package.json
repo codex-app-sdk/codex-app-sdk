@@ -47,11 +47,11 @@
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json --declaration --emitDeclarationOnly",
     "check": "npm run lint && npm run test:coverage && npm run build",
-    "lint": "tsc -p tsconfig.test.json --noEmit",
+    "lint": "node ../../scripts/ci-typecheck.mjs plain -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "cd ../.. && stryker run packages/core/stryker.config.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "node ../../scripts/ci-typecheck.mjs plain -p tsconfig.json --noEmit"
   },
   "engines": {
     "node": ">=22"

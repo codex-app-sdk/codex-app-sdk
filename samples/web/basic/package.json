@@ -9,7 +9,7 @@
     "dev": "node scripts/dev.mjs",
     "lint": "npm run typecheck",
     "start": "npm run build && node dist/server/index.js",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"
+    "typecheck": "node ../../../scripts/ci-typecheck.mjs vue --noEmit -p tsconfig.json && node ../../../scripts/ci-typecheck.mjs plain --noEmit -p tsconfig.server.json"
   },
   "dependencies": {
     "@codex-app-sdk/backend": "0.19.5",

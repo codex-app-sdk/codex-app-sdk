@@ -11,7 +11,7 @@
     "lint": "npm run typecheck",
     "start": "npm run build && electron .",
     "test": "vitest run",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "node ../../../scripts/ci-typecheck.mjs vue --noEmit"
   },
   "dependencies": {
     "@codex-app-sdk/backend": "0.19.5",
