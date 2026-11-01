@@ -213,6 +213,7 @@ const props = defineProps<{
   models?: readonly CodexModelOption[];
   modelMenuItems?: readonly CodexComposerMenuItem<Payload>[];
   placeholder?: string;
+  suggestedPrompt?: string;
   queuedPromptId?: string | null;
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
@@ -278,7 +279,8 @@ const goalCommand = computed(() => (
 ));
 const goalMode = computed(() => Boolean(goalCommand.value && activeCommandId.value === goalCommand.value.id));
 const effectivePlanMode = computed(() => Boolean(effectiveCodexCapabilities.value.planMode && props.planMode && !goalMode.value));
-const effectivePlaceholder = computed(() => activeCommand.value?.composerMode?.placeholder ?? props.placeholder ?? 'Ask Codex…');
+const effectivePlaceholder = computed(() => activeCommand.value?.composerMode?.placeholder
+  ?? (props.suggestedPrompt?.trim() ? props.suggestedPrompt : props.placeholder ?? 'Ask Codex…'));
 const voiceVisible = computed(() => (
   effectivePresentation.value.composer.voice
   && Boolean(props.transcribeAudio || hostCapabilities?.capabilities.transcription)
@@ -673,9 +675,9 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   if (['Tab', 'ArrowRight', ' ', 'Enter'].includes(event.key)
     && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
     && !event.isComposing && !props.disabled && !activeCommand.value
-    && props.placeholder?.trim() && (editorEl.value?.readText() ?? prompt.value) === '') {
+    && props.suggestedPrompt?.trim() && (editorEl.value?.readText() ?? prompt.value) === '') {
     event.preventDefault();
-    editorEl.value?.insertTextAtSelection(props.placeholder);
+    editorEl.value?.insertTextAtSelection(props.suggestedPrompt);
     return;
   }
 

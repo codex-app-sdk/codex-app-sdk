@@ -174,6 +174,7 @@
             :model-catalog-status="effectiveModelCatalogStatus"
             :models="effectiveModels"
             :placeholder="effectivePlaceholder"
+            :suggested-prompt="effectiveSuggestedPrompt"
             :approval-preset="effectiveApprovalPreset"
             :plan-mode="effectivePlanMode"
             :presentation="effectivePresentation"
@@ -420,6 +421,7 @@ const props = withDefaults(defineProps<{
   pickAttachments?: CodexAttachmentPicker;
   ingestAttachments?: CodexAttachmentIngester;
   placeholder?: string;
+  suggestedPrompt?: string;
   promptHistory?: readonly string[];
   approvalPreset?: ApprovalPreset | null;
   planMode?: boolean;
@@ -919,6 +921,10 @@ const effectiveModelMenuItems = computed(() => controlledValue(
 const effectivePlaceholder = computed(() => controlledValue(
   (state) => state.composer?.placeholder,
   () => props.placeholder,
+));
+const effectiveSuggestedPrompt = computed(() => controlledValue(
+  (state) => state.composer?.suggestedPrompt,
+  () => props.suggestedPrompt,
 ));
 const effectiveFollowUpBehavior = computed(() => controlledValue(
   (state) => state.composer?.followUpBehavior ?? 'queue',

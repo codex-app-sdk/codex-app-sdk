@@ -135,7 +135,7 @@ Controller-based panes supply the catalog through
 | `Up` / `Down` with a slash menu open | Highlight a command |
 | `Enter` with a slash menu open | Execute the highlighted command; commands requiring input activate their composer mode |
 | `Tab` with a slash menu open | Complete the highlighted command without submitting it; commands requiring input activate their composer mode |
-| `Tab` / `Right Arrow` / `Space` / `Enter` in an empty composer with a custom suggested placeholder | Insert the suggestion into the draft without sending; Enter again submits |
+| `Tab` / `Right Arrow` / `Space` / `Enter` in an empty composer with `suggestedPrompt` | Insert the suggestion into the draft without sending; Enter again submits |
 | `Shift+Enter` | Insert a newline at the current selection |
 | `Cmd+Enter` / `Ctrl+Enter` | While busy, use the other follow-up action; while idle, use ordinary send |
 | `Shift+Tab` | Toggle plan mode when the capability is enabled |
@@ -148,6 +148,12 @@ the send button steer during an active turn. Cmd/Ctrl+Enter then queues instead.
 The default is `'queue'`. Button labels and tooltip shortcuts reflect the
 effective action. With `capabilities.steerPrompt: false`, both paths use ordinary
 send, preserving attachments and input options; the host queues while busy.
+
+Use `placeholder` for display-only guidance and `suggestedPrompt` for a follow-up
+the user can accept. Controller hosts provide these separately through
+`state.composer.placeholder` and `state.composer.suggestedPrompt`. Suggestions
+appear as the empty-editor hint; accepting one fills the draft and never sends
+it immediately. Ordinary hints retain normal editing and keyboard navigation.
 
 Suggestion menus consume navigation keys before composer shortcuts. Newline
 insertion preserves the caret even when it splits text in the middle of a line,

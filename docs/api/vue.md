@@ -86,7 +86,7 @@ const paneState = computed(() => ({
     identity: { conversationKey, activeTurnId, turns, messages, busy, disabled, error },
     history: { hasOlder, loading, loadingOlder },
     thread: { approvals, clientRequests, answeredClientRequestIds, goal, queuedPrompts, turnGitDiff, contextUsage },
-    composer: { state, attachments, placeholder, leadingMenuItems, menuItems, modelMenuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
+    composer: { state, attachments, placeholder, suggestedPrompt, leadingMenuItems, menuItems, modelMenuItems, approvalPreset, planMode, selectedModelId, selectedReasoningEffort, selectedServiceTier },
     catalogs: { files, models, commands, skills, plugins, mentionGroups, modelCatalogStatus, skillCatalogStatus },
     capabilities,
     policy: { actionsDisabled, attachEnabled, canDeleteTurn, canEditTurn, canForkTurn, canRetryTurn, followUpsDisabled },
@@ -287,13 +287,18 @@ multiple panes are busy, only the pane containing document focus responds.
 ### Controlled composer state
 
 Set `placeholder` on `CodexConversationPane` or `CodexComposer`, or
-`state.composer.placeholder` when using a pane controller, to show a dynamic
-suggested follow-up. When the editor is empty, unmodified **Tab**, **Right Arrow**,
-**Space**, or **Enter** inserts a non-blank custom placeholder into the draft without submitting it. Press Enter again to submit. The caret moves to the
+`state.composer.placeholder` when using a pane controller, for a display-only
+input hint. It is never inserted into the draft by suggestion acceptance keys.
+
+Use `suggestedPrompt` (or `state.composer.suggestedPrompt`) for an actionable
+follow-up. A non-blank suggestion appears in place of the normal hint while the
+editor is empty. Unmodified **Tab**, **Right Arrow**, **Space**, or **Enter** inserts
+that suggestion into the draft without submitting it. Press Enter again to submit. The caret moves to the
 end and the insertion supports normal undo. Existing text (including whitespace)
 is never replaced. Disabled editors, IME composition, modified acceptance shortcuts,
-and active command modes do not accept the placeholder; suggestion-picker
-keyboard handling takes precedence. Omitting the placeholder retains the default
+and active command modes do not accept a prompt suggestion; suggestion-picker
+keyboard handling takes precedence. Without a suggestion, the placeholder retains normal
+editing and Tab navigation. Omitting the placeholder retains the default
 “Ask Codex…” hint and normal Tab navigation; an empty string hides the hint.
 
 ```ts

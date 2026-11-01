@@ -23,6 +23,7 @@ type ChatComposerProps = {
   hasExternalContent?: boolean;
   interruptArmed?: boolean;
   placeholder: string;
+  suggestedPrompt?: string;
   promptHistory?: readonly string[];
   promptHistoryLoading?: boolean;
   queuedPromptId?: string | null;
@@ -993,7 +994,7 @@ describe('ChatComposer', () => {
 
   it('uses the preferred follow-up action for Enter and the send button', async () => {
     for (const action of ['enter', 'click']) {
-      const wrapper = mountComposer({ isSending: true, followUpBehavior: 'steer', placeholder: 'adjust the current work' });
+      const wrapper = mountComposer({ isSending: true, followUpBehavior: 'steer', suggestedPrompt: 'adjust the current work' });
       await editor(wrapper).trigger('keydown', { key: 'Enter' });
       expect(editorValue(wrapper)).toBe('adjust the current work');
       expect(wrapper.emitted('steer')).toBeUndefined();

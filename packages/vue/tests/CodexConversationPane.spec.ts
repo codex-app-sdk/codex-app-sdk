@@ -201,7 +201,7 @@ describe('CodexConversationPane', () => {
 
   it.each(
     ['Tab', 'ArrowRight', ' '].flatMap(key => ['props', 'controller'].map(mode => ({ key, mode }))),
-  )('accepts a changing custom placeholder with $key through $mode without submitting', async ({ key, mode }) => {
+  )('accepts an explicit changing prompt suggestion with $key through $mode without submitting', async ({ key, mode }) => {
     const state = reactive<CodexConversationPaneState>({ identity: { messages: [] }, composer: {} });
     const submit = vi.fn();
     const updateComposerState = vi.fn((next) => { state.composer = { ...state.composer, state: next }; });
@@ -216,11 +216,11 @@ describe('CodexConversationPane', () => {
       return event;
     };
     expect(accept().defaultPrevented).toBe(false);
-    for (const placeholder of ['Review the changes', 'Write a release summary']) {
-      if (mode === 'controller') state.composer = { placeholder };
-      else await wrapper.setProps({ placeholder });
+    for (const suggestedPrompt of ['Review the changes', 'Ask for follow-up changes']) {
+      if (mode === 'controller') state.composer = { placeholder: 'Ask for follow-up changes', suggestedPrompt };
+      else await wrapper.setProps({ placeholder: 'Ask for follow-up changes', suggestedPrompt });
       await nextTick();
-      expect(editor.attributes('data-placeholder')).toBe(placeholder);
+      expect(editor.attributes('data-placeholder')).toBe(suggestedPrompt);
     }
     for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }, { isComposing: true },
       ...(key === 'Tab' ? [] : [{ shiftKey: true }])]) {
@@ -231,25 +231,27 @@ describe('CodexConversationPane', () => {
     }
     expect(accept().defaultPrevented).toBe(true);
     await nextTick();
-    expect(editor.element.textContent).toBe('Write a release summary');
+    expect(editor.element.textContent).toBe('Ask for follow-up changes');
     expect(mode === 'controller' ? state.composer?.state : wrapper.emitted('update:composerState')?.at(-1)?.[0])
-      .toMatchObject({ text: 'Write a release summary' });
-    expect(wrapper.emitted('send')).toBeUndefined();
+      .toMatchObject({ text: 'Ask for follow-up changes' });
+    expect(wrapper.emitted('submit')).toBeUndefined();
     expect(submit).not.toHaveBeenCalled();
     expect(accept().defaultPrevented).toBe(false);
     wrapper.unmount();
   });
 
   it.each([
-    { placeholder: '' },
-    { placeholder: '   ' },
-    { placeholder: 'Suggested follow-up', disabled: true },
-    { placeholder: 'Suggested follow-up', modelValue: 'My draft' },
-    { placeholder: 'Suggested follow-up', modelValue: ' ' },
-    { placeholder: 'Suggested follow-up', composerState: { text: '', selectionStart: 0, selectionEnd: 0, activeCommandId: 'codex.goal' } },
+    { placeholder: 'Ask for follow-up changes' },
+    { placeholder: 'Codex is working…', busy: true },
+    { suggestedPrompt: '' },
+    { suggestedPrompt: '   ' },
+    { suggestedPrompt: 'Suggested follow-up', disabled: true },
+    { suggestedPrompt: 'Suggested follow-up', modelValue: 'My draft' },
+    { suggestedPrompt: 'Suggested follow-up', modelValue: ' ' },
+    { suggestedPrompt: 'Suggested follow-up', composerState: { text: '', selectionStart: 0, selectionEnd: 0, activeCommandId: 'codex.goal' } },
   ])('leaves acceptance keys alone when the placeholder is not an available suggestion: %j', async (props) => {
     const wrapper = mount(CodexConversationPane, { props: {
-      placeholder: props.placeholder, disabled: props.disabled,
+      placeholder: 'placeholder' in props ? props.placeholder : undefined, suggestedPrompt: 'suggestedPrompt' in props ? props.suggestedPrompt : undefined, busy: 'busy' in props ? props.busy : false, disabled: props.disabled,
       modelValue: props.modelValue, composerState: props.composerState,
     } });
     const editor = wrapper.get('[role="textbox"]');
