@@ -3780,18 +3780,28 @@ describe('CodexConversationPane', () => {
     const expected = { href: 'https://example.com/controller', kind: 'external' as const };
     const openLink = vi.fn();
     const compatibility = vi.fn();
+    const userUrl: SurfaceMessage = { id: 'user-url', role: 'user', status: 'complete', parts: [{ type: 'text', text: expected.href }] };
+    const state = reactive<CodexConversationPaneState>({ identity: { conversationKey: 'controlled-link', messages: [userUrl] } });
     const controller = createCodexConversationPaneController({
-      state: { identity: { conversationKey: 'controlled-link', messages } },
+      state,
       actions: { openLink },
     });
     const wrapper = mount(CodexConversationPane, {
       props: { controller, openConversationLink: compatibility },
-      slots: { message: () => h('a', { class: 'controlled-link', href: expected.href }, 'Open') },
     });
 
-    await wrapper.get('.controlled-link').trigger('click');
-    await flushPromises();
-    expect(openLink).toHaveBeenCalledWith(expected);
+    for (const authored of [false, true]) {
+      if (authored) {
+        state.identity.messages = [{ ...userUrl, metadata: { promptContent: [{ type: 'text', text: expected.href }] } }];
+        await nextTick();
+      }
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      wrapper.get('a[href="https://example.com/controller"]').element.dispatchEvent(event);
+      await flushPromises();
+      expect(event.defaultPrevented).toBe(true);
+      expect(openLink).toHaveBeenLastCalledWith(expected);
+    }
+    expect(openLink).toHaveBeenCalledTimes(2);
     expect(compatibility).not.toHaveBeenCalled();
     expect(wrapper.emitted('openLink')).toBeUndefined();
 

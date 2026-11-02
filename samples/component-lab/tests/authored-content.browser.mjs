@@ -190,7 +190,25 @@ try {
     const messagePluginAlignment = await messagePill.evaluate(textAlignment);
     assert(Math.abs(messagePluginAlignment - pluginAlignment) <= 0.5, `Plugin alignment: composer ${pluginAlignment}px, message ${messagePluginAlignment}px`);
     await page.screenshot({ path: `/tmp/sdk-message-pills-${engine.name()}.png` });
-    console.log(`${engine.name()}: literal triggers, explicit skill/agent chips, draft restoration and inline paste/undo/resubmit preserve authored content.`);
+    await page.evaluate(() => window.authoredFixture.reset());
+    const href = 'https://x.com/home';
+    await focusEnd(editor); await editor.pressSequentially(href);
+    await page.locator('.chat-composer__send').click();
+    const link = page.getByRole('link', { name: href, exact: true });
+    await link.waitFor();
+    assert.equal(await link.getAttribute('href'), href);
+    await page.context().route(href, route => route.fulfill({ contentType: 'text/html', body: '<p>Isolated link target</p>' }));
+    for (const input of ['click', 'keyboard']) {
+      const opened = page.waitForEvent('popup');
+      if (input === 'click') await link.click();
+      else { await link.focus(); await link.press('Enter'); }
+      const popup = await opened;
+      await popup.waitForLoadState('domcontentloaded');
+      assert.equal(popup.url(), href);
+      await popup.close();
+    }
+    await page.screenshot({ path: `/tmp/sdk-plain-url-${engine.name()}.png` });
+    console.log(`${engine.name()}: literal triggers, explicit skill/agent chips, draft restoration and inline paste/undo/resubmit preserve authored content; plain URLs open by click and keyboard.`);
     await browser.close(); browser = undefined;
   }
 } finally {

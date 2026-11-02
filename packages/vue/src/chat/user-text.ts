@@ -1,3 +1,5 @@
+import { Lexer } from 'marked';
+import { codexConversationLinkFromHref } from './conversation-links';
 import { normalizePromptContent, type CodexPromptMention, type CodexPromptPart, type CodexSurfacePlugin, type CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
 import { skillDisplayName, skillMatchesMention } from './composer-skills';
 import { pluginMatchesMention } from './composer-plugins';
@@ -10,6 +12,7 @@ import {
 export type CodexUserTextToken =
   | { type: 'text'; text: string }
   | { type: 'code'; text: string }
+  | { type: 'link'; text: string; href: string }
   | { type: 'line-break' }
   | { type: 'file-mention'; displayName: string; label: string; href: string }
   | {
@@ -44,9 +47,9 @@ export function parseAuthoredUserText(
   if (content === undefined) return parseCodexUserText(text, plugins, skills, groups, false);
   return normalizePromptContent(content).flatMap((part): CodexUserTextToken[] => {
     if (part.type === 'text') {
-      return part.text.split(/(`[^`\n]+`|\n)/g).filter(Boolean).map(value => value === '\n'
+      return withWebLinks(part.text, text => text.split(/(`[^`\n]+`|\n)/g).filter(Boolean).map(value => value === '\n'
         ? { type: 'line-break' } : value.startsWith('`') && value.endsWith('`')
-          ? { type: 'code', text: value.slice(1, -1) } : { type: 'text', text: value });
+          ? { type: 'code', text: value.slice(1, -1) } : { type: 'text', text: value }));
     }
     if (part.kind === 'skill') return [{
       type: 'skill-mention', displayName: part.label, label: part.label, href: part.id,
@@ -77,6 +80,27 @@ export function parseCodexUserText(
   skills: readonly CodexSurfaceSkill[] = [],
   mentionGroups: readonly CodexComposerMentionGroup[] = [],
   allowBareMentions = true,
+): CodexUserTextToken[] {
+  return withWebLinks(content, text => parseUserTextTokens(text, plugins, skills, mentionGroups, allowBareMentions));
+}
+
+function withWebLinks(content: string, literal: (text: string) => CodexUserTextToken[]): CodexUserTextToken[] {
+  if (!/https?:\/\//i.test(content)) return literal(content);
+  return Lexer.lexInline(content, { gfm: true }).flatMap((token): CodexUserTextToken[] => {
+    const link = token.type === 'link' && /^https?:\/\//i.test(token.raw)
+      ? codexConversationLinkFromHref(token.href) : null;
+    return link?.kind === 'external'
+      ? [{ type: 'link', text: token.raw, href: link.href }]
+      : literal(token.raw);
+  });
+}
+
+function parseUserTextTokens(
+  content: string,
+  plugins: readonly CodexSurfacePlugin[],
+  skills: readonly CodexSurfaceSkill[],
+  mentionGroups: readonly CodexComposerMentionGroup[],
+  allowBareMentions: boolean,
 ): CodexUserTextToken[] {
   const tokens: CodexUserTextToken[] = [];
   let lastIndex = 0;

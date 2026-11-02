@@ -4,6 +4,7 @@
       <template v-for="(token, index) in tokens" :key="`${token.type}-${index}`">
         <span v-if="token.type === 'text'">{{ token.text }}</span>
         <code v-else-if="token.type === 'code'">{{ token.text }}</code>
+        <a v-else-if="token.type === 'link'" class="chat-message-link" :href="token.href" target="_blank" rel="noopener noreferrer">{{ token.text }}</a>
         <br v-else-if="token.type === 'line-break'">
         <ChatMentionChip v-else-if="token.type === 'file-mention'" kind="file" :name="token.displayName" class="chat-user-text__mention chat-user-text__mention--file" :title="token.displayName" />
         <slot

@@ -795,6 +795,10 @@ skill/plugin Markdown links render as pills with catalog names or fallback label
 Custom `mention://` links retain their label, group, ID, and value without a
 catalog; the existing `mention` slot renders them just like authored custom parts.
 Message pills share the composer's pill styling and default icons.
+Bare HTTP and HTTPS URLs in user messages render as clickable links and follow
+the conversation pane's host link handling. Inline code and ordinary Markdown
+links stay literal. The user-text parsers return `link` tokens with `text` and
+`href` for these URLs; surrounding punctuation is excluded from the destination.
 `parseCodexUserText` accepts a fifth argument of `false` to disable bare-trigger lookup.
 `CodexComposer` creates a mention only when the user accepts a suggestion, and
 emits the visible text plus `options.content` for submissions containing mentions.

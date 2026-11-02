@@ -79,7 +79,7 @@ describe('ChatUserText', () => {
     expect(wrapper.find('.chat-user-text__mention').exists()).toBe(false);
     expect(wrapper.text()).toBe('Use $update-bank-balance-sheet and @gmail');
     const link = `[$bank](${bankSkill.path})`;
-    await wrapper.setProps({ content: `$update-bank-balance-sheet ${link} \`${link}\` [@gmail](plugin://${gmail.id})` });
+    await wrapper.setProps({ content: `$update-bank-balance-sheet ${link} \`${link}\` [@gmail](plugin://${gmail.id}) https://example.com` });
     expect(wrapper.get('.chat-user-text__mention--skill').text()).toBe('Update Bank Balance Sheet');
     expect(wrapper.get('.chat-user-text__mention--plugin').text()).toBe('Gmail');
     expect(wrapper.get('code').text()).toBe(link);
@@ -289,15 +289,24 @@ describe('ChatUserText', () => {
       .toBe('Update Bank Balance Sheet');
   });
 
-  it('keeps ordinary Markdown links literal and escapes all user-controlled text', () => {
+  it('links bare web URLs while preserving literal Markdown, code, and escaped user text', async () => {
+    const urls = ['https://x.com/home', 'https://example.com/@gmail/_(one)?a=1&b=2', 'http://localhost:8317'];
+    const content = `Open ${urls[0]}, (${urls[1]}). ${urls[2]}\nKeep \`https://example.com/code\` [Docs](https://example.com/docs) [Local](README.md) javascript:alert(1) <script>alert(1)</script> <img src="https://example.com/literal.png" onerror="alert(1)"> literal. https://`;
     const wrapper = mount(ChatUserText, {
-      props: { content: '<script>alert(1)</script> [Docs](README.md) `code`' },
+      props: { content, plugins: [gmail] },
     });
 
-    expect(wrapper.find('script').exists()).toBe(false);
-    expect(wrapper.text()).toContain('<script>alert(1)</script>');
-    expect(wrapper.text()).toContain('[Docs](README.md)');
-    expect(wrapper.get('code').text()).toBe('code');
+    for (const authored of [false, true]) {
+      if (authored) await wrapper.setProps({ promptContent: [{ type: 'text', text: content }] });
+      expect(wrapper.findAll('a').map(link => [link.text(), link.attributes('href')])).toEqual(urls.map(url => [url, url]));
+      expect(wrapper.find('script, img').exists()).toBe(false);
+      expect(wrapper.find('.chat-user-text__mention').exists()).toBe(false);
+      expect(wrapper.text()).toContain('<script>alert(1)</script>');
+      expect(wrapper.text()).toContain('[Docs](https://example.com/docs) [Local](README.md) javascript:alert(1)');
+      expect(wrapper.text()).toContain('<img src="https://example.com/literal.png" onerror="alert(1)"> literal. https://');
+      expect(wrapper.get('code').text()).toBe('https://example.com/code');
+      expect(wrapper.find('br').exists()).toBe(true);
+    }
   });
 
   it('matches skill file URLs by exact app-server path and rejects lookalike destinations', () => {
