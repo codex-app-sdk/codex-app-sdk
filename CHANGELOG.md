@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.19.6
+
+### Fixed
+
+- Keep composer placeholders as display-only hints. Only explicit prompt
+  suggestions are inserted when accepting a follow-up with the keyboard.
+
 ## 0.19.5
 
 ### Fixed
