@@ -84,6 +84,35 @@ export function parseCodexUserText(
   return withWebLinks(content, text => parseUserTextTokens(text, plugins, skills, mentionGroups, allowBareMentions));
 }
 
+/** Rehydrate serialized selected references without interpreting bare typed triggers. */
+export function recalledPromptContent(
+  text: string,
+  plugins: readonly CodexSurfacePlugin[] = [],
+  skills: readonly CodexSurfaceSkill[] = [],
+  groups: readonly CodexComposerMentionGroup[] = [],
+): CodexPromptPart[] {
+  return normalizePromptContent(parseCodexUserText(text, plugins, skills, groups, false).map((token): CodexPromptPart => {
+    switch (token.type) {
+      case 'skill-mention': return {
+        type: 'mention', kind: 'skill', id: skillPathFromHref(token.href)!,
+        value: token.skill?.name ?? token.label.slice(1), label: token.displayName,
+      };
+      case 'plugin-mention': return {
+        type: 'mention', kind: 'plugin', id: safeDecode(token.href.slice('plugin://'.length)),
+        value: token.plugin?.name ?? token.label.slice(1), label: token.displayName,
+      };
+      case 'custom-mention': return {
+        type: 'mention', kind: 'custom', id: token.item.id, value: token.item.value,
+        label: token.displayName, groupId: token.group.id,
+      };
+      case 'file-mention': return { type: 'mention', kind: 'file', id: token.href, value: token.href, label: token.displayName };
+      case 'line-break': return { type: 'text', text: '\n' };
+      case 'code': return { type: 'text', text: `\`${token.text}\`` };
+      default: return { type: 'text', text: token.text };
+    }
+  }));
+}
+
 function withWebLinks(content: string, literal: (text: string) => CodexUserTextToken[]): CodexUserTextToken[] {
   if (!/https?:\/\//i.test(content)) return literal(content);
   return Lexer.lexInline(content, { gfm: true }).flatMap((token): CodexUserTextToken[] => {

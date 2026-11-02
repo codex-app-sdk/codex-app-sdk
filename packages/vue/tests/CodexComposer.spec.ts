@@ -108,6 +108,10 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('send')).toStrictEqual([
       ['$frontend-design then Frontend Design', { content }],
     ]);
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(wrapper.findAll('[data-skill-name]')).toHaveLength(1);
+    expect(editorValue(wrapper)).toBe('$frontend-design then Frontend Design');
     await wrapper.setProps({ composerState: {
       text: '$frontend-design then Frontend Design', content,
       selectionStart: 38, selectionEnd: 38,
@@ -336,6 +340,44 @@ describe('ChatComposer', () => {
 
     expect(editorValue(wrapper)).toBe('$frontend-design');
     expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
+
+    const serialized = 'back to [$prepare-release](/skills/prepare%20release/SKILL.md) I guess';
+    await wrapper.setProps({ promptHistory: [serialized], skills: [] });
+    await setEditorValue(wrapper, '');
+    await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+    await nextTick();
+    expect(editorValue(wrapper)).toBe('back to Prepare Release I guess');
+    expect(wrapper.get('[data-skill-name="prepare-release"]').text()).toBe('Prepare Release');
+    expect(wrapper.find('.chat-composer-skill-menu').exists()).toBe(false);
+    expect(richEditorVm(wrapper).getSelectionRange()).toMatchObject({ start: 31, end: 31 });
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('send')?.at(-1)).toStrictEqual(['back to Prepare Release I guess', { content: [
+      { type: 'text', text: 'back to ' },
+      { type: 'mention', kind: 'skill', id: '/skills/prepare release/SKILL.md', value: 'prepare-release', label: 'Prepare Release' },
+      { type: 'text', text: ' I guess' },
+    ] }]);
+
+    // Other selected references share recall, while code, newlines and URLs stay literal.
+    await wrapper.setProps({ promptHistory: [
+      'Use [@gmail](plugin://gmail@openai-curated-remote) with [@Alex](mention://agents/agent-1?value=agent%3A1)\n`$frontend-design` https://example.com',
+    ], plugins });
+    for (const catalog of [plugins, []]) {
+      await wrapper.setProps({ plugins: catalog });
+      await editor(wrapper).trigger('keydown', { key: 'ArrowUp' });
+      await nextTick();
+      expect(editorValue(wrapper)).toBe('Use Gmail with Alex\n`$frontend-design` https://example.com');
+      expect(wrapper.findAll('[data-plugin-name]')).toHaveLength(1);
+      expect(wrapper.findAll('[data-mention-value="agent:1"]')).toHaveLength(1);
+      expect(wrapper.find('[data-skill-name]').exists()).toBe(false);
+      await wrapper.get('form').trigger('submit');
+      expect(wrapper.emitted('send')?.at(-1)?.[1]).toStrictEqual({ content: [
+        { type: 'text', text: 'Use ' },
+        { type: 'mention', kind: 'plugin', id: plugins[0]!.id, value: 'gmail', label: 'Gmail' },
+        { type: 'text', text: ' with ' },
+        { type: 'mention', kind: 'custom', id: 'agent-1', value: 'agent:1', label: 'Alex', groupId: 'agents' },
+        { type: 'text', text: '\n`$frontend-design` https://example.com' },
+      ] });
+    }
   });
 
   it('resumes skill suggestions after editing a recalled prompt', async () => {

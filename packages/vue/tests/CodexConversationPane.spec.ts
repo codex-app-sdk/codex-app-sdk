@@ -524,7 +524,10 @@ describe('CodexConversationPane', () => {
       props: {
         conversationKey: 'thread-1',
         messages: [
-          { id: 'user-1', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'First prompt' }] },
+          { id: 'user-1', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Use Frontend Design' }], metadata: { promptContent: [
+            { type: 'text', text: 'Use ' },
+            { type: 'mention', kind: 'skill', id: '/skills/frontend-design/SKILL.md', value: 'frontend-design', label: 'Frontend Design' },
+          ] } },
           { id: 'assistant-1', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Done' }] },
           { id: 'user-2', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Second prompt' }] },
         ],
@@ -537,7 +540,8 @@ describe('CodexConversationPane', () => {
     expect(composerValue(wrapper)).toBe('Second prompt');
     await composerEditor(wrapper).trigger('keydown', { key: 'ArrowUp' });
     await nextTick();
-    expect(composerValue(wrapper)).toBe('First prompt');
+    expect(composerValue(wrapper)).toBe('Use Frontend Design');
+    expect(wrapper.get('[role="textbox"] [data-skill-name="frontend-design"]').text()).toBe('Frontend Design');
   });
 
   it('loads bounded prompt history on activation and merges the visible lazy page', async () => {

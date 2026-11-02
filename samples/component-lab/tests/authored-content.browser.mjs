@@ -35,6 +35,7 @@ const server = await createServer({
         const state = ref({text:'',selectionStart:0,selectionEnd:0});
         const submitted = ref(null);
         const catalogs = ref(true);
+        const history = ref(undefined);
         const editing = ref(false);
         const skill = {name:'cp',displayName:'Commit-Push',path:'/skills/cp/SKILL.md',enabled:true};
         const plugin = {id:'computer-use@openai-bundled',name:'computer-use',displayName:'Computer Use',brandColor:'#ff0000',enabled:true};
@@ -43,12 +44,13 @@ const server = await createServer({
           clearCatalogs() { catalogs.value = false; },
           reload() { const {prompt,options}=submitted.value; submitted.value={prompt:promptContentDispatchText(options.content,prompt)}; },
           edit() { editing.value=true; },
-          reset() { editing.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; catalogs.value=true; },
+          recall() { const {prompt,options}=submitted.value; catalogs.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; history.value=[options?.content?promptContentDispatchText(options.content,prompt):prompt]; },
+          reset() { history.value=undefined; editing.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; catalogs.value=true; },
           restore() { const {prompt,options}=submitted.value; state.value={text:prompt,content:options?.content,selectionStart:prompt.length,selectionEnd:prompt.length}; },
           read() { return {state:state.value,submitted:submitted.value}; },
         };
         createApp({setup:()=>()=>h('main',[
-          h(Composer,{disabled:false,isSending:false,composerState:state.value,
+          h(Composer,{disabled:false,isSending:false,composerState:state.value,promptHistory:history.value,
             skills:catalogs.value?[skill]:[],plugins:catalogs.value?[plugin]:[],mentionGroups:catalogs.value?groups:[],
             'onUpdate:composerState':value=>state.value=value,
             onSend:(prompt,options)=>submitted.value={prompt,options},
@@ -158,6 +160,13 @@ try {
     });
 
     await page.screenshot({ path: `/tmp/sdk-authored-content-${engine.name()}.png` });
+    await page.evaluate(() => window.authoredFixture.recall());
+    await focusEnd(editor); await editor.press('ArrowUp');
+    await editor.locator('[data-skill-name="cp"]').waitFor();
+    assert.equal(await editor.textContent(), '$cp then Cp');
+    assert.equal(await page.locator('.chat-composer-skill-menu').count(), 0);
+    await editor.press('Enter');
+    assert.deepEqual((await page.evaluate(() => window.authoredFixture.read().submitted)).options.content, [expected[0], { ...expected[1], label: 'Cp' }]);
     await page.evaluate(() => window.authoredFixture.reset());
     await focusEnd(editor); await editor.pressSequentially('@Al');
     await page.locator('.chat-composer-at-menu__item').filter({ hasText: 'Alex' }).waitFor();
@@ -171,6 +180,12 @@ try {
     assert.equal(await page.locator('.chat-user-text__mention--custom').innerText(), 'Alex');
     await page.evaluate(() => window.authoredFixture.reload());
     assert.equal(await page.locator('.chat-user-text__mention--custom').innerText(), 'Alex', 'Agent links restore pills without authored metadata or catalogs');
+    await page.evaluate(() => window.authoredFixture.recall());
+    await focusEnd(editor); await editor.press('ArrowUp');
+    await editor.locator('[data-mention-value="agent:1"]').waitFor();
+    assert.equal(await editor.textContent(), 'Alex');
+    await editor.press('Enter');
+    assert.equal((await page.evaluate(() => window.authoredFixture.read().submitted)).options.content[0].value, 'agent:1');
     await page.evaluate(() => window.authoredFixture.reset());
     await page.clock.install({ time: 0 });
     await page.clock.pauseAt(1);
@@ -190,6 +205,12 @@ try {
     const messagePluginAlignment = await messagePill.evaluate(textAlignment);
     assert(Math.abs(messagePluginAlignment - pluginAlignment) <= 0.5, `Plugin alignment: composer ${pluginAlignment}px, message ${messagePluginAlignment}px`);
     await page.screenshot({ path: `/tmp/sdk-message-pills-${engine.name()}.png` });
+    await page.evaluate(() => window.authoredFixture.recall());
+    await focusEnd(editor); await editor.press('ArrowUp');
+    await editor.locator('[data-plugin-name="computer-use"]').waitFor();
+    assert.equal(await editor.textContent(), 'Use Computer Use');
+    await editor.press('Enter');
+    assert.equal((await page.evaluate(() => window.authoredFixture.read().submitted)).options.content[1].id, 'computer-use@openai-bundled');
     await page.evaluate(() => window.authoredFixture.reset());
     const href = 'https://x.com/home';
     await focusEnd(editor); await editor.pressSequentially(href);

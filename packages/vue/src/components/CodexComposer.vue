@@ -160,10 +160,11 @@
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { CodexContextUsage, CodexFileSearchItem, ApprovalPreset, CodexCapabilities, CodexCommandSummary, CodexModelOption, CodexSkillSummary, CodexChatTranscription, CodexConversationPresentation, ReasoningEffort } from '../chat/contracts';
-import { promptContentText, trimPromptContent, replacePromptContentRange, type CodexPromptPart, type CodexRendererSendMessageOptions, type CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
+import { promptContentDispatchText, promptContentText, trimPromptContent, replacePromptContentRange, type CodexPromptPart, type CodexRendererSendMessageOptions, type CodexSurfacePlugin } from '@codex-app-sdk/core/surface';
 import { resolveCodexConversationPresentation } from '../chat/contracts';
 import { codexCapabilities } from '../chat/codex-capabilities';
 import { codexCommands, composerCommandsWithGoals } from '../chat/codex-commands';
+import { recalledPromptContent } from '../chat/user-text';
 import { createComposerPromptHistory } from '../chat/composer-prompt-history';
 import CodexComposerSendButton from './CodexComposerSendButton.vue';
 import ChatComposerActiveModes from '../chat/ChatComposerActiveModes.vue';
@@ -524,7 +525,7 @@ function submitWithIntent(intent: 'send' | 'steer'): void {
     ...(dictatedInput.value ? { inputMethod: 'dictated' as const } : {}),
     ...(hasMentions ? { content } : {}),
   } : undefined;
-  if (trimmed) rememberSubmittedPrompt(submittedPrompt);
+  if (trimmed) rememberSubmittedPrompt(promptContentDispatchText(content, submittedPrompt));
 
   // A submitted draft is a new editing document. Retire its native undo target
   // so WebKit cannot replay an old chip insertion into a later restored draft.
@@ -743,14 +744,16 @@ function handleEditorInput(): void {
 }
 
 function applyRecalledPrompt(value: string): void {
-  const caret = value.length;
-  prompt.value = value;
+  const content = recalledPromptContent(value, props.plugins, props.skills, props.mentionGroups);
+  promptContent.value = content;
+  prompt.value = promptContentText(content);
+  const caret = prompt.value.length;
   selectionStart.value = caret;
   selectionEnd.value = caret;
   caretPosition.value = caret;
   suspendComposerSuggestions();
   void nextTick(() => {
-    editorEl.value?.setText(value, caret);
+    editorEl.value?.setContent(content, caret);
   });
 }
 

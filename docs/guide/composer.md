@@ -176,7 +176,8 @@ becomes active, then immediately retains only visible user prompt strings;
 assistant summaries and the raw response are not stored in renderer state.
 The result is cached per conversation and merged with the currently visible
 lazy-history page. An `Up` press made during the brief load is replayed when the
-prompts arrive. Editing a recalled prompt exits navigation.
+prompts arrive. Saved skill, plugin, and custom references return as pills;
+bare typed references stay literal. Editing a recalled prompt exits navigation.
 Recall only intercepts Up/Down while the selection is collapsed at the very
 end of the prompt. Moving the caret left or selecting text restores the
 editor's native vertical cursor movement.

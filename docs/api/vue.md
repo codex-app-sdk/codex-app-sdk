@@ -817,8 +817,10 @@ receive the saved label and identity; catalogs may enrich the item payload.
 `filterComposerMentionGroups`, and `findComposerMention` support host composers.
 
 When the composer is empty, Up recalls submitted prompt text and Down moves
-forward, returning to an empty prompt after the newest entry. Recalled plain-text
-entries stay literal. Editing one exits history navigation.
+forward, returning to an empty prompt after the newest entry. Serialized skill,
+plugin, and custom mention links return as editable pills, including when their
+catalog is unavailable. Bare typed references remain literal. Editing a recalled
+prompt exits history navigation.
 
 Skill suggestions rank IDs, names, display names, and insertion aliases together:
 exact matches first, then whole words, word prefixes, and substrings.

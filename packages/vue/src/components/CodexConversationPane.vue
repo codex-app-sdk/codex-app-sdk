@@ -283,6 +283,7 @@
 
 <script setup lang="ts" generic="Payload = unknown">
 import { computed, nextTick, onMounted, provide, ref, shallowReactive, watch } from 'vue';
+import { promptContentDispatchText } from '@codex-app-sdk/core/surface';
 import type {
   CodexConversationRenderStrategy,
   CodexRendererAttachment,
@@ -649,7 +650,8 @@ const canContinueInterruptedTurn = computed(() => (
 const visiblePromptHistory = computed(() => effectiveMessages.value.flatMap((message) => {
   const chatMessage = chatMessageFromInput(message);
   if (chatMessage.role !== 'user') return [];
-  const content = stripMessageContext(chatMessage.content);
+  const content = stripMessageContext(chatMessage.promptContent
+    ? promptContentDispatchText(chatMessage.promptContent, chatMessage.content) : chatMessage.content);
   return content && content !== '(no user instructions)' ? [content] : [];
 }));
 const configuredPromptHistory = computed(() => controlledValue(
