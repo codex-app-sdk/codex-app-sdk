@@ -17,7 +17,7 @@ concurrency:
 jobs:
   sdk:
     name: SDK packages and compatibility facade
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -39,7 +39,7 @@ jobs:
 
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -58,7 +58,7 @@ jobs:
 
   workspaces:
     name: Scaffolder and samples
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v5
