@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.19.8
+
+### Fixed
+
+- Make bare HTTP and HTTPS URLs clickable in user messages, including restored
+  history, while preserving inline code, literal Markdown, and mention pills.
+
 ## 0.19.7
 
 ### Fixed
