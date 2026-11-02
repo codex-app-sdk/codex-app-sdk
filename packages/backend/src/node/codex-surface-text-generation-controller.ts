@@ -11,6 +11,7 @@ import {
   validateReasoningEffort,
   validateServiceTier,
 } from './codex-surface-settings';
+import { attachmentInput, validateAttachments } from './codex-surface-data';
 
 const DEFAULT_GENERATION_TIMEOUT_MS = 120_000;
 
@@ -58,6 +59,10 @@ export class CodexSurfaceTextGenerationController {
     const text = prompt.trim();
     if (!text) throw new Error('Generation prompt cannot be empty');
     if (options.signal?.aborted) throw abortedError();
+    if (options.attachments?.some(attachment => attachment.type !== 'image')) {
+      throw new Error('Utility generation accepts image attachments only');
+    }
+    const attachments = validateAttachments(options.attachments ?? []);
     await this.host.ensureConnected();
 
     const state = this.host.getSnapshot();
@@ -86,7 +91,7 @@ export class CodexSurfaceTextGenerationController {
         : { developerInstructions: options.developerInstructions }),
       cwd: options.cwd ?? this.defaultCwd,
       dynamicTools: [],
-      environments: [],
+      ...(options.tools === 'read-only' ? {} : { environments: [] }),
       ephemeral: true,
       ...(model ? { model } : {}),
       permissions: ':read-only',
@@ -118,8 +123,8 @@ export class CodexSurfaceTextGenerationController {
     try {
       const turnResponse = await this.client.request('turn/start', {
         threadId,
-        input: [{ type: 'text', text, text_elements: [] }],
-        environments: [],
+        input: [{ type: 'text', text, text_elements: [] }, ...attachments.map(attachmentInput)],
+        ...(options.tools === 'read-only' ? {} : { environments: [] }),
         permissions: ':read-only',
         ...(model ? { model } : {}),
         ...(reasoningEffort ? { effort: reasoningEffort as v2.TurnStartParams['effort'] } : {}),

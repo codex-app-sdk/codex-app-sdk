@@ -142,6 +142,38 @@ const module: CodexAppBackendModule<NotesService> = {
 This does not make the SDK own notes, agents, teams, or other product state.
 The backend is only a composition root around one reusable `CodexSurface`.
 
+## Read-only utility generation
+
+Use `surface.generateText()` for app-owned text or structured metadata without
+creating a visible conversation. Pass the source text in the prompt when no
+workspace inspection is needed. To let Codex inspect a worktree, opt in:
+
+```ts
+const result = await surface.generateText('Summarize the changes against main.', {
+  cwd: '/absolute/path/to/worktree',
+  tools: 'read-only',
+  reasoningEffort: 'high',
+});
+```
+
+Tool access and reasoning effort are independent. Omit `tools` or use `'none'`
+to preserve the default environment isolation. Both modes use read-only
+permissions; this option does not disable provider tools unrelated to workspace
+access. See [utility generation options](/api/node#utility-text-generation).
+
+For visual guidance, attach an image without enabling workspace tools:
+
+```ts
+const result = await surface.generateText('Use this reference to guide the diagram.', {
+  attachments: [{ type: 'image', path: '/absolute/path/to/reference.png' }],
+});
+```
+
+The image must be authorized and available on the machine running app-server.
+For bundled references, the app owns packaging and resolves the runtime asset
+path before calling the SDK. Attaching an image keeps the generation isolated
+from visible conversation history.
+
 ## Lifecycle and caching
 
 - `backend.close()` closes the shared surface and every TTL cache created by

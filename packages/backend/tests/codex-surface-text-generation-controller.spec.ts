@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe('CodexSurfaceTextGenerationController', () => {
-  it('rejects empty and already-aborted requests before connecting', async () => {
+  it('rejects invalid prompts, image attachments and already-aborted requests before connecting', async () => {
     const setup = createController();
     await expect(setup.controller.generate(' \n ')).rejects.toThrow('Generation prompt cannot be empty');
 
@@ -19,6 +19,14 @@ describe('CodexSurfaceTextGenerationController', () => {
     abort.abort();
     await expect(setup.controller.generate('prompt', { signal: abort.signal }))
       .rejects.toThrow('Codex ephemeral generation was aborted');
+
+    await expect(setup.controller.generate('prompt', { attachments: [{ type: 'image', path: ' ' }] }))
+      .rejects.toThrow('Attachment paths cannot be empty');
+    await expect(setup.controller.generate('prompt', { attachments: [{ type: 'image', path: 'relative.png' }] }))
+      .rejects.toThrow('Attachment path must be absolute');
+    // @ts-expect-error Utility generation supports image attachments only, including at runtime.
+    await expect(setup.controller.generate('prompt', { attachments: [{ type: 'file', path: '/tmp/file.txt' }] }))
+      .rejects.toThrow('Utility generation accepts image attachments only');
 
     expect(setup.host.ensureConnected).not.toHaveBeenCalled();
     expect(setup.request).not.toHaveBeenCalled();

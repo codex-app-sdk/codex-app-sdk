@@ -339,10 +339,12 @@ events.
 - `renameConversation(title)`
 - `conversation(id)`
 
+### Utility text generation
+
 `generateText()` is intended for trusted, app-owned helpers such as drafting a
 commit message or structured metadata. It starts an app-server thread with
-`ephemeral: true`, `:read-only` permissions, no dynamic SDK tools or sticky
-environments, and automatic unsubscription. The turn is never added to the
+`ephemeral: true`, `:read-only` permissions, no dynamic SDK tools, and automatic
+unsubscription. By default, it disables environment access. The turn is never added to the
 surface conversation catalog, selected, or emitted through surface events.
 
 ```ts
@@ -358,6 +360,32 @@ const result = await surface.generateText('Summarize these changes', {
   signal: abortController.signal,
 });
 ```
+
+`GenerateCodexTextOptions.tools` accepts `'none'` (default) or `'read-only'`,
+independently of `model`, `reasoningEffort`, and `serviceTier`. With `'none'`,
+both thread and turn creation send `environments: []`, preserving workspace
+isolation. With `'read-only'`, both omit the environment override so app-server
+can select its default environment and inspect the workspace at `cwd`. Both
+modes retain `:read-only` permissions and never request approval or register
+dynamic SDK tools.
+
+This is a workspace-tool policy, not a global provider tool denylist. The SDK
+does not disable provider-configured tools unrelated to environments, such as
+hosted search or external integrations. Read-only mode permits sandboxed
+workspace execution; it is not a Git-only command allowlist.
+
+`attachments?: readonly Extract<CodexSurfaceAttachment, { type: 'image' }>[]`
+adds native image inputs after the text prompt. It accepts the existing image
+`path` and optional `detail` fields; generic file attachments are rejected.
+Paths must be nonempty and absolute. Invalid attachments fail before connecting
+or starting a thread. A nonempty text prompt is still required.
+
+Images are supplied directly as app-server `localImage` inputs, independently
+of `tools`; attaching a reference image does not require workspace-tool access.
+The trusted host must authorize paths, enforce image format and size limits,
+and keep each file accessible on the app-server machine until generation ends.
+Renderer/mobile attachment references must be resolved by the owning host first.
+The SDK does not copy the files or add images to conversation history.
 
 The result remains text even when `outputSchema` is supplied; the host owns
 JSON parsing and product-specific validation. Closing the surface, aborting the

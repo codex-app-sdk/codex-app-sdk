@@ -12,6 +12,7 @@ import type {
   CodexSurfaceApprovalMode,
   CodexSurfaceApprovalPreset,
   CodexSurfaceApprovalScope,
+  CodexSurfaceAttachment,
   CodexSurfaceClientRequestResponse,
   CodexSurfaceJsonValue,
   CodexSurfacePermissionMode,
@@ -26,6 +27,8 @@ import type { CodexAppServerStdioTransportOptions } from './codex-stdio-transpor
 import type { CodexAppServerUnixSocketTransportOptions } from './codex-unix-socket-transport';
 
 export type GenerateCodexTextOptions = {
+  /** Image-only inputs at trusted absolute paths accessible to app-server. */
+  attachments?: readonly Extract<CodexSurfaceAttachment, { type: 'image' }>[];
   baseInstructions?: string;
   cwd?: string;
   developerInstructions?: string;
@@ -35,6 +38,12 @@ export type GenerateCodexTextOptions = {
   serviceTier?: string | null;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /**
+   * Workspace-tool policy. `none` (default) disables environment access;
+   * `read-only` uses the provider's default environment with read-only permissions.
+   * This does not disable provider-configured tools unrelated to environments.
+   */
+  tools?: 'none' | 'read-only';
 };
 
 export type CodexGeneratedText = {

@@ -32,7 +32,7 @@ describe('CodexSurface ephemeral generation', () => {
     await surface.close();
   });
 
-  it('returns structured text without changing or emitting visible surface state', async () => {
+  it.each([{ tools: undefined, images: false }, { tools: 'none', images: true }, { tools: 'read-only', images: true }] as const)('returns isolated structured text with policy=%j and the complete RPC input', async ({ tools, images }) => {
     const transport = new MockCodexAppServer({
       'thread/start': () => resumeResponse({
         ...thread('thread-ephemeral', false),
@@ -52,6 +52,11 @@ describe('CodexSurface ephemeral generation', () => {
     surface.onEvent((event) => events.push(event));
 
     const resultPromise = surface.generateText('Write a commit message', {
+      ...(tools === undefined ? {} : { tools }),
+      ...(images ? { attachments: [
+        { type: 'image' as const, path: '/tmp/reference image.png ', detail: 'high' as const },
+        { type: 'image' as const, path: '/tmp/other.png' },
+      ] } : {}),
       developerInstructions: 'Return JSON only.',
       model: 'gpt-mini',
       reasoningEffort: 'high',
@@ -91,27 +96,38 @@ describe('CodexSurface ephemeral generation', () => {
     });
     expect(transport.sent.find((message) => (
       'method' in message && message.method === 'thread/start'
-    ))).toMatchObject({
+    ))).toStrictEqual({
+      id: expect.any(Number), method: 'thread/start',
       params: {
         approvalPolicy: 'never',
         approvalsReviewer: 'user',
         cwd: '/tmp/project',
         developerInstructions: 'Return JSON only.',
         dynamicTools: [],
+        ...(tools === 'read-only' ? {} : { environments: [] }),
         ephemeral: true,
         model: 'gpt-mini-runtime',
         permissions: ':read-only',
         serviceName: 'codex_app_sdk',
+        serviceTier: null,
+        threadSource: 'sdk_ephemeral_generation',
       },
     });
     expect(transport.sent.find((message) => (
       'method' in message && message.method === 'turn/start'
-    ))).toMatchObject({
+    ))).toStrictEqual({
+      id: expect.any(Number), method: 'turn/start',
       params: {
         threadId: 'thread-ephemeral',
         effort: 'high',
-        environments: [],
-        input: [{ type: 'text', text: 'Write a commit message', text_elements: [] }],
+        ...(tools === 'read-only' ? {} : { environments: [] }),
+        input: [
+          { type: 'text', text: 'Write a commit message', text_elements: [] },
+          ...(images ? [
+            { type: 'localImage', path: '/tmp/reference image.png', detail: 'high' },
+            { type: 'localImage', path: '/tmp/other.png' },
+          ] : []),
+        ],
         model: 'gpt-mini-runtime',
         outputSchema: {
           type: 'object',
@@ -120,6 +136,7 @@ describe('CodexSurface ephemeral generation', () => {
           additionalProperties: false,
         },
         permissions: ':read-only',
+        serviceTier: null,
       },
     });
     expect(transport.sent).toContainEqual({
