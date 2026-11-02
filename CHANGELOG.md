@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.19.7
+
+### Fixed
+
+- Recover local execution token counts after resume and include compaction usage
+  with verified native history, without replacing newer live measurements.
+
 ## 0.19.6
 
 ### Fixed
