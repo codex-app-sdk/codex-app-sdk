@@ -130,6 +130,10 @@ describe('CodexSurface execution usage', () => {
       emit('turn-1', total);
       expect(surface.getSnapshot().turns.find(item => item.id === 'turn-1')?.executionUsage)
         .toStrictEqual({ last: { ...last, cacheWriteInputTokens: null }, total: { ...total, cacheWriteInputTokens: null }, execution: { ...execution, cacheWriteInputTokens: null }, model: null, requestUsage, observedStart: true });
+      // A valid cumulative revision can still imply impossible per-turn cache
+      // attribution. Such a difference is unknown, not an invented measurement.
+      usage(transport, 'turn-1', { ...total, totalTokens: 170, inputTokens: 110, cachedInputTokens: 105 });
+      expect(events.filter(event => event.type === 'conversation.executionUsageChanged').at(-1)?.payload.usage.execution).toBeNull();
       usage(transport, 'turn-1', { totalTokens: 2000, inputTokens: 0, cachedInputTokens: 0, cacheWriteInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 });
       expect(events.filter(event => event.type === 'conversation.executionUsageChanged').at(-1)?.payload.usage.execution).toBeNull();
     } finally { await surface.close(); }
@@ -239,6 +243,8 @@ describe('CodexSurface execution usage', () => {
       await surface.sendMessage('Second');
       usage(transport, 'turn-2', { ...total, totalTokens: 170, outputTokens: 70 });
       usage(transport, 'turn-1', { ...total, totalTokens: 180, outputTokens: 80 });
+      // Replayed usage can name an older execution whose start was never observed.
+      usage(transport, 'turn-unobserved', { ...total, totalTokens: 180, outputTokens: 80 });
       transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-1', 'completed', []) });
       expect(surface.getSnapshot().activeTurnId).toBe('turn-2');
       usage(transport, 'turn-2', { ...total, totalTokens: 190, outputTokens: 90 });
