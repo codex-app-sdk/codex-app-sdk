@@ -16,7 +16,8 @@ const unavailableRequestUsage: CodexSurfaceRequestUsage = {
   requests: null,
 };
 
-type Execution = { baseline: CodexSurfaceTokenUsage | null; latest: CodexSurfaceExecutionUsage | null };
+type Execution = { baseline: CodexSurfaceTokenUsage | null; latest: CodexSurfaceExecutionUsage | null;
+  native?: { total: CodexSurfaceTokenUsage; execution: CodexSurfaceTokenUsage } };
 type ThreadUsage = {
   total: CodexSurfaceTokenUsage | null;
   lastUsageTurnId: string | null;
@@ -29,6 +30,22 @@ export class CodexSurfaceUsageController {
   private readonly threads = new Map<string, ThreadUsage>();
 
   clear(): void { this.threads.clear(); }
+
+  recover(id: string, turnId: string, value: { total: CodexSurfaceTokenUsage; last: CodexSurfaceTokenUsage; execution: CodexSurfaceTokenUsage }): CodexSurfaceExecutionUsage | undefined {
+    const record = this.threads.get(id)?.executions.get(turnId);
+    if (!record) return;
+    // Native history can flush after the corresponding live packet. Preserve
+    // the newer live suffix while adding any native-only compaction charge.
+    const suffix = record.latest ? difference(value.total, record.latest.total) : null;
+    const execution = suffix ? add(value.execution, suffix) ?? value.execution : value.execution;
+    const total = suffix ? record.latest!.total : value.total;
+    const last = suffix ? record.latest!.last : value.last;
+    record.native = structuredClone({ total, execution });
+    const usage = { ...structuredClone({ last, total, execution }), observedStart: true, model: record.latest?.model ?? null,
+      requestUsage: structuredClone(unavailableRequestUsage) };
+    record.latest = structuredClone(usage);
+    return usage;
+  }
 
   /** A successful thread/start establishes zero prior consumption, unlike resume or fork. */
   observeEmptyConversation(id: string): void {
@@ -70,12 +87,16 @@ export class CodexSurfaceUsageController {
     const overlapping = thread.activeTurnId !== null && thread.activeTurnId !== input.turnId;
     if (overlapping) {
       const active = thread.executions.get(thread.activeTurnId!);
-      if (active) active.baseline = null;
-      if (record) record.baseline = null;
+      if (active) { active.baseline = null; active.native = undefined; }
+      if (record) { record.baseline = null; record.native = undefined; }
     }
     if (record && (!validCounts(incoming.total)
-      || (record.latest && !nondecreasing(record.latest.total, incoming.total)))) record.baseline = null;
-    const execution = record?.baseline ? difference(record.baseline, incoming.total) : null;
+      || (record.latest && !nondecreasing(record.latest.total, incoming.total)))) {
+      record.baseline = null; record.native = undefined;
+    }
+    const nativeDelta = record?.native ? difference(record.native.total, incoming.total) : null;
+    const execution = record?.native && nativeDelta ? add(record.native.execution, nativeDelta)
+      : record?.baseline ? difference(record.baseline, incoming.total) : null;
     if (record && execution === null) record.baseline = null;
     const usage: CodexSurfaceExecutionUsage = {
       ...incoming, execution, observedStart: Boolean(record),
@@ -98,7 +119,7 @@ export class CodexSurfaceUsageController {
 }
 
 const requiredCounts = ['totalTokens', 'inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens'] as const;
-function validCounts(usage: CodexSurfaceTokenUsage): boolean {
+export function validCounts(usage: CodexSurfaceTokenUsage): boolean {
   return requiredCounts.every(key => Number.isSafeInteger(usage[key]) && usage[key] >= 0)
     && (usage.cacheWriteInputTokens === null || (Number.isSafeInteger(usage.cacheWriteInputTokens) && usage.cacheWriteInputTokens >= 0))
     && usage.totalTokens === usage.inputTokens + usage.outputTokens
@@ -123,4 +144,11 @@ function difference(before: CodexSurfaceTokenUsage, after: CodexSurfaceTokenUsag
     reasoningOutputTokens: after.reasoningOutputTokens - before.reasoningOutputTokens,
   };
   return validCounts(delta) ? delta : null;
+}
+
+function add(before: CodexSurfaceTokenUsage, delta: CodexSurfaceTokenUsage): CodexSurfaceTokenUsage | null {
+  const result = Object.fromEntries(requiredCounts.map(key => [key, before[key] + delta[key]])) as unknown as CodexSurfaceTokenUsage;
+  result.cacheWriteInputTokens = before.cacheWriteInputTokens === null || delta.cacheWriteInputTokens === null
+    ? null : before.cacheWriteInputTokens + delta.cacheWriteInputTokens;
+  return validCounts(result) ? result : null;
 }

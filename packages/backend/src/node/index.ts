@@ -47,6 +47,7 @@ export {
   type GenerateCodexTextOptions,
   type ListCodexSkillsOptions,
 } from './codex-surface';
+export { CodexOriginalHistoryUsage, type CodexHistoricalExecutionUsage } from './codex-original-history-usage';
 export type {
   CodexConversationHistoryPage,
   CodexConversationLoadingStrategy,

@@ -25,6 +25,8 @@ flush.
 
 ```ts
 type CodexSurfaceOptions = {
+  /** Read verified local native per-turn usage; defaults to false. */
+  originalHistoryUsage?: boolean;
   approvalPreset?: CodexSurfaceApprovalPreset;
   approvalMode?: 'ask' | 'never';
   clientInfo?: { name: string; title?: string; version: string };
@@ -50,6 +52,15 @@ type CodexSurfaceOptions = {
   client?: CodexAppServerClient;
 };
 ```
+
+`CodexOriginalHistoryUsage` provides read-only numeric history for explicit
+reconciliation. `readFile(conversationId, absoluteProviderPath)` returns per-turn
+`turnId`, `recordedAt`, `execution`, `total`, `last`, and an optional terminal
+`status` (`completed` or `interrupted`). Counts use `CodexSurfaceTokenUsage`.
+Repeated records replace the same turn; callers replace retained measurements
+by conversation and turn identity rather than adding them. The reader verifies
+the file's session owner, validates counter relationships, ignores incomplete
+records, and invalidates its bounded index on replacement or truncation.
 
 `client` is a test/advanced embedding seam. Most applications should let the SDK
 construct the client.

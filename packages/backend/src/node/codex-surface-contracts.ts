@@ -199,6 +199,8 @@ export type CodexAppServerTransportOptions =
 export type CodexSurfaceOptions = {
   /** Read original tool images from local provider-owned history. Defaults to false. */
   originalHistoryImages?: boolean;
+  /** Read verified local provider history to recover exact per-turn usage, including compaction. */
+  originalHistoryUsage?: boolean;
   approvalPreset?: CodexSurfaceApprovalPreset;
   approvalMode?: CodexSurfaceApprovalMode;
   clientInfo?: { name: string; title?: string; version: string };

@@ -1,4 +1,5 @@
 import { CodexOriginalHistoryImages } from './codex-original-history-images';
+import { CodexOriginalHistoryUsage } from './codex-original-history-usage';
 import { ConversationContentTransport } from './conversation-content-transport';
 import {
   CodexAppServerClient,
@@ -169,6 +170,8 @@ export class CodexSurface {
   private readonly messagesController: CodexSurfaceMessagesController;
   private readonly lifecycle: CodexSurfaceLifecycleController;
   private readonly originalImages?: CodexOriginalHistoryImages;
+  private readonly originalUsage?: CodexOriginalHistoryUsage;
+  private readonly usageRefreshes = new Map<string, { again: boolean }>();
   private readonly forks: CodexSurfaceForkController;
   private readonly notifications: CodexSurfaceNotificationsController;
   private readonly runtimeState: CodexSurfaceRuntimeController;
@@ -200,6 +203,7 @@ export class CodexSurface {
       options.onListenerError ? { onListenerError: options.onListenerError } : {},
     );
     this.originalImages = options.originalHistoryImages ? new CodexOriginalHistoryImages(this.client) : undefined;
+    this.originalUsage = options.originalHistoryUsage ? new CodexOriginalHistoryUsage(this.client) : undefined;
     this.markdownImages = new CodexMarkdownImageHydrator(this.client);
     this.authentication = new CodexSurfaceAuthenticationController(this.client, {
       bootstrapSurfaceData: (force) => this.connection.bootstrapSurfaceData(force),
@@ -480,13 +484,13 @@ export class CodexSurface {
     this.unsubscribeNotification = this.client.onNotification((notification) => {
       if (notification.method === 'account/updated' || notification.method === 'account/login/completed') {
         this.accountGeneration += 1;
-        this.usage.clear();
+        this.clearUsage();
       }
       if (!this.textGeneration.handleNotification(notification)) this.notifications.handle(notification);
     });
     this.unsubscribeDisconnect = this.client.onDisconnect((error) => {
       this.accountGeneration += 1;
-      this.usage.clear();
+      this.clearUsage();
       this.textGeneration.close(error);
       this.connection.handleDisconnect(error);
     });
@@ -1026,7 +1030,7 @@ export class CodexSurface {
     if (this.closed) return;
     this.closed = true;
     this.originalImages?.clear();
-    this.usage.clear();
+    this.clearUsage();
     this.unsubscribeNotification();
     this.unsubscribeToolInputRequests();
     this.unsubscribeMcpElicitationRequests();
@@ -1304,7 +1308,10 @@ export class CodexSurface {
     return project(result);
   }
 
-  private emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void {
+  private emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput, recovered = false): void {
+    if (input.type === 'conversation.historyReplaced' && input.payload.reason !== 'details' && input.payload.reason !== 'images') {
+      this.originalUsage?.forget(input.conversationId);
+    }
     input = this.usage.observe(origin, input);
     if (input.type === 'turn.started' && origin !== 'lifecycle') {
       const runtime = this.runtimeState.get(input.conversationId);
@@ -1333,6 +1340,37 @@ export class CodexSurface {
       origin,
     } as CodexSurfaceEvent;
     notifyListeners(this.eventListeners, event, this.options.onListenerError);
+    if (!recovered && (input.type === 'conversation.executionUsageChanged' || input.type === 'turn.completed' || input.type === 'context.compactionCompleted')) {
+      void this.refreshOriginalUsage(input.conversationId, input.turnId);
+    }
+  }
+
+  private clearUsage(): void {
+    this.usage.clear();
+    this.originalUsage?.clear();
+  }
+
+  private async refreshOriginalUsage(conversationId: string, turnId: string): Promise<void> {
+    if (!this.originalUsage || this.closed) return;
+    const key = `${conversationId}\0${turnId}`;
+    const pending = this.usageRefreshes.get(key);
+    if (pending) { pending.again = true; return; }
+    const work = { again: true };
+    const generation = this.accountGeneration;
+    this.usageRefreshes.set(key, work);
+    try {
+      while (work.again && !this.closed && generation === this.accountGeneration) {
+        work.again = false;
+        try {
+          const records = await this.originalUsage.read(conversationId);
+          if (this.closed || generation !== this.accountGeneration) return;
+          const record = records.find(value => value.turnId === turnId);
+          if (!record) continue;
+          const usage = this.usage.recover(conversationId, turnId, record);
+          if (usage) this.emitEvent('action', { type: 'conversation.executionUsageChanged', conversationId, turnId, payload: { usage } }, true);
+        } catch { /* Optional native evidence never interrupts execution or invents a measurement. */ }
+      }
+    } finally { this.usageRefreshes.delete(key); }
   }
 
   private patch(patch: Partial<CodexSurfaceSnapshot>, conversationId?: string): void {

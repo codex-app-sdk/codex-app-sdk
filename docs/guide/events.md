@@ -48,7 +48,12 @@ Use `conversation.executionUsageChanged` for turn-key replacements, not
 observed starts, and retain `null` as unknown. Repeated observations replace
 the same turn; they are not increments. Conversations created through the SDK
 can attribute their first turn from a known zero baseline; resumed or forked
-conversations need a prior provider-counter observation.
+conversations need a prior provider-counter observation when using public counters alone.
+Local hosts can enable `originalHistoryUsage` to replace these estimates with
+verified native per-turn counters, including compaction usage. The SDK checks
+the provider-supplied history path and conversation identity; unreadable or
+unsupported history leaves the existing evidence unchanged. The default is off
+for hosts whose provider files are not on the same filesystem.
 A terminal event carries the latest
 usage, but later corrections can invalidate it. Keep this revisable evidence
 local rather than sending irreversible usage totals.
