@@ -17,8 +17,10 @@ try {
     await page.getByRole('button', { name: 'Long history', exact: false }).click();
     const viewport = page.locator('.message-list');
     // Offscreen messages must not move the text being read as their layout becomes visible.
-    await viewport.evaluate((element) => { element.scrollTop = 3000; });
-    await page.waitForTimeout(100);
+    await viewport.evaluate((element) => new Promise(resolve => {
+      element.addEventListener('scroll', resolve, { once: true });
+      element.scrollTop = 3000;
+    }));
     const bounds = await viewport.boundingBox();
     const point = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
     await page.mouse.move(point.x, point.y);
@@ -30,7 +32,7 @@ try {
         return { y: window.readingAnchor?.getBoundingClientRect().top, top: scroll.scrollTop };
       }, point);
       await page.mouse.wheel(0, -80);
-      await page.waitForTimeout(160);
+      await page.waitForFunction(top => document.querySelector('.message-list').scrollTop <= top - 80, before.top);
       const after = await page.evaluate(() => ({
         y: window.readingAnchor?.getBoundingClientRect().top,
         top: document.querySelector('.message-list').scrollTop,

@@ -50,6 +50,18 @@ rendered elements; use a real browser for layout geometry or other behavior
 JSDOM cannot prove, such as selection, clipboard, and scrolling. Loading a
 stylesheet into the test document is setup, not an assertion on its source text.
 
+Vue tests and browser test helpers must not use fixed real-time waits, including
+`sleep`, Playwright `waitForTimeout`, or promises resolved by timer delays
+(including zero-millisecond timers). Wait for observable DOM, layout, resource,
+or host events instead. Use deferred promises to control in-flight operations
+and fake clocks to test debounce, timeout, or deadline behavior. Polling an
+observable condition may have a bounded failure timeout; it must finish as soon
+as that condition holds.
+
+Extend the existing owning workflow before adding another test or mount for the
+same risk. Measure runtime before and after test-performance changes; fewer test
+lines or cases alone do not demonstrate an improvement.
+
 Run the component lab's scrolling regression with `npm run test:browser -w
 @codex-app-sdk/component-lab`. Install its Chromium and WebKit runtimes once with
 `npx playwright install chromium webkit` (add `--with-deps` on Linux CI).

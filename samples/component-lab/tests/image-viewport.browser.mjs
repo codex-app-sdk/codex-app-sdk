@@ -30,10 +30,12 @@ const fixture = {
       const items = ref(Array.from({length:12}, (_,i) => ({ id: 'photo-'+i, role:'assistant', content:'', parts:[{type:'media',media:{url:'/photo-'+i+'.png',title:'Photo '+i,width:1024,height:512}}] })));
       window.replaceImages = value => { items.value = value; };
       const gallery = ref(false); window.showGallery = () => { gallery.value = true; };
+      const crowdedReady = new Promise(resolve => { window.releaseCrowdedImages = resolve; });
       const app = createApp({setup() {
         provideCodexHostCapabilities({readImagePreview: async reference => {
           window.reads.push(reference); window.peak = Math.max(window.peak, ++window.active);
-          await new Promise(resolve => setTimeout(resolve, reference.includes('slow') ? 250 : 30));
+          if (reference.includes('crowded')) await crowdedReady;
+          if (reference === '/slow.png') await new Promise(resolve => { window.releaseSlowImage = resolve; });
           if (reference.includes('gallery-first')) await new Promise(resolve => { window.releaseFirstGalleryImage = resolve; });
           window.active--;
           const canvas = document.createElement('canvas'); canvas.width = reference.includes('portrait') ? 1170 : reference.includes('large') ? 3072 : 1024; canvas.height = reference.includes('portrait') ? 2532 : reference.includes('large') ? 2048 : 512;
@@ -80,10 +82,15 @@ try {
     assert.equal(await page.evaluate(()=>window.reads.filter(r=>r==='/photo-0.png').length),1,'returning reuses downloaded bytes after the decoded preview is released');
     // Crowded thumbnails must all render without repeated downloads.
     await page.evaluate(()=>window.replaceImages([{id:'crowded',role:'user',content:'',parts:Array.from({length:8},(_,i)=>({type:'attachment',attachment:{kind:'image',name:'Crowded '+i,path:'/crowded-'+i+'.png'}}))}]));
+    await page.waitForFunction(()=>window.active>=2);
+    assert.equal(await page.evaluate(()=>window.reads.filter(reference=>reference.includes('crowded')).length),2,'the host read limit holds while replies are pending');
+    await page.evaluate(()=>window.releaseCrowdedImages());
     await page.waitForFunction(()=>window.reads.some(r=>r.includes('crowded')) && window.active===0 && !document.body.textContent.includes('Loading image…'));
     const settled = await page.evaluate(()=>({reads:window.reads.length,urls:window.urls.size,retainedBytes:[...window.cachedBytes.values()].reduce((a,b)=>a+b,0)+[...document.querySelectorAll('img')].reduce((a,x)=>a+x.naturalWidth*x.naturalHeight*4,0)}));
     assert.ok(settled.retainedBytes<=5*1024*1024,'compressed originals and decoded thumbnails share the configured bound');
-    await page.waitForTimeout(350);
+    await page.getByRole('button',{name:'Open Crowded 7',exact:true}).scrollIntoViewIfNeeded();
+    await page.getByRole('button',{name:'Open Crowded 0',exact:true}).scrollIntoViewIfNeeded();
+    await page.locator('[aria-label^="Open Crowded"] img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
     assert.equal(await page.evaluate(()=>window.reads.length),settled.reads,'crowded previews do not continuously refetch');
     assert.equal(await page.locator('[aria-label^="Open Crowded"] img').count(),8,'all crowded previews render within the bounded cache');
     await page.evaluate(()=>window.replaceImages([{id:'large',role:'assistant',content:'',parts:[{type:'media',media:{url:'/large.png',title:'Large',width:3072,height:2048}}]}]));
@@ -150,6 +157,7 @@ try {
     await page.getByRole('button',{name:'Open Slow',exact:true}).evaluate(el=>el.scrollIntoView());
     await page.waitForFunction(()=>window.reads.includes('/slow.png'));
     await page.evaluate(()=>window.closeImages());
+    await page.evaluate(()=>window.releaseSlowImage());
     await page.waitForFunction(()=>window.active===0);
     assert.equal(await page.evaluate(()=>window.urls.size),0,'late replies cannot retain resources after the pane closes');
     evidence.push({engine:engine.name(),peak:await page.evaluate(()=>window.peak),...settled,portraitSize,stableGeometry:true,reloaded:true,released:true});

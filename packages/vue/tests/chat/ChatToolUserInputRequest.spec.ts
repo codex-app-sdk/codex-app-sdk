@@ -2,7 +2,7 @@
 
 import { flushPromises, mount } from '@vue/test-utils';
 import type { CodexNativeRendererApi, CodexSpeechSessionEvent } from '@codex-app-sdk/core/native';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import ChatToolUserInputRequest from '../../src/chat/ChatToolUserInputRequest.vue';
 import type { AskUserQuestion } from '../../src/chat/contracts';
 import type { MessageToolCall } from '../../src/chat/types';
@@ -632,6 +632,8 @@ describe('ChatToolUserInputRequest interactions', () => {
   });
 
   it('leaves focus alone when the user is already typing elsewhere', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => { vi.useRealTimers(); });
     const composer = document.createElement('textarea');
     document.body.append(composer);
     composer.focus();
@@ -639,7 +641,8 @@ describe('ChatToolUserInputRequest interactions', () => {
       attachTo: document.body,
       props: { toolCall: requestTool([firstQuestion]) },
     });
-    await new Promise((resolve) => window.setTimeout(resolve, 10));
+    await flushPromises();
+    await vi.runOnlyPendingTimersAsync();
 
     expect(document.activeElement).toBe(composer);
     wrapper.unmount();

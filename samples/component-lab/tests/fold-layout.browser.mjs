@@ -141,7 +141,6 @@ try {
     assert.equal(await header.textContent().then(text => text.trim()), 'Done · 1m 49s · View details');
     assert.equal(await page.evaluate(() => window.detailReads), 0, 'summaries must not request Working content');
     await header.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(150);
     const before = await header.boundingBox();
     await header.click();
     await header.getByRole('status', { name: 'Loading details…' }).waitFor();
@@ -152,16 +151,16 @@ try {
     if (artifacts) await page.screenshot({ path: join(artifacts, engine.name() + '-loading.png') });
     await page.evaluate(() => window.finishDetailRead());
     await page.waitForFunction(() => document.querySelector('.chat-work-group__body') && document.body.textContent.includes('Investigated the work.'));
-    await page.waitForTimeout(250);
+    const turn = header.locator('xpath=ancestor::*[contains(@class, "chat-message--assistant")][1]');
+    await turn.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
     const after = await header.boundingBox();
     assert(Math.abs(after.y - before.y) < 2, `${engine.name()}: expansion must preserve the clicked summary header position: ${JSON.stringify({before,after})}`);
-    const turn = header.locator('xpath=ancestor::*[contains(@class, "chat-message--assistant")][1]');
     assert.equal(await turn.locator('.chat-work-group__body .chat-media-block').count(), 3);
     assert.equal(await turn.locator('.chat-media-block').count(), 5);
     await page.waitForFunction(() => document.querySelectorAll('.chat-work-group__body .chat-media-block img').length === 3);
     if (artifacts) await turn.screenshot({ path: join(artifacts, engine.name() + '-expanded.png') });
     await header.click();
-    await page.waitForTimeout(250);
+    await turn.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
     assert.equal(await turn.locator('.chat-work-group__body').evaluateAll(nodes => nodes.reduce((sum, node) => sum + (node.closest('.chat-fold')?.getBoundingClientRect().height ?? node.getBoundingClientRect().height), 0)), 0, 'collapsed tool screenshots must occupy no transcript space');
     assert.equal(await turn.locator('.chat-media-block').evaluateAll(nodes => nodes.filter(node => !node.closest('.chat-work-group__body')).length), 2, 'only the final-answer screenshots remain outside Working');
     if (artifacts) {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref, toRaw } from 'vue';
 import CodexMessageList from '../src/components/CodexMessageList.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
@@ -162,6 +162,8 @@ function textNodeContaining(element: Element, value?: string): Text {
   }
   throw new Error(`Unable to find text node${value ? ` containing ${value}` : ''}`);
 }
+
+beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -1167,13 +1169,13 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 700;
 
     await wrapper.get('.chat-work-group__header').trigger('click');
     scrollHeight = 2_000;
     resizeCallback([], {} as ResizeObserver);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · Hide details');
     expect(scrollEl.scrollTop).toBe(700);
@@ -1181,7 +1183,7 @@ describe('CodexMessageList', () => {
     await wrapper.get('.chat-work-group__header').trigger('click');
     scrollHeight = 1_000;
     resizeCallback([], {} as ResizeObserver);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(wrapper.get('.chat-work-group__title').text()).toBe('Done · View details');
     expect(scrollEl.scrollTop).toBe(700);
@@ -1717,7 +1719,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_000 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(50);
     scrollEl.scrollTop = 0;
@@ -1725,13 +1727,13 @@ describe('CodexMessageList', () => {
     await wrapper.get('.message-list').trigger('scroll');
     await flushPromises();
     expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(51);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 0;
     writeScrollTop.mockClear();
 
     await wrapper.get('.message-list').trigger('scroll');
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(writeScrollTop).not.toHaveBeenCalled();
     wrapper.unmount();
@@ -1754,7 +1756,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     scrollEl.scrollTop = 0;
     await wrapper.get('.message-list').trigger('scroll');
@@ -1784,7 +1786,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_000 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     scrollEl.scrollTop = 0;
     await wrapper.get('.message-list').trigger('scroll');
@@ -1899,7 +1901,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 100;
     await wrapper.get('.message-list').trigger('scroll');
 
@@ -1924,7 +1926,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 1_000 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 100;
 
     await wrapper.setProps({ messageBatchSize: 6 });
@@ -1957,11 +1959,11 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     await wrapper.setProps({ messageBatchSize: 6 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     expect(wrapper.findAllComponents(CodexMessage)).toHaveLength(6);
     expect(scrollEl.scrollTop).toBe(600);
 
@@ -1992,7 +1994,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     await wrapper.setProps({ initialMessageBatchSize: 6, messages: replacement });
     await flushPromises();
@@ -2042,13 +2044,13 @@ describe('CodexMessageList', () => {
     });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     transformMessage.mockClear();
 
     scrollEl.scrollTop = 0;
     await wrapper.get('.message-list').trigger('scroll');
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(wrapper.findAllComponents(CodexMessage)[0]?.props('index')).toBe(5);
     expect(transformMessage).toHaveBeenCalled();
@@ -2129,7 +2131,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 0;
 
     await wrapper.setProps({ messages: [...makeMessages(5, -5), ...currentMessages] });
@@ -2161,7 +2163,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     scrollEl.scrollTop = 100;
     await wrapper.get('.message-list').trigger('scroll');
@@ -2198,7 +2200,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     await wrapper.setProps({ messages: [...olderMessages, ...currentMessages] });
     await flushPromises();
@@ -2230,7 +2232,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 0;
 
     await wrapper.setProps({
@@ -2261,7 +2263,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 200;
 
     await wrapper.setProps({
@@ -2293,7 +2295,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 200;
 
     await wrapper.setProps({ messages: appendedMessages });
@@ -2331,7 +2333,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     await wrapper.setProps({ messages: replacement });
     await flushPromises();
@@ -2379,7 +2381,7 @@ describe('CodexMessageList', () => {
     });
 
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 0;
     await wrapper.get('.message-list').trigger('scroll');
     await flushPromises();
@@ -2402,7 +2404,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
 
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     await wrapper.setProps({ messages: [...allMessages, makeMessages(1, 15)[0]!] });
     await flushPromises();
 
@@ -2428,7 +2430,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     scrollEl.scrollTop = 0;
     await wrapper.get('.message-list').trigger('scroll');
@@ -2468,7 +2470,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 0;
     writeScrollTop.mockClear();
 
@@ -2496,7 +2498,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100 + 300,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     scrollEl.scrollTop = scrollEl.scrollHeight - scrollEl.clientHeight - 100;
     await wrapper.get('.message-list').trigger('scroll');
@@ -2521,7 +2523,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 100;
     await wrapper.get('.message-list').trigger('scroll');
     expect(wrapper.emitted('stickiness-change')).toContainEqual([false]);
@@ -2566,7 +2568,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     for (let page = 0; page < 2; page += 1) {
       scrollEl.scrollTop = 0;
@@ -2618,7 +2620,7 @@ describe('CodexMessageList', () => {
       get: () => wrapper.findAll('.chat-message').length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     await wrapper.setProps({ messages: replacement, resetKey: 'thread-b' });
     await flushPromises();
@@ -2675,7 +2677,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 600;
 
     await (wrapper as unknown as { setProps: (props: { messages: Message[] }) => Promise<void> }).setProps({ messages });
@@ -2798,7 +2800,7 @@ describe('CodexMessageList', () => {
       messages: [messages[0]!, { ...messages[1]!, content: `${messages[1]!.content}\nStill working.` }],
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(scrollEl.scrollTop).toBe(900);
     wrapper.unmount();
@@ -2832,7 +2834,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, get: () => scrollHeight });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     const content = wrapper.get('.codex-message-list__content').element;
     const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === content));
@@ -2841,7 +2843,7 @@ describe('CodexMessageList', () => {
 
     scrollHeight = 1_200;
     observer!.callback([], observer as unknown as ResizeObserver);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(scrollEl.scrollTop).toBe(1_200);
 
@@ -2849,7 +2851,7 @@ describe('CodexMessageList', () => {
     await wrapper.get('.message-list').trigger('scroll');
     scrollHeight = 1_500;
     observer!.callback([], observer as unknown as ResizeObserver);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     expect(scrollEl.scrollTop).toBe(100);
 
     wrapper.unmount();
@@ -2868,7 +2870,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 100;
 
     await wrapper.get('.message-list').trigger('scroll');
@@ -2886,7 +2888,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 600;
 
     await wrapper.get('.message-list').trigger('scroll');
@@ -2915,7 +2917,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     scrollEl.scrollTop = 576;
     await wrapper.get('.message-list').trigger('scroll');
@@ -2959,7 +2961,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
     scrollEl.scrollTop = 100;
     await wrapper.get('.message-list').trigger('scroll');
 
@@ -2994,7 +2996,7 @@ describe('CodexMessageList', () => {
     Object.defineProperty(scrollEl, 'scrollHeight', { configurable: true, value: 900 });
     Object.defineProperty(scrollEl, 'clientHeight', { configurable: true, value: 300 });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     scrollEl.scrollTop = 100;
     await wrapper.get('.message-list').trigger('scroll');

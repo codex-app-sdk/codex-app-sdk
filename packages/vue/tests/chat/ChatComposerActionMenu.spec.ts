@@ -2,7 +2,7 @@
 
 import { mount } from '@vue/test-utils';
 import { h } from 'vue';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import ChatComposerActionMenu from '../../src/chat/ChatComposerActionMenu.vue';
 import type { CodexComposerMenuItem, CodexComposerMenuSelectableItem } from '../../src/composer-menu';
 
@@ -71,6 +71,8 @@ describe('ChatComposerActionMenu', () => {
   });
 
   it('selects an approval preset through the visible hover submenu', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => { vi.useRealTimers(); });
     const wrapper = mountMenu({
       approvalPreset: 'ask-for-approval',
       approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'],
@@ -91,7 +93,7 @@ describe('ChatComposerActionMenu', () => {
     (approvalTrigger.element as HTMLButtonElement).blur();
     await wrapper.vm.$nextTick();
     (fullAccess.element as HTMLButtonElement).focus();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(approvalSubmenu.classes()).toContain('codex-composer-menu-list__submenu--open');
     await fullAccess.trigger('click');

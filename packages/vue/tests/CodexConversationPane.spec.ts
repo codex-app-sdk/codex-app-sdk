@@ -2,7 +2,7 @@
 
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { h, nextTick, reactive, ref, type Component } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   CodexConversationPane,
   codexCapabilities,
@@ -814,6 +814,8 @@ describe('CodexConversationPane', () => {
   });
 
   it('keeps the lazy window bounded across progressive prepends from a host', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => { vi.useRealTimers(); });
     const makeMessages = (start: number, count: number): SurfaceMessage[] => Array.from({ length: count }, (_, offset) => ({
       id: `surface-${start + offset}`,
       role: 'assistant',
@@ -834,7 +836,7 @@ describe('CodexConversationPane', () => {
       get: () => wrapper.findAllComponents(CodexMessage).length * 100,
     });
     await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runOnlyPendingTimersAsync();
 
     expect(messageList.props('renderStrategy')).toBe('lazy');
     expect(messageList.props('initialMessageBatchSize')).toBe(50);
@@ -850,7 +852,7 @@ describe('CodexConversationPane', () => {
       currentMessages = [...olderBatch, ...currentMessages];
       await wrapper.setProps({ messages: currentMessages });
       await flushPromises();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await vi.runOnlyPendingTimersAsync();
 
       const visibleIds = new Set(currentMessages.slice(-50).map((message) => message.id));
       const transformedIds = transformMessage.mock.calls

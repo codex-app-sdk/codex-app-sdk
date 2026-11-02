@@ -26,6 +26,10 @@ try {
       : (await import('/@fs/' + root + 'packages/vue/src/components/CodexComposer.vue')).default;
     window.speechProbe = { chunks: 0, bytes: 0, sent: [], stops: 0, cancelled: [], listeners: new Set() };
     const probe = window.speechProbe;
+    const NativeAudioWorkletNode = window.AudioWorkletNode;
+    window.AudioWorkletNode = class extends NativeAudioWorkletNode {
+      constructor(...args) { super(...args); probe.capture = this; }
+    };
     const audio = new AudioContext();
     const tone = audio.createOscillator();
     const gain = audio.createGain();
@@ -37,6 +41,7 @@ try {
       const destination = audio.createMediaStreamDestination();
       gain.connect(destination);
       await audio.resume();
+      probe.stream = destination.stream;
       return destination.stream;
     };
     window.codexAppSdkNative = {
@@ -142,7 +147,8 @@ try {
   assert.ok(await page.evaluate((id) => window.speechProbe.cancelled.includes(id), cancelledId));
   assert.equal(await page.evaluate(() => window.speechProbe.listeners.size), 0);
   const bytes = await page.evaluate(() => window.speechProbe.bytes);
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => window.speechProbe.stream.getTracks().every(track => track.readyState === 'ended'));
+  await page.evaluate(() => window.speechProbe.capture.port.dispatchEvent(new MessageEvent('message', { data: new Float32Array(128).buffer })));
   assert.equal(await page.evaluate(() => window.speechProbe.bytes), bytes, 'Cancelled capture must stop sending PCM');
   await page.evaluate(async ({ root, packaged }) => {
     const { createApp, h } = await import('/node_modules/.vite/deps/vue.js');
