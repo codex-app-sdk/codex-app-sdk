@@ -25,6 +25,8 @@ flush.
 
 ```ts
 type CodexSurfaceOptions = {
+  /** Read original tool images from local provider-owned history; defaults to false. */
+  originalHistoryImages?: boolean;
   /** Read verified local native per-turn usage; defaults to false. */
   originalHistoryUsage?: boolean;
   approvalPreset?: CodexSurfaceApprovalPreset;

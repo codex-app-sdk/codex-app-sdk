@@ -109,17 +109,23 @@ const mentionGroups = [{
     <BotIcon /> {{ item.label }}
   </template>
   <template #mention="{ item, surface }">
-    <ThreadMention :thread="item.payload" :surface="surface" />
+    <ThreadMention v-if="item.payload" :thread="item.payload" :surface="surface" />
+    <span v-else>{{ item.label }}</span>
   </template>
 </CodexConversationPane>
 ```
 
-Selection inserts canonical text such as `@thread:019abc`; the composer and
-subsequently rendered user message display `item.label`. `value` must be a
-single token composed of letters, digits, `_`, `.`, `:`, or `-`. Keep the
-group catalog available while rendering history so the SDK can recognize the
-stable token after reload. `placement` defaults to `before`, placing app groups
-above Plugins and Files; use `after` for trailing groups.
+Selection stores a structured custom mention with the group's `id` and the
+item's `id`, `value`, and `label`. The composer and user message display the
+saved label; `value` is the nonempty stable value consumed by the host.
+`promptContentDispatchText` serializes the reference as a `mention://` Markdown
+link that preserves the group, item identity, value, and label across reloads.
+
+Saved mentions render without a catalog. App-owned `payload` data is not
+serialized: supply the group catalog to recover it, and let custom chip slots
+fall back to `item.label` when it is unavailable. `placement` defaults to
+`before`, placing app groups above Plugins and Files; use `after` for trailing
+groups.
 
 The `suggestion-item` slot owns custom suggestion-row rendering. The shared
 `mention` slot owns custom chips and receives `surface: 'composer' | 'message'`.
@@ -213,8 +219,11 @@ steering saves the edit instead, without duplicating it.
 Use `composerState` for per-conversation draft persistence:
 
 ```ts
+import type { CodexPromptPart } from '@codex-app-sdk/core/surface';
+
 export type CodexComposerState = {
   text: string;
+  content?: readonly CodexPromptPart[];
   selectionStart: number;
   selectionEnd: number;
   activeCommandId?: string | null;
@@ -227,6 +236,10 @@ export type CodexComposerState = {
   @update:composer-state="drafts[conversationId] = $event"
 />
 ```
+
+Preserve the complete state, including `content`, to retain selected mention
+labels and targets when restoring a draft. Text-only state cannot distinguish
+selected mentions from literal text.
 
 The component emits updates for canonical text changes and selection-only caret
 changes. Incoming selections are clamped to the text length and restored when
@@ -360,7 +373,7 @@ batch `transcribeAudio` callback remains supported and opts out of native
 streaming. Custom fields can instead supply a `streamingTranscription` service;
 only `onTranscript` should insert final text into their editable value.
 
-## Model, reasoning, and Fast mode
+## Model, reasoning, and speed {#model-reasoning-and-fast-mode}
 
 `CodexModelReasoningSelector` uses one hierarchical menu so the active model,
 reasoning effort, and service tier are visible together. Models and supported
@@ -375,7 +388,7 @@ High, then the model's supported default, then its first supported effort.
 Choosing an effort selects that model and effort, then closes the menu. Models
 without reasoning options (or with `showReasoning` disabled) are selected
 directly. The current model shows its effort beside its name, and the selected
-effort is highlighted without a checkmark. Fast mode remains below the model
+effort is highlighted without a checkmark. The speed row remains below the model
 list and applies to the currently selected model.
 
 Hosts can prepend their own actions and nested presets with
@@ -390,10 +403,17 @@ Set `valueAppearance` to `badge` when that short value is categorical metadata.
 Host items keep their own `closeOnSelect` behavior, so a preset can still apply
 all of its settings and close the menu in one step.
 
-When the model advertises a `priority` or `fast` service tier, the menu exposes
-a Fast mode toggle. Enabling it emits that tier ID. Disabling it emits `null`,
-not the reserved app-server `default` tier. The composer only displays the Fast
-indicator while the selected tier is actually fast/priority.
+The speed row shows Normal speed, Fast mode, or Ultrafast according to the
+selected tier. When only Fast mode is advertised, a lightning-bolt button
+toggles it. When Ultrafast is advertised, the row opens a submenu to select
+the speed. Unavailable tiers are omitted; the
+information tooltip uses the selected tier's catalog description.
+
+Fast mode recognizes `priority`/`fast` tiers. Ultrafast recognizes an `ultrafast`
+ID or a tier named Ultrafast. Choosing a speed emits its catalog ID; returning
+to Normal speed emits `null`, not the reserved app-server `default` tier.
+Active speed indicators are filled and blue, with a double bolt for Ultrafast.
+Hosts can reuse `<CodexUltrafastIcon :size="16" />` from `@codex-app-sdk/vue`.
 
 ## Focus and layout
 

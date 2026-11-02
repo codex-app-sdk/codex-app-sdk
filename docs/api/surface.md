@@ -84,7 +84,11 @@ Models may advertise service tiers through `serviceTiers` and
 `defaultServiceTier`. The selected tier is exposed as `selectedServiceTier`;
 `serviceTier: null` clears it. The app-server's reserved `default` tier remains
 valid even when it is not repeated in `serviceTiers`. The standard Vue selector
-presents the `priority`/`fast` tier as a Fast mode toggle.
+shows Normal speed, Fast mode, or catalog-advertised Ultrafast. It uses a
+lightning-bolt toggle when only Fast mode is available and a submenu when
+Ultrafast is available. Selecting Normal speed emits `null`;
+selecting Fast or Ultrafast emits that tier's catalog ID. Ultrafast uses a
+double-bolt indicator. See [model and speed controls](/guide/composer#model-reasoning-and-fast-mode).
 
 ```ts
 type CodexSurfaceServiceTier = {
