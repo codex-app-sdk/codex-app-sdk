@@ -3,11 +3,12 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
-import type { SurfaceMessagePart } from '@codex-app-sdk/core/surface';
+import type { SurfaceMessage, SurfaceMessagePart } from '@codex-app-sdk/core/surface';
 import ChatCompactionMessage from '../src/chat/ChatCompactionMessage.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
 import ChatMessageActions from '../src/chat/ChatMessageActions.vue';
 import ChatMessageBlock from '../src/chat/ChatMessageBlock.vue';
+import type { MessageBlock } from '../src/chat/message-blocks';
 import ChatMessageEditor from '../src/chat/ChatMessageEditor.vue';
 
 const clipboardWriteText = vi.fn();
@@ -34,6 +35,48 @@ function mountMessage(props: Record<string, unknown>) {
 }
 
 describe('CodexMessage', () => {
+  it('retains finished Markdown DOM while the tail streams and reparses replacements', async () => {
+    const prefix = 'Finished **paragraph**.\n\n```ts\nconst answer = 42;\n```\n\n';
+    const message = (content: string, streaming = true) => ({ id: 'incremental', role: 'assistant' as const, content, streaming });
+    const wrapper = mountMessage({ message: message(prefix + 'Tail') });
+    const paragraph = wrapper.get('p').element;
+    const code = wrapper.get('pre code').element;
+    await wrapper.setProps({ message: message(prefix + 'Tail grows.\n\nNext paragraph') });
+    expect(wrapper.get('p').element).toBe(paragraph);
+    expect(wrapper.get('pre code').element).toBe(code);
+    await wrapper.get('[data-chat-code-copy]').trigger('click');
+    expect(clipboardWriteText).toHaveBeenCalledWith('const answer = 42;');
+    await wrapper.setProps({ message: message(prefix + 'Tail grows.\n\nNext paragraph', false) });
+    expect(wrapper.get('pre code').element).toBe(code);
+    await wrapper.setProps({ message: message('Replacement **answer**', false) });
+    expect(wrapper.find('pre').exists()).toBe(false);
+    expect(wrapper.get('strong').text()).toBe('answer');
+    wrapper.unmount();
+  });
+
+  it('keeps completed tool slot props stable while text streams and exposes tool corrections', async () => {
+    const message = (text: string, body = 'Done'): SurfaceMessage => ({
+      id: 'stable-tool', role: 'assistant', status: 'streaming', parts: [
+        { type: 'tool', id: 'call', title: 'Read file', status: 'completed', body, metadata: { server: 'test', tool: 'read' } },
+        { type: 'text', text },
+      ],
+    });
+    const seen: MessageBlock[] = [];
+    const wrapper = mount(CodexMessage, { props: { message: message('Tail') }, slots: {
+      tool: ({ block }: { block: MessageBlock }) => {
+        seen.push(block);
+        return h('span', block.type === 'tool-group' ? String(block.toolCalls[0]?.result) : '');
+      },
+    } });
+    const initial = seen[0];
+    await wrapper.setProps({ message: message('Tail grows') });
+    expect(seen.at(-1)).toBe(initial);
+    await wrapper.setProps({ message: message('Tail grows', 'Corrected result') });
+    expect(seen.at(-1)).not.toBe(initial);
+    expect(wrapper.text()).toContain('Corrected result');
+    wrapper.unmount();
+  });
+
   it('renders an async question once when provider text and header repeat its title', () => {
     const question = 'Does the field receive focus?';
     const wrapper = mountMessage({

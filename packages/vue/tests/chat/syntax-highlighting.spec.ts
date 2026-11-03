@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { mount } from '@vue/test-utils';
+import CodexMessage from '../../src/components/CodexMessage.vue';
 import { describe, expect, it, vi } from 'vitest';
 import { languageForFilePath, renderCodeBlock } from '../../src/chat/syntax-highlighting';
 
@@ -60,26 +62,22 @@ describe('syntax highlighting', () => {
     expect(renderCodeBlock('&', undefined)).toBe('<pre><code><span class="line">&amp;</span></code></pre>');
   });
 
-  it('renders known languages with both packaged themes', () => {
-    const html = renderCodeBlock('const answer = 42', ' typescript extra ');
-
-    expect(html).toMatch(/--(?:shiki|hls)-light/);
-    expect(html).toMatch(/--(?:shiki|hls)-dark/);
-    expect(html).toContain('const');
-    expect(html).toContain('answer');
-  });
-  it('highlights code with line-preserving escaped output after initialization', async () => {
+  it('upgrades finished code after initialization without replacing the surrounding paragraph', async () => {
     const input = '<script>\nconst answer = 42 & 7';
+    const content = `Finished paragraph.\n\n\`\`\`typescript\n${input}\n\`\`\`\n\nTail`;
+    const wrapper = mount(CodexMessage, { props: { message: { role: 'assistant', content, streaming: true } } });
+    const paragraph = wrapper.get('p').element;
+    expect(wrapper.html()).toContain('--shiki-light');
+    await wrapper.setProps({ message: { role: 'assistant', content: content + ' grows', streaming: true } });
     await vi.waitFor(() => {
-      const container = document.createElement('div');
-      container.innerHTML = renderCodeBlock(input, 'typescript');
-      expect(container.querySelector('pre.highlights')).not.toBeNull();
-      const lines = [...container.querySelectorAll('pre > code > .line')];
-      expect(lines.map((line) => line.textContent).join('\n')).toBe(input);
-      expect(container.querySelector('script')).toBeNull();
-      expect(container.innerHTML).toContain('--hls-light');
-      expect(container.innerHTML).toContain('--hls-dark');
+      expect(wrapper.find('pre.highlights').exists()).toBe(true);
+      const lines = wrapper.findAll('pre > code > .line');
+      expect(lines.map(line => line.text()).join('\n')).toBe(input);
+      expect(wrapper.find('script').exists()).toBe(false);
+      expect(wrapper.html()).toContain('--hls-light');
+      expect(wrapper.html()).toContain('--hls-dark');
+      expect(wrapper.get('p').element).toBe(paragraph);
     });
+    wrapper.unmount();
   });
-
 });

@@ -14,16 +14,18 @@
   <slot v-else-if="block.type === 'text'" name="text" :block="block" :content="block.content" :user="false">
     <div
       class="codex-chat-theme chat-message-block chat-message-block--text codex-markdown"
-      v-html="renderedMarkdown"
       @click="copyCodeBlock"
-    />
+    >
+      <div v-for="chunk in markdownChunks" :key="chunk.start" class="chat-markdown-chunk" v-html="chunk.html" />
+    </div>
   </slot>
   <div
     v-else-if="block.type === 'reasoning'"
     class="codex-chat-theme chat-message-block chat-message-block--reasoning codex-markdown"
-    v-html="renderedMarkdown"
     @click="copyCodeBlock"
-  />
+  >
+    <div v-for="chunk in markdownChunks" :key="chunk.start" class="chat-markdown-chunk" v-html="chunk.html" />
+  </div>
   <ChatHtmlBlock v-else-if="block.type === 'html'" :source="block.source" :title="block.title" :complete="block.complete" />
   <slot v-else-if="block.type === 'mermaid'" name="mermaid" :block="block" :code="block.code">
     <ChatMermaidBlock :code="block.code" />
@@ -125,7 +127,7 @@ import ChatToolCall from './ChatToolCall.vue'
 import ChatUserText from './ChatUserText.vue'
 import ChatVisualizationBlock from './ChatVisualizationBlock.vue'
 import ChatWorkGroup from './ChatWorkGroup.vue'
-import { renderMarkdown } from './message-markdown'
+import { createIncrementalMarkdown } from './message-markdown'
 import { copyTextToClipboard } from './message-actions'
 import { useCodexChatTranslate } from './chat-i18n'
 import type { MessageBlock, RenderedMessageBlock } from './message-blocks'
@@ -179,12 +181,11 @@ const emit = defineEmits<{
 
 const t = useCodexChatTranslate()
 const hostCapabilities = useCodexHostCapabilities()
-// Parents re-render their blocks often (every streamed token re-renders the
-// message list), so parse Markdown only when this block's text changes.
-const renderedMarkdown = computed(() => (
+const incrementalMarkdown = createIncrementalMarkdown()
+const markdownChunks = computed(() => (
   props.block.type === 'text' || props.block.type === 'reasoning'
-    ? renderMarkdown(props.block.content, { codeCopyLabel: t('chat.code.copy') })
-    : ''
+    ? incrementalMarkdown(props.block.content, t('chat.code.copy'))
+    : []
 ))
 const copyResetTimers = new Map<HTMLButtonElement, ReturnType<typeof setTimeout>>()
 
@@ -216,6 +217,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.chat-markdown-chunk {
+  display: contents;
+}
 
 .chat-message-block--text {
   white-space: normal;

@@ -18,6 +18,7 @@
       :copied-label="t('chat.actions.copied')"
       :disabled="deleting"
       :label="t('chat.actions.copy')"
+      :show-icon="iconsVisible"
     />
     <ChatIconButton
       v-if="message.role === 'user' && canEdit && showEdit"
@@ -25,7 +26,7 @@
       :label="t('chat.actions.edit')"
       @click="emit('edit')"
     >
-      <PencilIcon />
+      <PencilIcon v-if="iconsVisible" />
     </ChatIconButton>
     <ChatIconButton
       v-if="message.role === 'user' && showQuote"
@@ -33,7 +34,7 @@
       :label="t('chat.actions.quote')"
       @click="emit('quote')"
     >
-      <QuoteIcon />
+      <QuoteIcon v-if="iconsVisible" />
     </ChatIconButton>
     <ChatIconButton
       v-if="message.role === 'assistant' && canRetry && showRetry"
@@ -41,7 +42,7 @@
       :label="t('chat.actions.retry')"
       @click="emit('retry')"
     >
-      <RotateClockwiseIcon />
+      <RotateClockwiseIcon v-if="iconsVisible" />
     </ChatIconButton>
     <ChatIconButton
       v-if="canFork && showFork"
@@ -49,7 +50,7 @@
       :label="t('chat.actions.fork')"
       @click="emit('fork')"
     >
-      <ArrowForkIcon class="chat-message-actions__fork-icon" />
+      <ArrowForkIcon v-if="iconsVisible" class="chat-message-actions__fork-icon" />
     </ChatIconButton>
     <ChatIconButton
       v-if="canDelete && showDelete"
@@ -58,8 +59,8 @@
       :label="deleting ? t('chat.actions.deleting') : t('chat.actions.delete')"
       @click="emit('delete')"
     >
-      <Loader2Icon v-if="deleting" class="chat-message-actions__spinner" />
-      <Trash2Icon v-else />
+      <Loader2Icon v-if="iconsVisible && deleting" class="chat-message-actions__spinner" />
+      <Trash2Icon v-else-if="iconsVisible" />
     </ChatIconButton>
     <span
       v-if="sentAtLabel && message.role === 'assistant'"
@@ -90,9 +91,11 @@ const props = withDefaults(defineProps<{
   copyAction?: () => Promise<void> | void
   deleting?: boolean
   message: Message
+  iconsVisible?: boolean
   mutationDisabled?: boolean
   presentation?: CodexMessageActionsPresentation
 }>(), {
+  iconsVisible: true,
   canDelete: true,
   canEdit: true,
   canFork: false,

@@ -2,7 +2,7 @@ import { Marked, Renderer } from 'marked'
 import katex from 'katex'
 import markedKatex from 'marked-katex-extension'
 import { escapeAttribute, escapeHtml } from './html-escape'
-import { renderCodeBlock } from './syntax-highlighting'
+import { renderCodeBlock, syntaxHighlightRevision } from './syntax-highlighting'
 import { parseCodexEditorFileReference } from './conversation-links'
 
 const renderer = new Renderer()
@@ -95,13 +95,65 @@ export function renderMarkdown(
   return options.codeCopyLabel ? addCodeCopyControls(html, options.codeCopyLabel) : html
 }
 
+/** Per-mounted-block state: finished top-level tokens retain their HTML and DOM. */
+export function createIncrementalMarkdown() {
+  let previous = ''
+  let label: string | undefined
+  let previousDocumentWide = false
+  let codeRevision: boolean | undefined
+  let chunks: { start: number; end: number; html: string; type: string }[] = []
+  return (raw: string, codeCopyLabel?: string) => {
+    const content = raw.replace(/\r\n?/g, '\n')
+    // Read on every update, including a plain-text tail, so asynchronous syntax
+    // initialization can invalidate finished code without another streamed token.
+    const nextCodeRevision = syntaxHighlightRevision()
+    const sameContext = codeCopyLabel === label && codeRevision === nextCodeRevision
+    if (content === previous && sameContext) return chunks
+    // Reference definitions can change earlier inline tokens. Open display math
+    // can span blank lines before its closing delimiter arrives. Keep the full
+    // parser's document-wide semantics in these cases, rather than freezing text.
+    const documentWide = content.includes(']:')
+      || (content.match(/^\$\$(?=\n|$)/gm)?.length ?? 0) % 2 !== 0
+      || (content.match(/^\$(?=\n|$)/gm)?.length ?? 0) % 2 !== 0
+      || content.lastIndexOf('\\[') > content.lastIndexOf('\\]')
+    const append = !documentWide && !previousDocumentWide && sameContext && content.startsWith(previous)
+    const stable = append ? chunks.slice(0, -1) : []
+    // A streamed ordered marker is initially a paragraph ("2" before ". ").
+    // Keep its preceding list mutable until a following block establishes the
+    // boundary; otherwise the new item can never join that list.
+    if (stable.at(-1)?.type === 'list') stable.pop()
+    const start = stable.at(-1)?.end ?? 0
+    const tokens = markdown.lexer(content.slice(start))
+    let offset = start
+    const next = [...stable]
+    for (const token of tokens) {
+      const end = offset + token.raw.length
+      // Blank lines belong to the preceding token. Its trailing whitespace
+      // must stay in the mutable tail so a list/table/fence can still grow.
+      if (token.type === 'space') {
+        if (next.length > stable.length) next[next.length - 1]!.end = end
+      } else {
+        next.push({ type: token.type, start: offset, end, html: addCodeCopyControls(markdown.parser([token]) as string, codeCopyLabel) })
+      }
+      offset = end
+    }
+    codeRevision = nextCodeRevision
+    previousDocumentWide = documentWide
+    previous = content
+    label = codeCopyLabel
+    chunks = next
+    return chunks
+  }
+}
+
 export function renderUserText(content: string) {
   return `<p>${escapeHtml(content)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\n/g, '<br>')}</p>`
 }
 
-function addCodeCopyControls(html: string, label: string): string {
+function addCodeCopyControls(html: string, label?: string): string {
+  if (!label) return html
   const button = [
     `<button class="chat-code-block__copy" type="button" data-chat-code-copy aria-label="${escapeAttribute(label)}" title="${escapeAttribute(label)}">`,
     '<svg class="chat-code-block__copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8m-2 0a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M16 6V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>',

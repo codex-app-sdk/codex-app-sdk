@@ -68,6 +68,15 @@ Run the component lab's scrolling regression with `npm run test:browser -w
 The scrolling regression runs in both engines, including offscreen message
 layout changes that can shift the reading position in iOS WebViews.
 
+The streaming browser workflow also measures a 50 KB reply over 80 updates with
+no history, a lazy 500-message history, all 501 messages mounted, and 50 settled
+segments in the active turn. It checks that finished Markdown nodes and selection
+survive, and only the active message updates, including the pane with host
+header/mention slots. Run
+`node samples/component-lab/tests/streaming.browser.mjs` from the repository root; use `--baseline=<git-ref> --measure-only` to compare an archived
+revision without changing the checkout. Timing output is diagnostic; CI asserts
+DOM and update isolation rather than a machine-dependent millisecond threshold.
+
 ## Put checks in the right tool
 
 Tests must never read committed implementation or configuration files to assert

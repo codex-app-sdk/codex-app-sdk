@@ -1,21 +1,15 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type {
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
   CodexSurfaceStatePatch,
   SurfaceMessage,
 } from '@codex-app-sdk/core/surface';
+import { effectScope } from 'vue';
 import { CodexConversationPane, useCodexSurface } from '../src';
-import { renderMarkdown } from '../src/chat/message-markdown';
-
-vi.mock('../src/chat/message-markdown', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/chat/message-markdown')>();
-  return { ...actual, renderMarkdown: vi.fn(actual.renderMarkdown) };
-});
-
 function answer(id: string, text: string, status: SurfaceMessage['status'] = 'complete'): SurfaceMessage {
   return { id, role: 'assistant', status, turnId: `turn-${id}`, parts: [{ type: 'text', text }] };
 }
@@ -24,7 +18,7 @@ describe('streaming render cost', () => {
   it('re-renders only the streaming message when the surface streams patches', async () => {
     const history = Array.from({ length: 12 }, (_, index) => answer(`done-${index}`, `Finished answer ${index}`));
     const base = {
-      status: 'ready', activeConversationId: 'thread-1', busy: true, messages: [...history, answer('live', 'Hel', 'streaming')],
+      status: 'ready', activeConversationId: 'thread-1', busy: true, messages: [...history, answer('live', 'Finished **prefix**.\n\nHel', 'streaming')],
       turns: [], approvals: [], clientRequests: [], answeredClientRequestIds: [], queuedPrompts: [], conversations: [],
       models: [], skills: [], plugins: [], approvalPresets: [], permissionProfiles: [],
     } as unknown as CodexSurfaceSnapshot;
@@ -37,26 +31,29 @@ describe('streaming render cost', () => {
     }, {
       get: (target, key) => (key in target ? target[key as keyof typeof target] : async () => base),
     }) as unknown as CodexSurfaceRendererApi;
-    const surface = useCodexSurface(api);
-    mount(CodexConversationPane, { props: { surface, renderStrategy: 'eager' } as never });
+    const scope = effectScope();
+    const surface = scope.run(() => useCodexSurface(api))!;
+    const wrapper = mount(CodexConversationPane, { props: { surface, renderStrategy: 'eager' } as never });
     await flushPromises();
-    const renders = vi.mocked(renderMarkdown);
-    const renderedText = () => renders.mock.calls.map(([content]) => content);
-    expect(renderedText()).toContain('Finished answer 0');
-    renders.mockClear();
+    const finished = wrapper.findAll('.chat-message--assistant p').slice(0, 12).map(node => node.element);
+    expect(finished.map(node => node.textContent)).toEqual(history.map((_, index) => `Finished answer ${index}`));
 
+    const prefix = wrapper.findAll('.chat-message--assistant p')[12]!.element;
     emit!({
       version: 2,
       changes: [{
         type: 'list',
         key: 'messages',
         ids: [...history.map((message) => message.id), 'live'],
-        items: [answer('live', 'Hello', 'streaming')],
+        items: [answer('live', 'Finished **prefix**.\n\nHello', 'streaming')],
       }],
     });
     await flushPromises();
 
-    expect(renderedText()).toContain('Hello');
-    expect(renderedText().filter((content) => content.startsWith('Finished answer'))).toStrictEqual([]);
+    expect(wrapper.text()).toContain('Hello');
+    expect(wrapper.findAll('.chat-message--assistant p')[12]!.element).toBe(prefix);
+    expect(wrapper.findAll('.chat-message--assistant p').slice(0, 12).map(node => node.element)).toEqual(finished);
+    wrapper.unmount();
+    scope.stop();
   });
 });

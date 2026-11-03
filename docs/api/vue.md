@@ -503,6 +503,10 @@ Escape cancels dictation and restores the draft.
 `CodexMermaidBlock`, `CodexVisualizationBlock`, `CodexCompactionMessage`, `CodexMessageActions`,
 `CodexMessageEditor`, `CodexWorkGroup`, and `CodexFoldTransition`.
 
+`CodexMessageActions.iconsVisible` defaults to `true`. The stock transcript mounts
+action glyphs on hover, keyboard focus, touch, and the latest completed assistant
+message while retaining accessible buttons and stable layout for other messages.
+
 The message block union includes an interactive HTML variant:
 
 ```ts
@@ -583,6 +587,10 @@ text. Explicit host titles take precedence.
 transcript is scrolled away from the bottom. It accepts an optional accessible
 `label` and emits `click`; use it directly when composing a custom message
 layout.
+
+Streaming replies update unfinished Markdown without replacing completed paragraphs
+and code blocks, preserving selection and code-copy controls as text arrives.
+Custom `text` slots still receive the full text block and own its rendering.
 
 Message rendering is incremental by default: `CodexMessageList` and
 `CodexConversationPane` initially mount only the newest batch. Set
@@ -886,7 +894,9 @@ previews while retaining compressed originals and thumbnails within the same bud
 Returning reuses the cached thumbnail immediately without another host request. Least-recently-used
 originals are evicted only when the total cache needs room, before visible images.
 Optional image `width` and `height` reserve the intrinsic aspect ratio before
-loading. Decoded dimensions survive cache eviction for images without metadata.
+loading. Small conversation images display at their natural size; larger images
+shrink to fit the conversation and viewport height limits. Decoded dimensions
+survive cache eviction for images without metadata.
 Failed previews remain explicitly retryable; eviction does not cause a fetch loop.
 
 Preview blob URLs are borrowed resources: a host that opens an independent image

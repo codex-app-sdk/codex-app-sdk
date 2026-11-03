@@ -1,6 +1,6 @@
 <template>
   <figure ref="rootElement" class="codex-chat-theme chat-media-block"
-    :style="aspectRatio ? { '--image-aspect-ratio': aspectRatio } : undefined"
+    :style="aspectRatio ? { '--image-aspect-ratio': aspectRatio, '--image-natural-width': `${dimensions?.width}px` } : undefined"
   >
     <button
       class="chat-media-block__image-button"
@@ -88,7 +88,8 @@ const promptLabel = 'Prompt'
 const openLabel = computed(() => `Open ${props.media.title || props.media.alt || generatedLabel}`)
 const rootElement = ref<HTMLElement | null>(null)
 const managedPreview = useManagedImagePreview(() => props.media.url, rootElement)
-const aspectRatio = computed(() => imageAspectRatio(props.media) ?? imageAspectRatio(managedPreview?.dimensions.value))
+const dimensions = computed(() => imageAspectRatio(props.media) ? props.media : managedPreview?.dimensions.value)
+const aspectRatio = computed(() => imageAspectRatio(dimensions.value))
 const previewSource = managedPreview?.source ?? useHostImageSource(() => props.media.url)
 const originalSource = computed(() => managedPreview ? managedPreview.original.value : previewSource.value)
 const detailsOpen = ref(false)
@@ -153,7 +154,7 @@ function mediaDownloadName(media: MessageMedia): string {
 .chat-media-block__image-button {
   display: block;
   width: fit-content;
-  max-width: 100%;
+  max-width: min(100%, var(--image-natural-width, 100%));
   max-height: min(360px, 50vh);
   padding: 0;
   overflow: hidden;

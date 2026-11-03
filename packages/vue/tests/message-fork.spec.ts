@@ -28,6 +28,7 @@ describe('message fork action', () => {
       .map((button) => button.attributes('aria-label'));
     expect(actionLabels).toContain('Fork');
     expect(actionLabels.indexOf('Fork')).toBe(actionLabels.indexOf('Delete') - 1);
+    await wrapper.get('.chat-message').trigger('pointerenter', { pointerType: 'mouse' });
     const icon = wrapper.get('[aria-label="Fork"] svg');
     expect(icon.classes()).toContain('tabler-icon-arrow-fork');
     expect(icon.classes()).toContain('chat-message-actions__fork-icon');

@@ -12,7 +12,7 @@ import {
   hasExplicitAssistantWorkPhases,
   isAssistantWorkBlock,
 } from '../chat/message-blocks'
-import { chatMessageFromInput } from '../chat/renderer-message-adapter'
+import { renderedChatMessage } from '../chat/renderer-message-adapter'
 import type { Message } from '../chat/types'
 import { assistantWorkTurnKey, questionResponsesKey } from '../chat/message-work-state'
 
@@ -42,7 +42,7 @@ const emit = defineEmits<{ loadTurnHistory: [turnId: string] }>()
 
 const messages = computed(() => props.entries.map((entry) => ({
   entry,
-  message: chatMessageFromInput(entry.message),
+  message: renderedChatMessage(entry.message),
 })))
 const turnId = computed(() => props.turnId)
 const phased = computed(() => messages.value.some(({ message }) => (

@@ -2,7 +2,7 @@
 
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, nextTick, ref, toRaw } from 'vue';
+import { defineComponent, h, nextTick, reactive, ref, toRaw } from 'vue';
 import CodexMessageList from '../src/components/CodexMessageList.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
 import type { Message } from '../src/chat/types';
@@ -305,17 +305,22 @@ describe('CodexMessageList', () => {
     expect(wrapper.find('.chat-message__stream-dot').exists()).toBe(true);
   });
 
-  it('passes surface messages to keyed rows without eagerly projecting the full transcript', () => {
-    const surfaceMessage: SurfaceMessage = {
+  it('passes surface messages to keyed rows and observes reactive in-place text changes', async () => {
+    const surfaceMessage = reactive<SurfaceMessage>({
       id: 'surface-user',
       role: 'user',
       status: 'complete',
       parts: [{ type: 'text', text: 'Keep this object stable.' }],
-    };
+    });
     const wrapper = mount(CodexMessageList, { props: { messages: [surfaceMessage] } });
 
-    expect(toRaw(wrapper.getComponent(CodexMessage).props('message'))).toBe(surfaceMessage);
+    expect(toRaw(wrapper.getComponent(CodexMessage).props('message'))).toBe(toRaw(surfaceMessage));
     expect(wrapper.text()).toContain('Keep this object stable.');
+    (surfaceMessage.parts[0] as Extract<SurfaceMessage['parts'][number], { type: 'text' }>).text = 'Reactive correction';
+    await nextTick();
+    expect(wrapper.text()).toContain('Reactive correction');
+    expect(wrapper.text()).not.toContain('Keep this object stable.');
+    wrapper.unmount();
   });
 
   it('only exposes tool input and output when explicitly enabled', async () => {
@@ -1241,7 +1246,7 @@ describe('CodexMessageList', () => {
     wrapper.unmount();
   });
 
-  it('keeps actions visible on the latest completed assistant message only', () => {
+  it('reveals action glyphs for hover, focus, touch and the latest completed assistant only', async () => {
     const wrapper = mount(CodexMessageList, {
       props: {
         messages: [
@@ -1255,6 +1260,25 @@ describe('CodexMessageList', () => {
     const rows = wrapper.findAll('.chat-message');
     expect(rows[0]?.classes()).not.toContain('chat-message--actions-visible');
     expect(rows[2]?.classes()).toContain('chat-message--actions-visible');
+    expect(rows[0]!.findAll('.chat-message-actions svg')).toHaveLength(0);
+    expect(rows[2]!.findAll('.chat-message-actions svg').length).toBeGreaterThan(0);
+    expect(rows[0]!.get('[aria-label="Copy"]').attributes('disabled')).toBeUndefined();
+    const labels = rows[0]!.findAll('.chat-message-actions button').map(button => button.attributes('aria-label'));
+    await rows[0]!.trigger('pointerenter', { pointerType: 'mouse' });
+    expect(rows[0]!.findAll('.chat-message-actions svg').length).toBeGreaterThan(0);
+    await rows[0]!.trigger('pointerleave');
+    expect(rows[0]!.findAll('.chat-message-actions svg')).toHaveLength(0);
+    await rows[0]!.trigger('focusin');
+    expect(rows[0]!.findAll('.chat-message-actions svg').length).toBeGreaterThan(0);
+    await rows[0]!.trigger('focusout');
+    expect(rows[0]!.findAll('.chat-message-actions svg')).toHaveLength(0);
+    await rows[0]!.trigger('pointerdown', { pointerType: 'touch' });
+    expect(rows[0]!.classes()).toContain('chat-message--actions-visible');
+    expect(rows[0]!.findAll('.chat-message-actions svg').length).toBeGreaterThan(0);
+    await rows[1]!.trigger('pointerdown', { pointerType: 'touch' });
+    expect(rows[0]!.findAll('.chat-message-actions svg')).toHaveLength(0);
+    expect(rows[0]!.findAll('.chat-message-actions button').map(button => button.attributes('aria-label'))).toEqual(labels);
+    wrapper.unmount();
   });
 
   it('keeps the latest completed assistant actions visible when a user follows it', () => {
@@ -1837,6 +1861,7 @@ describe('CodexMessageList', () => {
   });
 
   it('preserves public slot identity and absolute indexes when switching from lazy to eager', async () => {
+    const caption = ref('Initial caption');
     const transformedIndexes: number[] = [];
     const createdFor: string[] = [];
     const StatefulMessage = defineComponent({
@@ -1860,6 +1885,7 @@ describe('CodexMessageList', () => {
       slots: {
         message: ({ index, message }: { index: number; message: Message }) => h('section', {
           'class': 'slotted-message',
+          'data-caption': caption.value,
           'data-index': index,
         }, [h(StatefulMessage, { content: message.content })]),
       },
@@ -1867,6 +1893,9 @@ describe('CodexMessageList', () => {
 
     expect(wrapper.findAll('.slotted-message').map((row) => row.attributes('data-index'))).toStrictEqual(['2', '3']);
     expect(transformedIndexes).toStrictEqual([2, 3]);
+    caption.value = 'Updated caption';
+    await nextTick();
+    expect(wrapper.findAll('.slotted-message').map(row => row.attributes('data-caption'))).toEqual(['Updated caption', 'Updated caption']);
     transformedIndexes.length = 0;
 
     await wrapper.setProps({ renderStrategy: 'eager' });

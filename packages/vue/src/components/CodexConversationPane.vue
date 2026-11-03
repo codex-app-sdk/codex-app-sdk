@@ -20,7 +20,8 @@
       class="codex-conversation-pane__layout"
       scroll-mode="child"
     >
-      <CodexMessageList
+      <MessageListView
+        :source-slots="$slots"
         v-if="started"
         ref="messageList"
         class="codex-conversation-pane__messages"
@@ -69,18 +70,7 @@
         @quote-message="quoteMessage"
         @retry-turn="retryTurn"
         @send-follow-up="sendFollowUp"
-      >
-        <template v-if="$slots.message" #message="scope"><slot name="message" v-bind="scope" /></template>
-        <template v-if="$slots['message-actions']" #actions="scope"><slot name="message-actions" v-bind="scope" /></template>
-        <template v-if="$slots['message-attachment']" #attachment="scope"><slot name="message-attachment" v-bind="scope" /></template>
-        <template v-if="$slots['message-block']" #block="scope"><slot name="message-block" v-bind="scope" /></template>
-        <template v-if="$slots['message-header']" #header="scope"><slot name="message-header" v-bind="scope" /></template>
-        <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
-        <template v-if="$slots['message-status']" #status="scope"><slot name="message-status" v-bind="scope" /></template>
-        <template v-if="$slots['message-text']" #text="scope"><slot name="message-text" v-bind="scope" /></template>
-        <template v-if="$slots['message-thinking']" #thinking="scope"><slot name="message-thinking" v-bind="scope" /></template>
-        <template v-if="$slots['message-tool']" #tool="scope"><slot name="message-tool" v-bind="scope" /></template>
-      </CodexMessageList>
+      />
 
       <div v-else class="codex-conversation-pane__hero">
         <slot name="empty" :title="emptyTitle" :description="emptyDescription">
@@ -319,7 +309,7 @@ import type {
 import type { CodexMessageTextSelection } from '../chat/message-text-selection';
 import { stripMessageContext } from '../chat/message-blocks';
 import type { QueuedChatPrompt } from '../chat/queued-prompts';
-import { chatMessageFromInput } from '../chat/renderer-message-adapter';
+import { renderedChatMessage } from '../chat/renderer-message-adapter';
 import type {
   CodexContextUsage,
   CodexFileSearchItem,
@@ -360,7 +350,7 @@ import { questionResponsesKey } from '../chat/message-work-state';
 import CodexComposer from './CodexComposer.vue';
 import CodexApprovalPrompt from './CodexApprovalPrompt.vue';
 import CodexConversationHistoryLoader from './CodexConversationHistoryLoader.vue';
-import CodexMessageList from './CodexMessageList.vue';
+import MessageListView from './MessageListView';
 import CodexWorkbenchLayout from './CodexWorkbenchLayout.vue';
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
@@ -648,7 +638,7 @@ const canContinueInterruptedTurn = computed(() => (
   && (effectiveTurns.value ?? []).at(-1)?.status === 'interrupted'
 ));
 const visiblePromptHistory = computed(() => effectiveMessages.value.flatMap((message) => {
-  const chatMessage = chatMessageFromInput(message);
+  const chatMessage = renderedChatMessage(message);
   if (chatMessage.role !== 'user') return [];
   const content = stripMessageContext(chatMessage.promptContent
     ? promptContentDispatchText(chatMessage.promptContent, chatMessage.content) : chatMessage.content);
@@ -666,7 +656,12 @@ const effectiveAnsweredClientRequestIds = computed(() => controlledValue(
   (state) => state.thread?.answeredClientRequestIds,
   () => props.answeredClientRequestIds ?? props.surface?.answeredClientRequestIds,
 ));
-const displayAnsweredClientRequestIds = computed<ReadonlySet<string>>(() => new Set([
+// Equivalent question sets must not invalidate every row on each text delta.
+function retainRequestIds(previous: ReadonlySet<string> | undefined, ids: Iterable<string>): ReadonlySet<string> {
+  const next = new Set(ids);
+  return previous && next.size === previous.size && [...next].every(id => previous.has(id)) ? previous : next;
+}
+const displayAnsweredClientRequestIds = computed<ReadonlySet<string>>((previous) => retainRequestIds(previous, [
   ...(effectiveAnsweredClientRequestIds.value ?? []),
   ...questionResponses.keys(),
 ]));
@@ -677,7 +672,7 @@ const effectiveClientRequests = computed<readonly CodexSurfaceClientRequest[]>((
 const supersededQuestionIds = computed<ReadonlySet<string>>(() => {
   const ids = new Set<string>();
   const turns = new Map((effectiveTurns.value ?? []).map((turn, index) => [turn.id, index]));
-  const messages = authoritativeMessages.value.map(chatMessageFromInput);
+  const messages = authoritativeMessages.value.map(renderedChatMessage);
   for (const [questionIndex, message] of messages.entries()) {
     for (const part of message.parts ?? []) {
       if (part.type !== 'question' || part.request.payload.request.delivery !== 'async') continue;
@@ -709,7 +704,7 @@ const pendingQuestionRequests = computed(() => {
     requests.push(request);
   }
   for (const message of effectiveMessages.value) {
-    for (const part of chatMessageFromInput(message).parts ?? []) {
+    for (const part of renderedChatMessage(message).parts ?? []) {
       if (
         part.type !== 'question'
         || part.historical === true
@@ -733,7 +728,7 @@ const expandedQuestionRequest = computed(() => (
     return turn ? turn.status === 'inProgress' : request.turnId === effectiveActiveTurnId.value;
   })
 ));
-const hiddenQuestionRequestIds = computed<ReadonlySet<string>>(() => new Set(
+const hiddenQuestionRequestIds = computed<ReadonlySet<string>>((previous) => retainRequestIds(previous,
   pendingQuestionRequests.value.map((request) => request.id),
 ));
 const activeConfirmation = computed(() => effectiveClientRequests.value.find(
@@ -750,7 +745,7 @@ const activeComposerRequestItemIds = computed<ReadonlySet<string>>(() => new Set
 ));
 function transformTranscriptMessage(message: Message | SurfaceMessage, index: number): Message | SurfaceMessage {
   const transformed = props.transformMessage?.(message, index) ?? message;
-  const chatMessage = chatMessageFromInput(transformed);
+  const chatMessage = renderedChatMessage(transformed);
   const isHiddenTool = (toolCall: MessageToolCall) => activeComposerRequestItemIds.value.has(toolCall.itemId ?? toolCall.id);
   if (!chatMessage.parts?.some((part) => (
     (part.type === 'question' && dismissedQuestionIds.value.has(part.request.id))
@@ -1055,7 +1050,7 @@ watch([effectiveMessages, effectiveTurns], () => {
   const turnId = deletingTurnId.value;
   if (!turnId) return;
   const turnStillPresent = effectiveTurns.value?.some((turn) => turn.id === turnId)
-    || effectiveMessages.value.some((message) => chatMessageFromInput(message).turnId === turnId);
+    || effectiveMessages.value.some((message) => renderedChatMessage(message).turnId === turnId);
   if (turnStillPresent) return;
   deleteOperation += 1;
   deletingTurnId.value = null;
@@ -1239,7 +1234,7 @@ function matchesPendingSubmission(
   message: Message | SurfaceMessage,
   pending: PendingControlledSubmission,
 ): boolean {
-  const candidate = chatMessageFromInput(message);
+  const candidate = renderedChatMessage(message);
   return candidate.role === 'user' && stripMessageContext(candidate.content) === pending.prompt;
 }
 
@@ -1272,7 +1267,7 @@ function loadOlderHistory(): void {
 function quoteMessage(index: number): void {
   const message = effectiveMessages.value[index];
   if (!message) return;
-  const chatMessage = chatMessageFromInput(message);
+  const chatMessage = renderedChatMessage(message);
   const content = stripMessageContext(chatMessage.content);
   if (chatMessage.role !== 'user' || !content) return;
   updateDraft(content);

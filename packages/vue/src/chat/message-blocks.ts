@@ -1,12 +1,12 @@
 import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageAttachment, type MessageMedia, type MessagePhase, type MessageToolCall, type MessagePart } from './types'
 import { findInlineHtmlBlocks } from './inline-html'
-import { chatMessageFromInput, type ChatMessageInput } from './renderer-message-adapter'
+import { renderedChatMessage, type ChatMessageInput } from './renderer-message-adapter'
 
 /** A later model work item supersedes earlier final text in the same turn. */
 export function withoutSupersededFinalAnswers(messages: readonly ChatMessageInput[]): ChatMessageInput[] {
   const resumedTurns = new Set<string>()
   return [...messages].reverse().map((input) => {
-    const message = chatMessageFromInput(input)
+    const message = renderedChatMessage(input)
     if (message.role !== 'assistant' || !message.parts) return input
     let resumed = message.turnId ? resumedTurns.has(message.turnId) : false
     const parts = [...message.parts].reverse().filter((part) => {
@@ -102,6 +102,40 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
 
   appendUnanchoredTools(blocks, toolCalls, anchoredToolCallIds)
   return finalizeAssistantBlocks(blocks, prompts)
+}
+
+/** Preserve unchanged block props, including completed tools before a growing tail. */
+export function reuseMessageBlocks(next: MessageBlock[], previous: MessageBlock[] = []): MessageBlock[] {
+  const reused = next.map((block, index) => {
+    const old = previous[index]
+    return old && sameBlockValue(old, block) ? old : block
+  })
+  return reused.length === previous.length && reused.every((block, index) => block === previous[index])
+    ? previous : reused
+}
+
+function sameBlockValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((value, index) => sameBlockValue(value, b[index]))
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
+  const left = a as Record<string, unknown>
+  const right = b as Record<string, unknown>
+  const keys = Object.keys(left)
+  return keys.length === Object.keys(right).length && keys.every(key => {
+    const value = left[key]
+    const other = right[key]
+    // Block wrappers are recreated by parsing; their payloads stay shared.
+    if (['toolCalls', 'prompts', 'metadata'].includes(key)) return sameBlockValue(value, other)
+    if (['toolCall', 'media', 'attachment', 'args'].includes(key) && value && other) {
+      const fields = Object.keys(value)
+      return fields.length === Object.keys(other).length && fields.every(field => (
+        field === 'metadata'
+          ? sameBlockValue((value as Record<string, unknown>)[field], (other as Record<string, unknown>)[field])
+          : (value as Record<string, unknown>)[field] === (other as Record<string, unknown>)[field]
+      ))
+    }
+    return value === other
+  })
 }
 
 export function groupAssistantWorkBlocks(

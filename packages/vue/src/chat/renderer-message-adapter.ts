@@ -1,7 +1,21 @@
+import { computed, type ComputedRef } from 'vue';
 import { normalizePromptContent, type SurfaceMessage, type SurfaceMessagePart } from '@codex-app-sdk/core/surface';
 import type { Message, MessagePart, MessageToolCall, ToolExecutionState } from './types';
 
 export type ChatMessageInput = Message | SurfaceMessage;
+
+// Rendering receives immutable snapshots or Vue-reactive objects. A weak key
+// keeps settled conversions shared by the list, turn and message without owning
+// their lifetime; reactive in-place updates invalidate the computed normally.
+const renderedMessages = new WeakMap<ChatMessageInput, ComputedRef<Message>>();
+export function renderedChatMessage(message: ChatMessageInput): Message {
+  let cached = renderedMessages.get(message);
+  if (!cached) {
+    cached = computed(() => chatMessageFromInput(message));
+    renderedMessages.set(message, cached);
+  }
+  return cached.value;
+}
 
 export function chatMessagesFromInputs(messages: readonly ChatMessageInput[]): Message[] {
   return messages.map(chatMessageFromInput);

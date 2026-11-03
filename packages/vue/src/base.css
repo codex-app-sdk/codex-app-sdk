@@ -125,11 +125,13 @@
   line-height: var(--chat-message-line-height, 1.55);
 }
 
-.codex-markdown > *:first-child {
+.codex-markdown > :not(.chat-markdown-chunk):first-child,
+.codex-markdown > .chat-markdown-chunk:first-child > :first-child {
   margin-top: 0;
 }
 
-.codex-markdown > *:last-child {
+.codex-markdown > :not(.chat-markdown-chunk):last-child,
+.codex-markdown > .chat-markdown-chunk:last-child > :last-child {
   margin-bottom: 0;
 }
 

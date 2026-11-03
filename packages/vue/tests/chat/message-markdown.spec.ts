@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  createIncrementalMarkdown,
   renderInlineToken,
   renderMarkdown,
   renderUserText,
@@ -9,6 +10,41 @@ import {
 } from '../../src/chat/message-markdown';
 
 describe('message markdown rendering', () => {
+  it('matches full rendering through streamed Markdown boundaries, definitions and replacements', () => {
+    const examples = [
+      'First **paragraph**.\n\nSecond _paragraph_.\n\n# Heading\n\nTail',
+      '- First\n\n  More in the same item\n- Second\n  - Nested\n\nAfter list',
+      '1. one\n\n2. two\n\n3. three',
+      '1) one\n\n2) two\n\n3) three\n\nAfter list\n\nAnother paragraph',
+      '9. nine\n\n10. ten\n   1. Nested\n\n11. eleven',
+      'Before\n\n```ts\nconst a = 1;\n\nconst b = 2;\n```\n\nAfter',
+      'Before\n\n    indented code\n\n    more code\n\nAfter',
+      '> Quote\n>\n> Second paragraph\n\nAfter',
+      '| Name | Value |\n| --- | --- |\n| One | Two |\n\nAfter',
+      '<div>\nRaw HTML\n\nStill escaped</div>\n\nAfter',
+      'Inline $x^2$ and \\(y + 2\\).\n\n$$\nx^2\n\n+ y\n$$\n\nAfter',
+      'Before\n\n$\nx + y\n\n+ z\n$\n\nAfter',
+      'Before\n\n\\[\nx + y\n\n+ z\n\\]\n\nAfter',
+      'A [forward][target] and [shortcut].\n\nMore text.\n\n[target]: https://example.com\n[shortcut]: /local',
+      'A [nested][target].\n\n> [target]: https://example.com',
+      'CRLF\r\n\r\nAnother\r\n\r\nTail',
+      'Tabs\n\n\tcode\n\nAfter',
+      'Title\n=====\n\nParagraph\n\n---\n\nTail',
+    ];
+    for (const example of examples) {
+      const incremental = createIncrementalMarkdown();
+      for (let length = 0; length <= example.length; length++) {
+        const content = example.slice(0, length);
+        expect(incremental(content, 'Copy code').map(chunk => chunk.html).join(''), `${JSON.stringify(content)}`)
+          .toBe(renderMarkdown(content, { codeCopyLabel: 'Copy code' }));
+      }
+      const full = incremental(example, 'Copy code');
+      expect(incremental(example, 'Copy code')).toBe(full);
+      expect(incremental('Changed answer').map(chunk => chunk.html).join('')).toBe(renderMarkdown('Changed answer'));
+      expect(incremental('').map(chunk => chunk.html).join('')).toBe('');
+    }
+  });
+
   it('renders task lists in chat messages', () => {
     const html = renderMarkdown('- [ ] Todo\n- [x] Done');
 

@@ -18,6 +18,7 @@
           v-for="group in displayGroups"
           v-else
           :key="group.key"
+          v-memo="[group, renderOptions, inferredActiveTurnId, latestAssistantIndex, ...turnRenderState(group.turnId), activeOverrideForGroup(group), ...Object.values($slots)]"
           :entries="group.entries"
           :answered-client-request-ids="answeredClientRequestIds"
           :active="activeOverrideForGroup(group)"
@@ -31,58 +32,59 @@
           :details-error="group.turnId ? turnById.get(group.turnId)?.detailsError : undefined"
           @load-turn-history="emit('load-turn-history', $event)"
         >
-          <template v-for="entry in group.entries" :key="entry.key">
-            <div
-              class="codex-message-list__entry"
-              :data-codex-message-index="entry.index"
+          <div
+            v-for="entry in group.entries"
+            :key="entry.key"
+            v-memo="[entry.message, entry.index, entry.activityState, renderOptions, inferredActiveTurnId, latestAssistantIndex, ...turnRenderState(group.turnId), Object.keys($slots).length ? {} : undefined]"
+            class="codex-message-list__entry"
+            :data-codex-message-index="entry.index"
+          >
+            <slot v-if="$slots.message" name="message" :message="renderedChatMessage(displayMessage(entry.message, group.turnId))" :index="entry.index" />
+            <CodexMessage
+              v-else
+              :activity-state="entry.activityState"
+              :actions-disabled="actionsDisabled"
+              :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
+              :answered-client-request-ids="answeredClientRequestIds"
+              :can-delete-turn="canDeleteTurn && isTerminalTurn(group.turnId)"
+              :can-edit-turn="canEditTurn && isTerminalTurn(group.turnId)"
+              :can-fork-turn="canForkTurn && isForkableTurn(group.turnId)"
+              :can-retry-turn="canRetryTurn && isTerminalTurn(group.turnId)"
+              :deleting-turn="Boolean(deletingTurnId && group.turnId === deletingTurnId)"
+              :follow-ups-disabled="followUpsDisabled"
+              :hidden-client-request-ids="hiddenClientRequestIds"
+              :index="entry.index"
+              :message="displayMessage(entry.message, group.turnId)"
+              :mention-groups="mentionGroups"
+              :open-image="openImage"
+              :plugins="plugins"
+              :presentation="presentation"
+              :show-tool-details="showToolDetails"
+              :skills="skills"
+              :thread-actions-disabled="busy"
+              @cancel="emit('cancel')"
+              @client-response="emit('client-response', $event)"
+              @copy-message="emit('copy-message', $event)"
+              @delete-turn="emit('delete-turn', $event)"
+              @edit-turn="emit('edit-turn', $event)"
+              @fork-turn="emit('fork-turn', $event)"
+              @open-link="emit('open-link', $event)"
+              @open-visualization="emit('open-visualization', $event)"
+              @quote-message="emit('quote-message', $event)"
+              @retry-turn="emit('retry-turn', $event)"
+              @send-follow-up="emit('send-follow-up', $event)"
             >
-              <slot v-if="$slots.message" name="message" :message="chatMessageFromInput(displayMessage(entry.message, group.turnId))" :index="entry.index" />
-              <CodexMessage
-                v-else
-                :activity-state="entry.activityState"
-                :actions-disabled="actionsDisabled"
-                :actions-always-visible="shouldKeepAssistantActionsVisible(entry.index)"
-                :answered-client-request-ids="answeredClientRequestIds"
-                :can-delete-turn="canDeleteTurn && isTerminalTurn(group.turnId)"
-                :can-edit-turn="canEditTurn && isTerminalTurn(group.turnId)"
-                :can-fork-turn="canForkTurn && isForkableTurn(group.turnId)"
-                :can-retry-turn="canRetryTurn && isTerminalTurn(group.turnId)"
-                :deleting-turn="group.turnId === deletingTurnId"
-                :follow-ups-disabled="followUpsDisabled"
-                :hidden-client-request-ids="hiddenClientRequestIds"
-                :index="entry.index"
-                :message="displayMessage(entry.message, group.turnId)"
-                :mention-groups="mentionGroups"
-                :open-image="openImage"
-                :plugins="plugins"
-                :presentation="presentation"
-                :show-tool-details="showToolDetails"
-                :skills="skills"
-                :thread-actions-disabled="busy"
-                @cancel="emit('cancel')"
-                @client-response="emit('client-response', $event)"
-                @copy-message="emit('copy-message', $event)"
-                @delete-turn="emit('delete-turn', $event)"
-                @edit-turn="emit('edit-turn', $event)"
-                @fork-turn="emit('fork-turn', $event)"
-                @open-link="emit('open-link', $event)"
-                @open-visualization="emit('open-visualization', $event)"
-                @quote-message="emit('quote-message', $event)"
-                @retry-turn="emit('retry-turn', $event)"
-                @send-follow-up="emit('send-follow-up', $event)"
-              >
-                <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
-                <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
-                <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
-                <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
-                <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
-                <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
-                <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
-                <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
-                <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
-              </CodexMessage>
-            </div>
-          </template>
+              <template v-if="$slots.actions" #actions="scope"><slot name="actions" v-bind="scope" /></template>
+              <template v-if="$slots.attachment" #attachment="scope"><slot name="attachment" v-bind="scope" /></template>
+              <template v-if="$slots.block" #block="scope"><slot name="block" v-bind="scope" /></template>
+              <template v-if="$slots.header" #header="scope"><slot name="header" v-bind="scope" /></template>
+              <template v-if="$slots.mention" #mention="scope"><slot name="mention" v-bind="scope" /></template>
+              <template v-if="$slots.status" #status="scope"><slot name="status" v-bind="scope" /></template>
+              <template v-if="$slots.text" #text="scope"><slot name="text" v-bind="scope" /></template>
+              <template v-if="$slots.thinking" #thinking="scope"><slot name="thinking" v-bind="scope" /></template>
+              <template v-if="$slots.tool" #tool="scope"><slot name="tool" v-bind="scope" /></template>
+            </CodexMessage>
+          </div>
         </CodexMessageTurn>
       </div>
     </div>
@@ -96,7 +98,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowReactive, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowReactive, shallowRef, watch } from 'vue'
+import { touchedMessageActionsKey } from '../chat/message-action-state'
 import { questionResponsesKey } from '../chat/message-work-state'
 import type {
   CodexConversationRenderStrategy,
@@ -113,7 +116,7 @@ import type { CodexMessageImageOpenHandler } from '../chat/message-image'
 import { conversationImages, imageGalleryKey } from '../chat/image-gallery'
 import type { CodexConversationVisualization } from '../chat/visualization'
 import type { CodexMessageTextSelection } from '../chat/message-text-selection'
-import { chatMessageFromInput } from '../chat/renderer-message-adapter'
+import { renderedChatMessage } from '../chat/renderer-message-adapter'
 import { filterVisibleMessageTools, type CodexToolVisibility } from '../chat/tool-visibility'
 import CodexMessage from './CodexMessage.vue'
 import CodexMessageTurn from './CodexMessageTurn.vue'
@@ -221,6 +224,9 @@ const thinkingPlaceholder: SurfaceMessage = {
   status: 'streaming',
   parts: [],
 }
+const touchedMessageActions = shallowRef<string | number>()
+provide(touchedMessageActionsKey, touchedMessageActions)
+watch(() => props.resetKey, () => { touchedMessageActions.value = undefined })
 const questionResponses = inject(questionResponsesKey, undefined)
   ?? shallowReactive(new Map<string, ClientRequestResponse['payload']>())
 provide(questionResponsesKey, questionResponses)
@@ -278,7 +284,7 @@ let observedLastMessage = messageIdentityAt(props.messages, props.messages.lengt
 const loadingOlderMessages = ref(false)
 let olderMessagesRequestPending = false
 const presentedMessages = computed(() => withoutSupersededFinalAnswers(props.messages))
-provide(imageGalleryKey, computed(() => conversationImages(presentedMessages.value.map(chatMessageFromInput))))
+provide(imageGalleryKey, computed(() => conversationImages(presentedMessages.value.map(renderedChatMessage))))
 const visibleMessages = computed(() => effectiveRenderStrategy.value === 'lazy'
   ? presentedMessages.value.slice(renderStartIndex.value)
   : presentedMessages.value)
@@ -302,7 +308,7 @@ const displayEntries = computed<DisplayEntry[]>(() => {
     const visible = filterVisibleMessageTools(transformed, props.toolVisibility)
     if (!visible && transformed.role === 'assistant' && (
       props.activeTurnId
-        ? chatMessageFromInput(transformed).turnId === props.activeTurnId
+        ? renderedChatMessage(transformed).turnId === props.activeTurnId
         : index > lastUserIndex
     )) hiddenCurrentTurnActivity = true
     return visible ? [{ index, message: visible, key: message.id ?? index }] : []
@@ -317,7 +323,7 @@ const displayEntries = computed<DisplayEntry[]>(() => {
   ))
   if (props.busy && !hasStreamingAssistant) {
     const turnId = entries.length > 0
-      ? chatMessageFromInput(entries.at(-1)!.message).turnId?.trim() || undefined
+      ? renderedChatMessage(entries.at(-1)!.message).turnId?.trim() || undefined
       : undefined
     entries.push({
       index: props.messages.length,
@@ -329,14 +335,19 @@ const displayEntries = computed<DisplayEntry[]>(() => {
   return entries
 })
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
-const displayGroups = computed(() => {
-  const groups: Array<{
-    entries: typeof displayEntries.value
-    key: string | number
-    turnId?: string
-  }> = []
+// Message updates replace the array, but unchanged turns retain their render
+// inputs. Custom slot rows remain live because they may capture host state
+// outside the list props; root options still invalidate the default rows.
+const renderOptions = computed<Record<string, unknown>>((previous) => {
+  const next = Object.fromEntries(Object.entries(props).filter(([key]) => key !== 'messages' && key !== 'turns'))
+  return previous && Object.keys(previous).length === Object.keys(next).length
+    && Object.keys(next).every(key => next[key] === previous[key]) ? previous : next
+})
+type DisplayGroup = { entries: DisplayEntry[]; key: string | number; turnId?: string }
+const displayGroups = computed<DisplayGroup[]>((previous) => {
+  const groups: DisplayGroup[] = []
   for (const entry of displayEntries.value) {
-    const turnId = chatMessageFromInput(entry.message).turnId?.trim() || undefined
+    const turnId = renderedChatMessage(entry.message).turnId?.trim() || undefined
     const previous = groups.at(-1)
     if (turnId && previous?.turnId === turnId) {
       previous.entries.push(entry)
@@ -350,7 +361,7 @@ const displayGroups = computed(() => {
   }
   const assistantTurnIds = new Set(visibleMessages.value
     .filter((message) => message.role === 'assistant')
-    .map((message) => chatMessageFromInput(message).turnId?.trim()))
+    .map((message) => renderedChatMessage(message).turnId?.trim()))
   for (const [index, group] of groups.entries()) {
     if (!group.turnId || group.turnId === inferredActiveTurnId.value
       || turnStatusById.value.get(group.turnId) !== 'completed'
@@ -365,14 +376,27 @@ const displayGroups = computed(() => {
       message: { id, role: 'assistant', status: 'complete', turnId: group.turnId, parts: [] },
     })
   }
-  return groups
+  const old = new Map(previous?.map(group => [group.key, group]))
+  return groups.map(group => {
+    const cached = old.get(group.key)
+    return cached && cached.entries.length === group.entries.length && cached.entries.every((entry, index) => {
+      const next = group.entries[index]!
+      return entry.message === next.message && entry.index === next.index && entry.activityState === next.activityState
+    }) ? cached : group
+  })
 })
+
+function turnRenderState(turnId: string | undefined) {
+  const turn = turnId ? turnById.value.get(turnId) : undefined
+  return [turn?.status, turn?.startedAt, turn?.completedAt, turn?.durationMs,
+    turn?.itemsView, turn?.detailsLoading, turn?.detailsError]
+}
 
 function activeOverrideForGroup(group: (typeof displayGroups.value)[number]): boolean | undefined {
   if (props.busy && group.entries.some(({ index, message }) => (
     index < props.messages.length
     && message.role === 'assistant'
-    && chatMessageFromInput(message).streaming === true
+    && renderedChatMessage(message).streaming === true
   ))) return true
   if (props.activeTurnId === undefined) return undefined
   return group.turnId !== undefined && group.turnId === props.activeTurnId
@@ -382,7 +406,7 @@ const inferredActiveTurnId = computed(() => {
   const streamingTurnId = props.busy
     ? [...props.messages]
         .reverse()
-        .map(chatMessageFromInput)
+        .map(renderedChatMessage)
         .find((message) => message.role === 'assistant' && message.streaming)
         ?.turnId?.trim()
     : undefined
@@ -605,7 +629,7 @@ function updateMessageTextSelection(): void {
     return
   }
   const rect = range.getBoundingClientRect()
-  const message = chatMessageFromInput(entry.message)
+  const message = renderedChatMessage(entry.message)
   const next: CodexMessageTextSelection = {
     anchor: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
     messageIndex,
@@ -751,9 +775,9 @@ function tailRenderStart(messages: readonly (Message | SurfaceMessage)[], batchS
 function turnAlignedStart(messages: readonly (Message | SurfaceMessage)[], candidate: number): number {
   let start = Math.max(0, Math.min(messages.length, candidate))
   if (start >= messages.length) return start
-  const turnId = chatMessageFromInput(messages[start]!).turnId?.trim()
+  const turnId = renderedChatMessage(messages[start]!).turnId?.trim()
   if (!turnId) return start
-  while (start > 0 && chatMessageFromInput(messages[start - 1]!).turnId?.trim() === turnId) start -= 1
+  while (start > 0 && renderedChatMessage(messages[start - 1]!).turnId?.trim() === turnId) start -= 1
   return start
 }
 

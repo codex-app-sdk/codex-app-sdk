@@ -31,14 +31,16 @@ const fixture = {
       window.replaceImages = value => { items.value = value; };
       const gallery = ref(false); window.showGallery = () => { gallery.value = true; };
       const crowdedReady = new Promise(resolve => { window.releaseCrowdedImages = resolve; });
+      const smallReady = new Promise(resolve => { window.releaseSmallImages = resolve; });
       const app = createApp({setup() {
         provideCodexHostCapabilities({readImagePreview: async reference => {
           window.reads.push(reference); window.peak = Math.max(window.peak, ++window.active);
           if (reference.includes('crowded')) await crowdedReady;
+          if (reference.includes('small')) await smallReady;
           if (reference === '/slow.png') await new Promise(resolve => { window.releaseSlowImage = resolve; });
           if (reference.includes('gallery-first')) await new Promise(resolve => { window.releaseFirstGalleryImage = resolve; });
           window.active--;
-          const canvas = document.createElement('canvas'); canvas.width = reference.includes('portrait') ? 1170 : reference.includes('large') ? 3072 : 1024; canvas.height = reference.includes('portrait') ? 2532 : reference.includes('large') ? 2048 : 512;
+          const canvas = document.createElement('canvas'); canvas.width = reference.includes('small-wide') ? 96 : reference.includes('small') ? 64 : reference.includes('portrait') ? 1170 : reference.includes('large') ? 3072 : 1024; canvas.height = reference.includes('small-wide') ? 48 : reference.includes('small') ? 64 : reference.includes('portrait') ? 2532 : reference.includes('large') ? 2048 : 512;
           if (reference.includes('portrait')) {
             const ctx = canvas.getContext('2d'); ctx.fillStyle = 'white'; ctx.fillRect(0,0,canvas.width,canvas.height);
             ctx.fillStyle = 'black'; ctx.font = '32px sans-serif';
@@ -46,7 +48,7 @@ const fixture = {
           }
           const original=canvas.toDataURL('image/png'); window.originals.set(reference,original); return original;
         }}, {imagePreviewBudgetBytes: window.previewBudgetBytes ?? 5 * 1024 * 1024, viewportImageLoading: true});
-        return () => h('section', {id:'scroll',style:'height:600px;overflow-y:auto;width:700px;margin:80px auto'},
+        return () => h('section', {id:'scroll',style:'height:600px;overflow-y:auto;width:min(700px,100%);margin:80px auto'},
           gallery.value ? h(CodexMessageList,{messages:items.value,style:'height:100%',openImage:()=>false}) : items.value.map(message => h('article',{key:message.id,style:message.id === 'crowded' ? '' : 'padding-bottom:900px'},h(CodexMessage,{message,openImage: image => { window.openedImage = image; return true; }}))));
       }});
       app.mount('#app'); window.closeImages = () => app.unmount();
@@ -120,6 +122,34 @@ try {
     assert.ok(Math.abs(portraitSize.width/portraitSize.height-1170/2532)<0.001,'portrait previews preserve the source aspect ratio');
     await qualityPage.setViewportSize({width:390,height:600});
     assert.ok((await portrait.boundingBox()).height <= 300, 'previews use at most half a small viewport');
+    // Intrinsic sizing applies to both metadata-backed placeholders and images
+    // whose original dimensions are learned during the lazy host read.
+    await qualityPage.setViewportSize({width:1200,height:900});
+    await qualityPage.evaluate(()=>window.replaceImages([{id:'small-wide',role:'assistant',content:'',parts:[{type:'media',media:{url:'/small-wide.png',title:'Small wide',width:96,height:48}}]}]));
+    const smallWide=qualityPage.getByRole('button',{name:'Open Small wide',exact:true});
+    await smallWide.scrollIntoViewIfNeeded();
+    await qualityPage.waitForFunction(()=>window.reads.includes('/small-wide.png'));
+    const smallPlaceholder=await smallWide.boundingBox();
+    assert.ok(Math.abs(smallPlaceholder.width-96)<1 && Math.abs(smallPlaceholder.height-48)<1,
+      'small-image placeholders must not upscale beyond original dimensions: '+JSON.stringify(smallPlaceholder));
+    await qualityPage.evaluate(()=>window.releaseSmallImages());
+    await qualityPage.waitForFunction(()=>document.querySelector('[aria-label="Open Small wide"] img')?.naturalWidth>0);
+    assert.deepEqual(await smallWide.boundingBox(),smallPlaceholder,'decoding keeps the natural-size placeholder geometry');
+    for (const viewportWidth of [1200,390]) {
+      await qualityPage.setViewportSize({width:viewportWidth,height:600});
+      const bounds=await smallWide.boundingBox();
+      assert.ok(Math.abs(bounds.width-96)<1 && Math.abs(bounds.height-48)<1,'small landscape images stay natural size on desktop and phones');
+    }
+    await qualityPage.evaluate(()=>window.replaceImages([{id:'small-icon',role:'assistant',content:'',parts:[{type:'media',media:{url:'/small-icon.png',title:'Small icon'}}]}]));
+    const smallIcon=qualityPage.getByRole('button',{name:'Open Small icon',exact:true});
+    await smallIcon.scrollIntoViewIfNeeded();
+    await qualityPage.waitForFunction(()=>document.querySelector('[aria-label="Open Small icon"] img')?.naturalWidth>0);
+    for (const viewportWidth of [1200,390]) {
+      await qualityPage.setViewportSize({width:viewportWidth,height:600});
+      const bounds=await smallIcon.boundingBox();
+      assert.ok(Math.abs(bounds.width-64)<1 && Math.abs(bounds.height-64)<1,'learned original dimensions prevent icon upscaling');
+      await qualityPage.screenshot({path:join(artifacts,engine.name()+'-small-'+viewportWidth+'.png')});
+    }
     await qualityPage.close();
     const galleryPage = await browser.newPage({viewport:{width:1200,height:900}});
     galleryPage.setDefaultTimeout(5000);

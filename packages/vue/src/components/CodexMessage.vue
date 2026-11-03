@@ -17,9 +17,14 @@
     v-else-if="!hideCollapsedTurnDetail"
     class="codex-chat-theme chat-message"
     :class="[`chat-message--${chatMessage.role}`, {
-      'chat-message--actions-visible': actionsAlwaysVisible && !reserveActionSlot,
+      'chat-message--actions-visible': showActionIcons && !reserveActionSlot,
       'chat-message--editing': isEditing,
     }]"
+    @pointerenter="actionsHovered = $event.pointerType !== 'touch'"
+    @pointerleave="actionsHovered = false"
+    @pointerdown="touchActions"
+    @focusin="actionsFocused = true"
+    @focusout="blurActions"
   >
     <div class="chat-message__body">
       <div v-if="$slots.header" class="chat-message--steer chat-message--steer-above">
@@ -151,6 +156,7 @@
           :copy-action="copyMessage"
           :deleting="deletingTurn"
           :message="chatMessage"
+          :icons-visible="showActionIcons"
           :mutation-disabled="threadActionsDisabled"
           :presentation="effectivePresentation.messages.actions"
           @copy="emit('copy-message', index)"
@@ -169,7 +175,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, provide, ref, shallowReactive } from 'vue'
+import { computed, inject, provide, ref, shallowReactive, shallowRef } from 'vue'
+import { touchedMessageActionsKey } from '../chat/message-action-state'
 import { questionResponsesKey } from '../chat/message-work-state'
 import { useCodexChatTranslate } from '../chat/chat-i18n'
 import type { ClientRequestResponse, CodexConversationLink, CodexConversationPresentation } from '../chat/contracts'
@@ -188,9 +195,9 @@ import { imageGalleryMessageKey } from '../chat/image-gallery'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
 import ChatCompactionMessage from '../chat/ChatCompactionMessage.vue'
 import ChatMessageEditor from '../chat/ChatMessageEditor.vue'
-import { computeMessageBlocks, groupAssistantWorkBlocks, stripMessageContext } from '../chat/message-blocks'
+import { computeMessageBlocks, reuseMessageBlocks, groupAssistantWorkBlocks, stripMessageContext } from '../chat/message-blocks'
 import { copyMessageToClipboard } from '../chat/message-actions'
-import { chatMessageFromInput } from '../chat/renderer-message-adapter'
+import { renderedChatMessage } from '../chat/renderer-message-adapter'
 import { assistantWorkMessageIndexKey, assistantWorkTurnKey } from '../chat/message-work-state'
 import { useCodexHostCapabilities } from '../native-capabilities'
 import type { CodexComposerMentionGroup, CodexComposerMentionItem } from '../chat/composer-mentions-custom'
@@ -269,7 +276,7 @@ const t = useCodexChatTranslate()
 const activityLabel = computed(() => props.activityState === 'working'
   || (assistantWorkTurn?.phased.value && assistantWorkTurn.active.value)
   ? t('chat.work.working') : 'Thinking')
-const chatMessage = computed(() => chatMessageFromInput(props.message))
+const chatMessage = computed(() => renderedChatMessage(props.message))
 provide(imageGalleryMessageKey, chatMessage)
 const assistantWorkTurn = inject(assistantWorkTurnKey, undefined)
 provide(assistantWorkMessageIndexKey, computed(() => props.index))
@@ -288,7 +295,7 @@ const workActive = computed(() => {
 })
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
 provide(questionResponsesKey, inject(questionResponsesKey, undefined) ?? shallowReactive(new Map()))
-const allBlocks = computed(() => computeMessageBlocks(chatMessage.value))
+const allBlocks = computed<MessageBlock[]>((previous) => reuseMessageBlocks(computeMessageBlocks(chatMessage.value), previous))
 const visibleBlocks = computed(() => allBlocks.value.filter((block) => (
   (block.type !== 'question' || !props.hiddenClientRequestIds?.has(block.request.id))
   && (effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group'))
@@ -362,6 +369,19 @@ const reserveActionSlot = computed(() => (
   props.actionsDisabled ||
   (chatMessage.value.role === 'assistant' && chatMessage.value.streaming === true)
 ))
+const actionsHovered = ref(false)
+const actionsFocused = ref(false)
+const touchedActions = inject(touchedMessageActionsKey, undefined) ?? shallowRef<string | number>()
+const actionKey = computed(() => chatMessage.value.id ?? props.index)
+const showActionIcons = computed(() => props.deletingTurn || !reserveActionSlot.value && Boolean(
+  props.actionsAlwaysVisible || actionsHovered.value || actionsFocused.value || touchedActions.value === actionKey.value,
+))
+function touchActions(event: PointerEvent) {
+  if (event.pointerType === 'touch') touchedActions.value = actionKey.value
+}
+function blurActions(event: FocusEvent) {
+  actionsFocused.value = event.relatedTarget instanceof Node && (event.currentTarget as HTMLElement).contains(event.relatedTarget)
+}
 const renderActionSlot = computed(() => showActions.value)
 const canDelete = computed(() => Boolean(chatMessage.value.turnId) && props.canDeleteTurn && effectivePresentation.value.messages.actions.delete)
 const canEdit = computed(() => Boolean(chatMessage.value.turnId) && props.canEditTurn && effectivePresentation.value.messages.actions.edit)

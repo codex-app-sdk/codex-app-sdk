@@ -86,6 +86,11 @@ function renderHighlights(code: string, lang: string): string | undefined {
   return `<pre class="highlights" style="${escapeAttribute(result.rootStyle || '')}"><code>${lines}</code></pre>`
 }
 
+/** Reactive rendering context for caches that retain already highlighted blocks. */
+export function syntaxHighlightRevision() {
+  return highlightsReady.value
+}
+
 export function renderCodeBlock(code: string, language: string | undefined) {
   const lang = normalizeLanguage(language)
   if (!lang || !loadedLanguages.has(lang)) {
