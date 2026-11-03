@@ -27,6 +27,8 @@ import type { CodexAppServerStdioTransportOptions } from './codex-stdio-transpor
 import type { CodexAppServerUnixSocketTransportOptions } from './codex-unix-socket-transport';
 
 export type GenerateCodexTextOptions = {
+  /** Trusted per-call MCP servers, applied only to the ephemeral thread. */
+  mcpServers?: readonly CodexMcpServerDefinition[];
   /** Image-only inputs at trusted absolute paths accessible to app-server. */
   attachments?: readonly Extract<CodexSurfaceAttachment, { type: 'image' }>[];
   baseInstructions?: string;

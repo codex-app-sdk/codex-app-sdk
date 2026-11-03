@@ -53,6 +53,7 @@ describe('CodexSurface ephemeral generation', () => {
 
     const resultPromise = surface.generateText('Write a commit message', {
       ...(tools === undefined ? {} : { tools }),
+      ...(images ? {mcpServers:[{name:'icons_job',transport:{type:'http' as const,url:'http://127.0.0.1:1234/icons/token'},enabledTools:['fetch_tech_icon'],toolApprovalMode:'auto' as const}]} : {}),
       ...(images ? { attachments: [
         { type: 'image' as const, path: '/tmp/reference image.png ', detail: 'high' as const },
         { type: 'image' as const, path: '/tmp/other.png' },
@@ -104,6 +105,7 @@ describe('CodexSurface ephemeral generation', () => {
         cwd: '/tmp/project',
         developerInstructions: 'Return JSON only.',
         dynamicTools: [],
+        ...(images ? {config:{'mcp_servers.icons_job':{url:'http://127.0.0.1:1234/icons/token',enabled_tools:['fetch_tech_icon'],default_tools_approval_mode:'auto'}}} : {}),
         ...(tools === 'read-only' ? {} : { environments: [] }),
         ephemeral: true,
         model: 'gpt-mini-runtime',
@@ -222,4 +224,25 @@ describe('CodexSurface ephemeral generation', () => {
       'method' in message && message.method === 'turn/start'
     ))).toBe(false);
   });
+});
+
+it('rejects invalid per-call MCP definitions before connecting', async () => {
+ const transport=new MockCodexAppServer();const surface=new CodexSurface({client:new CodexAppServerClient(transport)});
+ try {await expect(surface.generateText('Inspect',{mcpServers:[{name:'bad server',transport:{type:'http',url:'file:///private'}}]})).rejects.toThrow(/MCP/);expect(transport.start).not.toHaveBeenCalled();}finally{await surface.close();}
+});
+
+it('keeps per-call MCP servers out of later utility calls', async () => {
+ const transport=new MockCodexAppServer({
+  'thread/start':()=>resumeResponse({...thread('isolated',false),ephemeral:true}),
+  'turn/start':()=>({turn:turn('done','completed',[{type:'agentMessage',id:'answer',text:'ok',phase:'final_answer',memoryCitation:null,delivery:null,questions:null}])}),
+  'thread/unsubscribe':()=>({status:'unsubscribed'}),
+ });
+ const surface=new CodexSurface({client:new CodexAppServerClient(transport)});
+ try {
+  await surface.generateText('first',{mcpServers:[{name:'icons',transport:{type:'http',url:'http://127.0.0.1:1234/job'},enabledTools:['fetch_tech_icon']}]});
+  await surface.generateText('second');
+  const starts=transport.sent.filter(message=>'method' in message&&message.method==='thread/start');
+  expect(starts[0]).toMatchObject({params:{config:{'mcp_servers.icons':{url:'http://127.0.0.1:1234/job',enabled_tools:['fetch_tech_icon']}}}});
+  expect(starts[1]).not.toHaveProperty('params.config');
+ } finally {await surface.close();}
 });

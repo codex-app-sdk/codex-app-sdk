@@ -326,6 +326,7 @@ events.
 ### Conversation lifecycle
 
 - `generateText(prompt, options?)` — runs one read-only ephemeral Codex turn and returns `{ text }` without persisting or projecting a conversation into surface state.
+  Optional `mcpServers` uses the existing typed server definitions only for that call's ephemeral thread. Definitions are validated before connecting, and later calls do not inherit them. This does not filter unrelated provider-configured tools.
 - `createConversation(options?, hostOptions?)`
 - `forkConversation(sourceId, options?, hostOptions?)` — forks through the latest completed turn and returns `{ conversationId, conversation, snapshot }` without selecting it.
 - `forkConversationAtTurn(sourceId, turnId, options?, hostOptions?)` — forks through one completed turn by stable ID.

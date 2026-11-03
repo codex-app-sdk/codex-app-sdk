@@ -199,3 +199,7 @@ from visible conversation history.
 
 For the complete business-data loop—backend module, read-only IPC, MCP tools,
 and UI refresh after tool completion—see the [Relay sample](/guide/samples#relay-business-ui-mcp).
+
+### MCP servers for isolated generation
+
+`generateText(prompt, { mcpServers })` accepts the same trusted main-process server definitions as conversations. The SDK normalizes them before connecting and applies their configuration only to the ephemeral thread. Omit the option to retain the default wire behavior. Hosts own endpoint authorization and lifetime, and should close request-scoped servers in a `finally` block. `enabledTools` restricts the supplied server; it does not disable other provider-configured tools. Workspace-tool policy and image attachments remain independent.

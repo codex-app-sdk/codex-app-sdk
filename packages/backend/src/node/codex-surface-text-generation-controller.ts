@@ -1,3 +1,4 @@
+import { normalizeMcpServers, mcpServerConfig } from './codex-surface-mcp';
 import type { CodexAppServerClient, ServerNotification, v2 } from '../codex/index';
 import type { CodexSurfaceSnapshot } from '@codex-app-sdk/core/surface';
 import type {
@@ -63,6 +64,7 @@ export class CodexSurfaceTextGenerationController {
       throw new Error('Utility generation accepts image attachments only');
     }
     const attachments = validateAttachments(options.attachments ?? []);
+    const servers = normalizeMcpServers(options.mcpServers ?? []);
     await this.host.ensureConnected();
 
     const state = this.host.getSnapshot();
@@ -91,6 +93,7 @@ export class CodexSurfaceTextGenerationController {
         : { developerInstructions: options.developerInstructions }),
       cwd: options.cwd ?? this.defaultCwd,
       dynamicTools: [],
+      ...(servers.length ? { config: mcpServerConfig(servers) } : {}),
       ...(options.tools === 'read-only' ? {} : { environments: [] }),
       ephemeral: true,
       ...(model ? { model } : {}),
