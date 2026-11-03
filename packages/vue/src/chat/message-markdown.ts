@@ -101,7 +101,7 @@ export function createIncrementalMarkdown() {
   let label: string | undefined
   let previousDocumentWide = false
   let codeRevision: boolean | undefined
-  let chunks: { start: number; end: number; html: string; type: string }[] = []
+  let chunks: { start: number; end: number; html: string }[] = []
   return (raw: string, codeCopyLabel?: string) => {
     const content = raw.replace(/\r\n?/g, '\n')
     // Read on every update, including a plain-text tail, so asynchronous syntax
@@ -117,11 +117,10 @@ export function createIncrementalMarkdown() {
       || (content.match(/^\$(?=\n|$)/gm)?.length ?? 0) % 2 !== 0
       || content.lastIndexOf('\\[') > content.lastIndexOf('\\]')
     const append = !documentWide && !previousDocumentWide && sameContext && content.startsWith(previous)
-    const stable = append ? chunks.slice(0, -1) : []
-    // A streamed ordered marker is initially a paragraph ("2" before ". ").
-    // Keep its preceding list mutable until a following block establishes the
-    // boundary; otherwise the new item can never join that list.
-    if (stable.at(-1)?.type === 'list') stable.pop()
+    // The last token can change class as characters arrive ("2" → "2. ",
+    // "***" → "***bold***") and rejoin its predecessor. Re-lex both tail
+    // tokens until another block establishes the earlier boundary.
+    const stable = append ? chunks.slice(0, -2) : []
     const start = stable.at(-1)?.end ?? 0
     const tokens = markdown.lexer(content.slice(start))
     let offset = start
@@ -133,7 +132,7 @@ export function createIncrementalMarkdown() {
       if (token.type === 'space') {
         if (next.length > stable.length) next[next.length - 1]!.end = end
       } else {
-        next.push({ type: token.type, start: offset, end, html: addCodeCopyControls(markdown.parser([token]) as string, codeCopyLabel) })
+        next.push({ start: offset, end, html: addCodeCopyControls(markdown.parser([token]) as string, codeCopyLabel) })
       }
       offset = end
     }

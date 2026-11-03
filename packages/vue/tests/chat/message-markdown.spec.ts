@@ -14,6 +14,9 @@ describe('message markdown rendering', () => {
     const examples = [
       'First **paragraph**.\n\nSecond _paragraph_.\n\n# Heading\n\nTail',
       '- First\n\n  More in the same item\n- Second\n  - Nested\n\nAfter list',
+      'text\n***bold***',
+      '***bold***\n***bold***',
+      'Before\n___emphasis___\n\nAfter',
       '1. one\n\n2. two\n\n3. three',
       '1) one\n\n2) two\n\n3) three\n\nAfter list\n\nAnother paragraph',
       '9. nine\n\n10. ten\n   1. Nested\n\n11. eleven',
