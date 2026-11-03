@@ -366,14 +366,14 @@ describe('CodexSurfaceTextGenerationController', () => {
     expect(methods(setup.request)).toStrictEqual(['thread/start', 'turn/start', 'thread/unsubscribe']);
   });
 
-  it('times out, interrupts, and unsubscribes even when cleanup RPCs fail', async () => {
+  it.each([0, 25])('times out after %s ms and cleans up even when cleanup RPCs fail', async (timeoutMs) => {
     vi.useFakeTimers();
     const setup = createController({ rejectMethods: new Set(['turn/interrupt', 'thread/unsubscribe']) });
-    const generated = setup.controller.generate('prompt', { timeoutMs: 25 });
+    const generated = setup.controller.generate('prompt', { timeoutMs });
     const rejection = expect(generated).rejects.toThrow('Codex ephemeral generation timed out');
     await vi.advanceTimersByTimeAsync(0);
 
-    await vi.advanceTimersByTimeAsync(25);
+    await vi.advanceTimersByTimeAsync(timeoutMs);
     await rejection;
     expect(setup.request).toHaveBeenCalledWith('turn/interrupt', {
       threadId: 'thread-1', turnId: 'turn-1',
@@ -381,7 +381,7 @@ describe('CodexSurfaceTextGenerationController', () => {
     expect(setup.request).toHaveBeenCalledWith('thread/unsubscribe', { threadId: 'thread-1' });
   });
 
-  it('uses the default timeout when no timeout option is supplied', async () => {
+  it('uses the default deadline unless explicitly disabled, while keeping unlimited generation cancellable', async () => {
     vi.useFakeTimers();
     const setup = createController();
     const generated = setup.controller.generate('prompt');
@@ -395,6 +395,17 @@ describe('CodexSurfaceTextGenerationController', () => {
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await rejection;
+
+    const abort = new AbortController();
+    const unlimited = setup.controller.generate('prompt', { timeoutMs: null, signal: abort.signal });
+    let unlimitedSettled = false;
+    void unlimited.then(() => { unlimitedSettled = true; }, () => { unlimitedSettled = true; });
+    await vi.advanceTimersByTimeAsync(240_000);
+    expect(unlimitedSettled).toBe(false);
+    abort.abort();
+    await expect(unlimited).rejects.toThrow('Codex ephemeral generation was aborted');
+    expect(methods(setup.request).slice(-2)).toStrictEqual(['turn/interrupt', 'thread/unsubscribe']);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('clears its timeout and abort listener after successful completion', async () => {

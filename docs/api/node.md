@@ -393,6 +393,11 @@ JSON parsing and product-specific validation. Closing the surface, aborting the
 provided signal, or reaching `timeoutMs` interrupts the active turn and still
 unsubscribes the ephemeral thread.
 
+`timeoutMs?: number | null` defaults to 120,000 milliseconds. Pass `null` to
+disable the generation timer while retaining explicit cancellation through
+`signal`. Numeric values retain their timer behavior; `0` does not disable
+the deadline. App-server RPC and host transport timeouts remain independent.
+
 ### Active conversation actions
 
 `turn.completed` reflects app-server `turn/completed`, never an inferred result

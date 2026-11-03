@@ -161,6 +161,10 @@ to preserve the default environment isolation. Both modes use read-only
 permissions; this option does not disable provider tools unrelated to workspace
 access. See [utility generation options](/api/node#utility-text-generation).
 
+For a job that should wait until completion or explicit Cancel, pass
+`timeoutMs: null` and an `AbortSignal`. The default generation deadline is
+120 seconds; the host also owns any outer request or transport deadlines.
+
 For visual guidance, attach an image without enabling workspace tools:
 
 ```ts

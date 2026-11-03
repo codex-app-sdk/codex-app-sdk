@@ -119,7 +119,7 @@ export class CodexSurfaceTextGenerationController {
     let completed = false;
     const abort = () => pending.reject(abortedError());
     options.signal?.addEventListener('abort', abort);
-    const timeout = setTimeout(() => {
+    const timeout = options.timeoutMs === null ? undefined : setTimeout(() => {
       pending.reject(new Error('Codex ephemeral generation timed out'));
     }, options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS);
 

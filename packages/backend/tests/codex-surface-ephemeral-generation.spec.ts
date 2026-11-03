@@ -164,7 +164,7 @@ describe('CodexSurface ephemeral generation', () => {
     await surface.connect();
     const abort = new AbortController();
 
-    const resultPromise = surface.generateText('Generate', { signal: abort.signal });
+    const resultPromise = surface.generateText('Generate', { signal: abort.signal, timeoutMs: null });
     await vi.waitFor(() => expect(transport.sent.some((message) => (
       'method' in message && message.method === 'turn/start'
     ))).toBe(true));

@@ -39,7 +39,8 @@ export type GenerateCodexTextOptions = {
   reasoningEffort?: string;
   serviceTier?: string | null;
   signal?: AbortSignal;
-  timeoutMs?: number;
+  /** Generation deadline in milliseconds (default 120 seconds); null disables this timer. */
+  timeoutMs?: number | null;
   /**
    * Workspace-tool policy. `none` (default) disables environment access;
    * `read-only` uses the provider's default environment with read-only permissions.
