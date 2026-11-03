@@ -93,26 +93,42 @@ describe('CodexConversationPane', () => {
   it('loads summary Working details on expansion, retries failures, and keeps the loaded group cached', async () => {
     const final = 'Final answer\n\n![Phone](data:image/png;base64,cG5n)\n\n![Desktop](data:image/png;base64,cG5n)';
     const state = reactive<CodexConversationPaneState>({ identity: {
-      conversationKey: 'summary-thread', busy: true, activeTurnId: 'summary-turn',
-      turns: [{ id: 'summary-turn', status: 'inProgress', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: 109_000, itemsView: 'summary' }],
-      messages: [{ id: 'summary-answer', role: 'assistant', status: 'streaming', turnId: 'summary-turn', parts: [{ type: 'text', text: 'Live work', phase: 'commentary' }] }],
+      conversationKey: 'summary-thread', busy: false, activeTurnId: null,
+      turns: [{ id: 'summary-turn', status: 'interrupted', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: 109_000, itemsView: 'summary' }],
+      messages: [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [{ type: 'text', text: 'Live work', phase: 'commentary' }] }],
     } });
     const loadTurnHistory = vi.fn();
     const controller = createCodexConversationPaneController({ state, actions: { loadTurnHistory } });
     const wrapper = mount(CodexConversationPane, { props: { controller } });
     const header = () => wrapper.get('.chat-work-group__header');
     const answerImages = () => wrapper.findAll('.chat-media-block').filter(image => !image.element.closest('.chat-work-group__body'));
+    const turn = state.identity.turns![0]!;
+    expect(header().text()).toBe('Stopped · 1m 49s · View details');
+    expect(header().find('[role="status"]').exists()).toBe(false);
+    expect(loadTurnHistory).not.toHaveBeenCalled();
+    state.identity.busy = true; state.identity.activeTurnId = 'summary-turn'; turn.status = 'inProgress';
+    await nextTick();
     expect(header().text()).toBe('Working');
     expect(header().find('[role="status"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('Live work');
     expect(loadTurnHistory).not.toHaveBeenCalled();
-    const turn = state.identity.turns![0]!;
+    for (const status of ['interrupted', 'failed'] as const) {
+      state.identity.busy = false; state.identity.activeTurnId = null; turn.status = status;
+      await nextTick();
+      expect(header().attributes('aria-expanded')).toBe('false');
+      expect(header().find('[role="status"]').exists()).toBe(false);
+      expect(loadTurnHistory).not.toHaveBeenCalled();
+    }
     state.identity.busy = false; state.identity.activeTurnId = null; turn.status = 'completed';
     state.identity.messages = [{ id: 'summary-answer', role: 'assistant', status: 'complete', turnId: 'summary-turn', parts: [{ type: 'text', text: final, phase: 'final_answer' }] }];
     await nextTick();
     expect(answerImages()).toHaveLength(2);
     expect(header().text()).toBe('Done · 1m 49s · View details');
     expect(wrapper.text()).toContain('Final answer'); expect(loadTurnHistory).not.toHaveBeenCalled();
+    turn.detailsLoading = true; await nextTick();
+    expect(header().find('[role="status"]').exists()).toBe(false);
+    expect(header().attributes('disabled')).toBeUndefined();
+    turn.detailsLoading = false; await nextTick();
     await header().trigger('click'); await flushPromises();
     expect(loadTurnHistory).toHaveBeenCalledExactlyOnceWith('summary-turn');
     expect(header().attributes('aria-expanded')).toBe('false');

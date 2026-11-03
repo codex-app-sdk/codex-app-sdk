@@ -66,10 +66,10 @@ const fixture = {
           h('header', [
             h('button', { onClick: () => { state.identity = {
               conversationKey: 'summary-browser', busy: false, activeTurnId: null,
-              turns: Array.from({ length: 20 }, (_, i) => ({ id: 'summary-'+i, status: 'completed', itemsView: 'summary', durationMs: 109000 })),
+              turns: Array.from({ length: 20 }, (_, i) => ({ id: 'summary-'+i, status: i === 0 ? 'interrupted' : 'completed', itemsView: 'summary', durationMs: 109000 })),
               messages: Array.from({ length: 20 }, (_, i) => [
                 { id: 'user-'+i, role: 'user', status: 'complete', turnId: 'summary-'+i, parts: [{ type: 'text', text: 'Request '+i }] },
-                { id: 'answer-'+i, role: 'assistant', status: 'complete', turnId: 'summary-'+i, parts: [{ type: 'text', text: 'Final answer '+i+'\\n\\n![Phone]('+image+')\\n\\n![Desktop]('+image+')', phase: 'final_answer' }] },
+                { id: 'answer-'+i, role: 'assistant', status: 'complete', turnId: 'summary-'+i, parts: i === 0 ? [] : [{ type: 'text', text: 'Final answer '+i+'\\n\\n![Phone]('+image+')\\n\\n![Desktop]('+image+')', phase: 'final_answer' }] },
               ]).flat(),
             }; } }, 'Summary history'),
             h('button', { onClick: () => { sidebarOpen.value = !sidebarOpen.value; } }, 'Toggle sidebar'),
@@ -140,6 +140,8 @@ try {
     await header.waitFor();
     assert.equal(await header.textContent().then(text => text.trim()), 'Done · 1m 49s · View details');
     assert.equal(await page.evaluate(() => window.detailReads), 0, 'summaries must not request Working content');
+    assert.equal((await page.locator('.chat-work-group__header').first().textContent()).trim(), 'Stopped · 1m 49s · View details');
+    assert.equal(await page.getByRole('status', { name: 'Loading details…' }).count(), 0, 'stopped summaries must stay idle until explicitly expanded');
     await header.scrollIntoViewIfNeeded();
     const before = await header.boundingBox();
     await header.click();

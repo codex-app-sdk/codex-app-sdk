@@ -34,6 +34,10 @@ steering messages, commentary, reasoning, and tools. Reopening uses the cached
 details. Loading failures offer a retry. Active turns load full items and
 continue streaming normally.
 
+Stopped and failed summary turns also stay collapsed until opened. A loading
+spinner appears only while an opened disclosure is waiting for details;
+background history reads do not put spinners on collapsed groups.
+
 Surface-bound panes request details automatically. Controlled hosts supply
 `turns` and `actions.loadTurnHistory(turnId)` through their pane controller, or
 handle the pane's `loadTurnHistory` event:

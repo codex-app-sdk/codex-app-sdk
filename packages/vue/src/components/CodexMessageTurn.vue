@@ -79,7 +79,8 @@ const status = computed(() => props.status)
 const startedAt = computed(() => props.startedAt)
 const durationMs = computed(() => props.durationMs)
 const stoppedWithoutFinal = computed(() => (
-  !active.value
+  props.itemsView !== 'summary'
+  && !active.value
   && !finalStarted.value
   && (status.value === 'interrupted' || status.value === 'failed')
 ))
@@ -103,8 +104,8 @@ const hasDetails = computed(() => props.itemsView === 'summary' || messages.valu
 const enabled = computed(() => Boolean(turnId.value && headerMessageIndex.value !== undefined))
 const expanded = ref((active.value && !finalStarted.value) || stoppedWithoutFinal.value)
 const userToggled = ref(false)
-const detailsLoading = computed(() => !active.value && (props.detailsLoading || (
-  expanded.value && props.itemsView === 'summary' && !props.detailsError
+const detailsLoading = computed(() => !active.value && expanded.value && (props.detailsLoading || (
+  props.itemsView === 'summary' && !props.detailsError
 )))
 
 watch(finalStarted, (started, previous) => {
