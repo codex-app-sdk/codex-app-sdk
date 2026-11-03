@@ -674,6 +674,7 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   }
 
   if (['Tab', 'ArrowRight', ' ', 'Enter'].includes(event.key)
+    && (event.key !== 'Enter' || !(props.hasAttachments || props.hasExternalContent))
     && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
     && !event.isComposing && !props.disabled && !activeCommand.value
     && props.suggestedPrompt?.trim() && (editorEl.value?.readText() ?? prompt.value) === '') {

@@ -293,7 +293,9 @@ input hint. It is never inserted into the draft by suggestion acceptance keys.
 Use `suggestedPrompt` (or `state.composer.suggestedPrompt`) for an actionable
 follow-up. A non-blank suggestion appears in place of the normal hint while the
 editor is empty. Unmodified **Tab**, **Right Arrow**, **Space**, or **Enter** inserts
-that suggestion into the draft without submitting it. Press Enter again to submit. The caret moves to the
+that suggestion into the draft without submitting it. Press Enter again to submit.
+When attachments or host context are present, Enter submits them immediately instead
+of accepting the suggestion. The caret moves to the
 end and the insertion supports normal undo. Existing text (including whitespace)
 is never replaced. Disabled editors, IME composition, modified acceptance shortcuts,
 and active command modes do not accept a prompt suggestion; suggestion-picker

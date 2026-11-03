@@ -53,7 +53,7 @@ const server = await createServer({
           read() { return {state:state.value,submitted:submitted.value}; },
         };
         createApp({setup:()=>()=>h('main',[
-          h(Composer,{disabled:false,isSending:externalContext.value,hasExternalContent:externalContext.value,followUpBehavior:'steer',composerState:state.value,promptHistory:history.value,
+          h(Composer,{disabled:false,isSending:externalContext.value,hasExternalContent:externalContext.value,suggestedPrompt:externalContext.value?'Suggested follow-up':undefined,followUpBehavior:'steer',composerState:state.value,promptHistory:history.value,
             skills:catalogs.value?[skill]:[],plugins:catalogs.value?[plugin]:[],mentionGroups:catalogs.value?groups:[],
             'onUpdate:composerState':value=>state.value=value,
             onSend:(prompt,options)=>submitted.value={prompt,options},
@@ -239,7 +239,7 @@ try {
     await page.locator('.chat-composer__send').click();
     await editor.press('Enter');
     assert.deepEqual(await page.evaluate(() => window.contextSteers.map(entry => entry.prompt)), ['', ''],
-      'Host annotations can steer by click or Enter without typed text');
+      'Host annotations must submit by click or Enter without accepting the suggested prompt');
     await editor.press('ControlOrMeta+Enter');
     assert.equal((await page.evaluate(() => window.authoredFixture.read().submitted)).prompt, '',
       'The alternate queue shortcut also forwards context-only work');

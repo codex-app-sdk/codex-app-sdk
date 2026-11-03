@@ -498,13 +498,15 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('');
   });
 
-  it('submits the attachment-only prompt sentinel', async () => {
-    const wrapper = mountComposer({ hasAttachments: true });
-
-    expect(wrapper.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
-    await wrapper.get('form').trigger('submit');
-
-    expect(wrapper.emitted('send')).toStrictEqual([['(no user instructions)']]);
+  it('sends attachment-only work with Enter instead of accepting the suggested prompt', async () => {
+    for (const content of [{ hasAttachments: true }, { hasExternalContent: true }]) {
+      const wrapper = mountComposer({ ...content, suggestedPrompt: 'Suggested follow-up' });
+      expect(wrapper.get('.chat-composer__send').attributes()).not.toHaveProperty('disabled');
+      await editor(wrapper).trigger('keydown', { key: 'Enter' });
+      expect(wrapper.emitted('send')).toStrictEqual([[content.hasAttachments ? '(no user instructions)' : '']]);
+      expect(editorValue(wrapper)).toBe('');
+      wrapper.unmount();
+    }
   });
 
   it('does not add the attachment-only sentinel to prompt history', async () => {
