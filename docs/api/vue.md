@@ -420,7 +420,10 @@ active selection.
 remain outside the SDK. `hasComposerContext` enables Send with no typed prompt;
 a context-only controlled submit receives an empty string so the host can
 serialize the cards. `CodexComposer` exposes the lower-level equivalent as
-`hasExternalContent`. Neither API modifies renderer attachments.
+`hasExternalContent`. Context-only work also supports steering while busy,
+including the configured follow-up behavior and Cmd/Ctrl+Enter. The host
+receives an empty string and serializes its context before sending or steering.
+Neither API modifies renderer attachments.
 
 `CodexConversationPane` provides `composer-shelf-actions` for host-owned
 controls in the shelf above the composer. It renders after the built-in turn

@@ -193,6 +193,16 @@ describe('ChatComposer', () => {
     await working.get('.chat-composer__send').trigger('click');
     expect(working.emitted('send')).toStrictEqual([['']]);
     expect(working.emitted('interrupt')).toBeUndefined();
+
+    await working.setProps({ followUpBehavior: 'steer', queuedPromptId: 'already-queued' });
+    await working.get('.chat-composer__send').trigger('click');
+    await editor(working).trigger('keydown', { key: 'Enter' });
+    await working.setProps({ followUpBehavior: 'queue' });
+    await editor(working).trigger('keydown', { key: 'Enter', metaKey: true });
+    await editor(working).trigger('keydown', { key: 'Enter', ctrlKey: true });
+    expect(working.emitted('steer')).toStrictEqual([[''], [''], [''], ['']]);
+    expect(working.emitted('steerQueuedPrompt')).toBeUndefined();
+    expect(working.emitted('interrupt')).toBeUndefined();
   });
 
   it('recalls submitted prompts from an empty composer and exits navigation after an edit', async () => {

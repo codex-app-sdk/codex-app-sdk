@@ -37,6 +37,8 @@ const server = await createServer({
         const catalogs = ref(true);
         const history = ref(undefined);
         const editing = ref(false);
+        const externalContext = ref(false);
+        window.contextSteers = [];
         const skill = {name:'cp',displayName:'Commit-Push',path:'/skills/cp/SKILL.md',enabled:true};
         const plugin = {id:'computer-use@openai-bundled',name:'computer-use',displayName:'Computer Use',brandColor:'#ff0000',enabled:true};
         const groups = [{id:'agents',label:'Agents',items:[{id:'agent-1',value:'agent:1',label:'Alex'}]}];
@@ -45,15 +47,17 @@ const server = await createServer({
           reload() { const {prompt,options}=submitted.value; submitted.value={prompt:promptContentDispatchText(options.content,prompt)}; },
           edit() { editing.value=true; },
           recall() { const {prompt,options}=submitted.value; catalogs.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; history.value=[options?.content?promptContentDispatchText(options.content,prompt):prompt]; },
-          reset() { history.value=undefined; editing.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; catalogs.value=true; },
+          contextOnly() { this.reset(); externalContext.value=true; window.contextSteers=[]; },
+          reset() { externalContext.value=false; history.value=undefined; editing.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; catalogs.value=true; },
           restore() { const {prompt,options}=submitted.value; state.value={text:prompt,content:options?.content,selectionStart:prompt.length,selectionEnd:prompt.length}; },
           read() { return {state:state.value,submitted:submitted.value}; },
         };
         createApp({setup:()=>()=>h('main',[
-          h(Composer,{disabled:false,isSending:false,composerState:state.value,promptHistory:history.value,
+          h(Composer,{disabled:false,isSending:externalContext.value,hasExternalContent:externalContext.value,followUpBehavior:'steer',composerState:state.value,promptHistory:history.value,
             skills:catalogs.value?[skill]:[],plugins:catalogs.value?[plugin]:[],mentionGroups:catalogs.value?groups:[],
             'onUpdate:composerState':value=>state.value=value,
             onSend:(prompt,options)=>submitted.value={prompt,options},
+            onSteer:(prompt,options)=>window.contextSteers.push({prompt,options}),
           }),
           submitted.value?h(Message,{message:{id:'submitted',role:'user',status:'complete',parts:[{type:'text',text:submitted.value.prompt}],metadata:{promptContent:submitted.value.options?.content}},
             skills:catalogs.value?[skill]:[],plugins:catalogs.value?[plugin]:[],mentionGroups:catalogs.value?groups:[]}):null,
@@ -229,6 +233,16 @@ try {
       await popup.close();
     }
     await page.screenshot({ path: `/tmp/sdk-plain-url-${engine.name()}.png` });
+    await page.evaluate(() => window.authoredFixture.contextOnly());
+    await focusEnd(editor);
+    assert.equal(await editor.textContent(), '');
+    await page.locator('.chat-composer__send').click();
+    await editor.press('Enter');
+    assert.deepEqual(await page.evaluate(() => window.contextSteers.map(entry => entry.prompt)), ['', ''],
+      'Host annotations can steer by click or Enter without typed text');
+    await editor.press('ControlOrMeta+Enter');
+    assert.equal((await page.evaluate(() => window.authoredFixture.read().submitted)).prompt, '',
+      'The alternate queue shortcut also forwards context-only work');
     console.log(`${engine.name()}: literal triggers, explicit skill/agent chips, draft restoration and inline paste/undo/resubmit preserve authored content; plain URLs open by click and keyboard.`);
     await browser.close(); browser = undefined;
   }

@@ -509,7 +509,7 @@ function submitSteer(): void {
 
 function submitWithIntent(intent: 'send' | 'steer'): void {
   const trimmed = prompt.value.trim();
-  if (!canSend.value || (intent === 'steer' && !trimmed && !props.hasAttachments)) {
+  if (!canSend.value || (intent === 'steer' && !trimmed && !props.hasAttachments && !props.hasExternalContent)) {
     return;
   }
   const slashCommand = activeCommand.value

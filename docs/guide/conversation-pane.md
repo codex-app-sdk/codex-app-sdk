@@ -212,8 +212,9 @@ changes. The feature is disabled by default.
 `composer-context` is a generic rendering slot; the SDK does not serialize its
 contents. Set `hasComposerContext` while host-owned cards are present so Send
 remains available with an empty text field. A context-only controlled submit
-passes `prompt === ''` to `actions.submit`, and the host must serialize its
-context before transport. Native image/file attachment-only submissions keep
+passes `prompt === ''` to `actions.submit` or `actions.steer`, according to the
+follow-up behavior and keyboard shortcut. The host serializes its context before
+transport; no extra typed instruction is required. Native image/file attachment-only submissions keep
 the existing `(no user instructions)` prompt.
 
 File attachments also send their filename and absolute path to the model so it
