@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { formatMessageSentAt, fullMessageSentAt } from '../../src/chat/message-time';
 
@@ -60,5 +60,42 @@ describe('message timestamps', () => {
       dateStyle: 'full',
       timeStyle: 'short',
     }));
+  });
+
+  describe('formatter cost', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    function renderTranscriptLabels(count: number) {
+      for (let index = 0; index < count; index += 1) {
+        const sameDay = new Date(2026, 8, 4, 1, index % 60);
+        const thisWeek = new Date(now.getTime() - 2 * dayMs);
+        const older = new Date(2025, 8, 4, 12, 0);
+        for (const sentAt of [sameDay, thisWeek, older]) formatMessageSentAt(sentAt.toISOString(), now);
+        fullMessageSentAt(older.toISOString());
+      }
+    }
+
+    it('shares formatters across a long transcript instead of building one per label', () => {
+      vi.useFakeTimers({ now });
+      const construct = vi.spyOn(Intl, 'DateTimeFormat');
+
+      renderTranscriptLabels(200);
+
+      expect(construct.mock.calls.length).toBeLessThanOrEqual(4);
+    });
+
+    it('rebuilds formatters after a while so a changed time zone or locale is picked up', () => {
+      vi.useFakeTimers({ now });
+      renderTranscriptLabels(1);
+      const construct = vi.spyOn(Intl, 'DateTimeFormat');
+
+      vi.advanceTimersByTime(61_000);
+      renderTranscriptLabels(1);
+
+      expect(construct).toHaveBeenCalled();
+    });
   });
 });
