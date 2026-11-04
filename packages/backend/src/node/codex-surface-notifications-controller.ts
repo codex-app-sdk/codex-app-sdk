@@ -164,14 +164,7 @@ export class CodexSurfaceNotificationsController {
         return;
       }
       case 'skills/changed':
-        void this.catalog.loadSkills(true, 'notification');
-        for (const runtime of this.host.runtimes()) {
-          void this.catalog.loadConversationCatalogs(runtime.cwd ?? undefined, true).then((catalogs) => {
-            this.host.patchRuntime(runtime.threadId, catalogs);
-            this.host.emitConversationSkills(runtime.threadId, 'notification');
-            this.host.emitConversationPermissions(runtime.threadId, 'notification');
-          });
-        }
+        this.catalog.invalidateSkills();
         return;
       case 'thread/name/updated': {
         const state = this.host.getState();

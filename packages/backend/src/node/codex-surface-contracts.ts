@@ -111,10 +111,7 @@ export type CodexConversationForkResult = {
   readonly snapshot: CodexConversationSnapshot;
 };
 
-export type ListCodexSkillsOptions = {
-  cwd?: string;
-  forceReload?: boolean;
-};
+export type { ListCodexSkillsOptions } from '@codex-app-sdk/core/surface';
 
 /** State returned by the app-server remote-control connection. */
 export type CodexSurfaceRemoteControlStatus = v2.RemoteControlStatusReadResponse;

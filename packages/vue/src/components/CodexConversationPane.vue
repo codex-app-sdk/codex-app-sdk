@@ -180,6 +180,7 @@
             @interrupt="interrupt"
             @menu-select="menuSelect"
             @mention-select="mentionSelect"
+            @request-skills="requestSkills"
             @select-approval-preset="selectApprovalPreset"
             @send="submit"
             @steer="steer"
@@ -1437,6 +1438,14 @@ function sendOptionsForAttachments(
 
 function updateDraft(value: string): void {
   updateComposerState({ text: value, selectionStart: value.length, selectionEnd: value.length });
+}
+
+async function requestSkills(): Promise<void> {
+  if (dispatchControllerAction('requestSkills')) return;
+  if (effectiveController.value || !props.surface?.listSkills) return;
+  const state = props.surface.state;
+  const cwd = state.conversations.find(conversation => conversation.id === state.activeConversationId)?.cwd;
+  await runSurfaceAction(() => props.surface!.listSkills!(cwd ? { cwd } : {}));
 }
 
 function updateComposerState(state: CodexComposerState): void {

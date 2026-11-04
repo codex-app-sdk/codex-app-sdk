@@ -34,6 +34,7 @@ type ChatComposerSuggestionOptions<Payload = unknown> = {
   prompt: Ref<string>
   skills: () => readonly CodexSkillSummary[]
   skillsEnabled: () => boolean
+  onSkillsRequested?: () => void
   editor: Ref<{
     getSelectionRange: () => { end: number; start: number; valid: boolean }
     insertMention: (mention: CodexPromptMention, start: number, end: number) => void
@@ -358,7 +359,9 @@ export function useChatComposerSuggestions<Payload = unknown>(options: ChatCompo
       return
     }
     if (activeSkillSlash.value !== null) {
+      const opening = openMenu.value !== 'skill'
       openMenu.value = 'skill'
+      if (opening) options.onSkillsRequested?.()
       return
     }
     if (activeCommandSlash.value !== null) {

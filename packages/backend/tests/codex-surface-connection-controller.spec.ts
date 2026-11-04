@@ -168,7 +168,7 @@ describe('CodexSurfaceConnectionController', () => {
     await Promise.all([first, second]);
 
     expect(setup.catalog.loadModels).toHaveBeenCalledOnce();
-    expect(setup.catalog.loadSkills).toHaveBeenCalledWith(false);
+    expect(setup.catalog.loadSkills).not.toHaveBeenCalled();
     expect(setup.lifecycle.resumeDuringBootstrap).toHaveBeenCalledWith('active');
     expect(setup.catalog.schedulePluginRefresh).toHaveBeenCalledWith(false);
 
@@ -176,7 +176,7 @@ describe('CodexSurfaceConnectionController', () => {
     expect(setup.catalog.loadModels).toHaveBeenCalledOnce();
     await setup.controller.bootstrapSurfaceData(true);
     expect(setup.catalog.loadModels).toHaveBeenCalledTimes(2);
-    expect(setup.catalog.loadSkills).toHaveBeenLastCalledWith(true);
+    expect(setup.catalog.loadSkills).not.toHaveBeenCalled();
   });
 
   it('honors a forced bootstrap requested while an ordinary bootstrap is still pending', async () => {
@@ -190,8 +190,7 @@ describe('CodexSurfaceConnectionController', () => {
     await Promise.all([ordinary, forced]);
 
     expect(setup.catalog.loadModels).toHaveBeenCalledTimes(2);
-    expect(setup.catalog.loadSkills).toHaveBeenNthCalledWith(1, false);
-    expect(setup.catalog.loadSkills).toHaveBeenNthCalledWith(2, true);
+    expect(setup.catalog.loadSkills).not.toHaveBeenCalled();
     expect(setup.catalog.schedulePluginRefresh).toHaveBeenNthCalledWith(1, false);
     expect(setup.catalog.schedulePluginRefresh).toHaveBeenNthCalledWith(2, true);
   });

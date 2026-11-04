@@ -160,7 +160,6 @@ export class CodexSurfaceConnectionController {
     const bootstrap = (async () => {
       await Promise.all([
         this.catalog.loadModels(),
-        this.catalog.loadSkills(force),
         this.catalog.loadPermissionProfiles(),
         this.catalog.loadRateLimits(),
         this.conversations.load(),

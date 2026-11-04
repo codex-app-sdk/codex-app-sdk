@@ -155,26 +155,11 @@ describe('CodexSurfaceNotificationsController', () => {
     expect(setup.host.patchConversationStatus).toHaveBeenCalledWith('thread-1', 'idle');
   });
 
-  it('refreshes global and per-runtime skill catalogs after a skills change', async () => {
+  it('invalidates skill discovery after a skills change without loading permissions', () => {
     const setup = createController();
-    const second = createThreadRuntime('thread-2', setup.state, { cwd: null });
-    setup.runtimes.set('thread-2', second);
-    setup.catalog.loadConversationCatalogs
-      .mockResolvedValueOnce({ skills: [{ name: 'one' }], marker: 'one' })
-      .mockResolvedValueOnce({ skills: [{ name: 'two' }], marker: 'two' });
-
     handle(setup, 'skills/changed', {});
-
-    expect(setup.catalog.loadSkills).toHaveBeenCalledExactlyOnceWith(true, 'notification');
-    await vi.waitFor(() => expect(setup.host.patchRuntime).toHaveBeenCalledTimes(2));
-    expect(setup.catalog.loadConversationCatalogs).toHaveBeenNthCalledWith(1, '/project', true);
-    expect(setup.catalog.loadConversationCatalogs).toHaveBeenNthCalledWith(2, undefined, true);
-    expect(setup.host.emitConversationSkills.mock.calls).toStrictEqual([
-      ['thread-1', 'notification'], ['thread-2', 'notification'],
-    ]);
-    expect(setup.host.emitConversationPermissions.mock.calls).toStrictEqual([
-      ['thread-1', 'notification'], ['thread-2', 'notification'],
-    ]);
+    expect(setup.catalog.invalidateSkills).toHaveBeenCalledOnce();
+    expect(setup.catalog.loadConversationCatalogs).not.toHaveBeenCalled();
   });
 
   it('trims an updated thread name, changes only the target, and emits its summary', () => {
@@ -715,6 +700,7 @@ function createController(options: SetupOptions = {}) {
   const authentication = { refresh: vi.fn(async () => undefined), handleLoginCompleted: vi.fn() };
   const approvals = { handleServerResolved: vi.fn() };
   const catalog = {
+    invalidateSkills: vi.fn(),
     loadSkills: vi.fn(async () => undefined),
     loadConversationCatalogs: vi.fn(async () => ({})),
   };

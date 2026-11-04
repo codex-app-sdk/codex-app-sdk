@@ -586,7 +586,7 @@ describe('CodexSurface', () => {
     transport.emitNotification('skills/changed', {});
     await vi.waitFor(() => expect(handleEvents.some((event) => event.type === 'conversation.skillsChanged')).toBe(true));
     expect(handleEvents).toContainEqual(expect.objectContaining({
-      type: 'conversation.permissionsChanged',
+      type: 'conversation.skillsChanged',
       conversationId: 'thread-existing',
       origin: 'notification',
     }));

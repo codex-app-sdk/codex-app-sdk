@@ -467,6 +467,7 @@ describe('CodexSurface', () => {
       b.load({ cwd: '/workspace/b', extensionContext: { agent: 'b' } }),
     ]);
     await Promise.all([a.sendMessage('Run A'), b.sendMessage('Run B')]);
+    await Promise.all([surface.listSkills({ cwd: '/workspace/a' }), surface.listSkills({ cwd: '/workspace/b' })]);
 
     expect(surface.getSnapshot().conversations).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'thread-a', turnCount: 2 }),

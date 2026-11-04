@@ -301,6 +301,15 @@ instructions through its native skill input; the SDK does not inline skill files
 Literal `$skill` and `@name` text never creates those items. Explicit
 programmatic `options.skills` is still supported and validated against the catalog.
 
+Skill catalogs start with `skillCatalogStatus: 'notLoaded'`. Connecting, loading
+history, creating and forking conversations do not discover skills. Call
+`listSkills({ cwd?, forceReload? })` when suggestions are needed; requests share
+an in-flight read and cache results by working directory. `forceReload: true`
+refreshes the catalog and artwork. Change notifications refresh only scopes that
+have already been requested. Sending an explicit skill reference discovers its
+conversation's catalog if necessary before validating the selected name and path.
+Ordinary text and rendering saved mention labels require no discovery.
+
 Submitted user messages retain their parts in `metadata.promptContent`. The
 visible message uses that content, while the transport prompt may include
 host-owned hidden context. Without saved parts, Vue renders canonical skill and

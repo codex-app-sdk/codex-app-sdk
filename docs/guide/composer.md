@@ -15,6 +15,11 @@ typing or pasting the same characters without accepting leaves literal text:
 | `$` | Codex skill mention | `skills` |
 | `@` | Plugin, file, or host-defined mention | `plugins`, `files`, `mentionGroups` |
 
+Skill discovery is on demand. Opening `$` suggestions emits `requestSkills` when
+the catalog is unloaded or failed. Supply the resulting `skills` and
+`skillCatalogStatus` to the composer. `CodexConversationPane` requests them from
+its bound surface automatically; controlled panes use the `requestSkills` action.
+
 Submissions containing chips include `options.content`, a portable sequence of
 text and selected mentions. The prompt string contains the same visible labels
 as the editor. Literal `$cp` stays `$cp`; an accepted skill chip retains its

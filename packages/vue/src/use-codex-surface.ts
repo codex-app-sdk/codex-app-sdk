@@ -8,9 +8,11 @@ import type {
   CodexSurfaceEvent,
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
+  CodexSurfaceSkill,
   CreateCodexRendererConversationOptions,
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
+  ListCodexSkillsOptions,
   CodexRendererSendMessageOptions,
   StartCodexReviewOptions,
   UpdateCodexConversationSettings,
@@ -95,7 +97,12 @@ export function useCodexSurface(api: CodexSurfaceRendererApi) {
     return snapshot;
   }
 
+  const skillActions: { listSkills?: (options?: ListCodexSkillsOptions) => Promise<CodexSurfaceSkill[]> } = {
+    listSkills: (options) => api.listSkills
+      ? api.listSkills(options) : Promise.reject(new Error('Skill discovery is unavailable')),
+  };
   return {
+    ...skillActions,
     state: readonly(state),
     lastEvent: readonly(lastEvent),
     answeredClientRequestIds,

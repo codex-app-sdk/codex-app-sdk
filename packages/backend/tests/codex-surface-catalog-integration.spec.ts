@@ -9,10 +9,40 @@ import {
   lastResponse,
   pluginSummary,
   resumeResponse,
+  requestsFor,
   thread,
 } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
+  it('defers skill discovery through connection, history, creation, forks, and change notifications', async () => {
+    const transport = new MockCodexAppServer({
+      'thread/start': () => resumeResponse(thread('thread-new', false)),
+      'thread/fork': () => resumeResponse(thread('thread-forked', false)),
+      'thread/settings/update': () => ({}),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
+    try {
+      await surface.connect();
+      await surface.conversation('thread-other').load();
+      await surface.createConversation();
+      await surface.forkConversation('thread-existing');
+      transport.emitNotification('skills/changed', {});
+      await surface.refreshAccount();
+      expect(requestsFor(transport, 'skills/list')).toStrictEqual([]);
+      expect(surface.getSnapshot().skillCatalogStatus).toBe('notLoaded');
+
+      await surface.listSkills({ cwd: '/tmp/project' });
+      expect(requestsFor(transport, 'skills/list')).toHaveLength(1);
+      expect(surface.getConversationSnapshot('thread-existing').skillCatalogStatus).toBe('loaded');
+      await surface.listSkills({ cwd: '/tmp/project' });
+      expect(requestsFor(transport, 'skills/list')).toHaveLength(1);
+
+      transport.emitNotification('skills/changed', {});
+      await vi.waitFor(() => expect(surface.getConversationSnapshot('thread-existing').skillCatalogStatus).toBe('loaded'));
+      expect(requestsFor(transport, 'skills/list')).toHaveLength(2);
+    } finally { await surface.close(); }
+  });
+
   it('connects before serving an explicit catalog request', async () => {
     const transport = new MockCodexAppServer();
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
@@ -25,6 +55,30 @@ describe('CodexSurface', () => {
     expect(lastRequest(transport, 'skills/list')).toBeDefined();
     expect(lastRequest(transport, 'model/list')).toMatchObject({ params: { includeHidden: true } });
     await surface.close();
+  });
+
+  it('coalesces scoped discovery and rejects a stale result after skills change', async () => {
+    const stale = deferred<v2.SkillsListResponse>();
+    let reads = 0;
+    const transport = new MockCodexAppServer({ 'skills/list': () => ++reads === 1 ? stale.promise : ({ data: [{
+      cwd: '/tmp/project', errors: [], skills: [{ pluginId: null, name: 'fresh', description: 'Fresh',
+        path: '/skills/fresh/SKILL.md', scope: 'user', enabled: true }],
+    }] }) });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    try {
+      await surface.connect();
+      const first = surface.listSkills({ cwd: '/tmp/project' });
+      const second = surface.listSkills({ cwd: '/tmp/project' });
+      const settled = Promise.allSettled([first, second]);
+      await vi.waitFor(() => expect(reads).toBe(1));
+      transport.emitNotification('skills/changed', {});
+      await vi.waitFor(() => expect(surface.getSnapshot().skills[0]?.name).toBe('fresh'));
+      stale.resolve({ data: [{ cwd: '/tmp/project', errors: [], skills: [] }] });
+      expect((await settled).map(result => result.status)).toStrictEqual(['rejected', 'rejected']);
+      const cached = await surface.listSkills({ cwd: '/tmp/project' });
+      expect(cached[0]?.name).toBe('fresh');
+      expect(reads).toBe(2);
+    } finally { await surface.close(); }
   });
 
   it('does not publish a catalog failure when closing with a refresh in flight', async () => {
@@ -218,14 +272,16 @@ describe('CodexSurface', () => {
       autoSelectFirstConversation: false,
     });
 
-    const snapshot = await surface.connect();
+    await surface.connect();
+    expect(readPaths).toStrictEqual([]);
+    const skills = await surface.listSkills();
 
     expect(readPaths).toStrictEqual([
       '/skills/branded/icon-small.svg',
       '/skills/branded/icon-large.png',
       '/skills/invalid/oversized.png',
     ]);
-    expect(snapshot.skills).toMatchObject([
+    expect(skills).toMatchObject([
       {
         name: 'branded-skill',
         description: 'A skill with catalog artwork',
@@ -244,11 +300,11 @@ describe('CodexSurface', () => {
         enabled: true,
       },
     ]);
-    expect(snapshot.skills[1]?.iconSmall).toBeUndefined();
-    expect(snapshot.skills[1]?.iconLarge).toBeUndefined();
-    expect(JSON.stringify(snapshot.skills)).not.toContain('/skills/branded/icon-');
-    expect(JSON.stringify(snapshot.skills)).not.toContain('/skills/invalid/readme.txt');
-    expect(JSON.stringify(snapshot.skills)).not.toContain('/skills/invalid/oversized.png');
+    expect(skills[1]?.iconSmall).toBeUndefined();
+    expect(skills[1]?.iconLarge).toBeUndefined();
+    expect(JSON.stringify(skills)).not.toContain('/skills/branded/icon-');
+    expect(JSON.stringify(skills)).not.toContain('/skills/invalid/readme.txt');
+    expect(JSON.stringify(skills)).not.toContain('/skills/invalid/oversized.png');
   });
 
   it('rereads same-path skill icons when the skill catalog is force reloaded', async () => {
@@ -278,8 +334,9 @@ describe('CodexSurface', () => {
       autoSelectFirstConversation: false,
     });
 
-    const initial = await surface.connect();
-    expect(initial.skills[0]?.iconSmall).toBe('data:image/png;base64,QQ==');
+    await surface.connect();
+    const initial = await surface.listSkills();
+    expect(initial[0]?.iconSmall).toBe('data:image/png;base64,QQ==');
 
     const reloaded = await surface.listSkills({ forceReload: true });
     expect(reloaded[0]?.iconSmall).toBe('data:image/png;base64,Qg==');

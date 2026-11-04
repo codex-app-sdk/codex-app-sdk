@@ -995,6 +995,11 @@ export type ListCodexModelsOptions = {
   forceReload?: boolean;
 };
 
+export type ListCodexSkillsOptions = {
+  cwd?: string;
+  forceReload?: boolean;
+};
+
 export type CodexSurfacePermissionMode = 'read-only' | 'workspace-write' | 'full-access';
 export type CodexSurfaceApprovalMode = 'ask' | 'never';
 
@@ -1104,6 +1109,7 @@ export type CodexSurfaceApi = {
   refreshConversations(): Promise<CodexSurfaceSnapshot>;
   listConversations(options?: ListCodexConversationsOptions): Promise<CodexConversationSummary[]>;
   listModels(options?: ListCodexModelsOptions): Promise<CodexSurfaceModel[]>;
+  listSkills?(options?: ListCodexSkillsOptions): Promise<CodexSurfaceSkill[]>;
   createConversation(options?: CreateCodexConversationOptions): Promise<CodexSurfaceSnapshot>;
   archiveConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;
   deleteConversation(conversationId: string): Promise<CodexSurfaceSnapshot>;

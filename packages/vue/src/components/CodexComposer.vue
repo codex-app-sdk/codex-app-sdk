@@ -236,6 +236,7 @@ const emit = defineEmits<{
   attach: [];
   menuSelect: [item: CodexComposerMenuSelectableItem<Payload>];
   mentionSelect: [item: CodexComposerMentionItem<Payload>, group: CodexComposerMentionGroup<Payload>];
+  requestSkills: [];
   interrupt: [];
   'update:modelId': [modelId: string];
   'update:composerState': [state: CodexComposerState];
@@ -442,6 +443,9 @@ const {
   prompt,
   skills: () => props.skills ?? [],
   skillsEnabled: () => effectiveCodexCapabilities.value.skills,
+  onSkillsRequested: () => {
+    if (!props.skillCatalogStatus || props.skillCatalogStatus === 'notLoaded' || props.skillCatalogStatus === 'error') emit('requestSkills');
+  },
   editor: editorEl,
 });
 

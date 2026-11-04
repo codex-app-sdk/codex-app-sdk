@@ -158,6 +158,8 @@ export type CodexConversationPaneActions<Payload = unknown> = {
   quoteMessage?: PaneAction<[index: number]>;
   /** Loads bounded user-only prompt history for the active conversation. */
   readPromptHistory?: () => readonly string[] | Promise<readonly string[]>;
+  /** Discovers the skill catalog when the composer opens skill suggestions. */
+  requestSkills?: PaneAction;
   resolveApproval?: PaneAction<[
     approvalId: string,
     decision: CodexSurfaceApprovalDecision,

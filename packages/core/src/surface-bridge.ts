@@ -18,6 +18,7 @@ import type {
   CreateCodexRendererConversationOptions,
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
+  ListCodexSkillsOptions,
   ReadCodexRateLimitsOptions,
   ConsumeCodexRateLimitResetCreditOptions,
   SendCodexMessageOptions,
@@ -43,7 +44,7 @@ type Awaitable<Value> = Value | Promise<Value>;
 type SurfaceOperationFunction<Name extends CodexSurfaceBridgeOperation> = Name extends keyof Required<CodexSurfaceApi>
   ? Extract<Required<CodexSurfaceApi>[Name], (...args: never[]) => unknown>
   : never;
-type OptionalAccountOperation = 'readRateLimits' | 'readAccountUsage' | 'consumeRateLimitResetCredit';
+type OptionalAccountOperation = 'readRateLimits' | 'readAccountUsage' | 'consumeRateLimitResetCredit' | 'listSkills';
 type BridgeOperationMethods = {
   [Name in CodexSurfaceBridgeOperation]: (
     ...args: Parameters<SurfaceOperationFunction<Name>>
@@ -251,7 +252,7 @@ export const codexSurfaceBridgeOperations = [
   'archiveConversation', 'cancelLogin', 'clearGoal', 'compactConversation', 'connect',
   'continueInterruptedTurn', 'createConversation', 'deleteConversation', 'deleteTurn', 'deleteQueuedPrompt',
   'editTurn', 'forkTurn', 'getSnapshot', 'interrupt', 'listConversations',
-  'listModels', 'loadOlderConversationHistory', 'loadTurnHistory', 'logout', 'readConversationHistory',
+  'listModels', 'listSkills', 'loadOlderConversationHistory', 'loadTurnHistory', 'logout', 'readConversationHistory',
   'readConversationPromptHistory', 'refreshAccount', 'refreshConversations', 'renameConversation', 'respondToClientRequest',
   'resolveApproval', 'retryTurn', 'selectConversation', 'sendMessage', 'setGoal',
   'startChatGptDeviceCodeLogin', 'startChatGptLogin', 'startReview', 'steerMessage', 'steerQueuedPrompt',
@@ -271,7 +272,7 @@ export const codexSurfaceBridgeArities: Readonly<
   compactConversation: [0, 0], connect: [0, 0], continueInterruptedTurn: [0, 0], createConversation: [0, 1],
   deleteConversation: [1, 1], deleteTurn: [1, 1], deleteQueuedPrompt: [1, 1],
   editTurn: [2, 3], forkTurn: [1, 1], getSnapshot: [0, 0], interrupt: [0, 0],
-  listConversations: [0, 1], listModels: [0, 1], loadOlderConversationHistory: [0, 1], loadTurnHistory: [1, 2],
+  listConversations: [0, 1], listModels: [0, 1], listSkills: [0, 1], loadOlderConversationHistory: [0, 1], loadTurnHistory: [1, 2],
   logout: [0, 0], readConversationHistory: [0, 1], readConversationPromptHistory: [0, 1],
   refreshAccount: [0, 0],
   readRateLimits: [0, 1],
@@ -372,6 +373,10 @@ async function invokeValidated(
     case 'interrupt': return target.interrupt();
     case 'listConversations': return target.listConversations(listConversationOptions(args[0]));
     case 'listModels': return target.listModels(listModelOptions(args[0]));
+    case 'listSkills': {
+      if (!target.listSkills) throw new Error('Skill discovery is unavailable');
+      return target.listSkills(listSkillOptions(args[0]));
+    }
     case 'loadTurnHistory': {
       if (!target.loadTurnHistory) throw new Error('Turn history is unavailable.');
       return target.loadTurnHistory(nonEmptyString(args[0], 'Turn id'), optionalString(args[1], 'Conversation id'));
@@ -513,6 +518,16 @@ function listModelOptions(value: unknown): ListCodexModelsOptions | undefined {
   return {
     ...(record.includeHidden === undefined ? {} : { includeHidden: booleanValue(record.includeHidden, 'Model list includeHidden') }),
     ...(record.forceReload === undefined ? {} : { forceReload: booleanValue(record.forceReload, 'Model list forceReload') }),
+  };
+}
+
+function listSkillOptions(value: unknown): ListCodexSkillsOptions | undefined {
+  if (value === undefined) return undefined;
+  const record = plainObject(value, 'Skill list options');
+  onlyKeys(record, ['cwd', 'forceReload'], 'Skill list options');
+  return {
+    ...(record.cwd === undefined ? {} : { cwd: nonEmptyString(record.cwd, 'Skill list cwd') }),
+    ...(record.forceReload === undefined ? {} : { forceReload: booleanValue(record.forceReload, 'Skill list forceReload') }),
   };
 }
 

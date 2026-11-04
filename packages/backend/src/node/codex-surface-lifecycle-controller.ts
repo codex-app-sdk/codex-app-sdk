@@ -318,6 +318,15 @@ export class CodexSurfaceLifecycleController {
     historyReason: 'load' | 'resume' = 'resume',
   ): Promise<CodexSurfaceSnapshot> {
     const requestedHostOptions = { ...this.hostOptionsByThread.get(conversationId), ...loadOptions };
+    const timingStarted = performance.now();
+    let timingPrevious = timingStarted;
+    const markTiming = (stage: string) => {
+      const now = performance.now();
+      if (process.env.CODEX_APP_SDK_TRACE_CONVERSATION_LOAD === '1') console.warn('[conversation-load] ' + JSON.stringify({ layer: 'codex-sdk', stage,
+        threadId: conversationId, at: performance.timeOrigin + now, stageMs: now - timingPrevious, elapsedMs: now - timingStarted }));
+      timingPrevious = now;
+    };
+    markTiming('resume.begin');
     const hostOptions = {
       ...requestedHostOptions,
       mcpServers: requestedHostOptions.mcpServers === undefined
@@ -331,6 +340,7 @@ export class CodexSurfaceLifecycleController {
       cwd: hostOptions.cwd,
       extensionContext: hostOptions.extensionContext,
     }, {}, hostOptions.mcpServers);
+    markTiming('extensions.ready');
     const historyItemsView = hostOptions.historyItemsView ?? this.options.historyItemsView ?? 'full';
     const loadingRuntime = this.host.createRuntime(conversationId, { historyLoading: true, error: null });
     const initialTurns = new Map(loadingRuntime.turns.map((turn) => [turn.id, turn]));
@@ -358,6 +368,7 @@ export class CodexSurfaceLifecycleController {
           .then((result) => result.goal)
           .catch(() => null),
       ]);
+      markTiming('resume-and-goal.ready');
       if (response.thread.id !== conversationId) {
         throw new Error(`Codex thread/resume returned '${response.thread.id}' for requested thread '${conversationId}'`);
       }
@@ -371,9 +382,12 @@ export class CodexSurfaceLifecycleController {
       const turns = await Promise.all([...initialPage.data].reverse().map(async turn =>
         turn.status === 'inProgress' && (turn.itemsView === 'summary' || turn.itemsView === 'notLoaded')
           ? { ...turn, items: await readTurnItems(this.client, response.thread.id, turn.id), itemsView: 'full' as const } : turn));
+      markTiming('initial-page-and-active-items.ready');
       const cwd = response.cwd ?? response.thread.cwd ?? hostOptions.cwd;
       const catalogs = await this.catalog.loadConversationCatalogs(cwd);
+      markTiming('permission-catalog.ready');
       const originalProjection = historyItemsView === 'full' ? await this.originalImages?.prepare(response.thread.id, response.thread.path) : undefined;
+      markTiming('original-images.ready');
       const changedTurns = loadingRuntime.turns.filter((turn) => initialTurns.get(turn.id) !== turn);
       const threadStatus = loadingRuntime.threadStatus !== initialStatus && loadingRuntime.threadStatus
         ? loadingRuntime.threadStatus
@@ -403,6 +417,7 @@ export class CodexSurfaceLifecycleController {
         ? ensureAssistantTurnMessage([...mergedMessages.values()], response.thread.id, runningTurnId)
         : [...mergedMessages.values()];
       if (originalProjection) messages = originalProjection(messages);
+      markTiming('messages.projected');
       const runtime = this.host.createRuntime(response.thread.id, {
         hydrated: true,
         historyMode: response.thread.historyMode ?? 'legacy',
@@ -425,6 +440,7 @@ export class CodexSurfaceLifecycleController {
         ...sessionSelection(response, this.host.getState().models, this.host.snapshotForRuntime(loadingRuntime)),
       });
       const summary = { ...threadToSummary(response.thread), turnCount: turns.length };
+      markTiming('runtime.created');
       const state = this.host.getState();
       this.host.patch({
         conversations: upsertConversation(state.conversations, summary),
@@ -433,6 +449,7 @@ export class CodexSurfaceLifecycleController {
       this.host.emitSummaryUpserted(summary, 'resumed', 'action');
       this.host.emitHistoryReplaced(response.thread.id, historyReason, 'action');
       this.emitConversationState(response.thread.id);
+      markTiming('events.published');
       if (historyItemsView === 'summary') this.conversations.hydrateOriginalImages(response.thread.id, response.thread.path);
       if (runtime.loadingStrategy === 'eager' && initialPage.nextCursor !== null) {
         void this.conversations.hydrateCompleteHistory(response.thread.id, {
@@ -440,8 +457,11 @@ export class CodexSurfaceLifecycleController {
           initialPageLoaded: true,
         }).catch(() => undefined);
       }
-      return this.host.getSnapshot();
+      const result = this.host.getSnapshot();
+      markTiming('snapshot.cloned');
+      return result;
     } catch (error) {
+      markTiming('resume.failed');
       this.host.patchRuntime(conversationId, { historyLoading: false, error: errorMessage(error) });
       throw error;
     }

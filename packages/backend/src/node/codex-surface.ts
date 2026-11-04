@@ -303,6 +303,10 @@ export class CodexSurface {
       sendMessageToThread: (threadId, prompt, options) => this.messagesController.sendToThread(threadId, prompt, options),
     });
     this.messagesController = new CodexSurfaceMessagesController(this.client, {
+      loadSkillsForThread: async threadId => {
+        const runtime = this.requireRuntime(threadId);
+        await this.catalog.listSkills({ ...(runtime.cwd ? { cwd: runtime.cwd } : {}) });
+      },
       clearGoalForThread: (threadId) => this.conversationSettings.clearGoalForThread(threadId),
       compactForThread: (threadId) => this.turnActions.compactForThread(threadId),
       createConversation: async () => { await this.createConversation(); },

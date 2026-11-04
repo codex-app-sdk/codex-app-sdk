@@ -48,6 +48,20 @@ class FakeTransport implements RpcTransport {
 }
 
 describe('CodexAppServerClient', () => {
+  it.each([undefined, '0', '1'])('emits conversation timings only for an explicit opt-in (%s)', async flag => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('CODEX_APP_SDK_TRACE_CONVERSATION_LOAD', flag);
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const transport = new FakeTransport();
+    const client = new CodexAppServerClient(transport);
+    try {
+      await client.start();
+      const result = client.request('model/list', { cursor: null, limit: null, includeHidden: false });
+      transport.receive({ id: 1, result: { data: [], nextCursor: null } });
+      await expect(result).resolves.toStrictEqual({ data: [], nextCursor: null });
+      expect(warning.mock.calls.some(([value]) => String(value).startsWith('[conversation-load]'))).toBe(flag === '1');
+    } finally { await client.close(); warning.mockRestore(); vi.unstubAllEnvs(); }
+  });
   afterEach(() => {
     vi.useRealTimers();
   });

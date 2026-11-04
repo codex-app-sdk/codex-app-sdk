@@ -3,6 +3,7 @@ import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationSummary,
   CodexSurfaceEventOrigin,
+  CodexSurfaceSkillInput,
   CodexSurfaceSnapshot,
   SendCodexMessageOptions,
   StartCodexReviewOptions,
@@ -49,6 +50,7 @@ export type CodexSurfaceMessagesHost = {
   emitEvent(origin: CodexSurfaceEventOrigin, input: SurfaceEventInput): void;
   ensureConnected(): Promise<void>;
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
+  loadSkillsForThread(threadId: string): Promise<void>;
   getSnapshot(): CodexSurfaceSnapshot;
   getState(): CodexSurfaceSnapshot;
   patchConversationStatus(
@@ -138,7 +140,7 @@ export class CodexSurfaceMessagesController {
     if (reviewCommand) return this.host.startReviewForThread(threadId, { target: reviewCommand });
     options = {
       ...validatedSendOptions(this.host.snapshotForRuntime(runtime), options),
-      ...(options.skills ? { skills: validateSkillInputs(options.skills, runtime.skills) } : {}),
+      ...(options.skills ? { skills: await this.validatedSkills(runtime, options.skills) } : {}),
     };
     await this.sendPromptToThread(threadId, text, options);
   }
@@ -216,10 +218,7 @@ export class CodexSurfaceMessagesController {
     const content = authoredPromptContent(normalizedOptions.content);
     if (content) normalizedOptions.content = content;
     const visibleText = content ? promptContentText(content) : displayText?.trim() || text;
-    const skillInputs = mergeSkillInputs(
-      validateSkillInputs(promptSkillInputsFromContent(content), runtime.skills),
-      validateSkillInputs(normalizedOptions.skills ?? [], runtime.skills),
-    );
+    const skillInputs = await this.validatedSkills(runtime, mergeSkillInputs(promptSkillInputsFromContent(content), normalizedOptions.skills ?? []));
     const attachments = validateAttachments(normalizedOptions.attachments ?? []);
     if (runtime.busy) {
       this.host.patchRuntime(threadId, {
@@ -332,10 +331,7 @@ export class CodexSurfaceMessagesController {
     const runtime = await this.host.ensureThreadReady(threadId);
     const text = prompt.trim();
     const content = authoredPromptContent(options.content);
-    const skillInputs = mergeSkillInputs(
-      validateSkillInputs(promptSkillInputsFromContent(content), runtime.skills),
-      validateSkillInputs(options.skills ?? [], runtime.skills),
-    );
+    const skillInputs = await this.validatedSkills(runtime, mergeSkillInputs(promptSkillInputsFromContent(content), options.skills ?? []));
     const visibleText = content ? promptContentText(content) : displayText?.trim() || text;
     if (!text) throw new Error('Cannot steer with an empty message');
     if (!runtime.activeTurnId) throw new Error('There is no active turn to steer');
@@ -444,12 +440,14 @@ export class CodexSurfaceMessagesController {
     const runtime = await this.host.ensureThreadReady(threadId);
     const text = prompt.trim();
     if (!text) throw new Error('Cannot update a queued prompt with empty content');
+    const content = authoredPromptContent(options?.content);
+    if (runtime.queuedPrompts.some(candidate => candidate.id === promptId)) {
+      await this.validatedSkills(runtime, promptSkillInputsFromContent(content));
+    }
     let found = false;
     const queuedPrompts = runtime.queuedPrompts.map((candidate) => {
       if (candidate.id !== promptId) return candidate;
       found = true;
-      const content = authoredPromptContent(options?.content);
-      validateSkillInputs(promptSkillInputsFromContent(content), runtime.skills);
       const nextOptions = { ...candidate.options, ...options };
       if (content) nextOptions.content = content;
       else delete nextOptions.content;
@@ -513,5 +511,10 @@ export class CodexSurfaceMessagesController {
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) throw new Error('There is no active conversation');
     return threadId;
+  }
+
+  private async validatedSkills(runtime: ThreadRuntimeState, inputs: readonly CodexSurfaceSkillInput[]): Promise<CodexSurfaceSkillInput[]> {
+    if (inputs.length > 0 && runtime.skillCatalogStatus !== 'loaded') await this.host.loadSkillsForThread(runtime.threadId);
+    return validateSkillInputs(inputs, runtime.skills);
   }
 }

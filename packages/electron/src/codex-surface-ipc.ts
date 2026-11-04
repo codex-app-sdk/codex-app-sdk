@@ -14,6 +14,7 @@ import type {
   CodexSurfaceClientRequestResponse,
   CodexSurfaceEvent,
   CodexSurfaceModel,
+  CodexSurfaceSkill,
   CodexSurfaceRateLimits,
   CodexSurfaceAccountUsage,
   ReadCodexRateLimitsOptions,
@@ -24,6 +25,7 @@ import type {
   CreateCodexRendererConversationOptions,
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
+  ListCodexSkillsOptions,
   CodexRendererSendMessageOptions,
   StartCodexReviewOptions,
   StartCodexLiveChatOptions,
@@ -68,6 +70,7 @@ const channels = {
   interrupt: 'codex-surface:interrupt',
   listConversations: 'codex-surface:list-conversations',
   listModels: 'codex-surface:list-models',
+  listSkills: 'codex-surface:list-skills',
   logout: 'codex-surface:logout',
   readConversationHistory: 'codex-surface:read-conversation-history',
   readConversationPromptHistory: 'codex-surface:read-conversation-prompt-history',
@@ -120,6 +123,7 @@ type SurfaceRequests = {
     options?: ListCodexConversationsOptions,
   ], CodexConversationSummary[]>;
   [channels.listModels]: IpcRequest<[options?: ListCodexModelsOptions], CodexSurfaceModel[]>;
+  [channels.listSkills]: IpcRequest<[options?: ListCodexSkillsOptions], CodexSurfaceSkill[]>;
   [channels.logout]: IpcRequest<[], CodexSurfaceSnapshot>;
   [channels.readConversationHistory]: IpcRequest<[conversationId?: string], CodexConversationHistory>;
   [channels.readConversationPromptHistory]: IpcRequest<[
@@ -222,6 +226,7 @@ export function registerCodexSurfaceIpc(
     [channels.interrupt]: (_event, ...args) => invoke('interrupt', args),
     [channels.listConversations]: (_event, ...args) => invoke('listConversations', args),
     [channels.listModels]: (_event, ...args) => invoke('listModels', args),
+    [channels.listSkills]: (_event, ...args) => invoke('listSkills', args),
     [channels.logout]: (_event, ...args) => invoke('logout', args),
     [channels.readConversationHistory]: (_event, ...args) => invoke('readConversationHistory', args),
     [channels.readConversationPromptHistory]: (_event, ...args) => invoke('readConversationPromptHistory', args),
@@ -294,6 +299,7 @@ export function createCodexSurfaceRendererApi(port: IpcRendererPort): CodexSurfa
     interrupt: () => renderer.invoke(channels.interrupt),
     listConversations: (options) => renderer.invoke(channels.listConversations, options),
     listModels: (options) => renderer.invoke(channels.listModels, options),
+    listSkills: (options) => renderer.invoke(channels.listSkills, options),
     logout: () => renderer.invoke(channels.logout),
     onEvent: (listener) => renderer.on(channels.event, listener),
     onStateChange: (listener) => {

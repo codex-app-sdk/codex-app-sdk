@@ -79,6 +79,24 @@ const plugins: CodexSurfacePlugin[] = [{
 }];
 
 describe('ChatComposer', () => {
+  it('requests skills only when the dollar suggestion context opens with an unloaded catalog', async () => {
+    const wrapper = mount(CodexComposer, { attachTo: document.body, props: {
+      disabled: false, isSending: false, skills: [], skillCatalogStatus: 'notLoaded',
+    } });
+    expect(wrapper.emitted('requestSkills')).toBeUndefined();
+    await setEditorValue(wrapper, 'ordinary text');
+    expect(wrapper.emitted('requestSkills')).toBeUndefined();
+    await setEditorValue(wrapper, '$');
+    expect(wrapper.emitted('requestSkills')).toHaveLength(1);
+    await wrapper.setProps({ skillCatalogStatus: 'loading' });
+    await setEditorValue(wrapper, '$front');
+    expect(wrapper.emitted('requestSkills')).toHaveLength(1);
+    await wrapper.setProps({ skills, skillCatalogStatus: 'loaded' });
+    expect(wrapper.get('[role="option"]').text()).toContain('Frontend Design');
+    await setEditorValue(wrapper, '$frontend');
+    expect(wrapper.emitted('requestSkills')).toHaveLength(1);
+    wrapper.unmount();
+  });
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();

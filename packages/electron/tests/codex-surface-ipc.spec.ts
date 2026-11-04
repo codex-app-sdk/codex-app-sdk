@@ -101,6 +101,7 @@ describe('Codex surface Electron bridge', () => {
       interrupt: vi.fn(async () => snapshot),
       listConversations: vi.fn(async () => []),
       listModels: vi.fn(async () => []),
+      listSkills: vi.fn(async () => []),
       loadOlderConversationHistory: vi.fn(async () => history),
       loadTurnHistory: vi.fn(async () => ({ ...snapshot, activeConversationId: 'thread-2', turnIds: ['turn-details'] })),
       logout: vi.fn(async () => snapshot),
@@ -200,6 +201,7 @@ describe('Codex surface Electron bridge', () => {
       'codex-surface:interrupt',
       'codex-surface:list-conversations',
       'codex-surface:list-models',
+      'codex-surface:list-skills',
       'codex-surface:load-older-conversation-history',
       'codex-surface:load-turn-history',
       'codex-surface:logout',
@@ -301,6 +303,8 @@ describe('Codex surface Electron bridge', () => {
     await expect(main.call('codex-surface:list-models', {
       includeHidden: true, forceReload: true,
     })).resolves.toStrictEqual([]);
+    await expect(main.call('codex-surface:list-skills', { cwd: '/workspace', forceReload: true })).resolves.toStrictEqual([]);
+    expect(surface.listSkills).toHaveBeenCalledWith({ cwd: '/workspace', forceReload: true });
     await expect(main.call('codex-surface:list-models', { includeHidden: 'yes' })).rejects.toThrow(
       'Model list includeHidden must be a boolean',
     );
@@ -644,6 +648,7 @@ describe('Codex surface Electron bridge', () => {
     await api.loadTurnHistory?.('turn-details', 'thread-2');
     await api.listConversations({ cwd: '/tmp/project', limit: 10 });
     await api.listModels({ includeHidden: true, forceReload: true });
+    await api.listSkills?.({ cwd: '/workspace', forceReload: true });
     await api.logout();
     await api.refreshAccount();
     await api.refreshConversations();
@@ -689,6 +694,7 @@ describe('Codex surface Electron bridge', () => {
       ['codex-surface:load-turn-history', 'turn-details', 'thread-2'],
       ['codex-surface:list-conversations', { cwd: '/tmp/project', limit: 10 }],
       ['codex-surface:list-models', { includeHidden: true, forceReload: true }],
+      ['codex-surface:list-skills', { cwd: '/workspace', forceReload: true }],
       ['codex-surface:logout'],
       ['codex-surface:refresh-account'],
       ['codex-surface:refresh-conversations'],

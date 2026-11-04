@@ -150,7 +150,7 @@ describe('CodexSurface', () => {
       approvalPreset: 'ask-for-approval',
     });
     expect(transport.sent.map((message) => 'method' in message ? message.method : null)).toStrictEqual([
-      'initialize', 'initialized', 'experimentalFeature/list', 'account/read', 'model/list', 'skills/list',
+      'initialize', 'initialized', 'experimentalFeature/list', 'account/read', 'model/list',
       'permissionProfile/list',
       'account/rateLimits/read', 'thread/list', 'configRequirements/read', 'thread/resume', 'thread/goal/get',
       'plugin/installed',

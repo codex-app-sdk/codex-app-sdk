@@ -243,14 +243,15 @@ describe('CodexSurfaceCatalogController', () => {
     const result = await setup.controller.listSkills({ cwd: '/workspace', forceReload: true });
 
     expect(setup.request).toHaveBeenCalledWith('skills/list', { cwds: ['/workspace'], forceReload: true });
-    expect(setup.host.patchRuntime).toHaveBeenNthCalledWith(1, 'thread-1', {
+    expect(setup.host.patchRuntime).toHaveBeenNthCalledWith(3, 'thread-1', {
       skills: result, skillCatalogStatus: 'loaded',
     });
-    expect(setup.host.patchRuntime).toHaveBeenNthCalledWith(2, 'thread-2', {
+    expect(setup.host.patchRuntime).toHaveBeenNthCalledWith(4, 'thread-2', {
       skills: result, skillCatalogStatus: 'loaded',
     });
     expect(setup.host.patchRuntime).not.toHaveBeenCalledWith('thread-3', expect.anything());
     expect(setup.host.emitConversationSkills.mock.calls).toStrictEqual([
+      ['thread-1', 'action'], ['thread-2', 'action'],
       ['thread-1', 'action'], ['thread-2', 'action'],
     ]);
     expect(setup.host.emitEvent).toHaveBeenCalledWith('action', {
@@ -374,12 +375,13 @@ describe('CodexSurfaceCatalogController', () => {
   });
 
   it('returns detached cached conversation catalogs only for the default loaded scope', async () => {
-    const setup = setupCatalog(vi.fn());
-    setup.state.skills = [{
+    const cachedSkills = [{
       name: 'cached', description: 'Cached', path: '/cached/SKILL.md',
       scope: 'user', enabled: true,
     }];
-    setup.state.skillCatalogStatus = 'error';
+    const setup = setupCatalog(vi.fn(async () => ({ data: [{ cwd: '/project', skills: cachedSkills, errors: [] }] })));
+    await setup.controller.listSkills({ cwd: '/project' });
+    setup.request.mockClear();
     setup.state.permissionProfiles = [profile(':workspace')];
     setup.state.approvalPresets = ['ask-for-approval'];
 
@@ -387,10 +389,10 @@ describe('CodexSurfaceCatalogController', () => {
 
     expect(setup.request).not.toHaveBeenCalled();
     expect(result).toStrictEqual({
-      skills: setup.state.skills, skillCatalogStatus: 'error',
+      skills: expect.arrayContaining([expect.objectContaining({ name: 'cached' })]), skillCatalogStatus: 'loaded',
       permissionProfiles: setup.state.permissionProfiles, approvalPresets: ['ask-for-approval'],
     });
-    expect(result.skills).not.toBe(setup.state.skills);
+    expect(result.skills).not.toBe(setup.runtime.skills);
     expect(result.permissionProfiles).not.toBe(setup.state.permissionProfiles);
     expect(result.approvalPresets).not.toBe(setup.state.approvalPresets);
 
@@ -401,7 +403,7 @@ describe('CodexSurfaceCatalogController', () => {
     }));
     notLoaded.state.skillCatalogStatus = 'notLoaded';
     await notLoaded.controller.loadConversationCatalogs('/project', false);
-    expect(notLoaded.request).toHaveBeenCalledWith('skills/list', { cwds: ['/project'], forceReload: false });
+    expect(notLoaded.request).not.toHaveBeenCalled();
   });
 
   it('loads conversation catalogs for another scope and isolates skill and permission failures', async () => {
@@ -415,6 +417,7 @@ describe('CodexSurfaceCatalogController', () => {
       }
       return { requirements: { allowedApprovalsReviewers: ['user'] } };
     }));
+    await successful.controller.listSkills({ cwd: '/other', forceReload: true });
     await expect(successful.controller.loadConversationCatalogs('/other', true)).resolves.toStrictEqual({
       skills: [expect.objectContaining({ name: 'conversation' })], skillCatalogStatus: 'loaded',
       permissionProfiles: [profile(':workspace')], approvalPresets: ['ask-for-approval'],
@@ -429,8 +432,9 @@ describe('CodexSurfaceCatalogController', () => {
       if (method === 'permissionProfile/list') return { data: [profile(':workspace')], nextCursor: null };
       return { requirements: { allowedApprovalsReviewers: ['user'] } };
     }));
+    await expect(skillFailure.controller.listSkills()).rejects.toThrow('skills unavailable');
     await expect(skillFailure.controller.loadConversationCatalogs(undefined)).resolves.toStrictEqual({
-      skills: [], skillCatalogStatus: 'error',
+      skills: [], skillCatalogStatus: 'notLoaded',
       permissionProfiles: [profile(':workspace')], approvalPresets: ['ask-for-approval'],
     });
 
@@ -439,7 +443,7 @@ describe('CodexSurfaceCatalogController', () => {
       throw new Error('permissions unavailable');
     }));
     await expect(permissionFailure.controller.loadConversationCatalogs(undefined)).resolves.toStrictEqual({
-      skills: [], skillCatalogStatus: 'loaded', permissionProfiles: [], approvalPresets: [],
+      skills: [], skillCatalogStatus: 'notLoaded', permissionProfiles: [], approvalPresets: [],
     });
   });
 
@@ -456,6 +460,7 @@ describe('CodexSurfaceCatalogController', () => {
       return { requirements: null };
     }));
 
+    await setup.controller.listSkills({ cwd: '/other' });
     await expect(setup.controller.loadConversationCatalogs('/other')).resolves.toMatchObject({
       skills: [{ iconSmall: 'data:image/svg+xml;base64,PHN2Zy8+' }], skillCatalogStatus: 'loaded',
     });

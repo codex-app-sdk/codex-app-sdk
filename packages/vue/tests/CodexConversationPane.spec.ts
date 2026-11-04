@@ -90,6 +90,23 @@ const routingMentionGroup = {
 };
 
 describe('CodexConversationPane', () => {
+  it('discovers skills from the bound surface only when the picker opens', async () => {
+    const surface = fakeSurfaceController();
+    surface.state.skillCatalogStatus = 'notLoaded';
+    surface.listSkills = vi.fn(async () => {
+      surface.state.skills = [{ name: 'review', description: 'Review code', path: '/skills/review/SKILL.md', enabled: true }];
+      surface.state.skillCatalogStatus = 'loaded';
+      return surface.state.skills;
+    });
+    const wrapper = mount(CodexConversationPane, { attachTo: document.body, props: { surface } });
+    await vi.waitFor(() => expect(surface.connect).toHaveBeenCalledOnce());
+    expect(surface.listSkills).not.toHaveBeenCalled();
+    await setComposerText(wrapper, '$');
+    await vi.waitFor(() => expect(wrapper.find('[role="option"]').exists()).toBe(true));
+    expect(surface.listSkills).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[role="option"]').text()).toContain('review');
+    wrapper.unmount();
+  });
   it('loads summary Working details on expansion, retries failures, and keeps the loaded group cached', async () => {
     const final = 'Final answer\n\n![Phone](data:image/png;base64,cG5n)\n\n![Desktop](data:image/png;base64,cG5n)';
     const state = reactive<CodexConversationPaneState>({ identity: {

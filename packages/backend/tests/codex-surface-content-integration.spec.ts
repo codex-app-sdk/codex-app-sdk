@@ -771,9 +771,8 @@ describe('CodexSurface', () => {
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
     onTestFinished(() => surface.close());
     await surface.connect();
-    expect(surface.getSnapshot().skills).toStrictEqual([
-      expect.objectContaining({ name: 'pdf', enabled: true }),
-    ]);
+    expect(surface.getSnapshot().skills).toStrictEqual([]);
+    expect(surface.getSnapshot().skillCatalogStatus).toBe('notLoaded');
 
     for (const skill of [
       { name: 'pdf', path: '/tmp/attacker/SKILL.md' },
@@ -783,6 +782,7 @@ describe('CodexSurface', () => {
       await expect(surface.sendMessage('bad', { skills: [skill] })).rejects.toThrow('is not an enabled skill');
       expect(lastRequest(transport, 'turn/start')).toBeUndefined();
     }
+    expect(surface.getSnapshot().skills).toStrictEqual([expect.objectContaining({ name: 'pdf', enabled: true })]);
 
     await surface.sendMessage('Use $pdf and /pdf');
     expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: {

@@ -41,6 +41,9 @@ export type CodexSurfaceCatalogHost = {
 
 export class CodexSurfaceCatalogController {
   private readonly iconDataUrls = new Map<string, Promise<string | undefined>>();
+  private readonly skillsByCwd = new Map<string | null, Pick<ConversationCatalogs, 'skills' | 'skillCatalogStatus'>>();
+  private readonly skillRequests = new Map<string | null, Promise<CodexSurfaceSkill[]>>();
+  private skillRevision = 0;
   private pluginPromise: Promise<void> | null = null;
   private pluginLastAttemptedCwdsKey: string | null = null;
   private pluginRefreshRequested = false;
@@ -53,6 +56,9 @@ export class CodexSurfaceCatalogController {
 
   reset(pluginRefreshRequested: boolean): void {
     this.iconDataUrls.clear();
+    this.skillsByCwd.clear();
+    this.skillRequests.clear();
+    this.skillRevision += 1;
     this.pluginLastAttemptedCwdsKey = null;
     this.pluginRefreshRequested = pluginRefreshRequested;
   }
@@ -94,6 +100,7 @@ export class CodexSurfaceCatalogController {
         (path) => this.iconDataUrl(path),
       );
       this.host.patch({ skills, skillCatalogStatus: 'loaded' });
+      this.skillsByCwd.set(this.cwd ?? null, { skills, skillCatalogStatus: 'loaded' });
       this.emitSkills(this.cwd ?? null, skills, 'loaded', origin);
     } catch {
       this.host.patch({ skills: [], skillCatalogStatus: 'error' });
@@ -103,22 +110,51 @@ export class CodexSurfaceCatalogController {
 
   async listSkills(options: ListCodexSkillsOptions = {}): Promise<CodexSurfaceSkill[]> {
     await this.host.ensureConnected();
+    const key = options.cwd ?? null;
+    const pending = this.skillRequests.get(key);
+    if (pending) return structuredClone(await pending);
+    const cached = this.skillsByCwd.get(key);
+    if (!options.forceReload && cached?.skillCatalogStatus === 'loaded') return structuredClone(cached.skills);
     if (options.forceReload) this.iconDataUrls.clear();
-    const response = await this.client.request('skills/list', {
-      ...(options.cwd ? { cwds: [options.cwd] } : {}),
-      forceReload: options.forceReload ?? false,
-    });
-    const skills = await surfaceSkills(
-      response.data.flatMap((entry) => entry.skills),
-      (path) => this.iconDataUrl(path),
-    );
+    const revision = this.skillRevision;
+    this.publishSkills(key, [], 'loading', 'action');
+    const request = (async () => {
+      try {
+        const response = await this.client.request('skills/list', {
+          ...(options.cwd ? { cwds: [options.cwd] } : {}), forceReload: options.forceReload ?? false,
+        });
+        const skills = await surfaceSkills(response.data.flatMap((entry) => entry.skills), (path) => this.iconDataUrl(path));
+        if (revision !== this.skillRevision) throw new Error('Skill discovery was invalidated; retry the request');
+        this.skillsByCwd.set(key, { skills, skillCatalogStatus: 'loaded' });
+        this.publishSkills(key, skills, 'loaded', 'action');
+        return skills;
+      } catch (error) {
+        if (revision === this.skillRevision) this.publishSkills(key, [], 'error', 'action');
+        throw error;
+      }
+    })();
+    this.skillRequests.set(key, request);
+    try { return structuredClone(await request); }
+    finally { if (this.skillRequests.get(key) === request) this.skillRequests.delete(key); }
+  }
+
+  invalidateSkills(): void {
+    const discoveredScopes = new Set([...this.skillsByCwd.keys(), ...this.skillRequests.keys()]);
+    this.skillRevision += 1;
+    this.skillsByCwd.clear();
+    this.skillRequests.clear();
+    this.iconDataUrls.clear();
+    this.host.patch({ skills: [], skillCatalogStatus: 'notLoaded' });
+    this.emitSkills(this.cwd ?? null, [], 'notLoaded', 'notification');
     for (const runtime of this.host.runtimes()) {
-      if (runtime.cwd !== (options.cwd ?? null)) continue;
-      this.host.patchRuntime(runtime.threadId, { skills, skillCatalogStatus: 'loaded' });
-      this.host.emitConversationSkills(runtime.threadId, 'action');
+      this.host.patchRuntime(runtime.threadId, { skills: [], skillCatalogStatus: 'notLoaded' });
+      this.host.emitConversationSkills(runtime.threadId, 'notification');
     }
-    this.emitSkills(options.cwd ?? null, skills, 'loaded', 'action');
-    return structuredClone(skills);
+    // Keep catalogs already requested by clients fresh without discovering any
+    // unopened workspace. Older renderer clients rely on pushed refreshes.
+    for (const cwd of discoveredScopes) {
+      void this.listSkills({ ...(cwd ? { cwd } : {}), forceReload: true }).catch(() => undefined);
+    }
   }
 
   async loadPermissionProfiles(): Promise<void> {
@@ -158,31 +194,23 @@ export class CodexSurfaceCatalogController {
 
   async loadConversationCatalogs(cwd: string | undefined, forceReload = false): Promise<ConversationCatalogs> {
     const state = this.host.getState();
-    if (!forceReload && cwd === this.cwd && state.skillCatalogStatus !== 'notLoaded') {
+    const skills = this.skillsByCwd.get(cwd ?? null) ?? { skills: [], skillCatalogStatus: 'notLoaded' as const };
+    if (!forceReload && cwd === this.cwd) {
       return {
-        skills: [...state.skills],
-        skillCatalogStatus: state.skillCatalogStatus,
+        ...structuredClone(skills),
         permissionProfiles: [...state.permissionProfiles],
         approvalPresets: [...state.approvalPresets],
       };
     }
-    const [skillResult, permissionResult] = await Promise.allSettled([
-      this.client.request('skills/list', { ...(cwd ? { cwds: [cwd] } : {}), forceReload }),
+    const [permissionResult] = await Promise.allSettled([
       (async () => ({
         profiles: await this.requestPermissionProfiles(cwd),
         requirements: (await this.client.request('configRequirements/read', undefined)).requirements,
       }))(),
     ]);
-    const skills = skillResult.status === 'fulfilled'
-      ? await surfaceSkills(
-        skillResult.value.data.flatMap((entry) => entry.skills),
-        (path) => this.iconDataUrl(path),
-      )
-      : [];
     const permissionProfiles = permissionResult.status === 'fulfilled' ? permissionResult.value.profiles : [];
     return {
-      skills,
-      skillCatalogStatus: skillResult.status === 'fulfilled' ? 'loaded' : 'error',
+      ...structuredClone(skills),
       permissionProfiles,
       approvalPresets: permissionResult.status === 'fulfilled'
         ? approvalPresetsForProfiles(permissionProfiles, permissionResult.value.requirements)
@@ -245,6 +273,17 @@ export class CodexSurfaceCatalogController {
     this.host.emitEvent(origin, {
       type: 'catalog.modelsChanged', payload: { models: structuredClone(models), status },
     });
+  }
+
+  private publishSkills(cwd: string | null, skills: CodexSurfaceSkill[], status: CodexSurfaceSnapshot['skillCatalogStatus'], origin: CodexSurfaceEventOrigin): void {
+    const activeId = this.host.getState().activeConversationId;
+    if (!activeId) this.host.patch({ skills, skillCatalogStatus: status });
+    for (const runtime of this.host.runtimes()) {
+      if (runtime.cwd !== cwd) continue;
+      this.host.patchRuntime(runtime.threadId, { skills, skillCatalogStatus: status });
+      this.host.emitConversationSkills(runtime.threadId, origin);
+    }
+    this.emitSkills(cwd, skills, status, origin);
   }
 
   private emitSkills(

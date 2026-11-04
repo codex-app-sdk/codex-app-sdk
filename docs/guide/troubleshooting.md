@@ -21,6 +21,13 @@ summary list does not.
 The surface keeps resume host options per thread and rejects mismatched thread
 IDs returned by app-server.
 
+Set `CODEX_APP_SDK_TRACE_CONVERSATION_LOAD=1` in the Node host's launch environment
+to emit `[conversation-load]` diagnostics for resume stages and related app-server
+requests. Tracing is disabled by default. Restart the host after changing its
+launch environment. Records include request/thread IDs, stages and durations;
+they exclude prompts and response bodies. Host applications control their own
+renderer and transport instrumentation.
+
 ## The web client reports a WebSocket response failure
 
 Check the browser console and server close reason first. The SDK defaults to a

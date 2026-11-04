@@ -258,6 +258,11 @@ own item state and actions; custom drawers do not enter the SDK prompt queue.
 
 Only `identity.messages` is required beyond the `identity` object itself. Omit
 an optional group or leaf when that capability is not present.
+
+Provide `actions.requestSkills` to load a controlled pane's skills when `$`
+suggestions open, and publish the result through `catalogs.skills` and
+`catalogs.skillCatalogStatus`. A pane bound to `useCodexSurface` requests the
+active conversation's working directory automatically.
 The default composer shelf presents active, paused, and limited goals, but
 hides a goal once its status is `complete`; the terminal goal remains available
 to controller state and event consumers.

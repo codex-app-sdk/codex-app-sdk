@@ -142,17 +142,29 @@ export class CodexAppServerClient {
     const message: RpcMessage = params === undefined
       ? { id, method }
       : { id, method, params };
+    const timingStarted = performance.now();
+    const timingStartAt = performance.timeOrigin + timingStarted;
+    const timingParams = params as Record<string, unknown> | undefined;
+    const traceRequest = typeof process !== 'undefined' && process.env.CODEX_APP_SDK_TRACE_CONVERSATION_LOAD === '1'
+      && /^(?:initialize|thread\/(?:resume|read|list|turns\/.*|goal\/get)|permissionProfile\/list|configRequirements\/read|model\/list|skills\/list)$/.test(method);
+    const finishTiming = (outcome: string) => {
+      if (!traceRequest) return;
+      console.warn('[conversation-load] ' + JSON.stringify({ layer: 'codex-rpc', method, id, outcome,
+        threadId: typeof timingParams?.threadId === 'string' ? timingParams.threadId : null,
+        startAt: timingStartAt, at: performance.timeOrigin + performance.now(), durationMs: performance.now() - timingStarted }));
+    };
 
     const result = new Promise<MethodResult<Method>>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
+        finishTiming('timeout');
         reject(new Error(`Codex app-server request timed out: ${method}`));
       }, this.options.requestTimeoutMs ?? requestTimeoutByMethod[method] ?? DEFAULT_REQUEST_TIMEOUT_MS);
 
       this.pending.set(id, {
         method,
-        resolve: (value) => resolve(value as MethodResult<Method>),
-        reject,
+        resolve: (value) => { finishTiming('ok'); resolve(value as MethodResult<Method>); },
+        reject: (error) => { finishTiming('error'); reject(error); },
         timeout,
       });
     });

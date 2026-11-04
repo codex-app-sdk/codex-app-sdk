@@ -437,6 +437,7 @@ function messagesController(options: {
     emitEvent: vi.fn(),
     ensureConnected: vi.fn(async () => undefined),
     ensureThreadReady: vi.fn(async () => runtime),
+    loadSkillsForThread: vi.fn(async () => undefined),
     getSnapshot: vi.fn(() => state),
     getState: vi.fn(() => state),
     patchConversationStatus: vi.fn(),

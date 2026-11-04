@@ -403,6 +403,7 @@ describe('CodexSurface', () => {
     surface.onEvent((event) => {
       if ('conversationId' in event && event.conversationId === 'thread-existing') replica.apply(event);
     });
+    await surface.listSkills({ cwd: '/tmp/project' });
     expect(surface.getSnapshot().skills).toMatchObject([{ name: 'reviewer', displayName: 'Reviewer' }]);
     transport.emitNotification('thread/tokenUsage/updated', {
         threadId: 'thread-existing', turnId: 'turn-history',
@@ -571,11 +572,12 @@ describe('CodexSurface', () => {
     await surface.connect();
     expect(surface.getSnapshot()).toMatchObject({
       activeConversationId: null,
-      skillCatalogStatus: 'error',
+      skillCatalogStatus: 'notLoaded',
       skills: [],
     });
     expect(lastRequest(transport, 'thread/list')).toBeUndefined();
-    expect(lastRequest(transport, 'skills/list')).toMatchObject({ params: { forceReload: false } });
+    expect(lastRequest(transport, 'skills/list')).toBeUndefined();
+    await expect(surface.listSkills()).rejects.toThrow();
     expect(lastRequest(transport, 'permissionProfile/list')).toMatchObject({ params: { cursor: null } });
     await expect(surface.clearGoal()).resolves.toMatchObject({ activeConversationId: null });
     await expect(surface.sendMessage('/goal')).resolves.toMatchObject({ activeConversationId: null });
