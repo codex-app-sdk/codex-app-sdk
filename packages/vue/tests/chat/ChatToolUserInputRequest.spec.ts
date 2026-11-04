@@ -286,7 +286,7 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
       },
     });
 
-    expect(wrapper.get('.chat-tool-user-input__summary--answered').text()).toContain('Answered user question');
+    expect(wrapper.get('.chat-tool-user-input__summary--answered').text()).toContain('User answered question');
     expect(wrapper.findAll('.chat-tool-user-input__answer-label').map((node) => node.text())).toStrictEqual([
       'Target',
       'Depth',
@@ -319,7 +319,7 @@ describe('ChatToolUserInputRequest normalization and resolution', () => {
         toolCall: requestTool([firstQuestion]),
       },
     });
-    expect(matching.get('.chat-tool-user-input__summary--answered').text()).toContain('Answered user question');
+    expect(matching.get('.chat-tool-user-input__summary--answered').text()).toContain('User answered question');
     expect(matching.get('.chat-tool-user-input__answer-value').text()).toBe('-');
 
     const other = mount(ChatToolUserInputRequest, {
@@ -437,7 +437,7 @@ describe('ChatToolUserInputRequest interactions', () => {
         payload: { answers: { target: { answers: ['package.json'] } } },
       },
     ]]);
-    expect(wrapper.get('.chat-tool-user-input__summary--answered').text()).toContain('Answered user question');
+    expect(wrapper.get('.chat-tool-user-input__summary--answered').text()).toContain('User answered question');
     expect(wrapper.get('.chat-tool-user-input__answer-value').text()).toBe('package.json');
   });
 

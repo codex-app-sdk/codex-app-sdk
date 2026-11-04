@@ -26,7 +26,7 @@ describe('component lab', () => {
 
     await footer.get('button[aria-label="Vue"]').trigger('click');
     expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(true);
-    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('User answered question');
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
   });
   it('exercises an asynchronous agent question through the controlled pane', async () => {

@@ -770,7 +770,7 @@ describe('ported id8 chat components', () => {
         },
       ],
     ]);
-    expect(wrapper.text()).toContain('Answered user question');
+    expect(wrapper.text()).toContain('User answered question');
     expect(wrapper.text()).toContain('README.md');
   });
 
@@ -811,7 +811,7 @@ describe('ported id8 chat components', () => {
         },
       ],
     ]);
-    expect(wrapper.text()).toContain('Answered user question');
+    expect(wrapper.text()).toContain('User answered question');
     expect(wrapper.text()).toContain('Summary, Tests');
   });
 

@@ -43,7 +43,7 @@ describe('ChatQuestionRequest', () => {
         [request.id, { answers: { 'question-1': { answers: ['Vue'] } } }],
       ]) } },
     })
-    expect(answeredHistory.text()).toContain('Answered user question')
+    expect(answeredHistory.text()).toContain('User answered question')
     expect(answeredHistory.text()).toContain('Vue')
     expect(answeredHistory.find('textarea, button').exists()).toBe(false)
     answeredHistory.unmount()

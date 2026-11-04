@@ -125,7 +125,7 @@ describe('ChatToolCall', () => {
         questions: [{ id: 'framework', header: 'Framework', question: 'Which framework?',
           isOther: false, isSecret: false, options: [{ label: 'Vue' }] }] }),
       result: { answers: { framework: { answers: ['Vue'] } } } }));
-    expect(answered.get('.chat-tool-user-input__summary--answered').text()).toContain('Answered user question');
+    expect(answered.get('.chat-tool-user-input__summary--answered').text()).toContain('User answered question');
     expect(answered.find('.chat-tool-call').exists()).toBe(false);
 
     const ordinaryCases = [

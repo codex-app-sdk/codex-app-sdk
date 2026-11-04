@@ -347,7 +347,7 @@ describe('CodexConversationPane', () => {
         output: { answers: { framework: { answers: ['Vue'] } } } }],
     }] as SurfaceMessage[] });
     expect(wrapper.findComponent(CodexComposer).exists()).toBe(true);
-    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('User answered question');
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
   });
 
@@ -419,7 +419,7 @@ describe('CodexConversationPane', () => {
     ]]);
     expect(wrapper.findComponent(CodexComposer).exists()).toBe(true);
     expect(wrapper.findComponent(ChatComposerShelf).exists()).toBe(true);
-    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Answered user question');
+    expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('User answered question');
     expect(wrapper.get('.codex-conversation-pane__messages').text()).toContain('Vue');
   });
 

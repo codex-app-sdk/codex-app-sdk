@@ -21,7 +21,7 @@
     </div>
 
     <div v-else-if="answered" class="chat-tool-user-input__summary chat-tool-user-input__summary--answered">
-      <ChatToolCallTitle title="Answered user question" :icon="SquareCheck" />
+      <ChatToolCallTitle title="User answered question" :icon="SquareCheck" />
       <div
         v-for="question in questions"
         :key="question.id"

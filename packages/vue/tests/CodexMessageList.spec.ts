@@ -58,7 +58,7 @@ it('folds resolved async questions with turn details while leaving pending quest
   await wrapper.setProps({ answeredClientRequestIds: new Set([request.id]) });
   expect(wrapper.find('.chat-tool-user-input').exists()).toBe(false);
   await wrapper.get('.chat-work-group__header').trigger('click');
-  expect(wrapper.get('.chat-tool-user-input__summary--answered').text()).toContain('Answered user question');
+  expect(wrapper.get('.chat-tool-user-input__summary--answered').text()).toContain('User answered question');
   expect(wrapper.get('.chat-tool-user-input__answer-value').text()).toBe('Keep the original answer.');
   await wrapper.get('.chat-work-group__header').trigger('click');
   expect(wrapper.find('.chat-tool-user-input').exists()).toBe(false);
