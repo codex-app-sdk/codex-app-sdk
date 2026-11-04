@@ -3,7 +3,7 @@ import { imageSize } from 'image-size';
 
 type Content = { text: string; byteLength: number; charOffset: number; byteOffset: number };
 type Projection = { value: unknown; contents: Map<string, Content> };
-/** Transport-only image and large file-diff references. Reads require the caller's current authoritative
+/** Transport-only image and file-diff references. Reads require the caller's current authoritative
  * snapshot; the weak cache neither owns history nor keeps discarded snapshots alive. */
 export class ConversationContentTransport {
   private readonly cache = new WeakMap<object, Projection>();
@@ -42,11 +42,11 @@ export class ConversationContentTransport {
       if (!value || typeof value !== 'object') return value;
       const change = value as { path?: unknown; kind?: { type?: unknown }; diff?: unknown };
       if (typeof change.path === 'string' && ['add', 'update', 'delete'].includes(String(change.kind?.type))
-        && typeof change.diff === 'string' && Buffer.byteLength(change.diff) > 64 * 1024) {
+        && typeof change.diff === 'string' && change.diff.length > 0) {
         const byteLength = Buffer.byteLength(change.diff);
         const contentId = contentHash(change.diff);
         contents.set(contentId, { text: change.diff, byteLength, charOffset: 0, byteOffset: 0 });
-        return { ...value, diff: '', diffContent: { sessionId: this.conversationId, contentId, byteLength, changeKind: change.kind!.type } };
+        return { ...value, diff: byteLength > 64 * 1024 ? '' : change.diff, diffContent: { sessionId: this.conversationId, contentId, byteLength, changeKind: change.kind!.type } };
       }
       let changed = false;
       let size: { width: number; height: number } | undefined;

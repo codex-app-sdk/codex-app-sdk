@@ -748,7 +748,7 @@ openLink: [link: {
 }]
 ```
 
-When a host uses `ConversationContentTransport`, oversized file diffs carry
+When a host uses `ConversationContentTransport`, nonempty file diffs carry
 `diffContent`. Fetch the exact patch through the host's authorized content reader
 only when that file is selected. The expandable file list exposes every deferred
 file even when raw tool details are disabled. Deleted files use the `edit` link

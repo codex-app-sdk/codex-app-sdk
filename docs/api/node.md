@@ -671,8 +671,10 @@ source values remain reachable; it is not a media archive or conversation store.
 Content entries refer to existing provider strings without retaining full binary
 copies. Reads encode bounded blocks of at most 64 KiB, including UTF-8 diffs.
 
-Large file changes keep their path, operation, and summary. Their `diff` becomes an
-empty string alongside `diffContent: { sessionId, contentId, byteLength, changeKind }`.
+Every nonempty file-change patch carries
+`diffContent: { sessionId, contentId, byteLength, changeKind }`, keeping its path,
+operation, and summary. Inline `diff` bytes are retained up to 64 KiB; larger
+patches replace `diff` with an empty string.
 The Vue file target forwards this reference to the host on selection. Fetch it using
 the same `read` method; offsets and lengths count UTF-8 bytes, and the reconstructed
 text is the exact historical patch (full file text for add/delete, unified hunks for

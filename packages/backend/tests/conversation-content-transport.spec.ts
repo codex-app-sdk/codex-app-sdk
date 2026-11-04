@@ -29,6 +29,22 @@ describe('conversation image transport', () => {
     expect(Buffer.concat(chunks).toString('utf8')).toBe(diff);
     expect(snapshot.messages[0]!.parts[0]!.input.changes[0]!.diff).toBe(diff);
     expect(() => transport.read({ messages: [] }, deferred.diffContent.contentId, 0)).toThrow();
+    // Small historical changes must remain readable after reload without a turn-level Git diff.
+    for (const kind of ['add', 'update', 'delete']) {
+      const text = kind === 'update' ? '@@ -1 +1 @@\n-old\n+README 🪴\n' : '# README 🪴\n';
+      const original = { path: '/repo/README.md', kind: { type: kind }, diff: text };
+      const reloaded = { changes: [JSON.parse(JSON.stringify(original))] };
+      const fresh = new ConversationContentTransport('thread');
+      const projected = fresh.project(reloaded).changes[0] as typeof original & { diffContent: { sessionId: string; contentId: string; byteLength: number; changeKind: string } };
+      expect(projected).toStrictEqual({ ...original, diffContent: { sessionId: 'thread', contentId: expect.stringMatching(/^[a-f0-9]{64}$/), byteLength: Buffer.byteLength(text), changeKind: kind } });
+      expect(fresh.read(reloaded, projected.diffContent.contentId, 0)).toStrictEqual({ data: Buffer.from(text).toString('base64'), totalBytes: Buffer.byteLength(text), nextOffset: null });
+      expect(reloaded.changes[0]).toStrictEqual(original);
+      expect(() => fresh.read({ changes: [] }, projected.diffContent.contentId, 0)).toThrow();
+      expect(() => fresh.read(reloaded, '0'.repeat(64), 0)).toThrow();
+      expect(() => fresh.read(reloaded, projected.diffContent.contentId, Buffer.byteLength(text))).toThrow();
+    }
+    const empty = { path: '/repo/empty.md', kind: { type: 'add' }, diff: '' };
+    expect(transport.project(empty)).toBe(empty);
     const text = { text: diff, diff, path: '/repo/user-text' };
     expect(transport.project(text)).toBe(text);
   });
