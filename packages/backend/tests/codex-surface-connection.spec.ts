@@ -25,34 +25,53 @@ describe('CodexSurface', () => {
 
   it('enters an error state after disconnect and reconnects the app-server', async () => {
     const { surface, transport } = createSurface('turn/start');
-    const events: CodexSurfaceEvent[] = [];
-    surface.onEvent((event) => events.push(event));
-    await surface.connect();
-    events.length = 0;
-
-    transport.fail(new Error('app-server exited'));
-    expect(surface.getSnapshot()).toMatchObject({
-      status: 'error',
-      busy: false,
-      approvals: [],
-      error: 'app-server exited',
+    vi.stubEnv('CODEX_APP_SDK_TRACE_CONVERSATION_LOAD', '0');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const timingRecords = () => warning.mock.calls.flatMap(([value]) => {
+      const text = String(value);
+      return text.startsWith('[conversation-load] ') ? [JSON.parse(text.slice('[conversation-load] '.length))] : [];
     });
-    expect(events).toContainEqual(expect.objectContaining({
-      type: 'surface.statusChanged',
-      origin: 'lifecycle',
-      payload: { status: 'error', error: 'app-server exited' },
-    }));
+    try {
+      const events: CodexSurfaceEvent[] = [];
+      surface.onEvent((event) => events.push(event));
+      await surface.connect();
+      events.length = 0;
+      expect(timingRecords()).toEqual([]);
 
-    await expect(surface.connect()).resolves.toMatchObject({ status: 'ready', error: null });
-    expect(transport.start).toHaveBeenCalledTimes(2);
-    expect(requestsFor(transport, 'account/read')).toHaveLength(2);
-    expect(requestsFor(transport, 'thread/list')).toHaveLength(2);
-    expect(requestsFor(transport, 'thread/resume')).toHaveLength(2);
+      transport.fail(new Error('app-server exited'));
+      expect(surface.getSnapshot()).toMatchObject({
+        status: 'error',
+        busy: false,
+        approvals: [],
+        error: 'app-server exited',
+      });
+      expect(events).toContainEqual(expect.objectContaining({
+        type: 'surface.statusChanged',
+        origin: 'lifecycle',
+        payload: { status: 'error', error: 'app-server exited' },
+      }));
 
-    await surface.sendMessage('Message after reconnect');
-    expect(lastRequest(transport, 'turn/start')).toMatchObject({
-      params: expect.objectContaining({ threadId: 'thread-existing' }),
-    });
+      vi.stubEnv('CODEX_APP_SDK_TRACE_CONVERSATION_LOAD', '1');
+      await expect(surface.connect()).resolves.toMatchObject({ status: 'ready', error: null });
+      expect(transport.start).toHaveBeenCalledTimes(2);
+      expect(requestsFor(transport, 'account/read')).toHaveLength(2);
+      expect(requestsFor(transport, 'thread/list')).toHaveLength(2);
+      expect(requestsFor(transport, 'thread/resume')).toHaveLength(2);
+      const stages = timingRecords().filter(record => record.layer === 'codex-sdk');
+      expect(new Set(stages.map(record => record.stage)).size).toBeGreaterThan(1);
+      for (const stage of stages) expect(stage).toMatchObject({
+        threadId: 'thread-existing', stageMs: expect.any(Number), elapsedMs: expect.any(Number),
+      });
+      expect(timingRecords()).toContainEqual(expect.objectContaining({
+        layer: 'codex-rpc', method: 'thread/resume', threadId: 'thread-existing', outcome: 'ok', durationMs: expect.any(Number),
+      }));
+
+      await surface.sendMessage('Message after reconnect');
+      expect(lastRequest(transport, 'turn/start')).toMatchObject({
+        params: expect.objectContaining({ threadId: 'thread-existing' }),
+      });
+      expect(timingRecords().some(record => record.method === 'turn/start')).toBe(false);
+    } finally { await surface.close(); warning.mockRestore(); vi.unstubAllEnvs(); }
   });
 
   it('publishes why pending UI work was resolved when the app-server disconnects', async () => {

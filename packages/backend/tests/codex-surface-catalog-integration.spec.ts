@@ -57,7 +57,8 @@ describe('CodexSurface', () => {
     await surface.close();
   });
 
-  it('coalesces scoped discovery and rejects a stale result after skills change', async () => {
+  it.each([undefined, '/tmp/project'])('coalesces discovery and rejects stale results after skills change (cwd: %s)', async cwd => {
+    const scope = cwd ? { cwd } : {};
     const stale = deferred<v2.SkillsListResponse>();
     let reads = 0;
     const transport = new MockCodexAppServer({ 'skills/list': () => ++reads === 1 ? stale.promise : ({ data: [{
@@ -65,19 +66,29 @@ describe('CodexSurface', () => {
         path: '/skills/fresh/SKILL.md', scope: 'user', enabled: true }],
     }] }) });
     const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    const events: CodexSurfaceEvent[] = [];
+    surface.onEvent(event => events.push(event));
     try {
       await surface.connect();
-      const first = surface.listSkills({ cwd: '/tmp/project' });
-      const second = surface.listSkills({ cwd: '/tmp/project' });
+      const first = surface.listSkills(scope);
+      const second = surface.listSkills(scope);
       const settled = Promise.allSettled([first, second]);
       await vi.waitFor(() => expect(reads).toBe(1));
       transport.emitNotification('skills/changed', {});
-      await vi.waitFor(() => expect(surface.getSnapshot().skills[0]?.name).toBe('fresh'));
+      await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+        type: 'catalog.skillsChanged', payload: expect.objectContaining({
+          cwd: cwd ?? null, status: 'loaded', skills: [expect.objectContaining({ name: 'fresh' })],
+        }),
+      })));
+      if (!cwd) expect(surface.getSnapshot().skills).toEqual([]);
       stale.resolve({ data: [{ cwd: '/tmp/project', errors: [], skills: [] }] });
       expect((await settled).map(result => result.status)).toStrictEqual(['rejected', 'rejected']);
-      const cached = await surface.listSkills({ cwd: '/tmp/project' });
+      const cached = await surface.listSkills(scope);
       expect(cached[0]?.name).toBe('fresh');
       expect(reads).toBe(2);
+      expect(transport.requests('skills/list').map(request => request.params))
+        .toStrictEqual([{ ...(cwd ? { cwds: [cwd] } : {}), forceReload: false },
+          { ...(cwd ? { cwds: [cwd] } : {}), forceReload: true }]);
     } finally { await surface.close(); }
   });
 
