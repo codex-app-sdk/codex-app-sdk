@@ -104,8 +104,14 @@ describe('CodexSurface', () => {
     } finally { await surface.close(); }
   });
 
-  it('loads history, sends a message, and reduces streaming events into surface state', async () => {
-    const { surface, transport } = createSurface('turn/start', 'turn/steer');
+  it.each([false, true])('keeps streamed items whole across steering and reload (subsequent item: %s)', async (subsequentItem) => {
+    const history = thread('thread-existing', true);
+    const transport = new MockCodexAppServer({
+      'thread/resume': () => resumeResponse(history),
+      'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
+      'turn/steer': () => ({ turnId: 'turn-live' }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
     await surface.connect();
     const selected = await surface.selectConversation('thread-existing');
     const replica = createCodexConversationReplica(surface.conversation('thread-existing').getSnapshot());
@@ -129,6 +135,7 @@ describe('CodexSurface', () => {
       method: 'turn/start',
       params: { threadId: 'thread-existing', input: [{ type: 'text', text: 'Build the UI' }] },
     });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: 'Working **on' });
     await surface.steerMessage('Focus on the renderer');
     expect(lastRequest(transport, 'turn/steer')).toMatchObject({
       params: {
@@ -137,20 +144,41 @@ describe('CodexSurface', () => {
       },
     });
 
-    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: 'Working' });
-    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: '… done' });
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: ' the renderer**.\n\n```ts\nconst' });
+    const liveText = (messages: readonly SurfaceMessage[]) => messages.filter(message => message.turnId === 'turn-live')
+      .flatMap(message => message.parts).filter(part => part.type === 'text' && part.itemId === 'agent-live');
+    expect(liveText(surface.getSnapshot().messages)).toEqual([
+      { type: 'text', text: 'Working **on the renderer**.\n\n```ts\nconst', itemId: 'agent-live' },
+    ]);
+    expect(liveText(replica.getSnapshot().messages)).toEqual(liveText(surface.getSnapshot().messages));
+    await surface.steerMessage('And preserve paragraphs');
+    transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-live', delta: ' value = 1;\n```' });
+    transport.emitNotification('item/completed', {
+      threadId: 'thread-existing', turnId: 'turn-live', completedAtMs: 1_000,
+      item: { type: 'agentMessage', id: 'agent-live', text: 'Working **on the renderer**.\n\n```ts\nconst value = 1;\n```\n\nDone.', phase: null, memoryCitation: null, delivery: null, questions: null },
+    });
+    expect(liveText(replica.getSnapshot().messages)).toEqual([
+      { type: 'text', text: 'Working **on the renderer**.\n\n```ts\nconst value = 1;\n```\n\nDone.', itemId: 'agent-live' },
+    ]);
+    if (subsequentItem) {
+      transport.emitNotification('item/agentMessage/delta', { threadId: 'thread-existing', turnId: 'turn-live', itemId: 'agent-next', delta: 'Following the new direction.' });
+      const liveMessages = surface.getSnapshot().messages.filter(message => message.turnId === 'turn-live');
+      expect(liveMessages.findIndex(message => message.parts.some(part => part.type === 'text' && part.itemId === 'agent-next')))
+        .toBeGreaterThan(liveMessages.map(message => message.kind === 'steer').lastIndexOf(true));
+    }
     transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
 
     const snapshot = surface.getSnapshot();
     const conversationSnapshot = surface.conversation('thread-existing').getSnapshot();
     expect(snapshot).toMatchObject({ busy: false, error: null });
+    expect(snapshot.messages.some(message => message.role === 'assistant' && message.parts.length === 0)).toBe(false);
     expect(snapshot.messages.find((message) => (
       message.role === 'assistant'
       && message.parts.some((part) => part.type === 'text' && part.itemId === 'agent-live')
     ))).toMatchObject({
       role: 'assistant',
       status: 'complete',
-      parts: [{ type: 'text', text: 'Working… done', itemId: 'agent-live' }],
+      parts: [{ type: 'text', text: 'Working **on the renderer**.\n\n```ts\nconst value = 1;\n```\n\nDone.', itemId: 'agent-live' }],
     });
     expect(replica.getSnapshot()).toMatchObject({
       activeTurnId: conversationSnapshot.activeTurnId,
@@ -161,6 +189,25 @@ describe('CodexSurface', () => {
     });
     expect(messagesWithoutCreatedAt(replica.getSnapshot().messages))
       .toStrictEqual(messagesWithoutCreatedAt(conversationSnapshot.messages));
+
+    const turnMessages = conversationSnapshot.messages.filter(message => message.turnId === 'turn-live');
+    const users = turnMessages.filter(message => message.role === 'user');
+    const userItem = (id: string, index: number, text: string): v2.ThreadItem => ({
+      type: 'userMessage', id, clientId: users[index]!.id,
+      content: [{ type: 'text', text, text_elements: [] }],
+    });
+    history.turns.push(turn('turn-live', 'completed', [
+      userItem('initial', 0, 'Build the UI'),
+      { type: 'agentMessage', id: 'agent-live', text: 'Working **on the renderer**.\n\n```ts\nconst value = 1;\n```\n\nDone.', phase: null, memoryCitation: null, delivery: null, questions: null },
+      userItem('steer-one', 1, 'Focus on the renderer'),
+      userItem('steer-two', 2, 'And preserve paragraphs'),
+      ...(subsequentItem ? [{ type: 'agentMessage' as const, id: 'agent-next', text: 'Following the new direction.', phase: null, memoryCitation: null, delivery: null, questions: null }] : []),
+    ]));
+    await surface.conversation('thread-existing').load();
+    expect(liveText(surface.getSnapshot().messages)).toEqual(liveText(conversationSnapshot.messages));
+    expect(liveText(replica.getSnapshot().messages)).toEqual(liveText(conversationSnapshot.messages));
+    expect(surface.getSnapshot().messages.filter(message => message.turnId === 'turn-live' && message.kind === 'steer')).toHaveLength(2);
+    await surface.close();
   });
 
   it.each(['eager', 'switch'] as const)('renders a bounded page before background hydration (%s)', async (strategy) => {

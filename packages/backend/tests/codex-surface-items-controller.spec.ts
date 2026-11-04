@@ -240,7 +240,7 @@ describe('CodexSurfaceItemsController', () => {
     });
   });
 
-  it('still applies agent deltas when the host cannot resolve their containing message', () => {
+  it('routes an item delta even when the latest-message lookup is unavailable', () => {
     const setup = itemController();
     vi.mocked(setup.host.assistantMessageForTurn).mockReturnValue(null);
     setup.controller.applyAgentDelta({
@@ -249,7 +249,10 @@ describe('CodexSurfaceItemsController', () => {
     expect(setup.runtime.messages[0]?.parts).toStrictEqual([
       { type: 'text', text: 'Hello', itemId: 'agent-1' },
     ]);
-    expect(setup.host.emitEvent).not.toHaveBeenCalled();
+    expect(setup.host.emitEvent).toHaveBeenCalledExactlyOnceWith('notification', {
+      type: 'message.delta', conversationId: 'thread-1', turnId: 'turn-1',
+      payload: { messageId: 'assistant-turn-1', itemId: 'agent-1', delta: 'Hello' },
+    });
   });
 
   it('accumulates plan deltas and replaces them with a completed structured plan', () => {

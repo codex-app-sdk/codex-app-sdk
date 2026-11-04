@@ -75,6 +75,16 @@ export function ensureAssistantTurnMessage(
   return next;
 }
 
+export function assistantMessageContainingText(
+  messages: readonly SurfaceMessage[],
+  turnId: string,
+  itemId: string,
+): SurfaceMessage | undefined {
+  return messages[findLastIndex(messages, message => message.role === 'assistant'
+    && message.kind === undefined && message.metadata?.turnId === turnId
+    && message.parts.some(part => part.type === 'text' && part.itemId === itemId))];
+}
+
 export function appendAssistantTextDelta(
   messages: readonly SurfaceMessage[],
   threadId: string,
@@ -84,8 +94,11 @@ export function appendAssistantTextDelta(
   phase?: SurfaceMessageTextPart['phase'],
 ): SurfaceMessage[] {
   if (!delta) return [...messages];
-  const next = ensureAssistantTurnMessage(messages, threadId, turnId);
-  const messageIndex = findLastIndex(next, (message) => (
+  // Steering creates a new segment, but an in-flight item still owns its
+  // existing text. Only a new item starts writing after the steering marker.
+  const existing = assistantMessageContainingText(messages, turnId, itemId);
+  const next = existing ? [...messages] : ensureAssistantTurnMessage(messages, threadId, turnId);
+  const messageIndex = existing ? next.indexOf(existing) : findLastIndex(next, (message) => (
     message.role === 'assistant'
     && message.kind === undefined
     && message.metadata?.turnId === turnId

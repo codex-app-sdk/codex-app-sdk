@@ -25,6 +25,7 @@ import {
 } from './codex-surface-events';
 import {
   appendAssistantTextDelta,
+  assistantMessageContainingText,
   appendCompactionMarker,
   ensureAssistantTurnMessage,
   extractProposedPlanDocument,
@@ -101,7 +102,7 @@ export class CodexSurfaceItemsController {
   applyAgentDelta(params: v2.AgentMessageDeltaNotification): void {
     const runtime = this.host.requireRuntime(params.threadId);
     this.host.markRuntimeTurnActive(runtime, params.turnId);
-    const phase = runtime.messages.flatMap((message) => message.parts)
+    const phase = assistantMessageContainingText(runtime.messages, params.turnId, params.itemId)?.parts
       .find((part): part is SurfaceMessageTextPart => (
         part.type === 'text' && part.itemId === params.itemId
       ))?.phase;
@@ -110,7 +111,8 @@ export class CodexSurfaceItemsController {
         runtime.messages, params.threadId, params.turnId, params.itemId, params.delta, phase,
       ),
     });
-    const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+    const message = assistantMessageContainingText(runtime.messages, params.turnId, params.itemId)
+      ?? this.host.assistantMessageForTurn(params.threadId, params.turnId);
     if (message) {
       this.host.emitEvent('notification', {
         type: 'message.delta', conversationId: params.threadId, turnId: params.turnId,
@@ -347,12 +349,13 @@ export class CodexSurfaceItemsController {
         this.reviewOutputByTurn.set(reviewTurnKey, text);
       }
       const previousMessageIds = new Set(runtime.messages.map((message) => message.id));
-      const previousMessage = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+      const previousMessage = assistantMessageContainingText(runtime.messages, params.turnId, params.item.id)
+        ?? this.host.assistantMessageForTurn(params.threadId, params.turnId);
       const previousParts = previousMessage ? JSON.stringify(previousMessage.parts) : null;
       const previousQuestionRequestIds = new Set(previousMessage?.parts.flatMap((part) => (
         part.type === 'question' ? [part.request.id] : []
       )) ?? []);
-      const previousText = runtime.messages.flatMap((message) => message.parts)
+      const previousText = previousMessage?.parts
         .find((part): part is Extract<SurfaceMessage['parts'][number], { type: 'text' }> => (
           part.type === 'text' && part.itemId === params.item.id
         ))?.text ?? '';
@@ -370,7 +373,8 @@ export class CodexSurfaceItemsController {
       }
       this.host.patchRuntime(params.threadId, { messages });
       if (!visibleText && !questionPart && !phase) return;
-      const message = this.host.assistantMessageForTurn(params.threadId, params.turnId);
+      const message = (questionPart ? undefined : assistantMessageContainingText(runtime.messages, params.turnId, params.item.id))
+        ?? this.host.assistantMessageForTurn(params.threadId, params.turnId);
       if (message && !previousMessageIds.has(message.id)) {
         this.host.emitEvent('notification', {
           type: 'message.appended', conversationId: params.threadId, turnId: params.turnId,
