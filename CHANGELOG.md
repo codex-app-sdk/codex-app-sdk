@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.21.5
+
+### Fixed
+
+- Hide the empty-instructions placeholder in attachment-only messages while preserving attachments, steering labels, and the original prompt.
+
 ## 0.21.4
 
 ### Fixed
