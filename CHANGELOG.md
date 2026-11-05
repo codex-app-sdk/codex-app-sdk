@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.21.2
+
+### Changed
+
+- Discover skills when the suggestion menu opens, with deduplicated requests and repository skills preserved through global catalog refreshes and reconnects.
+- Expose opt-in timing traces for conversation connection, history loading and catalog discovery.
+
+### Fixed
+
+- Keep answered question labels clear in conversation tool rows.
+
 ## 0.19.8
 
 ### Fixed
