@@ -2,7 +2,7 @@ import { shallowRef, type InjectionKey } from 'vue'
 
 export const imagePreviewPoolKey: InjectionKey<ImagePreviewPool> = Symbol('image-preview-pool')
 
-type Entry = { reference: string; source: ReturnType<typeof shallowRef<string | undefined>>; original: ReturnType<typeof shallowRef<string | undefined>>; state: ReturnType<typeof shallowRef<'idle' | 'loading' | 'ready'>>; dimensions: ReturnType<typeof shallowRef<{ width: number; height: number } | undefined>>; users: number; near: number; visible: number; width: number; bytes: number; originalBytes: number; thumbnail?: string; thumbnailBytes: number; previewPixels: number; ownedOriginal?: boolean; ownedPreview?: boolean; pending?: Promise<void> }
+type Entry = { reference: string; animated: boolean; source: ReturnType<typeof shallowRef<string | undefined>>; original: ReturnType<typeof shallowRef<string | undefined>>; state: ReturnType<typeof shallowRef<'idle' | 'loading' | 'ready'>>; dimensions: ReturnType<typeof shallowRef<{ width: number; height: number } | undefined>>; users: number; near: number; visible: number; width: number; bytes: number; originalBytes: number; thumbnail?: string; thumbnailBytes: number; previewPixels: number; ownedOriginal?: boolean; ownedPreview?: boolean; pending?: Promise<void> }
 
 /** Original compressed bytes outlive decoded previews within one shared budget.
  * Scrolling releases previews, while a cache hit needs no second host transfer. */
@@ -15,7 +15,7 @@ export class ImagePreviewPool {
   acquire(reference: string) {
     let entry = this.entries.get(reference)
     if (!entry) {
-      entry = { reference, source: shallowRef<string>(), original: shallowRef<string>(), state: shallowRef<'idle' | 'loading' | 'ready'>('idle'), dimensions: shallowRef(), users: 0, near: 0, visible: 0, width: 512, bytes: 0, originalBytes: 0, thumbnailBytes: 0, previewPixels: 0 }
+      entry = { reference, animated: /\.gif(?:[?#]|$)/i.test(reference), source: shallowRef<string>(), original: shallowRef<string>(), state: shallowRef<'idle' | 'loading' | 'ready'>('idle'), dimensions: shallowRef(), users: 0, near: 0, visible: 0, width: 512, bytes: 0, originalBytes: 0, thumbnailBytes: 0, previewPixels: 0 }
       this.entries.set(reference, entry)
     }
     entry.users++
@@ -69,6 +69,7 @@ export class ImagePreviewPool {
           if (!entry.original.value) {
             let data = await this.read(entry.reference)
             if (!entry.users || !data || data.length > 24 * 1024 * 1024) return
+            entry.animated ||= /^data:image\/gif;base64,/i.test(data) || /\.gif(?:[?#]|$)/i.test(data)
             let bytes = 0
             if (/^data:image\/(?:avif|bmp|gif|heic|heif|jpe?g|png|webp);base64,/i.test(data)) {
               const blob = await (await fetch(data)).blob()
@@ -81,7 +82,7 @@ export class ImagePreviewPool {
             entry.original.value = url; entry.originalBytes = bytes; entry.ownedOriginal = owned; url = undefined
           }
           if (!entry.users || (this.viewport && !entry.near && !explicit)) return
-          const preview = await imagePreview(entry.original.value!, this.viewport ? entry.width : undefined)
+          const preview = await imagePreview(entry.original.value!, this.viewport ? entry.width : undefined, entry.animated)
           url = preview.url; owned = preview.owned
           entry.dimensions.value = preview.originalSize
           const bytes = preview.bytes + preview.width * preview.height * 4
@@ -149,7 +150,7 @@ export class ImagePreviewPool {
   }
 }
 
-function imagePreview(url: string, maxWidth = Infinity): Promise<{ url: string; owned: boolean; bytes: number; width: number; height: number; originalSize: { width: number; height: number } }> {
+function imagePreview(url: string, maxWidth = Infinity, animated = false): Promise<{ url: string; owned: boolean; bytes: number; width: number; height: number; originalSize: { width: number; height: number } }> {
   return new Promise((resolve, reject) => {
     const image = new Image()
     let canvas: HTMLCanvasElement | undefined
@@ -162,7 +163,9 @@ function imagePreview(url: string, maxWidth = Infinity): Promise<{ url: string; 
     const timer = setTimeout(fail, 15_000)
     image.onload = () => {
       const originalSize = { width: image.naturalWidth, height: image.naturalHeight }
-      const scale = Math.min(1, maxWidth / originalSize.width)
+      // Canvas resizing collapses animations to one frame. Keep the original
+      // source and charge its full decoded dimensions against the pool budget.
+      const scale = animated ? 1 : Math.min(1, maxWidth / originalSize.width)
       if (scale === 1) { finished = true; cleanup(); resolve({ url, owned: false, bytes: 0, ...originalSize, originalSize }); return }
       try {
         canvas = document.createElement('canvas')

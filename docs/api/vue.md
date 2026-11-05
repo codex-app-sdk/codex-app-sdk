@@ -895,7 +895,9 @@ visible or within 400 CSS pixels of their scroll container. Observers are shared
 per container; visible requests take priority over prefetches. Inline previews are
 sized for their rendered width and display density, capped at 1024 pixels wide;
 height preserves the source aspect ratio. Open, copy and download actions use
-original bytes. Leaving the prefetch region releases decoded
+original bytes. GIF previews retain their animation by displaying the original
+GIF instead of a still thumbnail; their full pixel dimensions count against the
+preview budget. Leaving the prefetch region releases decoded
 previews while retaining compressed originals and thumbnails within the same budget.
 Returning reuses the cached thumbnail immediately without another host request.
 Viewport mode also retains up to 128 recently used immutable `conversation-image:`
