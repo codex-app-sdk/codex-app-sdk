@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.21.4
+
+### Fixed
+
+- Keep queued prompt previews readable by hiding attached context and showing skill, agent, and plugin names without serialized destinations.
+
 ## 0.21.3
 
 ### Fixed
