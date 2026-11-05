@@ -582,7 +582,7 @@ describe('CodexMessage', () => {
     expect(wrapper.get('.chat-message-block--text').classes()).toContain('codex-markdown');
   });
 
-  it('renders optimistic image previews and persisted file chips in user messages', () => {
+  it('renders user attachments without a placeholder bubble for attachment-only prompts', async () => {
     const wrapper = mountMessage({
       message: {
         id: 'user-attachments',
@@ -622,6 +622,28 @@ describe('CodexMessage', () => {
     expect(wrapper.findAll('.chat-attachment-block').map((block) => block.text()))
       .toStrictEqual(['', 'notes.md']);
     expect(wrapper.get('a.chat-attachment-block--chip').attributes('href')).toBe('/tmp/notes.md');
+    const attachmentParts: SurfaceMessagePart[] = [
+      { type: 'attachment', attachment: { kind: 'image', name: 'preview.png', path: '/tmp/preview.png', url: 'data:image/png;base64,cG5n', mimeType: 'image/png' } },
+      { type: 'attachment', attachment: { kind: 'file', name: 'notes.md', path: '/tmp/notes.md' } },
+    ];
+    for (const metadata of [undefined, { promptContent: [{ type: 'text', text: '<context>Attached annotations</context>\n(no user instructions)' }] }]) {
+      await wrapper.setProps({ message: {
+        id: 'attachment-only', role: 'user', status: 'complete', kind: 'steer',
+        parts: [{ type: 'text', text: '(no user instructions)' }, ...attachmentParts], metadata,
+      } });
+      expect(wrapper.find('.chat-message__stack').exists()).toBe(false);
+      expect(wrapper.findAll('.chat-attachment-block')).toHaveLength(2);
+      expect(wrapper.text()).not.toContain('(no user instructions)');
+      expect(wrapper.get('.chat-message--steer-below').text()).toBe('Steered conversation');
+    }
+    await wrapper.setProps({ message: { role: 'user', content: ' \n(no user instructions)\n ' } });
+    expect(wrapper.find('.chat-message__stack').exists()).toBe(false);
+    for (const role of ['user', 'assistant'] as const) {
+      await wrapper.setProps({ message: { role, content: 'Keep the literal text (no user instructions) in this explanation.' } });
+      expect(wrapper.get('.chat-message-block--text').text()).toBe('Keep the literal text (no user instructions) in this explanation.');
+    }
+    await wrapper.setProps({ message: { role: 'assistant', content: '(no user instructions)' } });
+    expect(wrapper.get('.chat-message-block--text').text()).toBe('(no user instructions)');
   });
 
   it('keeps assistant attachments in the response stack', () => {

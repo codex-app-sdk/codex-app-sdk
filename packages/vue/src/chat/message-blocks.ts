@@ -1,6 +1,7 @@
 import { getMessageToolCallArgs, getMessageToolCallName, type Message, type MessageAttachment, type MessageMedia, type MessagePhase, type MessageToolCall, type MessagePart } from './types'
 import { findInlineHtmlBlocks } from './inline-html'
 import { renderedChatMessage, type ChatMessageInput } from './renderer-message-adapter'
+import { promptContentText } from '@codex-app-sdk/core/surface'
 
 /** A later model work item supersedes earlier final text in the same turn. */
 export function withoutSupersededFinalAnswers(messages: readonly ChatMessageInput[]): ChatMessageInput[] {
@@ -66,7 +67,8 @@ const ungroupedToolNames = new Set([
 export function computeMessageBlocks(message: Message): MessageBlock[] {
   if (message.role !== 'assistant') {
     if (message.promptContent) return [
-      { type: 'user-text', content: message.content, promptContent: message.promptContent },
+      ...(userMessageDisplayText(promptContentText(message.promptContent))
+        ? [{ type: 'user-text' as const, content: message.content, promptContent: message.promptContent }] : []),
       ...(message.parts ?? []).flatMap((part): MessageBlock[] => part.type === 'attachment'
         ? [{ type: 'attachment', attachment: part.attachment }]
         : part.type === 'media' ? [{ type: 'media', media: part.media }] : []),
@@ -80,14 +82,14 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
           return [{ type: 'media', media: part.media }]
         }
         if (part.type === 'text') {
-          const content = stripMessageContext(part.content)
+          const content = userMessageDisplayText(part.content)
           return content ? [{ type: 'user-text', content }] : []
         }
         return []
       })
     }
 
-    const content = stripMessageContext(message.content)
+    const content = userMessageDisplayText(message.content)
     return content ? [{ type: 'user-text', content }] : []
   }
 
@@ -324,6 +326,11 @@ function finalizeAssistantBlocks(blocks: MessageBlock[], prompts: string[]): Mes
   }
 
   return grouped
+}
+
+export function userMessageDisplayText(content: string) {
+  const text = stripMessageContext(content)
+  return text === '(no user instructions)' ? '' : text
 }
 
 export function stripMessageContext(content: string) {

@@ -47,7 +47,7 @@ import ChatComposerDrawerRow from './ChatComposerDrawerRow.vue';
 import { PencilIcon, SteeringWheelIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
 import type { QueuedChatPrompt } from './queued-prompts';
 import { parseAuthoredUserText } from './user-text';
-import { stripMessageContext } from './message-blocks';
+import { userMessageDisplayText } from './message-blocks';
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = defineProps<{
@@ -67,7 +67,7 @@ const preview = computed(() => {
   const text = parseAuthoredUserText(props.prompt.text, props.prompt.options?.content)
     .map(token => 'displayName' in token ? token.displayName : token.type === 'line-break' ? '\n' : token.text)
     .join('');
-  return stripMessageContext(text) || 'Attached content';
+  return userMessageDisplayText(text) || 'Attached content';
 });
 </script>
 

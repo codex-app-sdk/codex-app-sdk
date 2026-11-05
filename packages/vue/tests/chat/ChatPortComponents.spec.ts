@@ -230,6 +230,8 @@ describe('ported id8 chat components', () => {
     expect(preview()).toBe('Use Review with GitHub and Main agent');
     await wrapper.setProps({ prompts: [{ id: 'prompt-1', text: '<context>Code annotations: /private/source.ts</context>' }] });
     expect(preview()).toBe('Attached content');
+    await wrapper.setProps({ prompts: [{ id: 'prompt-1', text: '(no user instructions)' }] });
+    expect(preview()).toBe('Attached content');
     await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
     await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
     await wrapper.get('[aria-label="Delete queued prompt"]').trigger('click');

@@ -382,6 +382,9 @@ Cmd/Ctrl+Enter dispatches `steerQueuedPrompt(promptId, prompt)` while busy.
 Queued prompt previews hide attached context and show skill, agent, and plugin
 names without their serialized destinations. Context-only prompts show
 “Attached content”. Editing and sending retain the original prompt content.
+The standalone `(no user instructions)` placeholder is hidden in conversation
+messages; attachments and steering labels remain visible. Queued previews use
+“Attached content” for this placeholder.
 
 `CodexComposer` and `CodexConversationPane` accept
 `followUpBehavior?: 'queue' | 'steer'` (default `'queue'`). Controlled panes read

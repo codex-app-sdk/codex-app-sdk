@@ -34,6 +34,7 @@ const server = await createServer({
         import ${source('styles.css')};
         const state = ref({text:'',selectionStart:0,selectionEnd:0});
         const submitted = ref(null);
+        const attachmentOnly = ref(false);
         const catalogs = ref(true);
         const history = ref(undefined);
         const editing = ref(false);
@@ -48,7 +49,8 @@ const server = await createServer({
           edit() { editing.value=true; },
           recall() { const {prompt,options}=submitted.value; catalogs.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; history.value=[options?.content?promptContentDispatchText(options.content,prompt):prompt]; },
           contextOnly() { this.reset(); externalContext.value=true; window.contextSteers=[]; },
-          reset() { externalContext.value=false; history.value=undefined; editing.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; catalogs.value=true; },
+          attachmentOnly(authored) { this.reset(); attachmentOnly.value=true; submitted.value={prompt:'(no user instructions)',options:authored?{content:[{type:'text',text:'(no user instructions)'}]}:undefined}; },
+          reset() { attachmentOnly.value=false; externalContext.value=false; history.value=undefined; editing.value=false; state.value={text:'',selectionStart:0,selectionEnd:0}; catalogs.value=true; },
           restore() { const {prompt,options}=submitted.value; state.value={text:prompt,content:options?.content,selectionStart:prompt.length,selectionEnd:prompt.length}; },
           read() { return {state:state.value,submitted:submitted.value}; },
         };
@@ -59,7 +61,8 @@ const server = await createServer({
             onSend:(prompt,options)=>submitted.value={prompt,options},
             onSteer:(prompt,options)=>window.contextSteers.push({prompt,options}),
           }),
-          submitted.value?h(Message,{message:{id:'submitted',role:'user',status:'complete',parts:[{type:'text',text:submitted.value.prompt}],metadata:{promptContent:submitted.value.options?.content}},
+          submitted.value?h(Message,{message:{id:'submitted',role:'user',status:'complete',kind:attachmentOnly.value?'steer':undefined,
+            parts:[{type:'text',text:submitted.value.prompt},...(attachmentOnly.value?[{type:'attachment',attachment:{kind:'image',name:'reference.svg',path:'/mock/reference.svg',url:'/samples/component-lab/public/attachment-preview.svg',mimeType:'image/svg+xml'}}]:[])],metadata:{promptContent:submitted.value.options?.content}},
             skills:catalogs.value?[skill]:[],plugins:catalogs.value?[plugin]:[],mentionGroups:catalogs.value?groups:[]}):null,
           submitted.value?.options?.content?h('button',{onClick:()=>editing.value=true},'Edit saved prompt'):null,
           editing.value?h(MessageEditor,{key:submitted.value.prompt,content:submitted.value.prompt,
@@ -243,6 +246,17 @@ try {
     await editor.press('ControlOrMeta+Enter');
     assert.equal((await page.evaluate(() => window.authoredFixture.read().submitted)).prompt, '',
       'The alternate queue shortcut also forwards context-only work');
+    for (const authored of [false, true]) {
+      await page.setViewportSize({ width: authored ? 390 : 900, height: 700 });
+      await page.evaluate(authored => window.authoredFixture.attachmentOnly(authored), authored);
+      await page.locator('.chat-attachment-block__preview').waitFor();
+      await page.waitForFunction(() => document.querySelector('.chat-attachment-block__preview')?.naturalWidth > 0);
+      assert.equal(await page.locator('.chat-message__stack').count(), 0, 'Attachment-only prompts have no placeholder bubble');
+      assert.equal(await page.locator('.chat-message--steer-below').textContent().then(text => text.trim()), 'Steered conversation');
+      assert.equal((await page.evaluate(() => window.authoredFixture.read().submitted)).prompt, '(no user instructions)',
+        'Hiding the placeholder must preserve the submitted payload');
+    }
+    await page.screenshot({ path: `/tmp/sdk-attachment-only-${engine.name()}.png` });
     console.log(`${engine.name()}: literal triggers, explicit skill/agent chips, draft restoration and inline paste/undo/resubmit preserve authored content; plain URLs open by click and keyboard.`);
     await browser.close(); browser = undefined;
   }
