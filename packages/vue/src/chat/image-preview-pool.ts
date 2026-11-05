@@ -51,6 +51,14 @@ export class ImagePreviewPool {
   load(entry: Entry, explicit = false): Promise<void> {
     if (entry.source.value) { this.touch(entry); return Promise.resolve() }
     if (entry.pending) return entry.pending
+    // Restoring owned preview bytes needs no IO or decode slot. In particular,
+    // a viewport return must not wait behind unrelated slow host reads.
+    if (entry.thumbnail) {
+      if (entry.users && (!this.viewport || entry.near || explicit) && this.room(entry.previewPixels, entry, explicit)) {
+        this.touch(entry); entry.bytes = entry.previewPixels; entry.source.value = entry.thumbnail; entry.state.value = 'ready'
+      }
+      return Promise.resolve()
+    }
     entry.state.value = 'loading'
     entry.pending = new Promise<void>(resolve => {
       this.queue.push({ entry, run: async () => {
@@ -58,12 +66,6 @@ export class ImagePreviewPool {
         let owned = false
         try {
           if (!entry.users || (this.viewport && !entry.near && !explicit)) return
-          if (entry.thumbnail) {
-            if (this.room(entry.previewPixels, entry, explicit)) {
-              this.touch(entry); entry.bytes = entry.previewPixels; entry.source.value = entry.thumbnail; entry.state.value = 'ready'
-            }
-            return
-          }
           if (!entry.original.value) {
             let data = await this.read(entry.reference)
             if (!entry.users || !data || data.length > 24 * 1024 * 1024) return

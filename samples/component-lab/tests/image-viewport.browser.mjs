@@ -89,10 +89,24 @@ try {
     assert.equal(await shot(0).locator('img').getAttribute('src'),firstThumbnail,'returning to an unmounted conversation immediately reuses its ready preview');
     assert.equal(await page.evaluate(()=>window.reads.length),readsBeforeSwitchBack,'switching back needs no new host read or thumbnail encoding');
     // Crowded thumbnails must all render without repeated downloads.
-    await page.evaluate(()=>window.replaceImages([{id:'crowded',role:'user',content:'',parts:Array.from({length:8},(_,i)=>({type:'attachment',attachment:{kind:'image',name:'Crowded '+i,path:'/crowded-'+i+'.png'}}))}]));
+    await page.evaluate(()=>window.replaceImages([
+      {id:'photo-0',role:'assistant',content:'',parts:[{type:'media',media:{url:'conversation-image:photo-0:'+ 'a'.repeat(64),title:'Photo 0',width:1024,height:512}}]},
+      {id:'crowded',role:'user',content:'',parts:Array.from({length:8},(_,i)=>({type:'attachment',attachment:{kind:'image',name:'Crowded '+i,path:'/crowded-'+i+'.png'}}))},
+    ]));
+    await page.getByRole('button',{name:'Open Crowded 0',exact:true}).evaluate(el=>el.scrollIntoView({block:'center'}));
     await page.waitForFunction(()=>window.active>=2);
     assert.equal(await page.evaluate(()=>window.reads.filter(reference=>reference.includes('crowded')).length),2,'the host read limit holds while replies are pending');
+    await page.waitForFunction(()=>!document.querySelector('[aria-label="Open Photo 0"] img'));
+    await shot(0).evaluate(el=>el.scrollIntoView({block:'center'}));
+    await page.waitForFunction(()=>document.querySelector('[aria-label="Open Photo 0"] img')?.naturalWidth>0);
+    assert.equal(await shot(0).locator('img').getAttribute('src'),firstThumbnail,'a cached preview bypasses unrelated unresolved image reads');
+    assert.equal(await page.evaluate(()=>window.active),2,'the cache hit must paint before either cold read completes');
+    assert.equal(await page.evaluate(()=>window.reads.filter(r=>r.includes(':photo-0:')).length),1,'the cache hit makes no additional host transfer');
     await page.evaluate(()=>window.releaseCrowdedImages());
+    for (let i=0;i<8;i++) {
+      await page.getByRole('button',{name:'Open Crowded '+i,exact:true}).evaluate(el=>el.scrollIntoView({block:'center'}));
+      await page.waitForFunction(i=>document.querySelector('[aria-label="Open Crowded '+i+'"] img')?.naturalWidth>0,i);
+    }
     await page.waitForFunction(()=>window.reads.some(r=>r.includes('crowded')) && window.active===0 && !document.body.textContent.includes('Loading image…'));
     const settled = await page.evaluate(()=>({reads:window.reads.length,urls:window.urls.size,retainedBytes:[...window.cachedBytes.values()].reduce((a,b)=>a+b,0)+[...document.querySelectorAll('img')].reduce((a,x)=>a+x.naturalWidth*x.naturalHeight*4,0)}));
     assert.ok(settled.retainedBytes<=5*1024*1024,'compressed originals and decoded thumbnails share the configured bound');
