@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.21.3
+
+### Fixed
+
+- Restore cached image previews immediately when returning to them, even while other images are loading.
+
 ## 0.21.2
 
 ### Changed
