@@ -3,7 +3,7 @@
     <template #leading>
       <TerminalIcon class="chat-queued-prompt__icon" aria-hidden="true" />
     </template>
-    <span class="chat-queued-prompt__text">{{ prompt.text }}</span>
+    <span class="chat-queued-prompt__text">{{ preview }}</span>
     <template #actions>
       <div class="chat-queued-prompt__actions">
         <button
@@ -42,12 +42,15 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import ChatComposerDrawerRow from './ChatComposerDrawerRow.vue';
 import { PencilIcon, SteeringWheelIcon, TerminalIcon, Trash2Icon } from '../icons/app-icons';
 import type { QueuedChatPrompt } from './queued-prompts';
+import { parseAuthoredUserText } from './user-text';
+import { stripMessageContext } from './message-blocks';
 
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
-defineProps<{
+const props = defineProps<{
   prompt: QueuedChatPrompt;
   editDisabled?: boolean;
   steerDisabled?: boolean;
@@ -59,6 +62,13 @@ const emit = defineEmits<{
   steer: [id: string];
 }>();
 // Stryker restore all
+
+const preview = computed(() => {
+  const text = parseAuthoredUserText(props.prompt.text, props.prompt.options?.content)
+    .map(token => 'displayName' in token ? token.displayName : token.type === 'line-break' ? '\n' : token.text)
+    .join('');
+  return stripMessageContext(text) || 'Attached content';
+});
 </script>
 
 <style scoped>

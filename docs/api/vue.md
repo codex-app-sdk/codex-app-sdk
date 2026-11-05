@@ -379,6 +379,9 @@ composer, Cmd/Ctrl+Enter emits
 In `CodexConversationPane`, queued-prompt Edit loads the text into an empty
 composer. Enter dispatches `updateQueuedPrompt(promptId, prompt)`, while
 Cmd/Ctrl+Enter dispatches `steerQueuedPrompt(promptId, prompt)` while busy.
+Queued prompt previews hide attached context and show skill, agent, and plugin
+names without their serialized destinations. Context-only prompts show
+“Attached content”. Editing and sending retain the original prompt content.
 
 `CodexComposer` and `CodexConversationPane` accept
 `followUpBehavior?: 'queue' | 'steer'` (default `'queue'`). Controlled panes read

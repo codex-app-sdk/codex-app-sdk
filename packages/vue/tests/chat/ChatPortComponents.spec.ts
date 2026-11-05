@@ -206,7 +206,7 @@ describe('ported id8 chat components', () => {
     expect(wrapper.attributes('aria-label')).toBe('Deleted lines: -1098');
   });
 
-  it('renders queued prompts and emits deletes', async () => {
+  it('previews queued prompts without hidden context or serialized mention destinations and preserves their actions', async () => {
     const wrapper = mount(ChatQueuedPrompts, {
       props: {
         prompts: [{ id: 'prompt-1', text: 'Run the tests after this turn' }],
@@ -214,6 +214,22 @@ describe('ported id8 chat components', () => {
     });
 
     expect(wrapper.text()).toContain('Run the tests after this turn');
+    const preview = () => wrapper.get('.chat-queued-prompt__text').text();
+    await wrapper.setProps({ prompts: [{ id: 'prompt-1', text: '<context>Code annotations: /private/source.ts</context>\nUse [$Review](/skills/review/SKILL.md) with [@main](mention://agents/main?value=agent%3Amain) and [@GitHub](plugin://github)' }] });
+    expect(preview()).toBe('Use Review with main and GitHub');
+    await wrapper.setProps({ prompts: [{ id: 'prompt-1', text: 'Serialized fallback', options: { content: [
+      { type: 'text', text: '<context>Hidden ' },
+      { type: 'mention', kind: 'custom', id: 'hidden', value: 'hidden', label: 'Private agent', groupId: 'agents' },
+      { type: 'text', text: '</context>\nUse ' },
+      { type: 'mention', kind: 'skill', id: '/skills/review/SKILL.md', value: 'review', label: 'Review' },
+      { type: 'text', text: ' with ' },
+      { type: 'mention', kind: 'plugin', id: 'github', value: 'github', label: 'GitHub' },
+      { type: 'text', text: ' and ' },
+      { type: 'mention', kind: 'custom', id: 'main', value: 'agent:main', label: 'Main agent', groupId: 'agents' },
+    ] } }] });
+    expect(preview()).toBe('Use Review with GitHub and Main agent');
+    await wrapper.setProps({ prompts: [{ id: 'prompt-1', text: '<context>Code annotations: /private/source.ts</context>' }] });
+    expect(preview()).toBe('Attached content');
     await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
     await wrapper.get('[aria-label="Edit queued prompt"]').trigger('click');
     await wrapper.get('[aria-label="Delete queued prompt"]').trigger('click');

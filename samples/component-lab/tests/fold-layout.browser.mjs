@@ -45,7 +45,7 @@ const fixture = {
       ] }];
       const state = reactive({
         identity: { conversationKey: 'fold-layout', messages, busy: true, activeTurnId: 'turn' },
-        thread: { queuedPrompts: [{ id: 'long', text: 'Standardize the host selectors. '.repeat(20) + '/repository/'.repeat(30) }] },
+        thread: { queuedPrompts: [{ id: 'long', text: '<context>Code annotations: /private/source.ts</context>Use [$Review](/skills/review/SKILL.md) with [@main](mention://agents/main?value=agent%3Amain) and [@GitHub](plugin://github). ' + 'Standardize the host selectors. '.repeat(20) + '/repository/'.repeat(30) }] },
       });
       window.detailReads = 0;
       const controller = createCodexConversationPaneController({ state, actions: {
@@ -102,6 +102,9 @@ try {
     await page.goto(new URL('/fold-layout', server.resolvedUrls.local[0]).href);
     const card = page.locator('.chat-tool-user-input');
     await card.waitFor();
+    const preview = page.locator('.chat-queued-prompt__text');
+    assert.equal(await preview.textContent(), 'Use Review with main and GitHub. ' + 'Standardize the host selectors. '.repeat(20) + '/repository/'.repeat(30),
+      'Queued previews hide attached context and show mention names without changing ordinary text');
     const widths = [];
     const measure = async (state) => {
       const bounds = await card.evaluate(element => ({
@@ -130,8 +133,10 @@ try {
     await measure('viewport narrowed');
     await page.setViewportSize({ width: 420, height: 838 });
     await measure('compact viewport');
+    if (artifacts) await page.screenshot({ path: join(artifacts, engine.name() + '-queue-compact.png') });
     await page.setViewportSize({ width: 900, height: 838 });
     await measure('viewport widened');
+    if (artifacts) await page.screenshot({ path: join(artifacts, engine.name() + '-queue-wide.png') });
     assert(Math.max(...widths) - Math.min(...widths) > 100,
       'The question must track substantial host and viewport width changes');
     console.log(`${engine.name()}: queue stays contained and folded question follows host resizing: ${widths.join(', ')}px.`);
