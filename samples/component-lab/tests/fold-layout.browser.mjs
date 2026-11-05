@@ -5,6 +5,7 @@ import { chromium, webkit } from 'playwright';
 import { createServer } from 'vite';
 
 const fixtureId = '\0fold-layout-fixture';
+const fullCommand = "python3 - <<'PY'\nfrom pathlib import Path\n" + "print(Path('/repository/packages/vue/src/chat/ChatToolCallTitle.vue').read_text())\n".repeat(4) + 'PY';
 const fixture = {
   name: 'fold-layout-fixture',
   configureServer(server) {
@@ -48,6 +49,13 @@ const fixture = {
         thread: { queuedPrompts: [{ id: 'long', text: '<context>Code annotations: /private/source.ts</context>Use [$Review](/skills/review/SKILL.md) with [@main](mention://agents/main?value=agent%3Amain) and [@GitHub](plugin://github). ' + 'Standardize the host selectors. '.repeat(20) + '/repository/'.repeat(30) }] },
       });
       window.detailReads = 0;
+      window.showCommandRows = command => { state.identity = { conversationKey:'commands', busy:false, messages:[{
+        id:'command-rows',role:'assistant',status:'complete',parts:[
+          ...[command,'pwd'].map((text,index)=>({type:'tool',id:'command-'+index,kind:'command',title:text,status:'completed',input:{command:text},statusText:JSON.stringify({source:'codex',action:'run',phase:'completed',params:{target:text}})})),
+          {type:'tool',id:'file-edit',kind:'fileChange',title:'short.ts',status:'completed',input:{changes:[{path:'/repo/short.ts',kind:{type:'update'},diff:'patch',diffContent:{sessionId:'thread',contentId:'a'.repeat(64),byteLength:5,changeKind:'update'}}]},statusText:JSON.stringify({source:'codex',action:'edit',phase:'completed',params:{target:'short.ts',addedLines:5,removedLines:2}})},
+        ]
+      }] }; };
+      window.runFirstCommand = () => { const message=state.identity.messages[0],tool=message.parts[0];state.identity.messages=[{...message,status:'streaming',parts:[{...tool,status:'running',statusText:JSON.stringify({source:'codex',action:'run',phase:'running',params:{target:tool.title}})},...message.parts.slice(1)]}]; };
       const controller = createCodexConversationPaneController({ state, actions: {
         async loadTurnHistory(turnId) {
           window.detailReads++;
@@ -98,6 +106,7 @@ try {
   for (const engine of [chromium, webkit]) {
     browser = await engine.launch();
     const page = await browser.newPage({ viewport: { width: 760, height: 838 } });
+    await page.addInitScript(() => { Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copiedToolText=text;}}}); });
     page.setDefaultTimeout(10_000);
     await page.goto(new URL('/fold-layout', server.resolvedUrls.local[0]).href);
     const card = page.locator('.chat-tool-user-input');
@@ -140,6 +149,79 @@ try {
     assert(Math.max(...widths) - Math.min(...widths) > 100,
       'The question must track substantial host and viewport width changes');
     console.log(`${engine.name()}: queue stays contained and folded question follows host resizing: ${widths.join(', ')}px.`);
+    await page.evaluate(command=>window.showCommandRows(command),fullCommand);
+    await page.locator('.chat-tool-group__header').click();
+    const commandTitle=page.locator('.chat-tool-call__title').filter({hasText:'from pathlib import Path'});
+    const text=commandTitle.locator('.chat-tool-call__title-content');
+    const expand=commandTitle.getByRole('button',{name:'Expand full text',exact:true});
+    await expand.waitFor({state:'attached'});
+    await page.mouse.move(0,0);
+    assert.equal(await expand.evaluate(el=>getComputedStyle(el).opacity),'0','the chevron is hidden until row hover or focus');
+    const commandRow=commandTitle.locator('..');
+    assert.equal(await commandRow.evaluate(el=>getComputedStyle(el.closest('.chat-tool-call')).userSelect),'none','tool rows do not start text selection');
+    const rowBounds=await commandRow.boundingBox();
+    await page.mouse.move(rowBounds.x+rowBounds.width-8,rowBounds.y+10);
+    assert.equal(await expand.evaluate(el=>getComputedStyle(el).opacity),'1');
+    const chrome=await expand.evaluate(el=>({background:getComputedStyle(el).backgroundColor,border:getComputedStyle(el).borderWidth}));
+    assert.deepEqual(chrome,{background:'rgba(0, 0, 0, 0)',border:'0px'},'the disclosure is a bare chevron');
+    const icon=commandTitle.locator('.chat-tool-call__copy-icon');
+    const offset=async()=>icon.evaluate(el=>{const parent=el.closest('.chat-tool-call__title');const range=document.createRange();range.selectNodeContents(parent.querySelector('.chat-tool-call__title-content'));return el.getBoundingClientRect().y+el.getBoundingClientRect().height/2-range.getClientRects()[0].y-range.getClientRects()[0].height/2;});
+    const iconOffsetBefore=await offset();
+    const titleTopBefore=(await commandTitle.boundingBox()).y;
+    const iconTopBefore=(await icon.boundingBox()).y;
+    await text.click();
+    assert.equal(await commandTitle.getAttribute('class').then(value=>value.includes('chat-tool-call__title--expanded')),true);
+    assert.ok((await text.textContent()).includes(fullCommand),'expansion preserves the complete command and line breaks');
+    assert.equal(await text.evaluate(el=>getComputedStyle(el).lineHeight),'24px','expanded lines have comfortable spacing');
+    assert.ok(Math.abs(await offset()-iconOffsetBefore)<1,'the tool icon keeps its first-line alignment');
+    assert.equal((await commandTitle.boundingBox()).y,titleTopBefore,'expansion must not change the gap above the row');
+    assert.equal((await icon.boundingBox()).y,iconTopBefore,'expansion must not move the tool icon');
+    await icon.hover();
+    assert.equal(await icon.evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','the copy affordance has no button chrome');
+    await icon.locator('.tabler-icon-copy').waitFor();
+    await icon.click();
+    await page.waitForFunction(()=>window.copiedToolText?.includes('from pathlib import Path'));
+    assert.equal(await page.evaluate(()=>window.copiedToolText),fullCommand,'shell copies use the structured command, without its display prefix');
+    await commandTitle.getByRole('button',{name:'Copied',exact:true}).locator('.tabler-icon-check').waitFor();
+    assert.equal(await commandTitle.getByRole('button',{name:'Collapse full text'}).count(),1,'copying must not collapse the row');
+    await page.mouse.move(0,0);
+    assert.equal(await commandTitle.getByRole('button',{name:'Collapse full text'}).evaluate(el=>getComputedStyle(el).opacity),'0',
+      'pointer focus after Copy must not pin the chevron on screen');
+    if(artifacts) await page.screenshot({path:join(artifacts,engine.name()+'-command-expanded.png')});
+    const diff=page.locator('.chat-tool-call').filter({hasText:'Edited short.ts'});
+    const link=await diff.getByRole('link',{name:'short.ts',exact:true}).boundingBox();
+    const stats=await diff.locator('.chat-tool-call__diff').boundingBox();
+    assert.ok(stats.x-link.x-link.width<24,'diff stats stay beside the filename');
+    assert.equal(await page.locator('.chat-tool-call__files').count(),0,'file panels are removed');
+    assert.equal(await page.locator('button button').count(),0,'copy and disclosure controls must not be nested buttons');
+    const short=page.locator('.chat-tool-call__title').filter({hasText:'Ran pwd'});
+    assert.equal(await short.getByRole('button',{name:'Expand full text'}).count(),0,'fitting rows have no chevron');
+    await icon.focus();
+    assert.equal(await icon.evaluate(el=>document.activeElement===el),true,
+      'copy icon should receive focus: '+JSON.stringify(await icon.evaluate(el=>({label:document.activeElement?.getAttribute('aria-label'),inert:!!el.closest('[inert]'),disabled:el.disabled,visibility:getComputedStyle(el).visibility,tabIndex:el.tabIndex,next:el.closest('.chat-tool-call__title').querySelector('.chat-tool-call__title-toggle')?.outerHTML}))));
+    // Safari's default macOS navigation uses Option+Tab for non-form controls.
+    await page.keyboard.press(engine.name()==='webkit' && process.platform==='darwin' ? 'Alt+Tab' : 'Tab');
+    assert.equal(await commandTitle.getByRole('button',{name:'Collapse full text'}).evaluate(el=>getComputedStyle(el).opacity),'1',
+      'keyboard focus reveals the chevron without hovering: '+JSON.stringify(await page.evaluate(()=>({label:document.activeElement?.getAttribute('aria-label'),visible:document.activeElement?.matches(':focus-visible')}))));
+    await page.keyboard.press('Enter');
+    assert.equal(await commandTitle.getByRole('button',{name:'Expand full text'}).count(),1);
+    if(artifacts) await page.screenshot({path:join(artifacts,engine.name()+'-command-rows.png')});
+    const touchPage=await browser.newPage({viewport:{width:390,height:700},hasTouch:true,isMobile:true});
+    await touchPage.goto(new URL('/fold-layout',server.resolvedUrls.local[0]).href);
+    await touchPage.evaluate(command=>window.showCommandRows(command),fullCommand);
+    await touchPage.evaluate(()=>window.runFirstCommand());
+    await touchPage.locator('.chat-tool-group__header').tap();
+    const touchTitle=touchPage.locator('.chat-tool-call__title').filter({hasText:'from pathlib import Path'});
+    const touchExpand=touchTitle.getByRole('button',{name:'Expand full text',exact:true});
+    await touchExpand.waitFor();
+    assert.equal(await touchExpand.evaluate(el=>getComputedStyle(el).opacity),'1','touch devices expose the chevron without hovering');
+    await touchTitle.locator('.chat-tool-call__title-content').tap();
+    assert.equal(await touchTitle.getByRole('button',{name:'Collapse full text'}).count(),1);
+    assert.ok(await touchTitle.evaluate(el=>el.getBoundingClientRect().right<=innerWidth),'expanded commands stay within the phone viewport');
+    assert.ok(await touchTitle.evaluate(el=>el.closest('.chat-tool-group__running-item').getBoundingClientRect().height>=el.getBoundingClientRect().height),
+      'running tool wrappers must not clip expanded commands');
+    if(artifacts) await touchPage.screenshot({path:join(artifacts,engine.name()+'-command-touch.png')});
+    await touchPage.close();
     await page.getByRole('button', { name: 'Summary history', exact: true }).click();
     const header = page.locator('.chat-work-group__header').last();
     await header.waitFor();

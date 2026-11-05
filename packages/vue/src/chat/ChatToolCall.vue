@@ -16,22 +16,21 @@
   <section v-else class="codex-chat-theme chat-tool-call" :class="{ 'chat-tool-call--open': isOpen, [`chat-tool-call--${toolCall.state}`]: true }">
     <div v-if="summaryOnly" class="chat-tool-call__summary">
       <ChatToolCallTitle
+        :allow-expand="!toolDetailsEnabled"
         :line-diff="lineDiff"
         :running="isRunning"
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
         :title-target-parts="titleTargetParts"
+        :expanded-target-parts="allTitleTargetParts"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
         @open-link="emit('open-link', $event)"
       />
-      <component
-        :is="isOpen ? ChevronUp : ChevronDown"
-        v-if="expandable !== false"
-        class="chat-tool-group__chevron"
-        :size="15"
-      />
+      <button v-if="expandable === true" class="chat-tool-call__details-toggle" type="button" :aria-label="titleParts.title" :aria-expanded="detailsExpanded" @click.stop="emit('toggle-details')">
+        <component :is="detailsExpanded ? ChevronUp : ChevronDown" class="chat-tool-group__chevron" :size="15" />
+      </button>
     </div>
 
     <div
@@ -39,19 +38,21 @@
       class="chat-tool-call__header chat-tool-call__header--static"
     >
       <ChatToolCallTitle
+        allow-expand
         :line-diff="lineDiff"
         :running="isRunning"
         :title="titleParts.title"
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
         :title-target-parts="titleTargetParts"
+        :expanded-target-parts="allTitleTargetParts"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
         @open-link="emit('open-link', $event)"
       />
     </div>
 
-    <button v-else-if="!headerless" class="chat-tool-call__header" type="button" @click="toggleOpen">
+    <div v-else-if="!headerless" class="chat-tool-call__header" @click="toggleOpen">
       <ChatToolCallTitle
         :line-diff="lineDiff"
         :running="isRunning"
@@ -59,20 +60,20 @@
         :title-prefix="titleParts.prefix"
         :title-target="titleParts.target"
         :title-target-parts="titleTargetParts"
+        :expanded-target-parts="allTitleTargetParts"
         :tool-call="toolCall"
         :tool-presentation="toolPresentation"
         @open-link="emit('open-link', $event)"
       />
-      <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-call__chevron" :size="15" />
-    </button>
+      <button class="chat-tool-call__details-toggle" type="button" :aria-label="titleParts.title" :aria-expanded="isOpen" @click.stop="toggleOpen">
+        <component :is="isOpen ? ChevronUp : ChevronDown" class="chat-tool-call__chevron" :size="15" />
+      </button>
+    </div>
 
-    <div v-if="headerless && (toolDetailsEnabled || deferredFiles.length)" class="chat-tool-call__body">
+    <div v-if="headerless && toolDetailsEnabled" class="chat-tool-call__body">
       <div v-if="hasParams" class="chat-tool-call__section">
-        <div class="chat-tool-call__section-title">{{ deferredFiles.length ? 'Files' : 'Input' }}</div>
-        <div v-if="deferredFiles.length" class="chat-tool-call__files">
-            <a v-for="file in deferredFiles" :key="file.href" :href="file.href" @click.stop.prevent="emit('open-link', file)">{{ file.path }}</a>
-          </div>
-          <pre v-else class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
+        <div class="chat-tool-call__section-title">Input</div>
+        <pre class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
       </div>
 
       <div v-if="toolDetailsEnabled && hasResult" class="chat-tool-call__section">
@@ -84,11 +85,8 @@
     <ChatFoldTransition v-else-if="detailsAvailable" :open="isOpen">
       <div class="chat-tool-call__body">
         <div v-if="hasParams" class="chat-tool-call__section">
-          <div class="chat-tool-call__section-title">{{ deferredFiles.length ? 'Files' : 'Input' }}</div>
-          <div v-if="deferredFiles.length" class="chat-tool-call__files">
-            <a v-for="file in deferredFiles" :key="file.href" :href="file.href" @click.stop.prevent="emit('open-link', file)">{{ file.path }}</a>
-          </div>
-          <pre v-else class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
+          <div class="chat-tool-call__section-title">Input</div>
+          <pre class="chat-tool-call__json">{{ formatValue(toolCallArgs) }}</pre>
         </div>
 
         <div v-if="toolDetailsEnabled && hasResult" class="chat-tool-call__section">
@@ -117,6 +115,7 @@ import { useCodexToolCallDetails } from './tool-call-details'
 // Stryker disable all: Vue compiler macros cannot be wrapped in mutation activation branches.
 const props = withDefaults(defineProps<{
   answeredClientRequestIds?: ReadonlySet<string>
+  detailsExpanded?: boolean
   expandable?: boolean
   headerless?: boolean
   showToolDetails?: boolean
@@ -127,6 +126,7 @@ const props = withDefaults(defineProps<{
 })
 const emit = defineEmits<{
   cancel: []
+  'toggle-details': []
   'client-response': [response: ClientRequestResponse]
   'open-link': [link: CodexConversationLink]
 }>()
@@ -180,16 +180,12 @@ const titleTargetParts = computed(() => getToolDisplayTargetParts(
   statusDescriptor.value,
   titleParts.value.target,
 ))
-const deferredFiles = computed(() => {
-  const links = (getToolDisplayTargetParts(props.toolCall, statusDescriptor.value, undefined, Infinity) ?? [])
-    .flatMap(part => part.link?.kind === 'file' ? [part.link] : [])
-  return links.some(link => link.diffContent) ? links : []
-})
+const allTitleTargetParts = computed(() => getToolDisplayTargetParts(props.toolCall, statusDescriptor.value, undefined, Infinity))
 const lineDiff = computed(() => getToolLineDiff(statusDescriptor.value))
 const hasParams = computed(() => toolCallArgs.value !== undefined)
 const hasResult = computed(() => props.toolCall.result !== undefined && props.toolCall.result !== null)
 const toolDetailsEnabled = computed(() => props.showToolDetails ?? providedToolDetails.value)
-const detailsAvailable = computed(() => deferredFiles.value.length > 0 || (toolDetailsEnabled.value && (hasParams.value || hasResult.value)))
+const detailsAvailable = computed(() => toolDetailsEnabled.value && (hasParams.value || hasResult.value))
 
 function toggleOpen() {
   isOpen.value = !isOpen.value
@@ -205,9 +201,9 @@ function formatValue(value: unknown) {
 </script>
 
 <style scoped>
-.chat-tool-call__files { display: flex; flex-direction: column; gap: var(--space-2); overflow-wrap: anywhere; }
-.chat-tool-call__files a { color: var(--color-primary); }
 .chat-tool-call {
+  -webkit-user-select: none;
+  user-select: none;
   width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -243,6 +239,22 @@ function formatValue(value: unknown) {
   cursor: default;
 }
 
+.chat-tool-call__header:has(> .chat-tool-call__title--expandable),
+.chat-tool-call__summary:has(> .chat-tool-call__title--expandable) {
+  position: relative;
+  box-sizing: border-box;
+  padding-right: 24px;
+}
+.chat-tool-call__header:has(> .chat-tool-call__title--expanded),
+.chat-tool-call__summary:has(> .chat-tool-call__title--expanded) {
+  align-items: flex-start;
+}
+.chat-tool-call__header:hover :deep(.chat-tool-call__title-toggle),
+.chat-tool-call__summary:hover :deep(.chat-tool-call__title-toggle) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .chat-tool-call__header:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: var(--space-1);
@@ -255,6 +267,8 @@ function formatValue(value: unknown) {
   height: 15px;
   color: var(--color-text-muted);
 }
+
+.chat-tool-call__details-toggle { display: inline-flex; flex: 0 0 auto; align-items: center; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
 
 .chat-tool-call__body {
   display: flex;

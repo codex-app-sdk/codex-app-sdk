@@ -10,10 +10,10 @@
   <section v-else class="codex-chat-theme chat-tool-group">
     <component
       v-if="props.toolCalls.length === 0 || headerToolCall || completedToolCalls.length > 0"
-      :is="canExpand ? 'button' : 'div'"
+      :is="canExpand && !headerToolCall ? 'button' : 'div'"
       class="chat-tool-group__header"
       :class="{ 'chat-tool-group__header--static': !canExpand }"
-      :type="canExpand ? 'button' : undefined"
+      :type="canExpand && !headerToolCall ? 'button' : undefined"
       @click="toggleExpanded"
     >
       <ChatToolCall
@@ -21,6 +21,8 @@
         class="chat-tool-group__active"
         summary-only
         :expandable="canExpand"
+        :details-expanded="expanded"
+        @toggle-details="toggleExpanded"
         :answered-client-request-ids="answeredClientRequestIds"
         :show-tool-details="toolDetailsEnabled"
         :tool-call="headerToolCall"
@@ -76,6 +78,7 @@
       class="chat-tool-group__running"
       :class="{ 'chat-tool-group__running--after-completed': expanded }"
       aria-live="polite"
+      @before-leave="captureStatusHeight"
       @after-leave="hideEmptyStatusContainer"
     >
       <div
@@ -130,6 +133,9 @@ const emit = defineEmits<{
 // Stryker restore all
 
 const expanded = ref(false)
+function captureStatusHeight(element: Element) {
+  (element as HTMLElement).style.setProperty('--tool-status-height', `${element.getBoundingClientRect().height}px`)
+}
 const recentlyCompletedIds = ref<ReadonlySet<string>>(new Set())
 const recentCompletionTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const recentCompletionRetentionMs = 3_000
@@ -261,6 +267,7 @@ function hasToolDetails(toolCall: MessageToolCall) {
 </script>
 
 <style scoped>
+.chat-tool-group__header { -webkit-user-select: none; user-select: none; }
 .chat-tool-group {
   width: 100%;
   min-width: 0;
@@ -317,7 +324,8 @@ function hasToolDetails(toolCall: MessageToolCall) {
 }
 
 .chat-tool-group__running-item {
-  height: var(--line-height-20);
+  min-height: var(--line-height-20);
+  height: auto;
   overflow: hidden;
 }
 
@@ -327,6 +335,8 @@ function hasToolDetails(toolCall: MessageToolCall) {
 }
 
 .chat-tool-group-running-leave-active {
+  min-height: 0;
+  height: var(--tool-status-height);
   transition:
     height 320ms cubic-bezier(0.4, 0, 0.2, 1),
     opacity 320ms ease;

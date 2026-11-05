@@ -117,7 +117,10 @@ describe('ChatToolGroup recent completions', () => {
         props: { showToolDetails: true, toolCalls: [detailed] },
       });
       const header = wrapper.get('.chat-tool-group__header');
-      expect(header.element.tagName).toBe('BUTTON');
+      const disclosure = header.get('button.chat-tool-call__details-toggle');
+      expect(disclosure.attributes('aria-expanded')).toBe('false');
+      await disclosure.trigger('click');
+      expect(disclosure.attributes('aria-expanded')).toBe('true');
     }
 
     const multiple = mount(ChatToolGroup, {

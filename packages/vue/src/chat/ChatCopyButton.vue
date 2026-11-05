@@ -1,7 +1,9 @@
 <template>
   <ChatIconButton :disabled="disabled" :label="copied ? copiedLabel : label" @click="copy">
-    <CheckIcon v-if="showIcon !== false && copied" />
-    <CopyIcon v-else-if="showIcon !== false" />
+    <slot :copied="copied">
+      <CheckIcon v-if="showIcon !== false && copied" />
+      <CopyIcon v-else-if="showIcon !== false" />
+    </slot>
   </ChatIconButton>
 </template>
 

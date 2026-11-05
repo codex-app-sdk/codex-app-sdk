@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { mount, type VueWrapper } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import ChatToolCall from '../../src/chat/ChatToolCall.vue';
 import ChatToolCallTitle from '../../src/chat/ChatToolCallTitle.vue';
 import ChatToolConfirmation from '../../src/chat/ChatToolConfirmation.vue';
@@ -51,19 +52,26 @@ describe('ChatToolCall', () => {
   it.each([
     ['create', 'add'], ['edit', 'update'], ['delete', 'delete'],
   ])('opens each %s diff with inline or deferred bytes, including files beyond the title summary', async (action, changeKind) => {
+    const copy = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('codexAppSdkNative', { copyToClipboard: copy });
+    try {
     for (const diff of ['', '# README 🪴\n']) {
       const diffContent = { sessionId: 'thread', contentId: 'a'.repeat(64), byteLength: diff ? new TextEncoder().encode(diff).length : 100_000, changeKind };
       const changes = Array.from({ length: 4 }, (_, index) => ({ path: `/repo/file${index}.txt`, kind: { type: changeKind }, diff, diffContent }));
       const wrapper = mountTool(tool({ kind: 'fileChange', args: { changes }, metadata: { changes }, status: descriptor('codex', action, { target: 'files' }) }));
       await wrapper.get('a').trigger('click');
       expect(wrapper.emitted('open-link')?.[0]?.[0]).toMatchObject({ path: '/repo/file0.txt', diffContent });
-      await wrapper.get('button.chat-tool-call__header').trigger('click');
-      const last = wrapper.findAll('a').find(link => link.text() === '/repo/file3.txt');
+      expect(wrapper.find('.chat-tool-call__body').exists()).toBe(false);
+      await wrapper.get('[aria-label="Copy full text"]').trigger('click'); await flushPromises();
+      expect(copy.mock.lastCall?.[0].text).toContain('file3.txt');
+      await wrapper.get('[aria-label="Expand full text"]').trigger('click');
+      const last = wrapper.findAll('a').find(link => link.attributes('href') === '/repo/file3.txt');
       expect(last).toBeDefined();
       await last!.trigger('click');
       expect(wrapper.emitted('open-link')?.at(-1)?.[0]).toMatchObject({ path: '/repo/file3.txt', diffContent });
       wrapper.unmount();
     }
+    } finally { vi.unstubAllGlobals(); }
   });
   it.each([
     { done: false, state: 'running', running: true },
@@ -159,10 +167,13 @@ describe('ChatToolCall', () => {
     { result: false, rendered: 'false' },
     { result: 0, rendered: '0' },
     { result: '', rendered: '' },
-  ])('renders the falsey result $result as an available detail', ({ result, rendered }) => {
+  ])('renders the falsey result $result as an available detail', async ({ result, rendered }) => {
     const wrapper = mountTool(tool({ result }), { showToolDetails: true });
 
-    expect(wrapper.get('.chat-tool-call__header').element.tagName).toBe('BUTTON');
+    const disclosure = wrapper.get('button.chat-tool-call__details-toggle');
+    expect(disclosure.attributes('aria-expanded')).toBe('false');
+    await disclosure.trigger('click');
+    expect(disclosure.attributes('aria-expanded')).toBe('true');
     expect(wrapper.findAll('.chat-tool-call__section-title').map((node) => node.text())).toStrictEqual(['Result']);
     expect(wrapper.get('.chat-tool-call__json').text()).toBe(rendered);
   });
@@ -199,7 +210,7 @@ describe('ChatToolCall', () => {
     expect(wrapper.get('.chat-fold').classes()).not.toContain('chat-fold--open');
     expect(wrapper.get('.chat-tool-call__chevron').classes()).toContain('tabler-icon-chevron-down');
 
-    await header.trigger('click');
+    await wrapper.get('.chat-tool-call__title-content').trigger('click');
     expect(wrapper.get('.chat-tool-call').classes()).toContain('chat-tool-call--open');
     expect(wrapper.get('.chat-fold').classes()).toContain('chat-fold--open');
     expect(wrapper.get('.chat-tool-call__chevron').classes()).toContain('tabler-icon-chevron-up');
@@ -210,23 +221,71 @@ describe('ChatToolCall', () => {
     expect(wrapper.get('.chat-tool-call__chevron').classes()).toContain('tabler-icon-chevron-down');
   });
 
-  it('keeps details disabled even when data exists and does not invent empty details', () => {
-    const disabled = mountTool(tool({ args: { command: 'npm test' }, result: 'passed' }), {
-      showToolDetails: false,
+  it('reveals overflowing titles without enabling verbose details or inventing empty details', async () => {
+    let resize!: ResizeObserverCallback;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) { resize = callback; }
+      observe() {} unobserve() {} disconnect() {}
     });
-    expect(disabled.get('.chat-tool-call__header').element.tagName).toBe('DIV');
-    expect(disabled.find('.chat-fold').exists()).toBe(false);
+    const disabled = mount(ChatToolCall, { props: {
+      toolCall: tool({ args: { command: 'npm test' }, result: 'passed' }), showToolDetails: false,
+    }, attachTo: document.body });
+    try {
+      expect(disabled.get('.chat-tool-call__header').element.tagName).toBe('DIV');
+      expect(disabled.find('.chat-fold').exists()).toBe(false);
+      await nextTick();
+      const text = disabled.get('.chat-tool-call__title-content').element;
+      let width = 40;
+      Object.defineProperties(text, { clientWidth: { get: () => width }, scrollWidth: { get: () => 400 } });
+      resize?.([{ target: text } as ResizeObserverEntry], {} as ResizeObserver);
+      await nextTick();
+      const expand = disabled.get('button[aria-label="Expand full text"]');
+      expect(expand.attributes('aria-expanded')).toBe('false');
+      await disabled.get('.chat-tool-call__title-content').trigger('click');
+      expect(disabled.get('.chat-tool-call__title').classes()).toContain('chat-tool-call__title--expanded');
+      expect(disabled.get('[aria-label="Collapse full text"]').attributes('aria-expanded')).toBe('true');
+      expect(disabled.find('.chat-fold').exists()).toBe(false);
+      expect(disabled.text()).not.toContain('passed');
+      expect(disabled.find('[aria-label="Copy"]').exists()).toBe(false);
+      await disabled.get('[aria-label="Collapse full text"]').trigger('click');
+      width = 800;
+      resize([{ target: text } as ResizeObserverEntry], {} as ResizeObserver);
+      await nextTick();
+      expect(disabled.find('[aria-label="Expand full text"]').exists()).toBe(false);
+      await disabled.get('.chat-tool-call__title-content').trigger('click');
+      expect(disabled.find('[aria-label="Collapse full text"]').exists()).toBe(false);
+    } finally { disabled.unmount(); vi.unstubAllGlobals(); }
 
     const empty = mountTool(tool(), { showToolDetails: true });
     expect(empty.get('.chat-tool-call__header').element.tagName).toBe('DIV');
     expect(empty.find('.chat-fold').exists()).toBe(false);
   });
 
-  it('uses an exact nonstandard status as the public title', () => {
-    const wrapper = mountTool(tool({ status: 'Searched 3 files' }));
-
-    expect(wrapper.get('.chat-tool-call__title').attributes('data-label')).toBe('Searched 3 files');
-    expect(wrapper.get('.chat-tool-call__title').text()).toBe('Searched 3 files');
+  it('copies the full current tool title through its leading icon and briefly confirms success', async () => {
+    const copy = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText: copy } });
+    vi.useFakeTimers();
+    const wrapper = mount(ChatToolCall, { props: { toolCall: tool({ status: 'Searched 3 files' }) }, attachTo: document.body });
+    try {
+      expect(wrapper.get('.chat-tool-call__title').attributes('data-label')).toBe('Searched 3 files');
+      const button = wrapper.get('[aria-label="Copy full text"]');
+      await button.trigger('pointerenter', { pointerType: 'mouse' });
+      expect(button.find('.tabler-icon-copy').exists()).toBe(true);
+      await button.trigger('click'); await flushPromises();
+      expect(copy).toHaveBeenLastCalledWith('Searched 3 files');
+      expect(wrapper.get('[aria-label="Copied"]').find('.tabler-icon-check').exists()).toBe(true);
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(wrapper.find('[aria-label="Copied"]').exists()).toBe(false);
+      await button.trigger('pointerleave');
+      await button.trigger('pointerenter', { pointerType: 'touch' });
+      expect(button.find('.tabler-icon-copy').exists()).toBe(false);
+      await button.trigger('focusin');
+      expect(button.find('.tabler-icon-copy').exists()).toBe(false);
+      await button.trigger('focusout');
+      await wrapper.setProps({ toolCall: tool({ kind: 'command', args: { command: 'first line\nsecond line with complete arguments' }, status: 'Ran a human-readable command summary' }) });
+      await wrapper.get('[aria-label="Copy full text"]').trigger('click'); await flushPromises();
+      expect(copy).toHaveBeenLastCalledWith('first line\nsecond line with complete arguments');
+    } finally { wrapper.unmount(); vi.useRealTimers(); vi.unstubAllGlobals(); }
   });
 
   it('forwards responses and links from every specialized and header renderer', async () => {

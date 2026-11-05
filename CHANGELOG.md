@@ -4,6 +4,11 @@
 
 ## 0.21.6
 
+### Changed
+
+- Expand truncated tool rows in place and copy their full text from the tool icon; shell tools copy the original command.
+- Keep file links inline without a separate Files panel.
+
 ### Fixed
 
 - Preserve GIF animation in user attachments and assistant image previews instead of flattening resized previews into still images.

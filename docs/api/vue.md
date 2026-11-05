@@ -756,12 +756,21 @@ openLink: [link: {
 
 When a host uses `ConversationContentTransport`, nonempty file diffs carry
 `diffContent`. Fetch the exact patch through the host's authorized content reader
-only when that file is selected. The expandable file list exposes every deferred
-file even when raw tool details are disabled. Deleted files use the `edit` link
+only when that file is selected. Expanding a shortened file row exposes its
+remaining inline file links. Deleted files use the `edit` link
 action to open their historical diff.
 
+Truncated tool rows reveal a small chevron on hover or keyboard focus. Click the
+text or chevron to expand the full row in place, preserving line breaks; click
+again to collapse it. Touch devices keep the chevron visible. Hovering a tool
+icon replaces it with Copy; activating it copies the full row text and briefly
+shows a checkmark. Shell tools copy their structured command without the status
+prefix. Visual wrapping never adds newlines to copied text. Tool rows disable
+text selection; use their Copy action instead. File links remain inline, with
+no separate Files panel.
+
 Raw tool-call input and output are inaccessible by default: stock tool rows do
-not render a disclosure control or place those values in the DOM. Enable access
+not place those values in the DOM. Enable access
 for one component tree with the `show-tool-details` prop on
 `CodexConversationPane`, `CodexMessageList`, `CodexMessage`, `CodexToolGroup`,
 or `CodexToolCall`. Applications can set the policy once for a Vue subtree:
