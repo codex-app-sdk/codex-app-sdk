@@ -200,7 +200,7 @@ describe('conversation message image previews', () => {
       set src(value: string) { if (value) queueMicrotask(() => this.onload?.()) }
     })
     const read = vi.fn(async (_reference: string): Promise<string | null> => imageUrl)
-    const items = shallowRef<CodexChatMessage[]>(['first','second','third'].map(id => ({id,role:'assistant',content:'',parts:[{type:'media',media:{title:id,url:`/${id}.png`, ...(id === 'first' ? {width:1024,height:512} : id === 'third' ? {width:Number.NaN,height:-1} : {})}}]})))
+    const items = shallowRef<CodexChatMessage[]>(['first','second','third'].map((id, index) => ({id,role:'assistant',content:'',parts:[{type:'media',media:{title:id,url:`conversation-image:thread:${String(index + 1).repeat(64)}`, ...(id === 'first' ? {width:1024,height:512} : id === 'third' ? {width:Number.NaN,height:-1} : {})}}]})))
     const wrapper = mount(defineComponent({setup() {
       provideCodexHostCapabilities({readImagePreview:read} as never, {imagePreviewBudgetBytes:256,viewportImageLoading:true})
       return {items}
@@ -229,12 +229,43 @@ describe('conversation message image previews', () => {
     deliver(third,true,true); await flushPromises()
     expect(wrapper.findAll('img')).toHaveLength(2)
     expect(wrapper.get('[aria-label="Open first"] img').attributes('src')).toBe('blob:viewport-1')
+    // Switching conversations removes every consumer, but a recent preview is
+    // ready on remount, before another viewport callback or native bridge read.
+    const previous = items.value
+    const beforeSwitch = read.mock.calls.length
+    items.value = []; await flushPromises()
+    items.value = previous; await flushPromises()
+    expect(wrapper.get('[aria-label="Open first"] img').attributes('src')).toBe('blob:viewport-1')
+    expect(read).toHaveBeenCalledTimes(beforeSwitch)
+    // Cached consumers must not keep stale visibility protection after unmount.
+    deliver(target('first'), true, true)
     items.value = [{id:'portrait',role:'user',content:'',parts:[{type:'attachment',attachment:{kind:'image',name:'Portrait',url:'/portrait.png',width:720,height:1280}}]}]
     await flushPromises()
     expect(wrapper.get('[aria-label="Open Portrait"]').attributes('style')).toContain('aspect-ratio: 720 / 1280')
     deliver(target('Portrait'),true,true); await flushPromises()
     expect(wrapper.get('[aria-label="Open Portrait"] img').attributes('src')).toMatch(/^blob:/)
     expect(wrapper.get('[aria-label="Open Portrait"]').attributes('style')).toContain('aspect-ratio: 720 / 1280')
+    const beforeEvicted = read.mock.calls.length
+    items.value = [previous[0]!]; await flushPromises()
+    expect(wrapper.get('[aria-label="Open first"] img').attributes('src')).toBe('blob:viewport-1')
+    expect(read).toHaveBeenCalledTimes(beforeEvicted)
+    items.value = [previous[1]!]; await flushPromises()
+    deliver(target('second'), true, true); await flushPromises()
+    expect(read).toHaveBeenCalledTimes(beforeEvicted + 1)
+    expect(wrapper.get('[aria-label="Open second"] img').attributes('src')).toMatch(/^blob:/)
+    // A mutable path must be resolved again, as must an immutable identity whose
+    // host returned a borrowed URL that can be revoked independently.
+    for (const [reference, result] of [['/current.png', imageUrl], [`conversation-image:thread:${'f'.repeat(64)}`, 'blob:host-owned']] as const) {
+      const current = {id:'current',role:'assistant' as const,content:'',parts:[{type:'media' as const,media:{title:'current',url:reference}}]}
+      const reads = read.mock.calls.length
+      read.mockResolvedValueOnce(result)
+      items.value = [current]; await flushPromises(); deliver(target('current'),true,true); await flushPromises()
+      expect(wrapper.find('[aria-label="Open current"] img').exists()).toBe(true)
+      items.value = []; await flushPromises()
+      expect(revoke).not.toHaveBeenCalledWith('blob:host-owned')
+      items.value = [current]; await flushPromises(); deliver(target('current'),true,true); await flushPromises()
+      expect(read).toHaveBeenCalledTimes(reads + 2)
+    }
     // Scrolling away before a queued request starts must avoid the host read.
     const releases: Array<(value: string) => void> = []
     read.mockImplementationOnce(() => new Promise(resolve => releases.push(resolve))).mockImplementationOnce(() => new Promise(resolve => releases.push(resolve)))

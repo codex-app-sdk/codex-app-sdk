@@ -875,8 +875,8 @@ See the [Vue guide](/guide/vue),
 bounds retained media and attachment previews for that Vue subtree. The budget
 counts cached original bytes, thumbnail bytes, and decoded preview pixels (four
 bytes per pixel). Two preview loads run at a time. Data URLs become blob URLs;
-no base64 strings are retained by the pool. The last consumer releasing an image
-revokes its owned URLs, and disposing the provider releases the whole pool.
+no base64 strings are retained by the pool. In eager mode, the last consumer
+releasing an image revokes its owned URLs. Disposing the provider releases the whole pool.
 Remote image URLs use the browser's own HTTP cache.
 
 This bounds retained preview resources, not total process RSS: provider snapshots,
@@ -891,8 +891,15 @@ sized for their rendered width and display density, capped at 1024 pixels wide;
 height preserves the source aspect ratio. Open, copy and download actions use
 original bytes. Leaving the prefetch region releases decoded
 previews while retaining compressed originals and thumbnails within the same budget.
-Returning reuses the cached thumbnail immediately without another host request. Least-recently-used
-originals are evicted only when the total cache needs room, before visible images.
+Returning reuses the cached thumbnail immediately without another host request.
+Viewport mode also retains up to 128 recently used immutable `conversation-image:`
+previews with pool-owned original bytes after their last consumer unmounts,
+so switching conversations can reuse ready previews. Mutable file references,
+direct data URLs and borrowed URLs keep last-consumer release behavior. Idle
+entries remain inside the same byte budget and are evicted before active previews,
+in least-recently-used order. The full source reference identifies each entry;
+hosts must dispose the provider when its authorized owner changes, including logout.
+Least-recently-used originals are evicted when the total cache needs room, before visible images.
 Optional image `width` and `height` reserve the intrinsic aspect ratio before
 loading. Small conversation images display at their natural size; larger images
 shrink to fit the conversation and viewport height limits. Decoded dimensions

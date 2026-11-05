@@ -19,14 +19,26 @@ export class ImagePreviewPool {
       this.entries.set(reference, entry)
     }
     entry.users++
+    if (entry.thumbnail && !entry.source.value && this.room(entry.previewPixels, entry, false)) {
+      entry.bytes = entry.previewPixels; entry.source.value = entry.thumbnail; entry.state.value = 'ready'
+    }
+    this.touch(entry)
     return entry
   }
 
   release(entry: Entry) {
     entry.users = Math.max(0, entry.users - 1)
     if (entry.users) return
+    entry.near = 0; entry.visible = 0
+    // Only transported immutable identities can outlive their consumers. A file
+    // path can change, and a borrowed URL can be revoked by its owning host.
+    if (this.viewport && entry.thumbnail && entry.ownedOriginal && entry.reference.length <= 512 && /^conversation-image:[^:]+:[a-f0-9]{64}$/i.test(entry.reference)) {
+      // A byte budget alone would permit millions of tiny cached images.
+      const idle = [...this.entries.values()].filter(candidate => !candidate.users)
+      for (const candidate of idle.slice(0, Math.max(0, idle.length - 128))) this.drop(candidate)
+      return
+    }
     this.drop(entry)
-    this.entries.delete(entry.reference)
   }
 
   clear() { for (const entry of this.entries.values()) { entry.users = 0; this.drop(entry) }; this.entries.clear() }
@@ -92,6 +104,13 @@ export class ImagePreviewPool {
     let retained = [...this.entries.values()].reduce((sum, item) => sum + item.bytes + item.originalBytes + item.thumbnailBytes, 0)
     const candidates = [...this.entries.values()].filter(entry => entry !== owner && !entry.pending && !(this.viewport && entry.visible && !explicit))
       .sort((a, b) => a.visible - b.visible || a.near - b.near)
+    // Old conversations have no consumers. Evict them completely before
+    // degrading previews still used by the current conversation.
+    for (const candidate of candidates.filter(entry => !entry.users)) {
+      if (retained + bytes <= this.budget) break
+      retained -= candidate.bytes + candidate.originalBytes + candidate.thumbnailBytes
+      this.drop(candidate)
+    }
     for (const candidate of candidates) {
       if (retained + bytes <= this.budget) break
       retained -= candidate.bytes
@@ -116,6 +135,7 @@ export class ImagePreviewPool {
     entry.thumbnail = undefined; entry.thumbnailBytes = 0; entry.previewPixels = 0; entry.ownedPreview = false
     if (entry.ownedOriginal) URL.revokeObjectURL(entry.original.value!)
     entry.original.value = undefined; entry.originalBytes = 0; entry.ownedOriginal = false
+    if (!entry.users && this.entries.get(entry.reference) === entry) this.entries.delete(entry.reference)
   }
 
   private pump() {

@@ -27,7 +27,7 @@ const fixture = {
       const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
       URL.createObjectURL = blob => { const url = create(blob); window.urls.add(url); window.cachedBytes.set(url,blob.size); return url; };
       URL.revokeObjectURL = url => { window.urls.delete(url); window.cachedBytes.delete(url); revoke(url); };
-      const items = ref(Array.from({length:12}, (_,i) => ({ id: 'photo-'+i, role:'assistant', content:'', parts:[{type:'media',media:{url:'/photo-'+i+'.png',title:'Photo '+i,width:1024,height:512}}] })));
+      const items = ref(Array.from({length:12}, (_,i) => ({ id: 'photo-'+i, role:'assistant', content:'', parts:[{type:'media',media:{url:'conversation-image:photo-'+i+':'+ 'a'.repeat(64),title:'Photo '+i,width:1024,height:512}}] })));
       window.replaceImages = value => { items.value = value; };
       const gallery = ref(false); window.showGallery = () => { gallery.value = true; };
       const crowdedReady = new Promise(resolve => { window.releaseCrowdedImages = resolve; });
@@ -81,7 +81,13 @@ try {
       assert.deepEqual(await shot(i).boundingBox(),before,'decoding and eviction preserve geometry');
     }
     assert.equal(await shot(0).locator('img').getAttribute('src'),firstThumbnail,'scrolling back immediately reuses the same cached thumbnail');
-    assert.equal(await page.evaluate(()=>window.reads.filter(r=>r==='/photo-0.png').length),1,'returning reuses downloaded bytes after the decoded preview is released');
+    assert.equal(await page.evaluate(()=>window.reads.filter(r=>r.includes(':photo-0:')).length),1,'returning reuses downloaded bytes after the decoded preview is released');
+    await page.evaluate(()=>window.replaceImages([{id:'other-thread',role:'assistant',content:'',parts:[{type:'media',media:{url:'conversation-image:other-thread:'+ 'a'.repeat(64),title:'Other thread',width:1024,height:512}}]}]));
+    await page.waitForFunction(()=>document.querySelector('[aria-label="Open Other thread"] img')?.naturalWidth>0);
+    const readsBeforeSwitchBack=await page.evaluate(()=>window.reads.length);
+    await page.evaluate(()=>window.replaceImages([{id:'photo-0',role:'assistant',content:'',parts:[{type:'media',media:{url:'conversation-image:photo-0:'+ 'a'.repeat(64),title:'Photo 0',width:1024,height:512}}]}]));
+    assert.equal(await shot(0).locator('img').getAttribute('src'),firstThumbnail,'returning to an unmounted conversation immediately reuses its ready preview');
+    assert.equal(await page.evaluate(()=>window.reads.length),readsBeforeSwitchBack,'switching back needs no new host read or thumbnail encoding');
     // Crowded thumbnails must all render without repeated downloads.
     await page.evaluate(()=>window.replaceImages([{id:'crowded',role:'user',content:'',parts:Array.from({length:8},(_,i)=>({type:'attachment',attachment:{kind:'image',name:'Crowded '+i,path:'/crowded-'+i+'.png'}}))}]));
     await page.waitForFunction(()=>window.active>=2);
@@ -150,6 +156,23 @@ try {
       assert.ok(Math.abs(bounds.width-64)<1 && Math.abs(bounds.height-64)<1,'learned original dimensions prevent icon upscaling');
       await qualityPage.screenshot({path:join(artifacts,engine.name()+'-small-'+viewportWidth+'.png')});
     }
+    // A large byte budget must not retain unbounded metadata for tiny images.
+    let oldestTiny, newestTiny;
+    for (let index=0;index<129;index++) {
+      await qualityPage.evaluate(index=>window.replaceImages([{id:'tiny-'+index,role:'assistant',content:'',parts:[{type:'media',media:{url:'conversation-image:small-tiny-'+index+':'+ 'a'.repeat(64),title:'Tiny',width:64,height:64}}]}]),index);
+      await qualityPage.waitForFunction(()=>document.querySelector('[aria-label="Open Tiny"] img')?.naturalWidth>0);
+      newestTiny=await qualityPage.getByRole('button',{name:'Open Tiny',exact:true}).locator('img').getAttribute('src');
+      if (index===0) oldestTiny=newestTiny;
+    }
+    const tinyReads=await qualityPage.evaluate(()=>window.reads.length);
+    await qualityPage.evaluate(()=>window.replaceImages([]));
+    assert.equal(await qualityPage.evaluate(url=>window.urls.has(url),oldestTiny),false,'oldest idle previews are evicted even when tiny images fit the byte budget');
+    assert.ok(await qualityPage.evaluate(()=>window.urls.size<=128),'at most 128 idle image entries remain');
+    await qualityPage.evaluate(()=>window.replaceImages([{id:'tiny-128',role:'assistant',content:'',parts:[{type:'media',media:{url:'conversation-image:small-tiny-128:'+ 'a'.repeat(64),title:'Tiny',width:64,height:64}}]}]));
+    assert.equal(await qualityPage.getByRole('button',{name:'Open Tiny',exact:true}).locator('img').getAttribute('src'),newestTiny);
+    assert.equal(await qualityPage.evaluate(()=>window.reads.length),tinyReads);
+    await qualityPage.evaluate(()=>window.closeImages());
+    assert.equal(await qualityPage.evaluate(()=>window.urls.size),0,'disposing the owner revokes the entire idle cache');
     await qualityPage.close();
     const galleryPage = await browser.newPage({viewport:{width:1200,height:900}});
     galleryPage.setDefaultTimeout(5000);

@@ -55,7 +55,7 @@ export function useManagedImagePreview(source: WatchSource<string>, element: Ref
       pool.visibilityChanged(current, target.clientWidth || 512)
       if (entered) void pool.load(current)
     })
-    onCleanup(() => { stop(); current.near -= Number(near); current.visible -= Number(visible) })
+    onCleanup(() => { stop(); current.near = Math.max(0, current.near - Number(near)); current.visible = Math.max(0, current.visible - Number(visible)) })
   }, { flush: 'post' })
   return {
     viewport: pool.viewport,
