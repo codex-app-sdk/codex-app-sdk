@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.21.6
+
+### Fixed
+
+- Preserve GIF animation in user attachments and assistant image previews instead of flattening resized previews into still images.
+
 ## 0.21.5
 
 ### Fixed
