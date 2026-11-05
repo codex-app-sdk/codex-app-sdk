@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- Retain inline image previews across viewport updates to avoid repeated loading.
 - Keep answered question labels clear in conversation tool rows.
 
 ## 0.19.8
