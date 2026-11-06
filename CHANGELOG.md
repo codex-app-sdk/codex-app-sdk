@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.21.7
+
+### Added
+
+- Let hosts render custom chat blocks alongside the built-in conversation content.
+
 ## 0.21.6
 
 ### Changed
