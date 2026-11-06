@@ -1,3 +1,4 @@
+import type { ContinueCodexSafetyReviewOptions } from '@codex-app-sdk/core/surface';
 import type {
   CodexConversationEvent,
   CodexConversationHistory,
@@ -25,6 +26,7 @@ export type CodexConversationHandleOperations = {
   clearGoal(): Promise<void>;
   compact(): Promise<void>;
   continueInterruptedTurn(): Promise<void>;
+  continueAfterSafetyReview?(options: ContinueCodexSafetyReviewOptions): Promise<void>;
   deleteTurn(turnId: string): Promise<void>;
   deleteQueuedPrompt(promptId: string): Promise<void>;
   updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<void>;
@@ -93,6 +95,7 @@ export function createCodexConversationHandle(
     startRealtime: operations.startRealtime,
     compact: () => snapshotAfter(operations.compact),
     continueInterruptedTurn: () => snapshotAfter(operations.continueInterruptedTurn),
+    continueAfterSafetyReview: (options) => snapshotAfter(() => operations.continueAfterSafetyReview?.(options) ?? Promise.reject(new Error('Safety review continuation is unavailable.'))),
     startReview: (options) => snapshotAfter(() => operations.startReview(options)),
     steerMessage: (prompt, options) => snapshotAfter(() => operations.steerMessage(prompt, options)),
     interrupt: () => snapshotAfter(operations.interrupt),

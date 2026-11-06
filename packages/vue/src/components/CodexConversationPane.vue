@@ -83,6 +83,8 @@
 
       <template #footer>
         <footer ref="footerElement" class="codex-conversation-pane__footer">
+          <slot v-if="$slots['composer-replacement']" name="composer-replacement" />
+          <template v-else>
           <p v-if="effectiveError" class="codex-conversation-pane__error" role="alert">{{ effectiveError }}</p>
           <div v-if="activeApproval" class="codex-conversation-pane__approvals">
             <slot name="approval" :approval="activeApproval">
@@ -265,6 +267,7 @@
             <template v-if="$slots['composer-after']" #after><slot name="composer-after" /></template>
           </CodexComposer>
           <slot name="after-composer" />
+          </template>
           </template>
         </footer>
       </template>
@@ -463,6 +466,7 @@ defineSlots<{
   'after-composer'(): unknown;
   approval(props: { approval: CodexSurfaceApproval }): unknown;
   'before-composer'(): unknown;
+  'composer-replacement'(): unknown;
   'composer-after'(): unknown;
   'composer-after-input'(): unknown;
   'composer-attachment-actions'(props: {

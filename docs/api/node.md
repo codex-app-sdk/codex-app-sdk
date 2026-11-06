@@ -712,3 +712,24 @@ record decodes are serialized per surface, including requests from older clients
 malformed, oversized records and foreign history cannot grant image access. The provider
 history file must be accessible to the SDK process; this option is intended for
 local app-server integrations.
+
+### Provider safety findings
+
+Turn errors in snapshots and `turn.error` events preserve optional
+`misalignment` findings: `errorType`, `detailedExplanation`, `steer.message`,
+and the optional opaque `reviewTarget`. Error categories are open-ended.
+The field is absent when the provider supplies no findings.
+
+Hosts can present the provider's explanation for review. Offer continuation only
+when a substantive explanation and a nonempty provider-issued `steer.message` are
+present, and submit that exact instruction only after the user confirms. Recheck
+the current conversation, blocked turn and findings before dispatch. A review
+target alone does not authorize continuation. The safety-review action does not automatically
+retry blocked requests or manufacture continuation metadata.
+
+Use the main-process `conversation.continueAfterSafetyReview({ turnId, findings })`
+action after confirmation. It rechecks the latest blocked turn, requires a
+substantive explanation and instruction, rejects changed findings or active work,
+and submits the exact provider instruction as native text input. It does not
+interpret slash commands, queue the instruction, or add safety-override metadata.
+The optional method is absent on older SDK hosts.

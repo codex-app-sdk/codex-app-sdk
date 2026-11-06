@@ -949,3 +949,12 @@ Failed previews remain explicitly retryable; eviction does not cause a fetch loo
 Preview blob URLs are borrowed resources: a host that opens an independent image
 tab must retain its own Blob/object URL before the preview is released, and revoke
 its own URL when the tab closes. The preview budget does not own that viewer.
+
+### Replace the composer
+
+The `composer-replacement` slot replaces the pane footer's standard composer,
+shelf, approvals and question controls while keeping the transcript visible.
+Declare the slot conditionally to restore the standard composer when it is no
+longer needed. Hosts presenting a stopped or read-only conversation should also
+disable submission, follow-ups and mutating message actions in their controller;
+copying and opening existing content can remain available.

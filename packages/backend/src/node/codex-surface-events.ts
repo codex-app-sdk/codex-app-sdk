@@ -34,6 +34,7 @@ export function surfaceTurnError(error: v2.TurnError | null): CodexSurfaceTurnEr
     message: error.message,
     additionalDetails: error.additionalDetails,
     codexErrorInfo: error.codexErrorInfo as CodexSurfaceJsonValue | null,
+    ...(error.misalignment ? { misalignment: { ...error.misalignment, steer: error.misalignment.steer ? { ...error.misalignment.steer } : null } } : {}),
   };
 }
 

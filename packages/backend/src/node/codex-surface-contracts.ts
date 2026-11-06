@@ -1,3 +1,4 @@
+import type { ContinueCodexSafetyReviewOptions } from '@codex-app-sdk/core/surface';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
   CodexConversationEvent,
@@ -165,6 +166,8 @@ export type CodexConversation = {
   updateSettings(settings: UpdateCodexConversationSettings): Promise<CodexConversationSnapshot>;
   sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<CodexConversationSnapshot>;
   continueInterruptedTurn(): Promise<CodexConversationSnapshot>;
+  /** Main-process only. Call only after explicit user review of the supplied findings. */
+  continueAfterSafetyReview?(options: ContinueCodexSafetyReviewOptions): Promise<CodexConversationSnapshot>;
   /** Starts an experimental app-server realtime voice session without exposing JSON-RPC. */
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   compact(): Promise<CodexConversationSnapshot>;

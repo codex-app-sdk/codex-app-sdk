@@ -3563,6 +3563,18 @@ describe('CodexConversationPane', () => {
     expect(composerProps(wrapper).disabled).toBe(false);
   });
 
+  it('lets a host replace the composer while retaining the readable transcript', () => {
+    const wrapper = mount(CodexConversationPane, {
+      props: { messages: [{ id: 'saved', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'Saved conversation' }] }] },
+      slots: { 'composer-replacement': '<div role="alert">Conversation stopped</div>' },
+    });
+    expect(wrapper.text()).toContain('Saved conversation');
+    expect(wrapper.get('[role="alert"]').text()).toBe('Conversation stopped');
+    expect(wrapper.find('[role="textbox"]').exists()).toBe(false);
+    expect(wrapper.find('.codex-conversation-pane__composer-shelf').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('exposes slots and extensible composer menu entries', async () => {
     const menuItems: CodexComposerMenuItem<{ source: string }>[] = [{
       id: 'custom-action',

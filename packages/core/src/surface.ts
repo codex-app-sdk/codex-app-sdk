@@ -650,7 +650,24 @@ export type CodexSurfaceSubagentActivity = {
   agentConversationId: string;
   agentPath: string;
 };
+/** Provider-authored findings; continuation requires an explanation, instruction and user confirmation. */
+export type CodexSurfaceMisalignmentErrorDetails = {
+  errorType: string | null;
+  detailedExplanation: string | null;
+  steer: { message: string } | null;
+  /** Opaque provider target; its presence alone does not permit continuation. */
+  reviewTarget?: string | null;
+};
+
+/** Explicit user review of the exact findings supplied by the provider. */
+export type ContinueCodexSafetyReviewOptions = {
+  turnId: string;
+  findings: CodexSurfaceMisalignmentErrorDetails;
+};
+
 export type CodexSurfaceTurnError = {
+  /** Absent when no provider findings were supplied. */
+  misalignment?: CodexSurfaceMisalignmentErrorDetails;
   message: string;
   additionalDetails: string | null;
   codexErrorInfo: CodexSurfaceJsonValue | null;

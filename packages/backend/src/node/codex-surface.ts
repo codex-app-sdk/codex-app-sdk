@@ -895,6 +895,7 @@ export class CodexSurface {
       clearGoal: () => this.conversationSettings.clearGoalForThread(id),
       compact: () => this.turnActions.compactForThread(id),
       continueInterruptedTurn: () => this.messagesController.continueInterruptedTurnForThread(id),
+      continueAfterSafetyReview: (options) => this.messagesController.continueInterruptedTurnForThread(id, options),
       deleteTurn: (turnId) => this.turnActions.deleteTurnForThread(id, turnId),
       deleteQueuedPrompt: (promptId) => this.messagesController.deleteQueuedPromptForThread(id, promptId),
       updateQueuedPrompt: (promptId, prompt, options) => this.messagesController.updateQueuedPromptForThread(id, promptId, prompt, options),

@@ -1,3 +1,4 @@
+import type { ContinueCodexSafetyReviewOptions } from '@codex-app-sdk/core/surface';
 import { promptContentDispatchText, promptContentText } from '@codex-app-sdk/core/surface';
 import type { CodexAppServerClient, v2 } from '../codex/index';
 import type {
@@ -153,7 +154,9 @@ export class CodexSurfaceMessagesController {
     return this.host.getSnapshot();
   }
 
-  async continueInterruptedTurnForThread(threadId: string): Promise<void> {
+  async continueInterruptedTurnForThread(threadId: string, safetyReview?: ContinueCodexSafetyReviewOptions): Promise<void> {
+    const reviewedTurnId = safetyReview?.turnId;
+    const reviewedFindings = safetyReview ? safetyFindingsKey(safetyReview.findings) : null;
     const runtime = await this.host.ensureThreadReady(threadId);
     if (runtime.busy || runtime.turnStartPending || runtime.activeTurnId) {
       throw new Error('Cannot continue while a turn is active');
@@ -162,7 +165,16 @@ export class CodexSurfaceMessagesController {
     const latestTurn = latestTurnId
       ? runtime.turns.find((turn) => turn.id === latestTurnId)
       : undefined;
-    if (latestTurn?.status !== 'interrupted') {
+    let input: v2.UserInput[] = [];
+    if (safetyReview) {
+      const findings = latestTurn?.error?.misalignment;
+      if (latestTurn?.status !== 'failed' || latestTurnId !== reviewedTurnId
+        || !findings?.detailedExplanation?.trim() || !findings.steer?.message.trim()
+        || safetyFindingsKey(findings) !== reviewedFindings) {
+        throw new Error('Provider safety continuation is unavailable or the reviewed findings have changed');
+      }
+      input = [{ type: 'text', text: findings.steer.message, text_elements: [] }];
+    } else if (latestTurn?.status !== 'interrupted') {
       throw new Error('The latest turn is not interrupted');
     }
 
@@ -173,7 +185,7 @@ export class CodexSurfaceMessagesController {
     try {
       const response = await this.client.request('turn/start', {
         threadId,
-        input: [],
+        input,
         ...turnSettings(this.host.snapshotForRuntime(runtime), {}),
       });
       const wasKnownTurn = runtime.turnIds.includes(response.turn.id);
@@ -517,4 +529,8 @@ export class CodexSurfaceMessagesController {
     if (inputs.length > 0 && runtime.skillCatalogStatus !== 'loaded') await this.host.loadSkillsForThread(runtime.threadId);
     return validateSkillInputs(inputs, runtime.skills);
   }
+}
+
+function safetyFindingsKey(findings: ContinueCodexSafetyReviewOptions['findings']): string {
+  return JSON.stringify([findings.errorType, findings.detailedExplanation, findings.steer?.message, findings.reviewTarget]);
 }

@@ -32,10 +32,11 @@ describe('CodexSurface', () => {
         turns: expect.arrayContaining([expect.objectContaining({ id: 'turn-idle-first', status: 'inProgress' })]),
       });
 
+      const misalignment = { errorType: 'reviewable', detailedExplanation: 'Review the operation and its authorization.', steer: { message: 'Provider-issued continuation instruction.' }, reviewTarget: 'opaque-provider-target' };
       if (status === 'error') {
         transport.emitNotification('error', {
           threadId: 'thread-existing', turnId: 'turn-idle-first', willRetry: false,
-          error: { message: 'Terminal failure', codexErrorInfo: null, additionalDetails: null, misalignment: null },
+          error: { message: 'Terminal failure', codexErrorInfo: null, additionalDetails: null, misalignment },
         });
       } else {
         transport.emitNotification('turn/completed', {
@@ -46,6 +47,7 @@ describe('CodexSurface', () => {
         id: 'turn-idle-first', status: status === 'error' ? 'failed' : status,
       }));
       expect(replica.getSnapshot().turns).toEqual(surface.getSnapshot().turns);
+      if (status === 'error') expect(replica.getSnapshot().turns.at(-1)?.error).toMatchObject({ misalignment });
       expect(events.filter((event) => event.type === 'turn.completed' || event.type === 'turn.error')).toEqual([
         expect.objectContaining({
           origin: 'notification', turnId: 'turn-idle-first',
@@ -55,6 +57,39 @@ describe('CodexSurface', () => {
     } finally {
       await surface.close();
     }
+  });
+
+  it('continues only reviewed provider findings and sends the exact instruction without queueing or command parsing', async () => {
+    const findings = { errorType: 'future-category', detailedExplanation: 'Review the operation.', steer: { message: ' /compact\nKeep the reviewed boundaries. ' }, reviewTarget: 'opaque' };
+    const blocked = { ...turn('blocked', 'failed', []), error: { message: 'Safety stop', codexErrorInfo: 'misalignmentPolicyViolation' as const, additionalDetails: null, misalignment: findings } };
+    const transport = new MockCodexAppServer({
+      'thread/resume': () => resumeResponse({ ...thread('thread-existing', false), turns: [blocked] }),
+      'turn/start': () => ({ turn: turn('continued', 'inProgress', []) }),
+    });
+    const surface = new CodexSurface({ client: new CodexAppServerClient(transport) });
+    await surface.connect();
+    try {
+      const conversation = surface.conversation('thread-existing');
+      for (const options of [{ turnId: 'other', findings }, { turnId: 'blocked', findings: { ...findings, detailedExplanation: 'Changed findings' } }]) {
+        await expect(conversation.continueAfterSafetyReview!(options)).rejects.toThrow();
+      }
+      for (const missing of [null, { ...findings, detailedExplanation: ' ' }, { ...findings, steer: null }]) {
+        transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: { ...blocked, error: { ...blocked.error, misalignment: missing } } });
+        await expect(conversation.continueAfterSafetyReview!({ turnId: 'blocked', findings })).rejects.toThrow();
+      }
+      transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: blocked });
+      const stale = conversation.continueAfterSafetyReview!({ turnId: 'blocked', findings });
+      transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: { ...blocked, error: { ...blocked.error, misalignment: { ...findings, steer: null } } } });
+      await expect(stale).rejects.toThrow();
+      transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: blocked });
+      expect(requestsFor(transport, 'turn/start')).toHaveLength(0);
+      await conversation.continueAfterSafetyReview!({ turnId: 'blocked', findings });
+      expect(lastRequest(transport, 'turn/start')).toMatchObject({ params: { threadId: 'thread-existing', input: [{ type: 'text', text: findings.steer.message, text_elements: [] }] } });
+      expect(requestsFor(transport, 'thread/compact/start')).toHaveLength(0);
+      await expect(conversation.continueAfterSafetyReview!({ turnId: 'blocked', findings })).rejects.toThrow();
+      expect(requestsFor(transport, 'turn/start')).toHaveLength(1);
+      expect(conversation.getSnapshot()).toMatchObject({ activeTurnId: 'continued', busy: true, queuedPrompts: [] });
+    } finally { await surface.close(); }
   });
 
   it.each(['pending', 'started'] as const)('recovers the queue on idle without settling unknown work or clearing a %s next turn', async (phase) => {

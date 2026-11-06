@@ -207,3 +207,15 @@ and UI refresh after tool completion—see the [Relay sample](/guide/samples#rel
 ### MCP servers for isolated generation
 
 `generateText(prompt, { mcpServers })` accepts the same trusted main-process server definitions as conversations. The SDK normalizes them before connecting and applies their configuration only to the ephemeral thread. Omit the option to retain the default wire behavior. Hosts own endpoint authorization and lifetime, and should close request-scoped servers in a `finally` block. `enabledTools` restricts the supplied server; it does not disable other provider-configured tools. Workspace-tool policy and image attachments remain independent.
+
+### Review provider safety findings
+
+A blocked turn can include `error.misalignment` with a provider-authored
+explanation and continuation instruction. Preserve these findings when forwarding
+snapshots or events to your UI. Display the explanation before offering a user
+confirmation, and offer continuation only when the provider also supplies a
+nonempty instruction. Revalidate the same blocked turn and findings at submission
+time and call `conversation.continueAfterSafetyReview({ turnId, findings })`. This
+main-process action sends the exact provider instruction without slash-command
+handling or queueing. Keep conversations stopped when this
+information is missing; an opaque `reviewTarget` alone is insufficient.
