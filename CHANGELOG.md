@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.22.0
+
+### Added
+
+- Preserve provider safety findings in conversation snapshots and events, with explicit continuation after review when the provider supplies an explanation and continuation instruction.
+- Let hosts replace the composer and its controls while keeping conversation history readable.
+
 ## 0.21.7
 
 ### Added
