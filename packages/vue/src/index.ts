@@ -242,3 +242,5 @@ export type {
   CodexSurfaceAttachment,
   SendCodexMessageOptions,
 } from '@codex-app-sdk/core/surface';
+
+export { codexCustomBlocksKey, type CodexCustomBlocks } from './chat/custom-blocks';

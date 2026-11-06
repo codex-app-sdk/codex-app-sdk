@@ -27,6 +27,7 @@
     <div v-for="chunk in markdownChunks" :key="chunk.start" class="chat-markdown-chunk" v-html="chunk.html" />
   </div>
   <ChatHtmlBlock v-else-if="block.type === 'html'" :source="block.source" :title="block.title" :complete="block.complete" />
+  <ChatCustomBlock v-else-if="block.type === 'custom'" :language="block.language" :code="block.code" :complete="block.complete" />
   <slot v-else-if="block.type === 'mermaid'" name="mermaid" :block="block" :code="block.code">
     <ChatMermaidBlock :code="block.code" />
   </slot>
@@ -122,6 +123,7 @@ import ChatFollowUps from './ChatFollowUps.vue'
 import ChatMediaBlock from './ChatMediaBlock.vue'
 import ChatMermaidBlock from './ChatMermaidBlock.vue'
 import ChatHtmlBlock from './ChatHtmlBlock.vue'
+import ChatCustomBlock from './ChatCustomBlock.vue'
 import ChatToolGroup from './ChatToolGroup.vue'
 import ChatToolCall from './ChatToolCall.vue'
 import ChatUserText from './ChatUserText.vue'

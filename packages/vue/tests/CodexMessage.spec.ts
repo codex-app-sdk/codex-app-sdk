@@ -2,10 +2,11 @@
 
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { h } from 'vue';
+import { defineComponent, h } from 'vue';
 import type { SurfaceMessage, SurfaceMessagePart } from '@codex-app-sdk/core/surface';
 import ChatCompactionMessage from '../src/chat/ChatCompactionMessage.vue';
 import CodexMessage from '../src/components/CodexMessage.vue';
+import { codexCustomBlocksKey } from '../src/chat/custom-blocks';
 import ChatMessageActions from '../src/chat/ChatMessageActions.vue';
 import ChatMessageBlock from '../src/chat/ChatMessageBlock.vue';
 import type { MessageBlock } from '../src/chat/message-blocks';
@@ -35,6 +36,40 @@ function mountMessage(props: Record<string, unknown>) {
 }
 
 describe('CodexMessage', () => {
+  it('renders registered fences through the host, including streaming state, with safe source fallbacks', async () => {
+    const component = defineComponent({ props: ['source', 'language', 'complete'], render() {
+      if (!this.complete) return h('div', { role: 'status' }, 'Rendering custom block');
+      if (this.source === 'broken') throw new Error('Host failed');
+      return h('output', { 'aria-label': 'Host widget' }, this.source);
+    } });
+    const message = (content: string, role = 'assistant') => ({ id: 'custom', role, content });
+    const wrapper = mount(CodexMessage, {
+      props: { message: message('Before\n\n```widget\nhello\n```\n\nAfter') as never },
+      global: { provide: { [codexCustomBlocksKey as symbol]: { widget: component } } },
+    });
+    expect(wrapper.get('output').text()).toBe('hello');
+    expect(wrapper.text()).toContain('Before');
+    expect(wrapper.text()).toContain('After');
+    await wrapper.setProps({ message: message('```widget\nbroken\n```') as never });
+    expect(wrapper.find('output').exists()).toBe(false);
+    expect(wrapper.get('pre').text()).toBe('broken');
+    await wrapper.setProps({ message: message('```widget\nrecovered\n```') as never });
+    expect(wrapper.get('output').text()).toBe('recovered');
+    await wrapper.setProps({ message: { ...message('```widget\npending'), streaming: true } as never });
+    expect(wrapper.get('[role="status"]').text()).toBe('Rendering custom block');
+    expect(wrapper.text()).not.toContain('pending');
+    expect(wrapper.find('pre').exists()).toBe(false);
+    await wrapper.setProps({ message: { ...message('```widget\nfinished\n```'), streaming: true } as never });
+    expect(wrapper.get('output').text()).toBe('finished');
+    await wrapper.setProps({ message: message('```widget\npending') as never });
+    expect(wrapper.find('output').exists()).toBe(false);
+    expect(wrapper.text()).toContain('pending');
+    await wrapper.setProps({ message: message('```other\nplain\n```') as never });
+    expect(wrapper.find('output').exists()).toBe(false);
+    await wrapper.setProps({ message: message('```widget\nuser text\n```', 'user') as never });
+    expect(wrapper.find('output').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('retains finished Markdown DOM while the tail streams and reparses replacements', async () => {
     const prefix = 'Finished **paragraph**.\n\n```ts\nconst answer = 42;\n```\n\n';
     const message = (content: string, streaming = true) => ({ id: 'incremental', role: 'assistant' as const, content, streaming });

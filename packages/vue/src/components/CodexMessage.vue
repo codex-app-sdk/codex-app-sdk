@@ -190,6 +190,7 @@ import type {
   CodexMessageImageOpenHandler,
 } from '../chat/message-image'
 import type { CodexConversationVisualization } from '../chat/visualization'
+import { useCodexCustomBlocks } from '../chat/custom-blocks'
 import ChatMessageBlock from '../chat/ChatMessageBlock.vue'
 import { imageGalleryMessageKey } from '../chat/image-gallery'
 import ChatMessageActions from '../chat/ChatMessageActions.vue'
@@ -295,7 +296,8 @@ const workActive = computed(() => {
 })
 const effectivePresentation = computed(() => resolveCodexConversationPresentation(props.presentation))
 provide(questionResponsesKey, inject(questionResponsesKey, undefined) ?? shallowReactive(new Map()))
-const allBlocks = computed<MessageBlock[]>((previous) => reuseMessageBlocks(computeMessageBlocks(chatMessage.value), previous))
+const customBlocks = useCodexCustomBlocks()
+const allBlocks = computed<MessageBlock[]>((previous) => reuseMessageBlocks(computeMessageBlocks(chatMessage.value, Object.keys(customBlocks)), previous))
 const visibleBlocks = computed(() => allBlocks.value.filter((block) => (
   (block.type !== 'question' || !props.hiddenClientRequestIds?.has(block.request.id))
   && (effectivePresentation.value.messages.toolBlocks || (block.type !== 'tool' && block.type !== 'tool-group'))
@@ -473,6 +475,7 @@ function isVisibleAssistantBlock(block: RenderedMessageBlock) {
   return block.type === 'attachment'
     || block.type === 'media'
     || block.type === 'mermaid'
+    || block.type === 'custom'
     || block.type === 'html'
     || block.type === 'reasoning'
     || block.type === 'tool'

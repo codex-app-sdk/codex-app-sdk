@@ -598,6 +598,29 @@ Streaming replies update unfinished Markdown without replacing completed paragra
 and code blocks, preserving selection and code-copy controls as text arrives.
 Custom `text` slots still receive the full text block and own its rendering.
 
+### Host-rendered fenced blocks
+
+Provide `codexCustomBlocksKey` (the global symbol
+`Symbol.for('codex.custom-blocks')`) with a language-to-Vue-component map:
+
+```ts
+import { codexCustomBlocksKey } from '@codex-app-sdk/vue'
+app.provide(codexCustomBlocksKey, { widget: MyWidget })
+```
+
+Assistant Markdown fences named `widget` render `MyWidget` with `source`,
+`language` and `complete` props. While streaming, an unfinished registered fence
+passes `complete: false` so the host can show a placeholder instead of source.
+After the closing fence, `complete` becomes true. Register lowercase language names.
+User messages, unfinished fences in stopped messages and unregistered languages
+retain their normal code rendering. Built-in
+HTML and Mermaid blocks are reserved. Custom blocks over 100,000 characters or
+components that throw show their source instead. Surrounding Markdown and
+assistant work grouping are preserved. The host owns format validation, lazy
+loading, resource limits, accessible output and interaction; the SDK has no
+diagram-engine dependency or knowledge of host panes. Registering a renderer
+does not change provider payloads or persisted conversation data.
+
 Message rendering is incremental by default: `CodexMessageList` and
 `CodexConversationPane` initially mount only the newest batch. Set
 `renderStrategy="eager"` when a host needs eager rendering of every supplied

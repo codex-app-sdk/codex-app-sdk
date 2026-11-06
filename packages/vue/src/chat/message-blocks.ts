@@ -33,6 +33,7 @@ export type MessageBlock =
   | { type: 'user-text'; content: string; promptContent?: Message['promptContent'] }
   | ({ type: 'reasoning'; content: string } & PhasedMessageBlock)
   | ({ type: 'mermaid'; code: string } & PhasedMessageBlock)
+  | ({ type: 'custom'; language: string; code: string; complete: boolean } & PhasedMessageBlock)
   | ({ type: 'html'; source: string; title?: string; complete: boolean } & PhasedMessageBlock)
   | ({ type: 'visualization'; path?: string; title: string } & PhasedMessageBlock)
   | ({ type: 'media'; media: MessageMedia; toolCall?: MessageToolCall } & PhasedMessageBlock)
@@ -64,7 +65,9 @@ const ungroupedToolNames = new Set([
   'ask_user_question',
 ])
 
-export function computeMessageBlocks(message: Message): MessageBlock[] {
+export function computeMessageBlocks(message: Message, customLanguages: readonly string[] = []): MessageBlock[] {
+  customLanguages = message.role === 'assistant'
+    ? customLanguages.filter(language => language !== 'mermaid' && language !== 'html') : [];
   if (message.role !== 'assistant') {
     if (message.promptContent) return [
       ...(userMessageDisplayText(promptContentText(message.promptContent))
@@ -96,11 +99,11 @@ export function computeMessageBlocks(message: Message): MessageBlock[] {
   const toolCalls = message.toolCalls ?? []
   const parts = message.parts ?? []
   if (parts.length > 0) {
-    return computeMessageBlocksFromParts(parts, toolCalls, message.streaming === true)
+    return computeMessageBlocksFromParts(parts, toolCalls, message.streaming === true, customLanguages)
   }
 
   const anchoredToolCallIds = new Set<string>()
-  const { blocks, prompts } = parseTextBlocks(message.content, toolCalls, anchoredToolCallIds, undefined, message.streaming === true)
+  const { blocks, prompts } = parseTextBlocks(message.content, toolCalls, anchoredToolCallIds, undefined, message.streaming === true, customLanguages)
 
   appendUnanchoredTools(blocks, toolCalls, anchoredToolCallIds)
   return finalizeAssistantBlocks(blocks, prompts)
@@ -180,7 +183,7 @@ export function groupAssistantWorkBlocks(
   return workGroupCount > 0 ? rendered : blocks
 }
 
-function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageToolCall[], streaming: boolean): MessageBlock[] {
+function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageToolCall[], streaming: boolean, customLanguages: readonly string[]): MessageBlock[] {
   const blocks: MessageBlock[] = []
   const prompts: string[] = []
   const anchoredToolCallIds = new Set<string>()
@@ -220,7 +223,7 @@ function computeMessageBlocksFromParts(parts: MessagePart[], toolCalls: MessageT
       continue
     }
 
-    const parsed = parseTextBlocks(part.content, toolCalls, anchoredToolCallIds, part.phase, streaming)
+    const parsed = parseTextBlocks(part.content, toolCalls, anchoredToolCallIds, part.phase, streaming, customLanguages)
     blocks.push(...parsed.blocks)
     prompts.push(...parsed.prompts)
   }
@@ -235,12 +238,13 @@ function parseTextBlocks(
   anchoredToolCallIds: Set<string>,
   phase?: MessagePhase,
   streaming = false,
+  customLanguages: readonly string[] = [],
 ) {
   const blocks: MessageBlock[] = []
   const prompts: string[] = []
   let offset = 0
   const appendMarkdown = (content: string) => {
-    const parsed = parseMarkdownBlocks(content, toolCalls, anchoredToolCallIds, phase)
+    const parsed = parseMarkdownBlocks(content, toolCalls, anchoredToolCallIds, phase, customLanguages, streaming)
     blocks.push(...parsed.blocks)
     prompts.push(...parsed.prompts)
   }
@@ -259,19 +263,23 @@ function parseMarkdownBlocks(
   toolCalls: MessageToolCall[],
   anchoredToolCallIds: Set<string>,
   phase?: MessagePhase,
+  customLanguages: readonly string[] = [],
+  streaming = false,
 ) {
   const { content, prompts } = extractFollowUps(completeStreamingCustomTags(rawContent))
   const codeBlocks = findCodeBlocks(content)
   const blocks: MessageBlock[] = []
   let lastIndex = 0
 
-  for (const item of findSpecialBlocks(content, codeBlocks)) {
+  for (const item of findSpecialBlocks(content, codeBlocks, customLanguages, streaming)) {
     if (item.start > lastIndex) {
       pushTextBlock(blocks, content.slice(lastIndex, item.start), phase)
     }
 
     if (item.type === 'mermaid') {
       blocks.push({ type: 'mermaid', code: item.code, ...(phase ? { phase } : {}) })
+    } else if (item.type === 'custom') {
+      blocks.push({ type: 'custom', language: item.language, code: item.code, complete: item.complete, ...(phase ? { phase } : {}) })
     } else if (item.type === 'visualization') {
       blocks.push({
         type: 'visualization',
@@ -553,11 +561,22 @@ function getToolCallParamString(toolCall: MessageToolCall | undefined, key: stri
 type SpecialBlock =
   | { type: 'tool'; start: number; end: number; kind: string; value: string }
   | { type: 'mermaid'; start: number; end: number; code: string }
+  | { type: 'custom'; start: number; end: number; language: string; code: string; complete: boolean }
   | { type: 'visualization'; start: number; end: number; path?: string; title: string }
   | { type: 'media'; start: number; end: number; media: MessageMedia }
 
-function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[]) {
+function findSpecialBlocks(content: string, codeBlocks: CodeBlockRange[], customLanguages: readonly string[], streaming: boolean) {
   const blocks: SpecialBlock[] = []
+  for (const range of codeBlocks) {
+    const fenced = content.slice(range.start, range.end).match(/^(```|~~~)[ \t]*([\w+-]+)[ \t]*\n([\s\S]*)$/)
+    const language = fenced?.[2]?.toLowerCase()
+    const body = fenced?.[3] ?? ''
+    const complete = !!fenced && body.endsWith(`\n${fenced[1]}`)
+    const code = (complete ? body.slice(0, -(fenced![1]!.length + 1)) : body).trim()
+    if (language && customLanguages.includes(language) && (complete || streaming)) {
+      blocks.push({ ...range, type: 'custom', language, code, complete })
+    }
+  }
 
   for (const block of findMermaidCodeBlocks(content)) {
     blocks.push(block)
