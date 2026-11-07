@@ -28,6 +28,12 @@ describe('Codex surface authentication values', () => {
     expect(surfaceAccount({ type: 'amazonBedrock', usesCodexManagedCredentials: false }))
       .toStrictEqual({ type: 'amazonBedrock', credentialSource: 'awsManaged' });
     expect(surfaceAccount({ type: 'apiKey' })).toStrictEqual({ type: 'apiKey' });
+    expect(surfaceAccount({ type: 'gcp' })).toStrictEqual({ type: 'gcp' });
+    const workspace = surfaceAccount({ type: 'chatgpt', email: 'person@example.test', planType: 'team', workspaceName: 'Research' });
+    expect(workspace).toStrictEqual({ type: 'chatgpt', email: 'person@example.test', planType: 'team', workspaceName: 'Research' });
+    expect(surfaceAuthenticationIdentityKey(authentication({ account: workspace })))
+      .not.toBe(surfaceAuthenticationIdentityKey(authentication({ account: { type: 'chatgpt', email: 'person@example.test', planType: 'team' } })));
+
 
     expect(surfaceAuthenticationIdentityKey(authentication({ account: null, requiresOpenaiAuth: true })))
       .toBe('{"type":null,"requiresOpenaiAuth":true}');

@@ -118,7 +118,7 @@ describe('CodexSurface', () => {
 
   it('clears authenticated state when a restarted app-server reports a signed-out account', async () => {
     let account: v2.Account | null = {
-      type: 'chatgpt', email: 'before@example.test', planType: 'pro',
+      type: 'chatgpt', workspaceName: null, email: 'before@example.test', planType: 'pro',
     };
     const transport = new MockCodexAppServer({
       'account/read': () => ({ workspaceRouting: null, account, requiresOpenaiAuth: true }),
@@ -384,7 +384,7 @@ describe('CodexSurface', () => {
       loginId: 'login-1',
     });
 
-    account = { type: 'chatgpt', email: 'kid@example.test', planType: 'plus' };
+    account = { type: 'chatgpt', workspaceName: null, email: 'kid@example.test', planType: 'plus' };
     transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'login-1', success: true, error: null });
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
       status: 'ready',

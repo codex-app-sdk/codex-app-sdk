@@ -21,6 +21,20 @@ describe('Codex approval protocol conversion', () => {
     expect(setup.unsubscribers.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true);
   });
 
+  it.each([undefined, ['accept', 'acceptForSession', 'decline']])('keeps mandatory-human commands one-time with decision list %s', (availableDecisions) => {
+    const setup = approvals();
+    const result = setup.request('item/commandExecution/requestApproval', 'human', {
+      kind: 'humanCommand', threadId: 'thread', turnId: 'turn', itemId: 'command',
+      // Even an inconsistent server allowlist cannot widen a human checkpoint.
+      availableDecisions,
+    });
+    expect(result.pending.approval).toMatchObject({ requiresHumanApproval: true, allowedScopes: ['once'] });
+    expect(() => result.pending.resolve('approve', 'session')).toThrow();
+    expect(result.responder.resolve).not.toHaveBeenCalled();
+    result.pending.resolve('approve', 'once');
+    expect(result.responder.resolve).toHaveBeenCalledWith({ decision: 'accept' });
+  });
+
   it('normalizes command metadata, scopes, denial, and additional permissions exactly', () => {
     const setup = approvals();
     const result = setup.request('item/commandExecution/requestApproval', 17, {

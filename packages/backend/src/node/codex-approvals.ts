@@ -99,6 +99,7 @@ function commandApproval(
   params: v2.CommandExecutionRequestApprovalParams,
 ): CodexSurfaceApproval {
   const availableDecisions = params.availableDecisions;
+  const requiresHumanApproval = params.kind === 'humanCommand';
   const additionalPermissions = permissionDetails(params.additionalPermissions);
   const requestedPermissions = [
     ...(params.networkApprovalContext ? [{
@@ -118,15 +119,16 @@ function commandApproval(
     title: 'Run command',
     command: params.command ?? undefined,
     cwd: params.cwd ?? undefined,
+    ...(requiresHumanApproval ? { requiresHumanApproval: true } : {}),
     ...(params.reason ? { description: params.reason } : {}),
     ...(requestedPermissions.length ? { requestedPermissions } : {}),
     ...(availableDecisions ? {
       allowedScopes: [
         ...(availableDecisions.includes('accept') ? ['once' as const] : []),
-        ...(availableDecisions.includes('acceptForSession') ? ['session' as const] : []),
+        ...(!requiresHumanApproval && availableDecisions.includes('acceptForSession') ? ['session' as const] : []),
       ],
       canDeny: availableDecisions.includes('decline') || availableDecisions.includes('cancel'),
-    } : {}),
+    } : requiresHumanApproval ? { allowedScopes: ['once'] } : {}),
   };
 }
 
@@ -171,6 +173,9 @@ function commandDecision(
   scope: CodexSurfaceApprovalScope,
 ): v2.CommandExecutionApprovalDecision {
   const available = params.availableDecisions;
+  if (params.kind === 'humanCommand' && decision === 'approve' && scope !== 'once') {
+    throw new Error('Mandatory human approval requires a fresh one-time decision');
+  }
   const requested = decision === 'deny' ? 'decline' : scope === 'session' ? 'acceptForSession' : 'accept';
   if (!available || available.includes(requested)) return requested;
   if (decision === 'deny' && available.includes('cancel')) return 'cancel';

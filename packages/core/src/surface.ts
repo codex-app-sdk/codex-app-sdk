@@ -155,6 +155,8 @@ export type CodexSurfaceApproval = {
   requestedPermissions?: readonly CodexSurfaceRequestedPermission[];
   allowedScopes?: readonly CodexSurfaceApprovalScope[];
   canDeny?: boolean;
+  /** Requires a fresh human decision; never satisfy this through automatic or remembered approval. */
+  requiresHumanApproval?: boolean;
 };
 
 export type CodexSurfaceRequestedPermission =
@@ -466,7 +468,8 @@ export type CodexConversationHistoryState = {
 
 export type CodexSurfaceAccount =
   | { type: 'apiKey' }
-  | { type: 'chatgpt'; email: string | null; planType: string }
+  | { type: 'chatgpt'; email: string | null; planType: string; workspaceName?: string }
+  | { type: 'gcp' }
   | { type: 'amazonBedrock'; credentialSource: 'codexManaged' | 'awsManaged' };
 
 export type CodexSurfaceLoginStatus =

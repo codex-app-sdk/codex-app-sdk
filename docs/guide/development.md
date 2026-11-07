@@ -225,6 +225,12 @@ inspect npm before retrying; the publisher does not silently skip existing
 versions. If only GitHub release creation fails, rerun that failed job rather
 than republishing the packages.
 
+## CLI compatibility checks
+
+Generated bindings and the schema gate target Codex CLI 0.167.0. Runtime compatibility is checked separately against 0.164.0, 0.165.0, 0.166.0 and 0.167.0 in CI. After building the runtime packages, run `npm run check:cli-compatibility` against the CLI on `PATH`, or `node scripts/check-cli-compatibility.mjs /absolute/path/to/codex` to select a binary.
+
+The check connects the actual SDK to a real app-server with mandatory-human support both omitted and enabled. It uses empty temporary Codex homes, file-only credential storage and an environment without provider credentials. It starts no conversations or model turns. Mocked wire workflows separately cover older account payloads, optional workspace data, mandatory-human one-time decisions, repeated callbacks and withdrawn approvals.
+
 ## Architectural test philosophy
 
 Follow the [testing policy](./testing.md) whenever tests are added, changed,

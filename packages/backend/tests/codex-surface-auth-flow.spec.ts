@@ -48,7 +48,7 @@ describe('CodexSurface', () => {
     });
     await surface.connect();
 
-    account = { type: 'chatgpt', email: 'kid@example.test', planType: 'plus' };
+    account = { type: 'chatgpt', workspaceName: null, email: 'kid@example.test', planType: 'plus' };
     transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'login-immediate', success: true, error: null });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toMatchObject({
       type: 'chatgpt',
@@ -75,14 +75,14 @@ describe('CodexSurface', () => {
     });
   });
 
-  it('invalidates local conversation state when the authoritative account identity changes', async () => {
+  it.each([false, true])('invalidates conversation state on account or workspace switches (workspace: %s)', async (workspace) => {
     let account: Extract<v2.Account, { type: 'chatgpt' }> = {
-      type: 'chatgpt', email: 'account-a@example.test', planType: 'pro',
+      type: 'chatgpt', workspaceName: workspace ? 'First' : null, email: 'account-a@example.test', planType: 'pro',
     };
     const transport = new MockCodexAppServer({
       'account/read': () => ({ workspaceRouting: null, account, requiresOpenaiAuth: true }),
       'thread/list': () => ({ readStates: null, backwardsCursor: null,
-        data: account.email?.startsWith('account-a') ? [thread('thread-existing', false)] : [],
+        data: account.email?.startsWith('account-a') && account.workspaceName !== 'Second' ? [thread('thread-existing', false)] : [],
         nextCursor: null,
       }),
     });
@@ -96,13 +96,14 @@ describe('CodexSurface', () => {
       messages: expect.arrayContaining([expect.objectContaining({ role: 'user' })]),
     });
 
-    account = { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' };
+    const expectedAccount = { type: 'chatgpt' as const, email: workspace ? 'account-a@example.test' : 'account-b@example.test', planType: 'plus', ...(workspace ? { workspaceName: 'Second' } : {}) };
+    account = { ...expectedAccount, planType: 'plus', workspaceName: workspace ? 'Second' : null };
     events.length = 0;
     transport.emitNotification('account/updated', { authMode: 'chatgpt', planType: 'plus' });
 
     await vi.waitFor(() => expect(surface.getSnapshot()).toMatchObject({
       authentication: {
-        account: { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' },
+        account: expectedAccount,
       },
       conversations: [],
       activeConversationId: null,
@@ -115,7 +116,7 @@ describe('CodexSurface', () => {
       origin: 'notification',
       payload: {
         authentication: expect.objectContaining({
-          account: { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' },
+          account: expectedAccount,
         }),
       },
     }));
@@ -123,7 +124,7 @@ describe('CodexSurface', () => {
 
   it('retains account identity across account/read errors so a later account switch still invalidates state', async () => {
     let account: Extract<v2.Account, { type: 'chatgpt' }> = {
-      type: 'chatgpt', email: 'account-a@example.test', planType: 'pro',
+      type: 'chatgpt', workspaceName: null, email: 'account-a@example.test', planType: 'pro',
     };
     let failAccountRead = false;
     const transport = new MockCodexAppServer({
@@ -149,7 +150,7 @@ describe('CodexSurface', () => {
     }));
 
     failAccountRead = false;
-    account = { type: 'chatgpt', email: 'account-b@example.test', planType: 'plus' };
+    account = { type: 'chatgpt', workspaceName: null, email: 'account-b@example.test', planType: 'plus' };
     await surface.refreshAccount();
     expect(surface.getSnapshot()).toMatchObject({
       authentication: { account: { email: 'account-b@example.test' } },
@@ -160,7 +161,7 @@ describe('CodexSurface', () => {
   });
 
   it('does not invalidate conversation state for metadata changes on the same account', async () => {
-    let account: v2.Account = { type: 'chatgpt', email: 'same@example.test', planType: 'plus' };
+    let account: v2.Account = { type: 'chatgpt', workspaceName: null, email: 'same@example.test', planType: 'plus' };
     const transport = new MockCodexAppServer({
       'account/read': () => ({ workspaceRouting: null, account, requiresOpenaiAuth: true }),
     });
@@ -169,7 +170,7 @@ describe('CodexSurface', () => {
     const messages = surface.getSnapshot().messages;
     const resumeCount = requestsFor(transport, 'thread/resume').length;
 
-    account = { type: 'chatgpt', email: 'same@example.test', planType: 'pro' };
+    account = { type: 'chatgpt', workspaceName: null, email: 'same@example.test', planType: 'pro' };
     transport.emitNotification('account/updated', { authMode: 'chatgpt', planType: 'pro' });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication.account).toMatchObject({ planType: 'pro' }));
 
@@ -235,7 +236,7 @@ describe('CodexSurface', () => {
       authUrl: 'https://auth.example.test/device',
       error: null,
     });
-    account = { type: 'chatgpt', email: 'headless@example.test', planType: 'pro' };
+    account = { type: 'chatgpt', workspaceName: null, email: 'headless@example.test', planType: 'pro' };
     transport.emitNotification('account/login/completed', { onboardingEntrypoint: null, loginId: 'device-login', success: true, error: null });
     await vi.waitFor(() => expect(surface.getSnapshot().authentication).toMatchObject({
       account: { type: 'chatgpt', email: 'headless@example.test', planType: 'pro' },
@@ -338,7 +339,7 @@ describe('CodexSurface', () => {
         if (accountReadCount === 1) return { workspaceRouting: null, account: null, requiresOpenaiAuth: true };
         if (accountReadCount === 2) return staleRefresh.promise;
         return { workspaceRouting: null,
-          account: { type: 'chatgpt', email: 'fresh@example.test', planType: 'plus' },
+          account: { type: 'chatgpt', workspaceName: null, email: 'fresh@example.test', planType: 'plus' },
           requiresOpenaiAuth: true,
         };
       },
@@ -370,7 +371,7 @@ describe('CodexSurface', () => {
         if (accountReadCount === 1) return { workspaceRouting: null, account: null, requiresOpenaiAuth: true };
         if (accountReadCount === 2) return staleRefresh.promise;
         return { workspaceRouting: null,
-          account: { type: 'chatgpt', email: 'recovered@example.test', planType: 'plus' },
+          account: { type: 'chatgpt', workspaceName: null, email: 'recovered@example.test', planType: 'plus' },
           requiresOpenaiAuth: true,
         };
       },
@@ -396,7 +397,7 @@ describe('CodexSurface', () => {
 
   it('refreshes the full authoritative account projection on account updates', async () => {
     let account: v2.Account = {
-      type: 'chatgpt', email: 'before@example.test', planType: 'pro',
+      type: 'chatgpt', workspaceName: null, email: 'before@example.test', planType: 'pro',
     };
     const transport = new MockCodexAppServer({
       'account/read': () => ({ workspaceRouting: null, account, requiresOpenaiAuth: true }),

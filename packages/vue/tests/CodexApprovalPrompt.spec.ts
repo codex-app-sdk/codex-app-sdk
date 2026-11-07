@@ -33,6 +33,17 @@ describe('CodexApprovalPrompt', () => {
     ]);
   });
 
+  it('requires a fresh one-time human decision even without a scope hint', async () => {
+    const wrapper = mount(CodexApprovalPrompt, { props: { approval: { ...approval, requiresHumanApproval: true } } });
+    expect(wrapper.text()).toContain('Human approval required');
+    expect(wrapper.text()).not.toContain('Allow for session');
+    await wrapper.findAll('button').find(button => button.text() === 'Allow')!.trigger('click');
+    expect(wrapper.emitted('resolve')).toStrictEqual([['approve', 'once']]);
+    await wrapper.setProps({ approval: { ...approval, requiresHumanApproval: true, allowedScopes: [] } });
+    expect(wrapper.findAll('button').map(button => button.text())).toStrictEqual(['Deny']);
+    wrapper.unmount();
+  });
+
   it('disables all decisions while the host is processing', () => {
     const wrapper = mount(CodexApprovalPrompt, { props: { approval, disabled: true } });
     expect(wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined)).toBe(true);

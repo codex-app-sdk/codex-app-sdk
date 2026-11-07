@@ -2,7 +2,7 @@
   <ChatApprovalCard
     class="codex-approval-prompt"
     role="status"
-    :summary="approval.title"
+    :summary="approval.requiresHumanApproval ? 'Human approval required' : approval.title"
     :description="approval.description"
     :actions="actions"
     :disabled="disabled"
@@ -47,7 +47,8 @@ const emit = defineEmits<{
 }>();
 // Stryker restore all
 
-const allowedScopes = computed(() => props.approval.allowedScopes ?? ['once', 'session']);
+const allowedScopes = computed(() => (props.approval.allowedScopes ?? ['once', 'session'])
+  .filter(scope => !props.approval.requiresHumanApproval || scope === 'once'));
 const canDeny = computed(() => props.approval.canDeny ?? true);
 const actions = computed(() => [
   ...(allowedScopes.value.includes('once') ? [{ id: 'once' as const, label: 'Allow', primary: true }] : []),

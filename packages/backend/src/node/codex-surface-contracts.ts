@@ -215,6 +215,8 @@ export type CodexSurfaceOptions = {
   originalHistoryUsage?: boolean;
   approvalPreset?: CodexSurfaceApprovalPreset;
   approvalMode?: CodexSurfaceApprovalMode;
+  /** Opt in only when the host presents mandatory-human checkpoints to a person. Defaults to false. */
+  requiredHumanApproval?: boolean;
   clientInfo?: { name: string; title?: string; version: string };
   /** Host-owned defaults used by explicit and implicit conversation creation. */
   conversationDefaults?: Readonly<CodexConversationDefaults>;

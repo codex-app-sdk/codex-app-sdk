@@ -499,7 +499,7 @@ describe('CodexSurface', () => {
     transport.emitNotification('item/started', {
         threadId: 'thread-existing', turnId: 'turn-image', startedAtMs: 1,
         item: { failure: null,
-          type: 'imageGeneration', id: 'image-live', status: 'inProgress',
+          type: 'imageGeneration', generationId: null, id: 'image-live', status: 'inProgress',
           revisedPrompt: null, result: '',
         },
       });
@@ -519,7 +519,7 @@ describe('CodexSurface', () => {
     expect(JSON.stringify(surface.getSnapshot())).not.toContain(generatedPngBase64);
 
     const completedItem: v2.ThreadItem = {
-      type: 'imageGeneration', id: 'image-live', status: 'completed',
+      type: 'imageGeneration', generationId: null, id: 'image-live', status: 'completed',
       revisedPrompt: 'Draw the route map', result: generatedPngBase64,
       savedPath: '/tmp/generated route.png', failure: null,
     };

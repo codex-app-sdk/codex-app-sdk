@@ -219,3 +219,11 @@ time and call `conversation.continueAfterSafetyReview({ turnId, findings })`. Th
 main-process action sends the exact provider instruction without slash-command
 handling or queueing. Keep conversations stopped when this
 information is missing; an opaque `reviewTarget` alone is insufficient.
+
+### Compatibility with installed Codex versions
+
+Hosts can use the SDK with Codex CLI 0.164–0.167. Newer generated bindings do not require every user to upgrade: the SDK normalizes older account payloads and retains existing initialization behavior by default. Optional raw methods can still be unavailable on an older server.
+
+For managed commands requiring a fresh human decision, set `requiredHumanApproval: true` when creating the surface only if the host will present those requests to a person. Inspect `approval.requiresHumanApproval` before any automatic approval logic. The built-in Vue prompt distinguishes these checkpoints and omits session approval. Servers predating the capability continue using their existing approval workflow.
+
+Native compaction improvements require a CLI version that includes them. The SDK preserves compaction event ordering and markers across supported versions.

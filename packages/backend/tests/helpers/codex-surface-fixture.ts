@@ -61,7 +61,7 @@ const defaultHandlers: MockCodexAppServerHandlers = {
     userAgent: 'test', codexHome: '/tmp/codex', platformFamily: 'unix', platformOs: 'macos',
   }),
   'account/read': () => ({ workspaceRouting: null,
-      account: { type: 'chatgpt', email: 'test@example.test', planType: 'pro' },
+      account: { type: 'chatgpt', workspaceName: null, email: 'test@example.test', planType: 'pro' },
       requiresOpenaiAuth: true,
     }),
   'model/list': () => ({
@@ -245,6 +245,7 @@ export function configRequirements(
     checkForUpdateOnStartup: null,
     allowLoginShell: null,
     feedback: null,
+    otel: null,
     ...overrides,
   };
 }

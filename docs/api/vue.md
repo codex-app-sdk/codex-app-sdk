@@ -234,7 +234,7 @@ Pending approvals replace the shelf and composer, one at a time in the supplied
 expanded questions. Native approvals and tool confirmations use one shared
 **Approve tool call** card, expandable Details, and left-aligned actions, with
 only their supported decision scopes. Native **Allow** emits `approve, once`;
-**Allow for session** emits `approve, session`. Tool confirmation responses use `actions.clientResponse`
+**Allow for session** emits `approve, session`. Approvals marked `requiresHumanApproval` show **Human approval required** and offer only a fresh one-time decision; an explicit server allowlist can further restrict the available actions. Tool confirmation responses use `actions.clientResponse`
 or `clientResponse`. Their pending tool card is hidden from the transcript,
 and the resolved history remains. The `approval` slot receives only
 the active approval. Resolution still uses `actions.resolveApproval`, the

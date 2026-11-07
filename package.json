@@ -76,7 +76,7 @@
     "build:spark": "npm run build -w @codex-app-sdk/spark-sample",
     "build:web": "npm run build -w @codex-app-sdk/core && npm run build -w @codex-app-sdk/backend && npm run build -w @codex-app-sdk/vue && npm run build -w @codex-app-sdk/web && npm run build -w @codex-app-sdk/basic-web-sample",
     "build:workspaces": "npm run build -w @codex-app-sdk/component-lab && npm run build -w @codex-app-sdk/basic-sample && npm run build -w @codex-app-sdk/spark-sample && npm run build -w @codex-app-sdk/relay-sample && npm run build -w @codex-app-sdk/basic-web-sample",
-    "check": "npm run check:sdk && npm run check:workspaces:owned && npm run build:docs",
+    "check": "npm run check:sdk && npm run check:cli-compatibility && npm run check:workspaces:owned && npm run build:docs",
     "check:compat": "npm run lint:compat && npm run build:compat",
     "check:electron": "npm run check -w @codex-app-sdk/basic-sample",
     "check:packages": "npm run check -w @codex-app-sdk/core && npm run check -w @codex-app-sdk/backend && npm run check -w @codex-app-sdk/vue && npm run check -w @codex-app-sdk/electron && npm run check -w @codex-app-sdk/web",
@@ -135,7 +135,8 @@
     "typecheck:sdk": "npm run typecheck:packages && npm run typecheck:compat",
     "typecheck:spark": "npm run typecheck -w @codex-app-sdk/spark-sample",
     "typecheck:web": "npm run typecheck -w @codex-app-sdk/basic-web-sample",
-    "typecheck:workspaces": "npm run typecheck -w @codex-app-sdk/component-lab && npm run typecheck -w @codex-app-sdk/basic-sample && npm run typecheck -w @codex-app-sdk/spark-sample && npm run typecheck -w @codex-app-sdk/relay-sample && npm run typecheck -w @codex-app-sdk/basic-web-sample"
+    "typecheck:workspaces": "npm run typecheck -w @codex-app-sdk/component-lab && npm run typecheck -w @codex-app-sdk/basic-sample && npm run typecheck -w @codex-app-sdk/spark-sample && npm run typecheck -w @codex-app-sdk/relay-sample && npm run typecheck -w @codex-app-sdk/basic-web-sample",
+    "check:cli-compatibility": "node scripts/check-cli-compatibility.mjs"
   },
   "dependencies": {
     "@codex-app-sdk/backend": "0.22.0",

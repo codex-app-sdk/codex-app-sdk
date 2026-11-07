@@ -25,9 +25,9 @@ describe('CodexSurfaceConnectionController', () => {
     expect(closed.host.patch).not.toHaveBeenCalled();
   });
 
-  it('shares a pending connection and initializes the complete default session', async () => {
+  it.each([undefined, false, true])('initializes the session with opt-in human approval capability (%s)', async (requiredHumanApproval) => {
     const started = deferred<void>();
-    const setup = setupConnection();
+    const setup = setupConnection({ requiredHumanApproval });
     setup.client.start.mockReturnValueOnce(started.promise);
     const first = setup.controller.connect();
     const second = setup.controller.connect();
@@ -38,7 +38,7 @@ describe('CodexSurfaceConnectionController', () => {
     await expect(first).resolves.toBe(setup.state);
     expect(setup.client.initialize).toHaveBeenCalledWith({
       clientInfo: { name: 'codex_app_sdk', title: 'Codex Surface', version: '0.1.0' },
-      capabilities: { experimentalApi: true, requestAttestation: false },
+      capabilities: { experimentalApi: true, requestAttestation: false, ...(requiredHumanApproval ? { requiredHumanApproval: true } : {}) },
     });
     expect(setup.client.request).toHaveBeenCalledWith('experimentalFeature/list', {
       cursor: null,

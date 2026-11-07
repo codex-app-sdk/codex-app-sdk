@@ -32,7 +32,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Install schema-compatible Codex app-server
-        run: npm install --global @openai/codex@0.164.0
+        run: npm install --global @openai/codex@0.167.0
 
       - name: Check SDK packages and compatibility facade
         run: npm run check:sdk
@@ -77,3 +77,24 @@ jobs:
 
       - name: Check scaffolder and samples
         run: npm run check:workspaces
+
+  cli-compatibility:
+    name: Codex CLI ${{ matrix.codex }} compatibility
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        codex: ['0.164.0', '0.165.0', '0.166.0', '0.167.0']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Install selected Codex CLI
+        run: npm install --global @openai/codex@${{ matrix.codex }}
+      - name: Build runtime packages
+        run: npm run build -w @codex-app-sdk/core && npm run build -w @codex-app-sdk/backend
+      - name: Check isolated SDK connection
+        run: npm run check:cli-compatibility

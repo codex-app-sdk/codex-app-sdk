@@ -54,7 +54,7 @@ export class CodexSurfaceConnectionController {
 
   constructor(
     private readonly client: CodexAppServerClient,
-    private readonly options: Pick<CodexSurfaceOptions, 'autoSelectFirstConversation' | 'clientInfo'>,
+    private readonly options: Pick<CodexSurfaceOptions, 'autoSelectFirstConversation' | 'clientInfo' | 'requiredHumanApproval'>,
     private readonly authentication: CodexSurfaceAuthenticationController,
     private readonly approvals: CodexSurfaceApprovalsController,
     private readonly catalog: CodexSurfaceCatalogController,
@@ -90,7 +90,11 @@ export class CodexSurfaceConnectionController {
             title: clientInfo.title ?? null,
             version: clientInfo.version,
           },
-          capabilities: { experimentalApi: true, requestAttestation: false },
+          capabilities: {
+            experimentalApi: true,
+            requestAttestation: false,
+            ...(this.options.requiredHumanApproval ? { requiredHumanApproval: true } : {}),
+          },
         });
         await this.enableSupportedRuntimeFeatures();
         const authenticationChanged = await this.authentication.load('lifecycle');

@@ -16,10 +16,16 @@ export function initialAuthentication(): CodexSurfaceAuthentication {
   };
 }
 
-export function surfaceAccount(account: v2.Account): NonNullable<CodexSurfaceAuthentication['account']> {
+type CompatibleAccount = Exclude<v2.Account, { type: 'chatgpt' }>
+  | (Omit<Extract<v2.Account, { type: 'chatgpt' }>, 'workspaceName'> & { workspaceName?: string | null });
+
+export function surfaceAccount(account: CompatibleAccount): NonNullable<CodexSurfaceAuthentication['account']> {
   if (account.type === 'chatgpt') {
-    return { type: 'chatgpt', email: account.email, planType: account.planType };
+    return { type: 'chatgpt', email: account.email, planType: account.planType,
+      ...(typeof account.workspaceName === 'string' ? { workspaceName: account.workspaceName } : {}),
+    };
   }
+  if (account.type === 'gcp') return { type: 'gcp' };
   if (account.type === 'amazonBedrock') {
     return {
       type: 'amazonBedrock',
@@ -41,7 +47,9 @@ export function surfaceAuthenticationIdentityKey(authentication: CodexSurfaceAut
   if (!account) {
     return JSON.stringify({ type: null, requiresOpenaiAuth: authentication.requiresOpenaiAuth });
   }
-  if (account.type === 'chatgpt') return JSON.stringify({ type: account.type, email: account.email });
+  if (account.type === 'chatgpt') return JSON.stringify({ type: account.type, email: account.email,
+    ...(account.workspaceName === undefined ? {} : { workspaceName: account.workspaceName }),
+  });
   if (account.type === 'amazonBedrock') {
     return JSON.stringify({ type: account.type, credentialSource: account.credentialSource });
   }

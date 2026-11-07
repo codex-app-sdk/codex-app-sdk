@@ -31,6 +31,8 @@ type CodexSurfaceOptions = {
   originalHistoryUsage?: boolean;
   approvalPreset?: CodexSurfaceApprovalPreset;
   approvalMode?: 'ask' | 'never';
+  /** Opt in only when the host presents mandatory-human checkpoints to a person. Defaults to false. */
+  requiredHumanApproval?: boolean;
   clientInfo?: { name: string; title?: string; version: string };
   conversationDefaults?: {
     model?: string;
@@ -211,6 +213,12 @@ schedulers are unref'd when supported and are always cleared during close.
   `subscribeCodexSurfaceState` do it). A patch carries only changed top-level
   values and changed list items, so its size tracks the change rather than
   conversation length. The Electron and web transports use it automatically.
+
+The SDK supports Codex CLI 0.164–0.167 without requiring hosts to upgrade users' installations. Generated bindings track 0.167; missing newer response fields remain optional in normalized surface data. GCP accounts are represented as `{ type: 'gcp' }`. ChatGPT accounts may include `workspaceName`; older servers and accounts without a workspace name retain their existing shape.
+
+Set `requiredHumanApproval: true` only when the host can present every mandatory-human checkpoint to a person for a fresh decision. This declares the native capability; it does not enable automatic approval. Such approvals have `requiresHumanApproval: true`, permit only one-time approval, and reject session grants even if a server supplies an inconsistent decision list. Automatic or remembered decisions must not satisfy them. The default omits the capability and preserves the older initialization payload. Servers without this capability ignore the opt-in; their ordinary approvals remain unchanged. Managed commands on newer servers can be rejected when no capable client is connected.
+
+New raw protocol methods remain subject to the running server's support. Unsupported methods reject through `RpcRemoteError`; hosts should use available discovery or handle method-not-found for optional operations. Do not replay mutations to probe availability. Compaction accounting improvements belong to the installed CLI; the SDK keeps the same compaction request and event lifecycle on older versions.
 
 During `connect()`, the surface discovers app-server experimental features and
 enables supported runtime capabilities when the running version advertises
