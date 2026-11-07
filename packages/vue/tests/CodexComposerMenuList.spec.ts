@@ -339,6 +339,9 @@ describe('CodexComposerMenuList', () => {
     expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
     await submenu.trigger('mouseenter');
     expect(submenuTrigger.attributes('aria-expanded')).toBe('true');
+    await wrapper.get('[role="menu"]').trigger('scroll');
+    expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
+    await submenu.trigger('mouseenter');
     await submenu.trigger('mouseleave');
     expect(submenuTrigger.attributes('aria-expanded')).toBe('false');
 

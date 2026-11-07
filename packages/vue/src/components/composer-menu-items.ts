@@ -1,4 +1,4 @@
-import { defineComponent, h, nextTick, reactive, type Component, type PropType, type Slots, type VNode } from 'vue';
+import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, type Component, type PropType, type Slots, type VNode } from 'vue';
 import type {
   CodexComposerMenuItem,
   CodexComposerMenuSelectableItem,
@@ -17,17 +17,21 @@ const CodexComposerMenuItems = defineComponent({
       type: Array as unknown as PropType<readonly CodexComposerMenuItem<unknown>[]>,
       required: true,
     },
+    pinnedItemCount: { type: Number, default: 0 },
   },
   emits: {
     select: (_item: CodexComposerMenuSelectableItem<unknown>) => true,
   },
   setup(props, { emit, slots }) {
     const openSubmenus = reactive(new Set<string>());
+    const closeSubmenus = () => openSubmenus.clear();
+    onMounted(() => window.addEventListener('resize', closeSubmenus));
+    onBeforeUnmount(() => window.removeEventListener('resize', closeSubmenus));
     const select = (item: CodexComposerMenuSelectableItem<unknown>): void => {
       emit('select', item);
     };
 
-    return (): VNode => renderMenu(props.items, props.ariaLabel, slots, select, openSubmenus);
+    return (): VNode => renderMenu(props.items, props.ariaLabel, slots, select, openSubmenus, undefined, props.pinnedItemCount);
   },
 });
 
@@ -38,17 +42,50 @@ function renderMenu(
   select: (item: CodexComposerMenuSelectableItem<unknown>) => void,
   openSubmenus: Set<string>,
   className: string | Array<string | null> = 'codex-chat-theme codex-composer-menu-list',
+  pinnedItemCount = 0,
 ): VNode {
   const firstFocusableId = items.find((item) => item.type !== 'separator'
     && item.type !== 'heading'
     && !item.disabled
     && (item.type !== 'submenu' || item.items.length > 0))?.id;
+  const content = items.map((item) => renderItem(item, slots, select, openSubmenus, item.id === firstFocusableId));
+  const pinned = Math.max(0, Math.floor(pinnedItemCount));
+  const children = pinned > 0 ? [
+    h('div', { class: 'codex-composer-menu-list__pinned', 'data-menu-section': '' }, content.slice(0, pinned)),
+    h('div', { class: 'codex-composer-menu-list__scroll', 'data-menu-section': '' }, content.slice(pinned)),
+  ] : content;
   return h('div', {
-    class: className,
+    class: [className, pinned > 0 ? 'codex-composer-menu-list--pinned' : null],
     role: 'menu',
     'aria-label': ariaLabel,
     onKeydown: (event: KeyboardEvent) => handleMenuKeydown(event, openSubmenus),
-  }, items.map((item) => renderItem(item, slots, select, openSubmenus, item.id === firstFocusableId)));
+    onScroll: (event: Event) => {
+      if (typeof className === 'string' && (event.target === event.currentTarget
+        || (event.target instanceof HTMLElement && event.target.hasAttribute('data-menu-section')))) openSubmenus.clear();
+    },
+    onVnodeMounted: typeof className === 'string' ? undefined : positionScrollableSubmenu,
+    onVnodeUpdated: typeof className === 'string' ? undefined : positionScrollableSubmenu,
+  }, children);
+}
+
+/** Fixed flyouts escape a scrolling parent while retaining its slots, theme and focus hierarchy. */
+function positionScrollableSubmenu(vnode: VNode): void {
+  const menu = vnode.el;
+  if (!(menu instanceof HTMLElement) || getComputedStyle(menu).display === 'none') return;
+  const parent = menu.parentElement?.closest<HTMLElement>('[data-menu-section], [role="menu"]');
+  if (!parent || !['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) return;
+  Object.assign(menu.style, { position: '', top: '', left: '', bottom: '', right: '', maxHeight: '', overflowY: '' });
+  const bounds = menu.getBoundingClientRect();
+  const anchor = menu.parentElement!.getBoundingClientRect();
+  const margin = 12;
+  const height = Math.min(bounds.height, window.innerHeight - margin * 2);
+  const left = bounds.right > window.innerWidth - margin ? anchor.left - bounds.width : bounds.left;
+  Object.assign(menu.style, {
+    position: 'fixed',
+    left: `${Math.max(margin, Math.min(left, window.innerWidth - bounds.width - margin))}px`,
+    top: `${Math.max(margin, Math.min(bounds.top, window.innerHeight - height - margin))}px`,
+    right: 'auto', bottom: 'auto', maxHeight: `${window.innerHeight - margin * 2}px`, overflowY: 'auto',
+  });
 }
 
 function renderItem(
@@ -244,6 +281,10 @@ function menuItems(menu: HTMLElement | null): HTMLButtonElement[] {
   if (!menu) return [];
   const items: HTMLButtonElement[] = [];
   for (const child of menu.children) {
+    if (child.hasAttribute('data-menu-section')) {
+      items.push(...menuItems(child as HTMLElement));
+      continue;
+    }
     const candidates = child.matches('button[role^="menuitem"]')
       ? [child]
       : child.querySelectorAll(

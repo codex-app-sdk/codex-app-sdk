@@ -18,6 +18,7 @@
       button-label="Model and reasoning"
       :disabled="controlDisabled"
       :items="selectorItems"
+      :pinned-item-count="menuItems.length ? menuItems.length + 1 : 0"
       menu-class="chat-model-selector__menu"
       @select="onSelect"
     >
@@ -368,12 +369,18 @@ function wrapHostMenuItems(
   left: auto;
   min-width: 220px;
   max-width: 260px;
+  max-height: min(420px, calc(100dvh - 80px));
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface-lowest);
   box-shadow: var(--shadow-menu);
   color: var(--color-text);
+}
+
+:deep(.chat-model-selector__menu:not(.codex-composer-menu-list--pinned)) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .chat-model-selector__leading-icon {

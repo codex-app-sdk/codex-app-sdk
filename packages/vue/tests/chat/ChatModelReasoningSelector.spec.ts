@@ -209,13 +209,13 @@ describe('ChatModelReasoningSelector', () => {
 
     const rootMenu = wrapper.get('.chat-model-selector__menu');
     expect(rootMenu.get('.codex-composer-menu-list__heading-label').text()).toBe('Favorites');
-    expect(rootMenu.findAll(':scope > .codex-composer-menu-list__separator')).toHaveLength(2);
+    expect(rootMenu.findAll('[role="separator"]')).toHaveLength(2);
     await rootMenu.get('button[aria-label="Add current to favorites"]').trigger('click');
     expect(wrapper.emitted('menuSelect')).toStrictEqual([[addFavorite]]);
 
     await wrapper.get('.chat-model-selector__button').trigger('click');
     const reopenedMenu = wrapper.get('.chat-model-selector__menu');
-    await reopenedMenu.findAll(':scope > button')[0]!.trigger('click');
+    await reopenedMenu.findAll('button').find(button => button.text() === selectFavorite.label)!.trigger('click');
     expect(wrapper.emitted('menuSelect')).toStrictEqual([[addFavorite], [selectFavorite]]);
     expect(wrapper.find('.chat-model-selector__menu').exists()).toBe(false);
 

@@ -2,6 +2,7 @@
   <CodexComposerMenuItems
     :aria-label="ariaLabel"
     :items="items"
+    :pinned-item-count="pinnedItemCount"
     @select="forwardSelection"
   >
     <template v-if="$slots.icon" #icon="scope"><slot name="icon" v-bind="scope" /></template>
@@ -17,8 +18,10 @@ import CodexComposerMenuItems from './composer-menu-items';
 withDefaults(defineProps<{
   ariaLabel?: string;
   items: readonly CodexComposerMenuItem<Payload>[];
+  pinnedItemCount?: number;
 }>(), {
   ariaLabel: 'Composer actions',
+  pinnedItemCount: 0,
 });
 
 const emit = defineEmits<{
@@ -65,6 +68,24 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
   line-height: var(--chat-menu-line-height, 20px);
   text-align: left;
   cursor: pointer;
+}
+
+.codex-composer-menu-list--pinned {
+  max-height: min(420px, calc(100dvh - 80px));
+}
+
+.codex-composer-menu-list__pinned {
+  flex: 0 0 auto;
+  max-height: min(210px, calc((100dvh - 80px) / 2));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.codex-composer-menu-list__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .codex-composer-menu-list__item:hover:not(:disabled),
@@ -183,6 +204,7 @@ function forwardSelection(item: CodexComposerMenuSelectableItem<unknown>): void 
 
 .codex-composer-menu-list__separator {
   height: 1px;
+  flex-shrink: 0;
   margin: var(--space-2) var(--space-1);
   background: var(--codex-border-color, var(--color-border, #dedede));
 }

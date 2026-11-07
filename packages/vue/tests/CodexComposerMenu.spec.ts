@@ -81,7 +81,7 @@ describe('CodexComposerMenu', () => {
   });
 
   it('moves focus with menu keys and restores the trigger on Escape', async () => {
-    const wrapper = mount(CodexComposerMenu, { attachTo: document.body, props: { items } });
+    const wrapper = mount(CodexComposerMenu, { attachTo: document.body, props: { items, pinnedItemCount: 1 } });
     const trigger = wrapper.get('.codex-composer-menu__trigger');
     await trigger.trigger('click');
 

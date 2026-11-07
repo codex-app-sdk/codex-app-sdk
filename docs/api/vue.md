@@ -164,6 +164,12 @@ dispatch through `actions.menuSelect`; the equivalent granular prop is
 rendered as accessible trailing icon controls in the heading row.
 At viewport widths up to 720px, the model selector uses a compact brain-icon
 button with the same model and reasoning menu; wider layouts show the model label.
+The model list scrolls vertically, capped at 420px or the viewport height minus
+80px, whichever is smaller. Host-provided favorites and their divider stay above
+the scrolling model list. An oversized favorites section scrolls separately and
+uses at most half the menu's height. Effort submenus remain inside the viewport and outside
+the scrolling list's clipping area. Scrolling the model list or resizing the window
+closes open effort submenus; they reopen through hover or ArrowRight.
 The speed row shows Normal speed or Fast mode beside an information tooltip and
 a lightning-bolt toggle. Active speed indicators are filled and blue. When the
 model catalog advertises Ultrafast, the row offers a speed submenu and shows a
@@ -464,6 +470,12 @@ own item state and actions; custom drawers do not enter the SDK prompt queue.
 `CodexMentionChip`, `CodexRichTextEditor`,
 `CodexContextUsageIndicator`, and
 `CodexModelReasoningSelector`.
+
+`CodexComposerMenu` and `CodexComposerMenuList` accept `pinnedItemCount` (default
+`0`). The first N root entries stay above a separately scrolling remainder, with
+keyboard navigation following the original item order. Pinned menus use the
+model selector's viewport-bounded height; a long pinned section can scroll within
+half that height. The model selector uses this for host `menuItems` and their divider.
 
 `CodexRichTextEditor` exposes `CodexRichTextEditorExpose` for custom composer
 layouts that need its focus and selection controls. `CodexComposerAtMentionMenu`

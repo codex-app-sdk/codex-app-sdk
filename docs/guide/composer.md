@@ -386,8 +386,11 @@ efforts come from the app-server catalog; the component does not invent IDs. The
 selector stays available while a turn is running. Changes update the conversation
 settings used by subsequent prompts without interrupting the active turn.
 Models appear directly at the menu root. Each model opens a submenu containing
-only its supported reasoning efforts; hovering or pressing ArrowRight opens it
-without changing settings. Clicking a model (or pressing Enter) selects it
+only its supported reasoning efforts. Long model lists scroll inside a menu shorter
+than the viewport, and effort flyouts stay within the window edges. Hovering or
+pressing ArrowRight opens a model's effort submenu without changing settings.
+Host-provided favorites stay above the scrolling models, separated by a divider.
+Clicking a model (or pressing Enter) selects it
 immediately, preserving the current effort when supported. Otherwise it chooses
 High, then the model's supported default, then its first supported effort.
 Choosing an effort selects that model and effort, then closes the menu. Models

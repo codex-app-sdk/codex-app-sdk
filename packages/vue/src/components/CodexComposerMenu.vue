@@ -21,6 +21,7 @@
       :class="menuClass"
       :aria-label="ariaLabel"
       :items="items"
+      :pinned-item-count="pinnedItemCount"
       @select="selectItem"
     >
       <template v-if="$slots.icon" #icon="scope"><slot name="icon" v-bind="scope" /></template>
@@ -40,12 +41,14 @@ const props = withDefaults(defineProps<{
   buttonLabel?: string;
   disabled?: boolean;
   items: readonly CodexComposerMenuItem<Payload>[];
+  pinnedItemCount?: number;
   menuClass?: string;
   open?: boolean;
 }>(), {
   ariaLabel: 'Composer actions',
   buttonLabel: 'Open composer actions',
   disabled: false,
+  pinnedItemCount: 0,
   menuClass: undefined,
   open: undefined,
 });
@@ -68,7 +71,7 @@ watch(menuOpen, async (open) => {
   if (!open) return;
   await nextTick();
   const firstItem = root.value?.querySelector(
-    '.codex-composer-menu__list > button[role^="menuitem"], .codex-composer-menu__list > div > button[role^="menuitem"]',
+    '.codex-composer-menu__list [role^="menuitem"][tabindex="0"]:not(:disabled)',
   );
   if (firstItem instanceof HTMLElement) firstItem.focus();
 }, { immediate: true });
