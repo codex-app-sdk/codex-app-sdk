@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.22.1
+
+### Changed
+
+- Support Codex CLI versions 0.164 through 0.167.
+
+### Fixed
+
+- Keep model menus within the window and favorite models visible while scrolling.
+
 ## 0.22.0
 
 ### Added
