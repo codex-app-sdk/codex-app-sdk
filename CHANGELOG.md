@@ -2,11 +2,12 @@
 
 ## Unreleased
 
-## 0.22.2
+## 0.23.0
 
 ### Added
 
 - Support OpenAI dictation and live transcription with parallel microphone and connection startup.
+- Accept suggested prompts by double-clicking the empty composer, without submitting them.
 
 ### Fixed
 
