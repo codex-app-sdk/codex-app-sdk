@@ -5,13 +5,27 @@ export type CodexSpeechTranscriptionResult = {
 
 /** Full replacement of the current transcript, not an append-only word delta. */
 export type CodexSpeechTranscript = { finalText: string; partialText: string };
-export type CodexSpeechSessionOptions = { sessionId: string; sampleRate: number; locale?: string };
+export type CodexSpeechPreparationOptions = { sessionId: string; locale?: string };
+export type CodexSpeechSessionOptions = CodexSpeechPreparationOptions & { sampleRate: number };
+/** Trusted-process session; PCM is delivered only after startup completes. */
+export type CodexSpeechSession = {
+  append(audio: ArrayBuffer): Promise<void>;
+  stop(): Promise<CodexSpeechTranscriptionResult>;
+  cancel(): Promise<void>;
+};
+/** Preparation owns resources until activation at the actual capture sample rate. */
+export type CodexPreparedSpeechSession = {
+  start(sampleRate: number): Promise<CodexSpeechSession>;
+  cancel(): Promise<void>;
+};
 export type CodexSpeechSessionEvent =
   | ({ type: 'transcript'; sessionId: string } & CodexSpeechTranscript)
   | { type: 'error'; sessionId: string; error: string };
 
 /** Mono Float32 little-endian PCM, sent once in capture order. Stop drains final results. */
 export type CodexStreamingTranscription = {
+  /** Optional connection preparation, safe to run concurrently with microphone setup. */
+  prepare?(options: CodexSpeechPreparationOptions): Promise<void>;
   start(options: CodexSpeechSessionOptions): Promise<void>;
   append(sessionId: string, audio: ArrayBuffer): Promise<void>;
   stop(sessionId: string): Promise<CodexSpeechTranscriptionResult>;

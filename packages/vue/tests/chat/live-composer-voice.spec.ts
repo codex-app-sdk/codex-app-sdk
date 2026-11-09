@@ -128,3 +128,56 @@ it('does not finalize native recognition when cancellation interrupts the microp
   expect(h.service.stop).not.toHaveBeenCalled();
   expect(h.insert).not.toHaveBeenCalled();
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+it.each(['microphone', 'provider'] as const)('prepares provider and microphone concurrently, activating at the resolved rate (%s first)', async first => {
+  const h = setup();
+  const microphone = deferred<number>();
+  const provider = deferred<void>();
+  h.service.prepare = vi.fn(() => provider.promise);
+  h.capture.start.mockReturnValueOnce(microphone.promise);
+  const starting = h.voice.toggle();
+  expect(h.service.prepare).toHaveBeenCalledOnce();
+  expect(h.capture.start).toHaveBeenCalledOnce();
+  if (first === 'microphone') microphone.resolve(48000);
+  else provider.resolve();
+  await Promise.resolve();
+  expect(h.service.start).not.toHaveBeenCalled();
+  expect(h.capture.activate).not.toHaveBeenCalled();
+  if (first === 'microphone') provider.resolve();
+  else microphone.resolve(48000);
+  await starting;
+  expect(h.service.start).toHaveBeenCalledWith({ sessionId: expect.any(String), sampleRate: 48000, locale: navigator.language });
+  expect(h.capture.activate).toHaveBeenCalledOnce();
+  expect(h.voice.isRecording.value).toBe(true);
+});
+
+it.each(['cancel', 'pending cancel', 'microphone', 'provider', 'provider event'] as const)('cleans up parallel startup and ignores late completion after %s', async outcome => {
+  const h = setup();
+  const microphone = deferred<number>();
+  const provider = deferred<void>();
+  h.service.prepare = vi.fn(() => provider.promise);
+  h.capture.start.mockReturnValueOnce(microphone.promise);
+  const starting = h.voice.toggle();
+  if (outcome === 'cancel') { provider.resolve(); await h.voice.cancel(); }
+  else if (outcome === 'pending cancel') await h.voice.cancel();
+  else if (outcome === 'provider event') h.emit({ type: 'error', sessionId: vi.mocked(h.service.prepare!).mock.calls[0]![0].sessionId, error: 'Connection lost' });
+  else if (outcome === 'microphone') microphone.reject(new Error('Microphone denied'));
+  else provider.reject(new Error('Provider unavailable'));
+  await vi.waitFor(() => expect(h.capture.release).toHaveBeenCalled());
+  expect(h.service.cancel).toHaveBeenCalledWith(expect.any(String));
+  microphone.resolve(44100);
+  provider.resolve();
+  await starting;
+  expect(h.service.start).not.toHaveBeenCalled();
+  expect(h.capture.activate).not.toHaveBeenCalled();
+  expect(h.voice.isStarting.value).toBe(false);
+  expect(h.voice.isRecording.value).toBe(false);
+  expect(h.insert).not.toHaveBeenCalled();
+});

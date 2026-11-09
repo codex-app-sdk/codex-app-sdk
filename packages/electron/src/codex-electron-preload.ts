@@ -16,7 +16,7 @@ export type CodexElectronRendererApis = {
 export function exposeCodexElectronPreload(
   contextBridge: CodexContextBridge,
   ipcRenderer: IpcRendererPort,
-  options?: { transcription?: boolean },
+  options?: { transcription?: boolean; streamingTranscription?: boolean; speechPreparation?: boolean },
 ): CodexElectronRendererApis {
   const surface = createCodexSurfaceRendererApi(ipcRenderer);
   const native = createCodexNativeRendererApi(ipcRenderer, options);

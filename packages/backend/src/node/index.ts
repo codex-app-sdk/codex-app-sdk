@@ -86,3 +86,5 @@ export {
 export { startAppleSpeechSession, type AppleSpeechSession } from './apple-speech-session';
 
 export { ConversationContentTransport } from "./conversation-content-transport";
+
+export { startOpenAISpeechSession, prepareOpenAISpeechSession, type OpenAISpeechSession, type OpenAISpeechSessionConfiguration, type OpenAISpeechSocket, type OpenAISpeechData } from './openai-speech-session';

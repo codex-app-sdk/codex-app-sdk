@@ -1,5 +1,5 @@
 import { startAppleSpeechSession, type AppleSpeechSession } from '@codex-app-sdk/backend';
-import type { CodexSpeechSessionOptions, CodexSpeechTranscriptionResult } from '@codex-app-sdk/core/native';
+import type { CodexSpeechSessionOptions, CodexSpeechTranscriptionResult, CodexSpeechPreparationOptions, CodexSpeechSessionEvent, CodexPreparedSpeechSession } from '@codex-app-sdk/core/native';
 import { codexNativeChannels as channels, codexSpeechEventChannel, type CodexNativeRequests } from './codex-native-renderer';
 import type { IpcMainHandlers } from './typed-ipc';
 import type { WebContentsDidStartNavigationEventParams } from 'electron';
@@ -20,18 +20,26 @@ type Owner = {
 type Entry = {
   owner: Owner;
   abort: AbortController;
-  session: Promise<AppleSpeechSession>;
+  session?: Promise<AppleSpeechSession>;
+  prepared?: Promise<CodexPreparedSpeechSession>;
   stopping?: Promise<CodexSpeechTranscriptionResult>;
   bytes: number;
   cleanup: () => void;
 };
-type SpeechChannels = typeof channels.startSpeech | typeof channels.appendSpeech | typeof channels.stopSpeech | typeof channels.cancelSpeech;
+type SpeechChannels = typeof channels.prepareSpeech | typeof channels.startSpeech | typeof channels.appendSpeech | typeof channels.stopSpeech | typeof channels.cancelSpeech;
+
+export type CodexSpeechSessionPreparer = (
+  input: CodexSpeechPreparationOptions,
+  onEvent: (event: CodexSpeechSessionEvent) => void,
+  dependencies: { signal: AbortSignal; assetsPath?: string },
+) => Promise<CodexPreparedSpeechSession>;
 
 /** One bounded recording per renderer, owned by its invoking frame. */
 export function createCodexSpeechSessions(options: {
   maxAudioBytes: number;
   appleSpeechAssetsPath?: string;
   startSpeechSession?: typeof startAppleSpeechSession;
+  prepareSpeechSession?: CodexSpeechSessionPreparer;
   onSpeechOperation?: CodexSpeechOperationObserver;
 }): { handlers: IpcMainHandlers<Pick<CodexNativeRequests, SpeechChannels>>; dispose(): void } {
   const sessions = new Map<string, Entry>();
@@ -75,10 +83,67 @@ export function createCodexSpeechSessions(options: {
     sessions.delete(id);
     entry.cleanup();
     entry.abort.abort();
-    await entry.session.then((session) => observe('cancel', () => session.cancel())).catch(() => undefined);
+    // Do not wait for a host factory that is still resolving credentials or ignoring abort.
+    // Its eventual resources must nevertheless be cancelled exactly when they arrive.
+    void entry.session?.then(session => observe('cancel', () => session.cancel())).catch(() => undefined);
+    void entry.prepared?.then(prepared => prepared.cancel()).catch(() => undefined);
+  }
+  function create(event: unknown, input: CodexSpeechSessionOptions | CodexSpeechPreparationOptions, preparing: boolean): Entry {
+    const current = owner(event);
+    if (sessions.has(input.sessionId) || [...sessions.values()].some((entry) => entry.owner.sender === current.sender)) {
+      throw new Error('A speech session is already active in this renderer.');
+    }
+    const id = input.sessionId;
+    const abort = new AbortController();
+    const teardown = () => { void cancel(id, entry); };
+    const onNavigation = (details: unknown, _url: unknown, sameDocument: unknown, mainFrame: unknown, processId: unknown, routingId: unknown) => {
+      const navigation = details as Partial<WebContentsDidStartNavigationEventParams>;
+      const frame = navigation.frame ?? { processId, routingId };
+      // Older Electron versions supply positional arguments instead of details.
+      if (!(navigation.isSameDocument ?? sameDocument) && ((navigation.isMainFrame ?? mainFrame)
+        || (frame.processId === current.senderFrame.processId && frame.routingId === current.senderFrame.routingId))) teardown();
+    };
+    const publish = (result: CodexSpeechSessionEvent) => {
+      if (sessions.get(id) !== entry) return;
+      try { current.senderFrame.send(codexSpeechEventChannel, result); }
+      catch { teardown(); }
+      if (result.type === 'error') teardown();
+    };
+    const entry: Entry = {
+      owner: current, abort, bytes: 0,
+      // Defer startup until the entry exists, including synchronous custom adapters.
+      ...(preparing ? {
+        prepared: Promise.resolve().then(() => options.prepareSpeechSession!(input, publish, {
+          assetsPath: options.appleSpeechAssetsPath, signal: abort.signal,
+        })),
+      } : {
+        session: Promise.resolve().then(() => observe('start', () => start(input as CodexSpeechSessionOptions, publish,
+          { assetsPath: options.appleSpeechAssetsPath, signal: abort.signal }), () => abort.signal.aborted)),
+      }),
+      cleanup: () => {
+        for (const name of ['destroyed', 'render-process-gone']) current.sender.removeListener(name, teardown);
+        current.sender.removeListener('did-start-navigation', onNavigation);
+      },
+    };
+    sessions.set(id, entry);
+    for (const name of ['destroyed', 'render-process-gone']) current.sender.on(name, teardown);
+    current.sender.on('did-start-navigation', onNavigation);
+    return entry;
   }
   return {
     handlers: {
+      [channels.prepareSpeech]: async (event, raw) => {
+        const input = raw as CodexSpeechPreparationOptions | null;
+        if (!options.prepareSpeechSession) throw new Error('Speech preparation is not supported.');
+        if (!input || typeof input.sessionId !== 'string' || !/^[\w-]{1,128}$/.test(input.sessionId)
+          || (input.locale !== undefined && (typeof input.locale !== 'string' || input.locale.length > 128))) {
+          throw new TypeError('Invalid speech preparation options.');
+        }
+        const entry = create(event, input, true);
+        try { await entry.prepared; }
+        catch (error) { await cancel(input.sessionId, entry); throw error; }
+        if (entry.abort.signal.aborted) throw new Error('Speech recording cancelled.');
+      },
       [channels.startSpeech]: async (event, raw) => {
         const input = raw as CodexSpeechSessionOptions | null;
         if (!input || typeof input.sessionId !== 'string' || !/^[\w-]{1,128}$/.test(input.sessionId)
@@ -86,43 +151,24 @@ export function createCodexSpeechSessions(options: {
           || (input.locale !== undefined && (typeof input.locale !== 'string' || input.locale.length > 128))) {
           throw new TypeError('Invalid speech session options.');
         }
-        const current = owner(event);
-        if (sessions.has(input.sessionId) || [...sessions.values()].some((entry) => entry.owner.sender === current.sender)) {
-          throw new Error('A speech session is already active in this renderer.');
+        const existing = sessions.get(input.sessionId);
+        const entry = existing?.prepared ? get(event, input.sessionId) : create(event, input, false);
+        if (existing?.prepared) {
+          if (entry.session) throw new Error('A speech session is already active in this renderer.');
+          entry.session = entry.prepared!.then(prepared => {
+            entry.abort.signal.throwIfAborted();
+            return observe('start', () => prepared.start(input.sampleRate), () => entry.abort.signal.aborted);
+          });
         }
         const id = input.sessionId;
-        const abort = new AbortController();
-        const teardown = () => { void cancel(id, entry); };
-        const onNavigation = (details: unknown, _url: unknown, sameDocument: unknown, mainFrame: unknown, processId: unknown, routingId: unknown) => {
-          const navigation = details as Partial<WebContentsDidStartNavigationEventParams>;
-          const frame = navigation.frame ?? { processId, routingId };
-          // Older Electron versions supply positional arguments instead of details.
-          if (!(navigation.isSameDocument ?? sameDocument) && ((navigation.isMainFrame ?? mainFrame)
-            || (frame.processId === current.senderFrame.processId && frame.routingId === current.senderFrame.routingId))) teardown();
-        };
-        const entry: Entry = {
-          owner: current, abort, bytes: 0,
-          // Defer startup until the entry exists, including synchronous custom adapters.
-          session: Promise.resolve().then(() => observe('start', () => start(input, (result) => {
-            if (sessions.get(id) !== entry) return;
-            try { current.senderFrame.send(codexSpeechEventChannel, result); }
-            catch { teardown(); }
-            if (result.type === 'error') teardown();
-          }, { assetsPath: options.appleSpeechAssetsPath, signal: abort.signal }), () => abort.signal.aborted)),
-          cleanup: () => {
-            for (const name of ['destroyed', 'render-process-gone']) current.sender.removeListener(name, teardown);
-            current.sender.removeListener('did-start-navigation', onNavigation);
-          },
-        };
-        sessions.set(id, entry);
-        for (const name of ['destroyed', 'render-process-gone']) current.sender.on(name, teardown);
-        current.sender.on('did-start-navigation', onNavigation);
+        const abort = entry.abort;
         try { await entry.session; }
         catch (error) { await cancel(id, entry); throw error; }
         if (abort.signal.aborted) throw new Error('Speech recording cancelled.');
       },
       [channels.appendSpeech]: async (event, id, audio) => {
         const entry = get(event, id);
+        if (!entry.session) throw new Error('Speech session is not active.');
         if (entry.stopping) throw new Error('Speech session is finalizing.');
         if (!(audio instanceof ArrayBuffer) || !audio.byteLength || audio.byteLength % 4 || audio.byteLength > 256 * 1024) {
           throw new TypeError('Invalid PCM audio chunk.');
@@ -136,10 +182,11 @@ export function createCodexSpeechSessions(options: {
       },
       [channels.stopSpeech]: async (event, id) => {
         const entry = get(event, id);
+        if (!entry.session) throw new Error('Speech session is not active.');
         entry.stopping ??= entry.session.then((session) => observe(
           'stop', () => session.stop(), () => entry.abort.signal.aborted, result => Boolean(result.error),
         )).finally(() => {
-          sessions.delete(id);
+          if (sessions.get(id) === entry) sessions.delete(id);
           entry.cleanup();
         });
         return entry.stopping;

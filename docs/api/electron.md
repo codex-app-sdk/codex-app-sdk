@@ -75,6 +75,7 @@ type CodexNativeMainOptions = {
   maxAudioBytes?: number;
   maxImagePreviewBytes?: number;
   startSpeechSession?: typeof startAppleSpeechSession;
+  prepareSpeechSession?: CodexSpeechSessionPreparer;
   onSpeechOperation?: CodexSpeechOperationObserver;
   transcribeAudio?: (audioData, options?) => Promise<AppleSpeechTranscriptionResult>;
 };
@@ -90,6 +91,7 @@ custom batch-only service should set `streamingTranscription: false`.
 
 ```ts
 type CodexStreamingTranscription = {
+  prepare?(options: { sessionId: string; locale?: string }): Promise<void>;
   start(options: { sessionId: string; sampleRate: number; locale?: string }): Promise<void>;
   append(sessionId: string, audio: ArrayBuffer): Promise<void>;
   stop(sessionId: string): Promise<{ text: string; error?: string }>;
@@ -123,6 +125,90 @@ For source-mode development, point `appleSpeechAssetsPath` (or
 `CODEX_APP_SDK_ASSETS_PATH`) at the source SDK's `packages/backend/assets` so
 the native helper matches the source API. Packaged apps should use the helper
 from the same SDK version as their bridge.
+
+### Selecting a speech engine
+
+The main entrypoint exports `startAppleSpeechSession`, `startOpenAISpeechSession`,
+and their session types. `startSpeechSession` is called for each recording, so
+hosts can read current settings and credentials without restarting the bridge:
+
+```ts
+import {
+  registerCodexNativeIpc,
+  startAppleSpeechSession,
+  startOpenAISpeechSession,
+} from '@codex-app-sdk/electron';
+
+registerCodexNativeIpc(dependencies, {
+  startSpeechSession: async (input, onEvent, nativeOptions) => {
+    if (readSpeechEngine() === 'openai') {
+      return startOpenAISpeechSession(input, onEvent, {
+        apiKey: await readSpeechApiKey(), // Host-owned secure storage, main process only.
+        signal: nativeOptions?.signal,
+      });
+    }
+    return startAppleSpeechSession(input, onEvent, nativeOptions);
+  },
+}, attachments);
+```
+
+An active recording retains its selected session until stop or cancel; later
+settings changes apply to the next recording. Enable `transcription: true` and
+`streamingTranscription: true` in `exposeCodexElectronPreload` (or
+`createCodexNativeRendererApi`) when supplying OpenAI streaming on any desktop
+platform. The renderer continues using the same PCM and transcript bridge;
+credentials never cross it. OpenAI streams audio to the provider; Apple
+recognition stays on the device. Engine selection and credential storage belong
+to the host. See the [OpenAI service contract](/api/node#openai-streaming-dictation).
+
+### Parallel connection and microphone setup
+
+Supply `prepareSpeechSession` and enable `speechPreparation: true` alongside
+`transcription` and `streamingTranscription` in preload to overlap the provider
+handshake with microphone setup. The composer calls `prepare({ sessionId,
+locale? })` while opening capture, then `start({ sessionId, sampleRate, locale? })`
+with the actual resolved microphone rate. It activates microphone delivery only
+after both are ready. No early audio is buffered or uploaded.
+
+```ts
+import {
+  prepareOpenAISpeechSession,
+  startAppleSpeechSession,
+} from '@codex-app-sdk/electron';
+
+const nativeOptions = {
+  prepareSpeechSession: async (input, onEvent, dependencies) => {
+    const engine = readSpeechEngine(); // Pin settings for this recording.
+    const model = readOpenAILivePreference() ? 'gpt-live-transcribe' : 'gpt-transcribe';
+    if (engine === 'openai') {
+      return prepareOpenAISpeechSession(input, onEvent, {
+        apiKey: await readSpeechApiKey(),
+        model,
+        signal: dependencies.signal,
+      });
+    }
+    return {
+      start: sampleRate => startAppleSpeechSession({ ...input, sampleRate }, onEvent, dependencies),
+      cancel: async () => {}, // The shared abort signal owns Apple startup/recording.
+    };
+  },
+  startSpeechSession, // Keep the existing callback for clients without preparation.
+};
+```
+
+`CodexSpeechSessionPreparer` receives `{ sessionId, locale? }`, the existing
+speech event callback, and `{ signal, assetsPath? }`. It returns
+`Promise<CodexPreparedSpeechSession>` whose `start(sampleRate)` resolves a
+`CodexSpeechSession` (`append`, `stop`, `cancel`) and whose `cancel()` releases
+preparation resources. Factories should respect the signal, and cancellation
+must be safe to repeat. The bridge cancels late resources even if a factory
+finishes after its renderer has gone away. Settings and credentials stay pinned
+from preparation through activation; read them before awaiting asynchronous work.
+
+Existing hosts and clients without the optional `prepare` method retain sequential
+startup. A preparation failure or microphone failure cancels its sibling and
+releases capture; late completion cannot activate an old recording. Apple helper
+startup still receives the actual microphone rate and keeps its existing behavior.
 
 ### Speech operation observation
 

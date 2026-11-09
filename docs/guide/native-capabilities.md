@@ -95,5 +95,14 @@ registerCodexElectronMain({
 });
 ```
 
+For incremental dictation on Windows, Linux, or macOS, select
+`startOpenAISpeechSession` through the main bridge's `startSpeechSession` callback.
+Keep API keys in host-owned secure storage and supply them only in the trusted
+process. Settings can select Apple or OpenAI for each new recording without
+changing the renderer. To overlap connection setup with microphone permissions,
+provide `prepareSpeechSession` and enable preload's `speechPreparation` flag.
+Audio activates after both steps finish, using the actual capture rate; cancelling
+either step also cleans up late completion. See [speech engine selection](/api/electron#selecting-a-speech-engine).
+
 Presentation controls can omit the voice control entirely when transcription
 is unavailable or inappropriate for the product.

@@ -1,13 +1,13 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { CodexSpeechSessionEvent, CodexSpeechTranscriptionResult } from '@codex-app-sdk/core/native';
+import type { CodexSpeechSessionEvent, CodexSpeechTranscriptionResult, CodexPreparedSpeechSession } from '@codex-app-sdk/core/native';
 import { registerCodexNativeIpc, type CodexNativeMainOptions } from '../src/codex-native-ipc';
 import { createCodexNativeRendererApi } from '../src/codex-native-renderer';
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 
-function runtime(options: CodexNativeMainOptions) {
+function runtime(options: CodexNativeMainOptions, speechPreparation = false) {
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
   const ipcMain = { handle: (name: string, fn: (event: unknown, ...args: unknown[]) => unknown) => { handlers.set(name, fn); },
     removeHandler: (name: string) => { handlers.delete(name); } };
@@ -18,7 +18,7 @@ function runtime(options: CodexNativeMainOptions) {
     return { sender, senderFrame, api: createCodexNativeRendererApi({
       invoke: async (name, ...args) => handlers.get(name)!({ sender, senderFrame }, ...args),
       on: (name, fn) => { bus.on(name, fn); }, off: (name, fn) => { bus.off(name, fn); },
-    }, { transcription: true, streamingTranscription: true }) };
+    }, { transcription: true, streamingTranscription: true, speechPreparation }) };
   }
   const dispose = registerCodexNativeIpc({ ipcMain, clipboard: { write() {} }, dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }) }, shell: { openExternal: async () => {} } }, options);
   cleanups.push(dispose);
@@ -241,4 +241,69 @@ it('reports recognizer errors and permits retry after a failed startup', async (
   expect(events).toEqual([{ type: 'error', sessionId: 'retry', error: 'Recognition failed' }]);
   await vi.waitFor(() => expect(session.cancel).toHaveBeenCalledOnce());
   h.dispose();
+});
+
+
+it('owns prepared sessions before activation, preserves actual rate, and rejects foreign or repeated activation', async () => {
+  const session = { append: vi.fn(async () => {}), stop: vi.fn(async () => ({ text: 'ready' })), cancel: vi.fn(async () => {}) };
+  const prepared = { start: vi.fn(async (_rate: number) => session), cancel: vi.fn(async () => {}) };
+  const prepare = vi.fn(async () => prepared);
+  const h = runtime({ prepareSpeechSession: prepare }, true);
+  const owner = h.renderer();
+  const other = h.renderer();
+  const stream = owner.api.streamingTranscription!;
+  await stream.prepare!({ sessionId: 'prepared', locale: 'fr-FR' });
+  expect(prepared.start).not.toHaveBeenCalled();
+  await expect(other.api.streamingTranscription!.start({ sessionId: 'prepared', sampleRate: 48000 })).rejects.toThrow('owner');
+  await expect(stream.append('prepared', new ArrayBuffer(4))).rejects.toThrow('not active');
+  await stream.start({ sessionId: 'prepared', sampleRate: 48000, locale: 'fr-FR' });
+  expect(prepared.start).toHaveBeenCalledWith(48000);
+  await expect(stream.start({ sessionId: 'prepared', sampleRate: 48000 })).rejects.toThrow('already active');
+  await stream.append('prepared', new Float32Array([0.5]).buffer);
+  expect(await stream.stop('prepared')).toEqual({ text: 'ready' });
+  expect(session.append).toHaveBeenCalledOnce();
+  await stream.prepare!({ sessionId: 'next' });
+  owner.sender.emit('destroyed');
+  await vi.waitFor(() => expect(prepared.cancel).toHaveBeenCalled());
+});
+
+it('cancels pending preparation immediately and cleans late resources without reviving the renderer', async () => {
+  let finish!: (value: CodexPreparedSpeechSession) => void;
+  let signal!: AbortSignal;
+  const prepared = { start: vi.fn<CodexPreparedSpeechSession['start']>(), cancel: vi.fn(async () => {}) };
+  const h = runtime({ prepareSpeechSession: async (_input, _onEvent, options) => {
+    signal = options.signal;
+    return new Promise(resolve => { finish = resolve; });
+  } }, true);
+  const stream = h.renderer().api.streamingTranscription!;
+  const preparing = stream.prepare!({ sessionId: 'pending' });
+  const rejected = expect(preparing).rejects.toThrow('cancelled');
+  await vi.waitFor(() => expect(signal).toBeDefined());
+  await stream.cancel('pending');
+  expect(signal.aborted).toBe(true);
+  finish(prepared);
+  await rejected;
+  await vi.waitFor(() => expect(prepared.cancel).toHaveBeenCalledOnce());
+  expect(prepared.start).not.toHaveBeenCalled();
+});
+
+it.each(['cancel', 'failure'] as const)('cleans prepared resources across an in-flight activation %s and permits the next recording', async outcome => {
+  let resolve!: (value: typeof session) => void;
+  let reject!: (error: Error) => void;
+  const session = { append: vi.fn(async () => {}), stop: vi.fn(async () => ({ text: '' })), cancel: vi.fn(async () => {}) };
+  const pending = new Promise<typeof session>((yes, no) => { resolve = yes; reject = no; });
+  const prepared = { start: vi.fn(() => pending), cancel: vi.fn(async () => {}) };
+  const h = runtime({ prepareSpeechSession: async () => prepared }, true);
+  const stream = h.renderer().api.streamingTranscription!;
+  await stream.prepare!({ sessionId: 'activation' });
+  const starting = stream.start({ sessionId: 'activation', sampleRate: 44100 });
+  const failed = expect(starting).rejects.toThrow(outcome === 'cancel' ? 'cancelled' : 'Activation failed');
+  await vi.waitFor(() => expect(prepared.start).toHaveBeenCalledWith(44100));
+  if (outcome === 'cancel') { await stream.cancel('activation'); resolve(session); }
+  else reject(new Error('Activation failed'));
+  await failed;
+  await vi.waitFor(() => expect(prepared.cancel).toHaveBeenCalledOnce());
+  if (outcome === 'cancel') await vi.waitFor(() => expect(session.cancel).toHaveBeenCalledOnce());
+  await stream.prepare!({ sessionId: 'next-activation' });
+  await stream.cancel('next-activation');
 });

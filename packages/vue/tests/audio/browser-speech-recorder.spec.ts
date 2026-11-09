@@ -21,14 +21,15 @@ function audioHost() {
 }
 afterEach(() => vi.unstubAllGlobals());
 
-it('drains the last worklet block before closing capture, without recording before activation', async () => {
+it.each([16000, 48000])('drains capture without early activation and reports actual rate %s', async actualRate => {
   const h = audioHost();
+  h.context.sampleRate = actualRate;
   const recorder = new BrowserSpeechRecorder();
   let acknowledge!: () => void;
   const received: ArrayBuffer[] = [];
   const levels: number[] = [];
   const rate = await recorder.start((audio) => { received.push(audio); return new Promise((resolve) => { acknowledge = resolve; }); }, vi.fn(), (level) => levels.push(level));
-  expect(rate).toBe(16000);
+  expect(rate).toBe(actualRate);
   expect(h.source.connect).not.toHaveBeenCalled();
   recorder.activate();
   const stop = recorder.stop();
@@ -141,5 +142,18 @@ it.each(['module', 'resume'] as const)('does not revive the microphone when canc
   proceed();
   await expect(starting).rejects.toThrow('cancelled');
   expect(h.track.stop).toHaveBeenCalledOnce();
+  expect(h.source.connect).not.toHaveBeenCalled();
+});
+
+
+it.each(['module', 'resume'] as const)('releases microphone resources when %s setup rejects', async stage => {
+  const h = audioHost();
+  const error = new Error('Audio setup failed');
+  const operation = stage === 'module' ? h.context.audioWorklet.addModule : h.context.resume;
+  operation.mockRejectedValueOnce(error);
+  const recorder = new BrowserSpeechRecorder();
+  await expect(recorder.start(vi.fn(async () => {}), vi.fn())).rejects.toBe(error);
+  expect(h.track.stop).toHaveBeenCalledOnce();
+  expect(h.context.close).toHaveBeenCalledOnce();
   expect(h.source.connect).not.toHaveBeenCalled();
 });

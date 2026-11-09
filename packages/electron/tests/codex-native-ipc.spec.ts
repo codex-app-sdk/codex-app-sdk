@@ -59,6 +59,7 @@ describe('Codex native Electron bridge', () => {
       'codex-native:ingest-attachments',
       'codex-native:open-external',
       'codex-native:pick-attachments',
+      'codex-native:prepare-speech',
       'codex-native:read-image-preview',
       'codex-native:start-speech',
       'codex-native:stop-speech',

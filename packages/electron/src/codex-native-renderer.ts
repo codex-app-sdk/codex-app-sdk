@@ -5,6 +5,7 @@ import type {
   CodexNativeRendererApi,
   CodexSpeechTranscriptionResult,
   CodexSpeechSessionOptions,
+  CodexSpeechPreparationOptions,
   CodexSpeechSessionEvent,
 } from '@codex-app-sdk/core/native';
 import {
@@ -20,6 +21,7 @@ export const codexNativeChannels = {
   pickAttachments: 'codex-native:pick-attachments',
   readImagePreview: 'codex-native:read-image-preview',
   transcribeAudio: 'codex-native:transcribe-audio',
+  prepareSpeech: 'codex-native:prepare-speech',
   startSpeech: 'codex-native:start-speech',
   appendSpeech: 'codex-native:append-speech',
   stopSpeech: 'codex-native:stop-speech',
@@ -28,6 +30,7 @@ export const codexNativeChannels = {
 export const codexSpeechEventChannel = 'codex-native:speech-event';
 
 export type CodexNativeRequests = {
+  [codexNativeChannels.prepareSpeech]: IpcRequest<[options: CodexSpeechPreparationOptions], void>;
   [codexNativeChannels.startSpeech]: IpcRequest<[options: CodexSpeechSessionOptions], void>;
   [codexNativeChannels.appendSpeech]: IpcRequest<[sessionId: string, audio: ArrayBuffer], void>;
   [codexNativeChannels.stopSpeech]: IpcRequest<[sessionId: string], CodexSpeechTranscriptionResult>;
@@ -51,7 +54,7 @@ export type CodexContextBridge = {
 
 export function createCodexNativeRendererApi(
   port: IpcRendererPort,
-  options: { transcription?: boolean; streamingTranscription?: boolean } = {},
+  options: { transcription?: boolean; streamingTranscription?: boolean; speechPreparation?: boolean } = {},
 ): CodexNativeRendererApi {
   const renderer = new TypedIpcRenderer<CodexNativeRequests, { [codexSpeechEventChannel]: CodexSpeechSessionEvent }>(port);
   const transcription = options.transcription ?? process.platform === 'darwin';
@@ -64,6 +67,7 @@ export function createCodexNativeRendererApi(
     },
     ...(transcription && (options.streamingTranscription ?? process.platform === 'darwin') ? {
       streamingTranscription: {
+        ...(options.speechPreparation ? { prepare: (input: CodexSpeechPreparationOptions) => renderer.invoke(codexNativeChannels.prepareSpeech, input) } : {}),
         start: (input: CodexSpeechSessionOptions) => renderer.invoke(codexNativeChannels.startSpeech, input),
         append: (id: string, audio: ArrayBuffer) => renderer.invoke(codexNativeChannels.appendSpeech, id, audio),
         stop: (id: string) => renderer.invoke(codexNativeChannels.stopSpeech, id),
@@ -85,7 +89,7 @@ export function createCodexNativeRendererApi(
 export function exposeCodexNativeRendererApi(
   contextBridge: CodexContextBridge,
   port: IpcRendererPort,
-  options?: { transcription?: boolean; streamingTranscription?: boolean },
+  options?: { transcription?: boolean; streamingTranscription?: boolean; speechPreparation?: boolean },
 ): CodexNativeRendererApi {
   const api = createCodexNativeRendererApi(port, options);
   contextBridge.exposeInMainWorld('codexAppSdkNative', api);

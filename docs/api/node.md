@@ -627,6 +627,48 @@ synchronous helpers keep their behavior but now also bound each shell probe by
 - `codexItemToToolPart`
 - `codexItemToMediaPart`
 
+### OpenAI streaming dictation
+
+`startOpenAISpeechSession(input, onEvent, configuration)` runs in a trusted Node.js
+or Electron main process on macOS, Windows, and Linux. `input` is
+`{ sessionId, sampleRate, locale? }`. Configuration requires a host-supplied
+`apiKey` and optionally accepts `signal`, `model`, and a `createWebSocket(url,
+{ headers })` transport factory. The default model is `gpt-live-transcribe`.
+Pass `model: 'gpt-transcribe'` for committed-turn transcription: text arrives
+after `stop()` commits the recording. The live model emits words while recording.
+Model selection remains with the host; preparing a connection does not change it.
+The SDK does not discover, store, or manage credentials.
+
+`prepareOpenAISpeechSession({ sessionId, locale? }, onEvent, configuration)`
+connects without needing a source sample rate. It returns a
+`CodexPreparedSpeechSession` with `start(sampleRate)` and `cancel()`. Call `start`
+once with the actual capture rate to obtain the recording session; it rejects
+repeated activation or activation after cancellation. No audio is sent during
+preparation. The original `startOpenAISpeechSession` combines these steps for
+hosts that already know the capture rate. Both use the same abort signal,
+provider configuration, and connection deadlines.
+
+The returned `OpenAISpeechSession` exposes `append(ArrayBuffer)`, `stop()`, and
+`cancel()` with the same contracts as Apple speech. Feed mono Float32
+little-endian PCM at the declared sample rate (8–96 kHz), awaiting each append.
+The service resamples continuously to 24 kHz PCM16 and sends audio over an
+authenticated TLS WebSocket to OpenAI. Transcript events replace the current
+`{ finalText, partialText }` snapshot; partial words arrive during recording.
+`stop()` commits the audio and waits for the matching authoritative transcript;
+`cancel()` discards it and closes the connection. Empty recordings return empty
+text without a provider commit. Very short recordings are padded to the API's
+100 ms commit minimum.
+
+Startup has a 15-second deadline and finalization a 30-second deadline. The
+service accepts at most 256 KiB per append and 25 MiB per recording; a socket
+backlog above 1 MiB fails the recording. Provider and transport failures return
+safe errors without forwarding arbitrary provider messages. There is no
+automatic retry or provider fallback. The host owns microphone permissions,
+engine selection, credential storage, and any user-facing retry.
+
+See the [OpenAI Realtime transcription guide](https://developers.openai.com/api/docs/guides/realtime-transcription)
+and the [Electron integration](/api/electron#selecting-a-speech-engine).
+
 ### Apple speech
 
 - `resolveAppleSpeechAnalyzerPath`

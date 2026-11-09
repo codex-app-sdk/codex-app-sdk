@@ -133,12 +133,19 @@ export function useChatComposerVoice(
           if (event.type === 'error') { fail(session, event.error); return }
           transcript.value = { finalText: event.finalText, partialText: event.partialText }
         })
-        const sampleRate = await capture.start(
+        const preparation = streaming.prepare?.({ sessionId: session.id, locale: navigator.language })
+        // Also observe rejection if a custom microphone adapter throws synchronously.
+        void preparation?.catch(() => {})
+        const microphone = capture.start(
           (audio) => streaming.append(session.id, audio),
           (error) => fail(session, errorMessage(error)),
           (level) => { if (active === session && !session.stopping) audioLevel.value = level },
-        )
-        if (active !== session) return
+        ).then(sampleRate => {
+          if (active !== session) capture.release()
+          return sampleRate
+        })
+        const [sampleRate] = await Promise.all([microphone, preparation])
+        if (active !== session) { await streaming.cancel(session.id); return }
         await streaming.start({ sessionId: session.id, sampleRate, locale: navigator.language })
         if (active !== session) { await streaming.cancel(session.id); return }
         capture.activate()

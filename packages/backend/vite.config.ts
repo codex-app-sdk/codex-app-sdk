@@ -2,7 +2,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 function isExternal(id: string): boolean {
-  return id.startsWith('node:')
+  return id === 'ws' || id.startsWith('node:')
     || id === '@codex-app-sdk/core'
     || id.startsWith('@codex-app-sdk/core/');
 }

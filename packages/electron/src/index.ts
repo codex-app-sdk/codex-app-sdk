@@ -43,6 +43,7 @@ export type {
   CodexSpeechOperation,
   CodexSpeechOperationOutcome,
   CodexSpeechOperationObserver,
+  CodexSpeechSessionPreparer,
 } from './codex-speech-sessions';
 export {
   CodexElectronAttachmentRegistry,
@@ -56,6 +57,9 @@ export type {
   CodexNativeClipboardContent,
   CodexNativeRendererApi,
   CodexSpeechTranscriptionResult,
+  CodexSpeechPreparationOptions,
+  CodexPreparedSpeechSession,
+  CodexSpeechSession,
 } from '@codex-app-sdk/core/native';
 export {
   exposeCodexElectronPreload,
@@ -65,3 +69,13 @@ export {
   registerCodexElectronMain,
   type CodexElectronMainOptions,
 } from './codex-electron-integration';
+export {
+  startAppleSpeechSession,
+  startOpenAISpeechSession,
+  prepareOpenAISpeechSession,
+  type AppleSpeechSession,
+  type OpenAISpeechSession,
+  type OpenAISpeechSessionConfiguration,
+  type OpenAISpeechSocket,
+  type OpenAISpeechData,
+} from '@codex-app-sdk/backend';

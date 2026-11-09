@@ -24,7 +24,7 @@ try {
     const Composer = packaged
       ? (await import('/@fs/' + root + 'packages/vue/dist/index.js')).CodexComposer
       : (await import('/@fs/' + root + 'packages/vue/src/components/CodexComposer.vue')).default;
-    window.speechProbe = { chunks: 0, bytes: 0, sent: [], stops: 0, cancelled: [], listeners: new Set() };
+    window.speechProbe = { chunks: 0, bytes: 0, sent: [], stops: 0, cancelled: [], listeners: new Set(), holdPreparation: true };
     const probe = window.speechProbe;
     const NativeAudioWorkletNode = window.AudioWorkletNode;
     window.AudioWorkletNode = class extends NativeAudioWorkletNode {
@@ -42,12 +42,17 @@ try {
       gain.connect(destination);
       await audio.resume();
       probe.stream = destination.stream;
+      if (probe.holdMicrophone) await new Promise(resolve => { probe.microphoneReady = resolve; });
       return destination.stream;
     };
     window.codexAppSdkNative = {
       capabilities: { transcription: true },
       streamingTranscription: {
-        start: async ({ sessionId }) => { probe.id = sessionId; await new Promise((resolve) => { probe.startReady = resolve; }); },
+        prepare: async ({ sessionId }) => {
+          probe.preparedId = sessionId;
+          if (probe.holdPreparation) await new Promise(resolve => { probe.prepareReady = resolve; });
+        },
+        start: async ({ sessionId, sampleRate }) => { probe.rate = sampleRate; probe.id = sessionId; await new Promise((resolve) => { probe.startReady = resolve; }); },
         append: async (_id, data) => { probe.chunks++; probe.bytes += data.byteLength; },
         stop: async () => { probe.stops++; return new Promise((resolve) => { probe.finish = resolve; }); },
         cancel: async (id) => { probe.cancelled.push(id); },
@@ -87,8 +92,35 @@ try {
   await editor.press('Home');
   for (let i = 0; i < 7; i++) await editor.press('ArrowRight');
   const initialHeight = (await fixture.locator('form').boundingBox()).height;
+  // Provider failure while permission is pending must not revive a late microphone.
+  await page.evaluate(() => { window.speechProbe.holdMicrophone = true; });
   await fixture.locator('.chat-composer__voice').click();
+  await page.waitForFunction(() => typeof window.speechProbe.prepareReady === 'function'
+    && typeof window.speechProbe.microphoneReady === 'function');
+  await page.evaluate(() => {
+    const p = window.speechProbe;
+    for (const fn of p.listeners) fn({ type: 'error', sessionId: p.preparedId, error: 'Provider connection failed' });
+  });
+  await page.waitForFunction(() => window.speechProbe.cancelled.includes(window.speechProbe.preparedId));
+  await page.evaluate(() => {
+    const p = window.speechProbe;
+    p.holdMicrophone = false;
+    p.prepareReady(); p.microphoneReady(); p.prepareReady = undefined;
+  });
+  await page.waitForFunction(() => window.speechProbe.stream.getTracks().every(track => track.readyState === 'ended'));
+  assert.equal(await page.evaluate(() => window.speechProbe.bytes), 0, 'Failed preparation must never upload late microphone audio');
+  assert.equal(await fixture.locator('.chat-composer__voice').isEnabled(), true);
+  assert.equal(await editor.innerText(), 'Before ending', 'Failed startup preserves the draft');
+  await editor.press('Home');
+  for (let i = 0; i < 7; i++) await editor.press('ArrowRight');
+  await fixture.locator('.chat-composer__voice').click();
+  await page.waitForFunction(() => typeof window.speechProbe.prepareReady === 'function' && Boolean(window.speechProbe.capture));
+  assert.equal(await page.evaluate(() => window.speechProbe.chunks), 0, 'Mic setup and connection prepare overlap without sending audio');
+  assert.equal(await page.evaluate(() => typeof window.speechProbe.startReady), 'undefined', 'Activation waits for preparation');
+  await page.evaluate(() => { window.speechProbe.holdPreparation = false; window.speechProbe.prepareReady(); });
   await page.waitForFunction(() => typeof window.speechProbe.startReady === 'function');
+  assert.equal(await page.evaluate(() => window.speechProbe.rate === window.speechProbe.capture.context.sampleRate), true,
+    'Prepared activation uses the actual AudioContext sample rate');
   assert.equal((await fixture.locator('form').boundingBox()).height, initialHeight, 'Starting recording must preserve composer height');
   await page.evaluate(() => { window.speechProbe.startReady(); window.speechProbe.startReady = undefined; });
   await page.waitForFunction(() => window.speechProbe.chunks > 1);
