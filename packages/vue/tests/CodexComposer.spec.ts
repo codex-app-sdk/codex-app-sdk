@@ -516,6 +516,36 @@ describe('ChatComposer', () => {
     expect(editorValue(wrapper)).toBe('');
   });
 
+  it('accepts a suggested prompt on double-click without submitting or replacing an existing draft', async () => {
+    const wrapper = mountComposer({ suggestedPrompt: 'Inspect the changes', hasAttachments: true });
+    await editor(wrapper).trigger('dblclick');
+    expect(editorValue(wrapper)).toBe('Inspect the changes');
+    expect(wrapper.emitted('send')).toBeUndefined();
+    await wrapper.setProps({ suggestedPrompt: 'Run the checks' });
+    await editor(wrapper).trigger('dblclick');
+    expect(editorValue(wrapper)).toBe('Inspect the changes');
+    await setEditorValue(wrapper, '');
+    await editor(wrapper).trigger('dblclick');
+    expect(editorValue(wrapper)).toBe('Run the checks');
+    expect(wrapper.emitted('send')).toBeUndefined();
+    await editor(wrapper).trigger('keydown', { key: 'Enter' });
+    expect(wrapper.emitted('send')).toStrictEqual([['Run the checks']]);
+    wrapper.unmount();
+  });
+
+  it.each([{ disabled: true, suggestedPrompt: 'A suggestion' }, { suggestedPrompt: '   ' }, {}])(
+    'leaves a double-click alone when a suggestion cannot be accepted (%j)', async props => {
+      const wrapper = mountComposer(props);
+      const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true });
+      editor(wrapper).element.dispatchEvent(event);
+      await nextTick();
+      expect(editorValue(wrapper)).toBe('');
+      expect(event.defaultPrevented).toBe(false);
+      expect(wrapper.emitted('send')).toBeUndefined();
+      wrapper.unmount();
+    },
+  );
+
   it('sends attachment-only work with Enter instead of accepting the suggested prompt', async () => {
     for (const content of [{ hasAttachments: true }, { hasExternalContent: true }]) {
       const wrapper = mountComposer({ ...content, suggestedPrompt: 'Suggested follow-up' });

@@ -246,6 +246,20 @@ try {
     await editor.press('ControlOrMeta+Enter');
     assert.equal((await page.evaluate(() => window.authoredFixture.read().submitted)).prompt, '',
       'The alternate queue shortcut also forwards context-only work');
+    await editor.dblclick();
+    assert.equal(await editor.textContent(), 'Suggested follow-up', 'Double-click accepts the suggestion');
+    assert.equal(await page.evaluate(() => window.contextSteers.length), 2, 'Double-click never submits');
+    assert.equal(await editor.evaluate(element => {
+      const selection = getSelection();
+      return selection.isCollapsed && selection.anchorNode?.parentElement === element
+        && selection.anchorOffset === element.textContent.length;
+    }), true, 'Accepted suggestion leaves the caret at the end');
+    await editor.press('ControlOrMeta+z');
+    assert.equal(await editor.textContent(), '', 'Suggestion acceptance can be undone');
+    await editor.dblclick();
+    await editor.dblclick({ position: { x: 20, y: 8 } });
+    assert.equal(await editor.textContent(), 'Suggested follow-up', 'A second double-click preserves the draft');
+    assert.ok(await editor.evaluate(() => getSelection().toString().length > 0), 'Existing draft retains native word selection');
     for (const authored of [false, true]) {
       await page.setViewportSize({ width: authored ? 390 : 900, height: 700 });
       await page.evaluate(authored => window.authoredFixture.attachmentOnly(authored), authored);

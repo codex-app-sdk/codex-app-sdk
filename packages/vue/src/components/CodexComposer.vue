@@ -66,6 +66,7 @@
         :skills="skills"
         @blur="closeComposerMenusSoon"
         @click="updateCaretPosition"
+        @dblclick="acceptSuggestedPrompt"
         @caret-change="handleCaretChange"
         @input="handleEditorInput"
         @keydown="handleEditorKeydown"
@@ -672,6 +673,14 @@ function sameComposerState(left: CodexComposerState, right: CodexComposerState |
     && (left.activeCommandId ?? null) === (right.activeCommandId ?? null));
 }
 
+function acceptSuggestedPrompt(event: Event): boolean {
+  if (props.disabled || activeCommand.value || !props.suggestedPrompt?.trim()
+    || (editorEl.value?.readText() ?? prompt.value) !== '') return false;
+  event.preventDefault();
+  editorEl.value?.insertTextAtSelection(props.suggestedPrompt);
+  return true;
+}
+
 function handleEditorKeydown(event: KeyboardEvent): void {
   if (handleSuggestionKeydown(event)) {
     return;
@@ -680,10 +689,7 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   if (['Tab', 'ArrowRight', ' ', 'Enter'].includes(event.key)
     && (event.key !== 'Enter' || !(props.hasAttachments || props.hasExternalContent))
     && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
-    && !event.isComposing && !props.disabled && !activeCommand.value
-    && props.suggestedPrompt?.trim() && (editorEl.value?.readText() ?? prompt.value) === '') {
-    event.preventDefault();
-    editorEl.value?.insertTextAtSelection(props.suggestedPrompt);
+    && !event.isComposing && acceptSuggestedPrompt(event)) {
     return;
   }
 
