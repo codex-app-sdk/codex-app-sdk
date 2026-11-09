@@ -141,12 +141,14 @@ hovering over the muted Send button enables a normal submission of that prompt.
 `Cmd+Enter` does the same unless it is steering an existing queued prompt. This
 does not replace the interrupted-turn action above or the busy-turn interrupt.
 
-When a controlled pane with no messages submits its first prompt, the pane
+When an idle controlled pane submits a prompt, including a follow-up, the pane
 renders an optimistic user row immediately. The row survives settlement of the
-`submit` promise and one `identity.conversationKey` change while the host creates
-the provider conversation. Publish the authoritative user message through
-`identity.messages`; matching prompt content replaces the optimistic row without
-duplication. The pane also keeps its Thinking state active if provider `busy`
+`submit` promise. For an empty conversation it also survives one
+`identity.conversationKey` change while the host creates the provider conversation.
+Publish authoritative messages with stable IDs through `identity.messages`;
+new matching user messages replace the optimistic row without duplication, while
+older identical prompts remain history. Changing an existing conversation removes
+its pending row. The pane also keeps its Thinking state active if provider `busy`
 briefly clears during that handoff. The host must not insert a second
 renderer-only optimistic row or preserve a synthetic busy flag.
 

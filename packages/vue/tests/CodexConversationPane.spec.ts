@@ -1296,13 +1296,45 @@ describe('CodexConversationPane', () => {
     expect(wrapper.text().match(/Create the first turn/g)).toHaveLength(1);
   });
 
-  it('removes a controlled initial submission when the host rejects it', async () => {
+  it('shows a follow-up immediately and reconciles a new user message without matching identical history', async () => {
+    let finish!: () => void;
+    const submit = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const previous: SurfaceMessage = { id: 'previous-user', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Repeat this task' }] };
+    const state = reactive<CodexConversationPaneState>({ identity: { conversationKey: 'existing-thread', messages: [previous] } });
+    const wrapper = mount(CodexConversationPane, { props: { controller: createCodexConversationPaneController({ state, actions: { submit } }) } });
+    await setComposerText(wrapper, 'Repeat this task');
+    await wrapper.get('form').trigger('submit');
+    await nextTick();
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(2);
+    expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
+    state.identity.messages = [{ ...previous }];
+    await nextTick();
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(2);
+    state.identity.messages = [previous, { ...previous, id: 'accepted-user', turnId: 'new-turn' }];
+    await nextTick();
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(2);
+    finish();
+    await flushPromises();
+    await setComposerText(wrapper, 'Do not show this in another conversation');
+    await wrapper.get('form').trigger('submit');
+    await nextTick();
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(3);
+    state.identity.conversationKey = 'another-thread';
+    state.identity.messages = [{ ...previous, id: 'other-user', parts: [{ type: 'text', text: 'Another conversation' }] }];
+    await nextTick();
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain('Do not show this in another conversation');
+    finish();
+    await flushPromises();
+  });
+
+  it.each([false, true])('removes a controlled submission when the host rejects it (history=%s)', async history => {
     let rejectSubmit!: (error: Error) => void;
     const submit = vi.fn(() => new Promise<void>((_resolve, reject) => {
       rejectSubmit = reject;
     }));
     const controller = createCodexConversationPaneController({
-      state: { identity: { conversationKey: 'agent-provisional', messages: [] } },
+      state: { identity: { conversationKey: 'agent-provisional', messages: history ? [{ id: 'previous', role: 'user', status: 'complete', parts: [{ type: 'text', text: 'Previous prompt' }] }] : [] } },
       actions: { submit },
     });
     const wrapper = mount(CodexConversationPane, { props: { controller } });
@@ -1310,15 +1342,15 @@ describe('CodexConversationPane', () => {
     await setComposerText(wrapper, 'Reject this turn');
     await wrapper.get('form').trigger('submit');
     await nextTick();
-    expect(wrapper.findAll('.chat-message--user')).toHaveLength(1);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(history ? 2 : 1);
     expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(1);
 
     rejectSubmit(new Error('Submission rejected'));
     await flushPromises();
 
-    expect(wrapper.findAll('.chat-message--user')).toHaveLength(0);
+    expect(wrapper.findAll('.chat-message--user')).toHaveLength(history ? 1 : 0);
     expect(wrapper.findAll('.chat-message__thinking')).toHaveLength(0);
-    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(true);
+    expect(wrapper.find('.codex-conversation-pane__hero').exists()).toBe(!history);
     expect(wrapper.get('[role="alert"]').text()).toBe('Submission rejected');
   });
 

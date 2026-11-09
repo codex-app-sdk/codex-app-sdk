@@ -605,7 +605,9 @@ const editingQueuedPromptId = ref<string | null>(null);
 const deletingTurnId = ref<string | null>(null);
 type PendingControlledSubmission = {
   adoptedConversationKey: string | number | null;
+  canAdoptConversationKey: boolean;
   hasAdoptedConversationKey: boolean;
+  priorMessageIds: ReadonlySet<string | undefined>;
   message: SurfaceMessage;
   originConversationKey: string | number | null;
   prompt: string;
@@ -1006,7 +1008,8 @@ watch(effectiveConversationKey, (conversationKey, previousConversationKey) => {
   const pending = pendingControlledSubmission.value;
   if (pending) {
     if (
-      !pending.hasAdoptedConversationKey
+      pending.canAdoptConversationKey
+      && !pending.hasAdoptedConversationKey
       && (previousConversationKey ?? null) === pending.originConversationKey
     ) {
       pendingControlledSubmission.value = {
@@ -1205,11 +1208,13 @@ function beginControlledSubmission(
   attachments: readonly CodexHostAttachment[],
   content?: CodexRendererSendMessageOptions['content'],
 ): string | null {
-  if (effectiveBusy.value || authoritativeMessages.value.length > 0) return null;
+  if (effectiveBusy.value || pendingControlledSubmission.value) return null;
   const id = `codex-optimistic-user-${++optimisticSubmissionSequence}`;
   pendingControlledSubmission.value = {
     adoptedConversationKey: null,
+    canAdoptConversationKey: authoritativeMessages.value.length === 0,
     hasAdoptedConversationKey: false,
+    priorMessageIds: new Set(authoritativeMessages.value.map(message => renderedChatMessage(message).id)),
     originConversationKey: effectiveConversationKey.value ?? null,
     prompt,
     message: {
@@ -1240,7 +1245,7 @@ function matchesPendingSubmission(
   pending: PendingControlledSubmission,
 ): boolean {
   const candidate = renderedChatMessage(message);
-  return candidate.role === 'user' && stripMessageContext(candidate.content) === pending.prompt;
+  return !pending.priorMessageIds.has(candidate.id) && candidate.role === 'user' && stripMessageContext(candidate.content) === pending.prompt;
 }
 
 function clearPendingControlledSubmission(messageId: string | null): void {

@@ -319,11 +319,12 @@ until an asynchronous host action settles. `onMessageCopied` is only a
 post-action notification: `CodexMessage` performs the clipboard write and
 copied-state feedback itself.
 
-For the first controlled submission, keep `actions.submit(prompt, options)` as a
-normal transport action. The pane owns the temporary user row while
-`identity.messages` is empty, preserves it if the provisional conversation key
-becomes the provider thread ID, and reconciles it when the matching authoritative
-user message arrives. The submit promise may resolve before that message; do not
+Keep `actions.submit(prompt, options)` as a normal transport action for initial
+prompts and follow-ups. The pane owns the temporary user row, preserves it if an
+empty conversation's provisional key becomes the provider thread ID, and
+reconciles it when a new matching authoritative user message arrives. Supply stable
+message IDs so an older identical prompt cannot acknowledge the submission.
+The submit promise may resolve before that message; do not
 add a host-owned optimistic transcript row or delay promise settlement just for
 rendering. While the temporary row is pending, the pane keeps Thinking visible
 even if provider busy state briefly clears during thread creation. A rejected
