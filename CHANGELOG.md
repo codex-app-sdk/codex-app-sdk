@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.22.2
+
+### Added
+
+- Support OpenAI dictation and live transcription with parallel microphone and connection startup.
+
+### Fixed
+
+- Show host-controlled follow-up prompts immediately.
+
 ## 0.22.1
 
 ### Changed
