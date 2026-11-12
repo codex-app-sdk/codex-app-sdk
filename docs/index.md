@@ -40,6 +40,13 @@ features:
     details: Capabilities, presentation controls, slots, reusable leaf components, scoped styles, semantic tokens, and light/dark themes.
 ---
 
+::: info Successor SDKs
+For new integrations, use the Codex, Multi Agent and Agent UI SDKs under
+`@korus-dev`. The [migration guide](/guide/migration) maps packages, conversation
+state, Electron capabilities and browser bridges. These pages retain the
+Codex App SDK reference.
+:::
+
 ## One surface. Five focused packages.
 
 Build your own Codex experience on an Apache-2.0 SDK. Start with the mocked

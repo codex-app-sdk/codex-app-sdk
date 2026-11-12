@@ -1,5 +1,20 @@
 # Codex App SDK
 
+> [!WARNING]
+> **Codex App SDK is deprecated. Use the successor SDKs for new projects.**
+>
+> The SDK is now split into three focused packages. Choose the layers you need:
+>
+> - **[Codex SDK](https://github.com/Korus-Dev/codex-sdk)** — typed access to the Codex app-server protocol.
+> - **[Multi Agent SDK](https://github.com/Korus-Dev/multi-agent-sdk)** — provider integration, agent sessions and conversation history.
+> - **[Agent UI SDK](https://github.com/Korus-Dev/agent-ui-sdk)** — Vue conversation controls, Electron integration and speech.
+>
+> **Already using Codex App SDK?** Follow the **[migration guide](docs/guide/migration.md)** to move your application while preserving existing conversations.
+>
+> Existing releases remain available. The documentation below is retained as a reference for legacy integrations.
+
+## Legacy SDK reference
+
 Build complete desktop and web Codex experiences without rebuilding app-server
 process management, transport bridges, conversation state, and chat UI in every app.
 

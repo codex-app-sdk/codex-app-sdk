@@ -25,6 +25,7 @@ export default defineConfig({
     logo: '/logo.svg',
     siteTitle: 'Codex App SDK',
     nav: [
+      { text: 'Migration', link: '/guide/migration' },
       { text: 'Guide', link: '/guide/' },
       {
         text: 'Targets',
@@ -44,6 +45,7 @@ export default defineConfig({
           text: 'Getting started',
           collapsed: false,
           items: [
+            { text: 'Migrate to successor SDKs', link: '/guide/migration' },
             { text: 'Why Codex App SDK', link: '/guide/' },
             { text: 'Scaffold an application', link: '/guide/scaffolding' },
             { text: 'Tour the generated targets', link: '/guide/quick-start' },
